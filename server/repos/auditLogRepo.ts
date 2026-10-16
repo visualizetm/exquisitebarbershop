@@ -1,0 +1,40 @@
+import { auditLogDocumentSchema, type AuditLogDocument } from '../../shared/schemas/auditLog';
+import { collection } from '../db/collections';
+import { newId } from '../lib/ids';
+import { sessionOf, type RepoOptions } from './types';
+
+export type AuditEntryInput = Omit<AuditLogDocument, '_id' | 'at'>;
+
+/** Appends an entry. Call it inside the transaction of the change it describes. */
+export async function appendAuditEntry(
+  input: AuditEntryInput,
+  now: Date,
+  options?: RepoOptions,
+): Promise<AuditLogDocument> {
+  const doc = auditLogDocumentSchema.parse({ _id: newId(), at: now, ...input });
+  const col = await collection('auditLog');
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+
+export async function listAuditForEntity(
+  entityType: string,
+  entityId: string,
+  limit = 100,
+  options?: RepoOptions,
+): Promise<AuditLogDocument[]> {
+  const col = await collection('auditLog');
+  return col
+    .find({ entityType, entityId }, sessionOf(options))
+    .sort({ at: -1 })
+    .limit(limit)
+    .toArray();
+}
+
+export async function listRecentAudit(
+  limit = 100,
+  options?: RepoOptions,
+): Promise<AuditLogDocument[]> {
+  const col = await collection('auditLog');
+  return col.find({}, sessionOf(options)).sort({ at: -1 }).limit(limit).toArray();
+}
