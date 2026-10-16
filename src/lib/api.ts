@@ -7,6 +7,7 @@ export class ApiRequestError extends Error {
   readonly code: ApiError['error']['code'];
   readonly details: ApiError['error']['details'];
   readonly requestId: string;
+  readonly alternatives: ApiError['error']['alternatives'];
 
   constructor(status: number, body: ApiError) {
     super(body.error.message);
@@ -15,6 +16,7 @@ export class ApiRequestError extends Error {
     this.code = body.error.code;
     this.details = body.error.details;
     this.requestId = body.error.requestId;
+    this.alternatives = body.error.alternatives;
   }
 }
 
@@ -23,6 +25,8 @@ export interface ApiRequestOptions {
   body?: unknown;
   signal?: AbortSignal;
   headers?: Record<string, string>;
+  /** Bypass the browser cache, for example right after a conflict. */
+  fresh?: boolean;
 }
 
 /**
@@ -45,6 +49,7 @@ export async function apiRequest<T>(
   };
   if (options.body !== undefined) init.body = JSON.stringify(options.body);
   if (options.signal) init.signal = options.signal;
+  if (options.fresh) init.cache = 'reload';
   const response = await fetch(path, init);
   const text = await response.text();
   const json: unknown = text ? JSON.parse(text) : null;
