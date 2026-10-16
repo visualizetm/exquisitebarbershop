@@ -21,6 +21,12 @@ export async function getStaffHours(
   return col.findOne({ subjectType: 'staff', staffId }, sessionOf(options));
 }
 
+/** Every hours document, shop and staff, in one query. */
+export async function listAllHours(options?: RepoOptions): Promise<WeeklyHoursDocument[]> {
+  const col = await collection('weeklyHours');
+  return col.find({}, sessionOf(options)).toArray();
+}
+
 export async function listStaffHours(options?: RepoOptions): Promise<WeeklyHoursDocument[]> {
   const col = await collection('weeklyHours');
   return col.find({ subjectType: 'staff' }, sessionOf(options)).toArray();
