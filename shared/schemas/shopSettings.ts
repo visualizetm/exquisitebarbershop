@@ -21,8 +21,8 @@ export const bookingSettingsSchema = z.object({
     .max(120)
     .multipleOf(LOCK_GRANULARITY_MINUTES)
     .default(15),
-  /** Gap reserved after each booking. Locked with the booking. */
-  bufferMinutes: z.int().min(0).max(60).multipleOf(5).default(0),
+  /** Gap reserved after each booking. Locked with the booking. A service may override it. */
+  bufferMinutes: z.int().min(0).max(60).multipleOf(5).default(10),
   /** How far in the future a slot must be before it can be booked online. */
   leadTimeMinutes: z
     .int()

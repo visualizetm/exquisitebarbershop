@@ -27,7 +27,7 @@ export const shopSettingsSeed: ShopSettingsInput = {
   timezone: 'America/New_York',
   booking: {
     slotStepMinutes: 15,
-    bufferMinutes: 0, // PLACEHOLDER ask whether chairs want a cleanup gap
+    bufferMinutes: 10, // PLACEHOLDER cleanup gap after every appointment
     leadTimeMinutes: 60, // PLACEHOLDER
     bookingWindowDays: 30, // PLACEHOLDER
     cancelCutoffMinutes: 120, // PLACEHOLDER
@@ -225,6 +225,7 @@ export const servicesSeed: ServiceSeed[] = [
       priceCents: 12000,
       priceFrom: true,
       durationMinutes: 180,
+      bufferMinutes: 20, // PLACEHOLDER longer cleanup after braids
       sortOrder: 140,
       isActive: true,
     },

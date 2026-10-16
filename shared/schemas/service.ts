@@ -18,6 +18,8 @@ export const serviceDocumentSchema = z
       .min(5)
       .max(8 * 60)
       .multipleOf(5),
+    /** Cleanup gap after this service. Null means use the shop default buffer. */
+    bufferMinutes: z.int().min(0).max(60).multipleOf(5).nullable().default(null),
     sortOrder: z.int().min(0),
     /** Temporarily hidden from booking without deleting. */
     isActive: z.boolean(),

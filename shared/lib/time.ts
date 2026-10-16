@@ -17,6 +17,13 @@ export function isIsoDate(value: string): boolean {
   return ISO_DATE_PATTERN.test(value) && DateTime.fromISO(value, { zone: SHOP_TIMEZONE }).isValid;
 }
 
+/** ISO date (YYYY-MM-DD) of a DateTime. Throws instead of returning null for an invalid value. */
+export function isoDateOf(dt: DateTime): string {
+  const iso = dt.toISODate();
+  if (iso === null) throw new RangeError('Invalid DateTime');
+  return iso;
+}
+
 /** Start of the given shop-local calendar day as a Luxon DateTime in the shop zone. */
 export function shopDayStart(isoDate: string): DateTime {
   const dt = DateTime.fromISO(isoDate, { zone: SHOP_TIMEZONE });

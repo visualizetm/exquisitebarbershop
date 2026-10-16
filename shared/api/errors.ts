@@ -23,6 +23,7 @@ export const ERROR_CODES = {
   IDEMPOTENCY_MISMATCH: 409,
   IDEMPOTENCY_IN_PROGRESS: 409,
   BOOKING_NOT_CANCELLABLE: 409,
+  BOOKING_CANCELLED: 410,
   BOOKING_NOT_RESCHEDULABLE: 409,
   SHOP_CLOSED: 409,
   OUTSIDE_BOOKING_WINDOW: 409,
@@ -30,6 +31,7 @@ export const ERROR_CODES = {
   SERVICE_UNAVAILABLE: 409,
   TOO_MANY_OPEN_BOOKINGS: 409,
   PAYLOAD_TOO_LARGE: 413,
+  IDEMPOTENCY_BODY_MISMATCH: 422,
   UNSUPPORTED_MEDIA_TYPE: 415,
   ACCOUNT_LOCKED: 423,
   RATE_LIMITED: 429,
@@ -55,6 +57,10 @@ export const apiErrorSchema = z.object({
     requestId: z.string(),
     /** Seconds until a rate-limited or locked client may retry. */
     retryAfterSeconds: z.int().optional(),
+    /** For SLOT_TAKEN: the next open times so the UI can offer them right away. */
+    alternatives: z
+      .array(z.object({ startAt: z.iso.datetime(), endAt: z.iso.datetime(), staffId: z.string() }))
+      .optional(),
   }),
 });
 export type ApiError = z.infer<typeof apiErrorSchema>;

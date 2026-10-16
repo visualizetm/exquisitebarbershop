@@ -15,8 +15,11 @@ export const createBookingRequestSchema = z.object({
   startAt: z.iso.datetime({ offset: true }),
   customer: bookingCustomerSchema,
   notes: z.string().trim().max(MAX_NOTE_LENGTH).optional(),
+  /** Honeypot. Hidden in the form; humans never fill it. Any value rejects the request. */
+  website: z.string().max(200).optional(),
 });
 export type CreateBookingRequest = z.input<typeof createBookingRequestSchema>;
+export type CreateBookingInput = z.output<typeof createBookingRequestSchema>;
 
 /** The customer-facing view of a booking. No internal ids beyond what the UI needs. */
 export const bookingViewSchema = z.object({
@@ -33,6 +36,8 @@ export const bookingViewSchema = z.object({
   totalPriceCents: z.int(),
   customer: z.object({ name: z.string(), phone: z.string(), email: z.string().nullable() }),
   notes: z.string().nullable(),
+  /** Calendar sequence number: rises on every reschedule so calendar apps replace the event. */
+  sequence: z.int(),
   createdAt: z.iso.datetime(),
 });
 export type BookingView = z.infer<typeof bookingViewSchema>;
@@ -59,11 +64,15 @@ export const cancelBookingRequestSchema = z.object({
   token: z.string().min(20).max(512),
   reason: z.string().trim().max(MAX_NOTE_LENGTH).optional(),
 });
+export type CancelBookingRequest = z.input<typeof cancelBookingRequestSchema>;
 
 export const rescheduleBookingRequestSchema = z.object({
   token: z.string().min(20).max(512),
   startAt: z.iso.datetime({ offset: true }),
+  /** Defaults to the same chair. */
   staff: staffSelectorSchema.optional(),
 });
+export type RescheduleBookingRequest = z.input<typeof rescheduleBookingRequestSchema>;
 
 export const rescheduleBookingResponseSchema = createBookingResponseSchema;
+export type RescheduleBookingResponse = z.infer<typeof rescheduleBookingResponseSchema>;
