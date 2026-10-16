@@ -13,6 +13,8 @@ export class AppError extends Error {
   readonly retryAfterSeconds: number | undefined;
   /** Internal context for logs only. Never sent to the client. */
   readonly context: Record<string, unknown> | undefined;
+  /** Extra public fields merged into the error body, such as SLOT_TAKEN alternatives. */
+  readonly extra: Record<string, unknown> | undefined;
 
   constructor(
     code: ErrorCode,
@@ -21,6 +23,7 @@ export class AppError extends Error {
       details?: ErrorDetail[];
       retryAfterSeconds?: number;
       context?: Record<string, unknown>;
+      extra?: Record<string, unknown>;
       cause?: unknown;
     } = {},
   ) {
@@ -31,6 +34,7 @@ export class AppError extends Error {
     this.details = options.details;
     this.retryAfterSeconds = options.retryAfterSeconds;
     this.context = options.context;
+    this.extra = options.extra;
   }
 
   static fromZod(error: ZodError, message = 'Some fields are invalid'): AppError {

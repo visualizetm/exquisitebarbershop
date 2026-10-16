@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
+import { getEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { randomRequestId } from '../lib/ids';
 import { logger } from '../lib/logger';
@@ -40,6 +42,20 @@ function matchSegments(pattern: string[], actual: string[]): Record<string, stri
     }
   }
   return params;
+}
+
+/** Internal routes (cron, maintenance) carry `Authorization: Bearer <CRON_SECRET>`. */
+function assertCronSecret(req: IncomingMessage): void {
+  const secret = getEnv().CRON_SECRET;
+  const header = req.headers.authorization ?? '';
+  const provided = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!secret) throw new AppError('FORBIDDEN', 'Not allowed');
+  if (
+    provided.length !== secret.length ||
+    !timingSafeEqual(Buffer.from(provided), Buffer.from(secret))
+  ) {
+    throw new AppError('FORBIDDEN', 'Not allowed');
+  }
 }
 
 export function createRouter(
@@ -96,13 +112,14 @@ export function createRouter(
         now: new Date(),
       };
 
-      if (route.auth !== 'public') {
+      if (route.auth === 'internal') {
+        assertCronSecret(req);
+      } else if (route.auth !== 'public') {
         const principal = await authenticate(ctx);
         if (!principal) throw new AppError('AUTH_REQUIRED', 'Please sign in');
         if (route.auth === 'owner' && principal.role !== 'owner') {
           throw new AppError('FORBIDDEN', 'Owner access is required');
         }
-        if (route.auth === 'internal') throw new AppError('FORBIDDEN', 'Not allowed');
         ctx.principal = principal;
       }
 

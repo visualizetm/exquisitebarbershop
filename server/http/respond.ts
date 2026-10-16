@@ -63,6 +63,7 @@ export function sendError(res: ServerResponse, error: unknown, requestId: string
       ...(appError.retryAfterSeconds !== undefined
         ? { retryAfterSeconds: appError.retryAfterSeconds }
         : {}),
+      ...(appError.extra ?? {}),
     },
   };
   const headers: Record<string, string> = {};
