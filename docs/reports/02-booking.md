@@ -44,15 +44,15 @@ Built:
 - build: pass, dist/assets/index-*.js 472.2 kB (145.1 kB gzip)
 - test:e2e: 2 passed in about 9 seconds against the e2e server
   Commits:
-- e082574 chore: add @vercel/functions and Playwright with an e2e server script
-- 0f6f9ba feat(shared): per-service buffer, availability reasons, booking payloads and ics builder
-- a3403af feat(server): pure availability engine with one query per collection
-- 6dd2cfc feat(server): notification channels, email templates, ics attachments and outbox delivery
-- 0c96a8a feat(server): booking service with manage link flows and public booking routes
-- e6af24e feat(web): booking flow and manage page
-- 4a81f21 test: availability, booking, manage, outbox, ics and template suites plus Playwright e2e
-- 0483c3c chore: cron backstop for the outbox, env documentation and architecture update
-- (next) docs: booking report
+- 0ed9a0b chore: add @vercel/functions and Playwright with an e2e server script
+- 6b57189 feat(shared): per-service buffer, availability reasons, booking payloads and ics builder
+- cb19a2c feat(server): pure availability engine with one query per collection
+- e4fcf92 feat(server): notification channels, email templates, ics attachments and outbox delivery
+- a3f11f1 feat(server): booking service with manage link flows and public booking routes
+- 422076e feat(web): booking flow and manage page
+- ee96116 test: availability, booking, manage, outbox, ics and template suites plus Playwright e2e
+- 60d74b0 chore: cron backstop for the outbox, env documentation and architecture update
+- 27bdcb6 docs: booking report
   Env vars:
 - MONGODB_URI, MONGODB_DB_NAME, APP_BASE_URL, MANAGE_LINK_SECRET (now): unchanged
 - CRON_SECRET (now): bearer token Vercel Cron sends to the outbox delivery route

@@ -53,15 +53,15 @@ Built:
 - lint: pass with zero warnings; format:check: pass
 - build: pass, dist/assets/index-*.js 441.7 kB (137.0 kB gzip); commit sha verified inside the bundle
   Commits:
-- 093f48c chore: scaffold tooling, conventions and deployment config
-- 6cc2602 feat(shared): zod schemas and helpers shared by client and server
-- ff16e06 feat(server): cached Mongo client, transactions, index registry and repositories
-- 9a4d517 feat(server): HTTP router, one error format, health and public routes
-- 3ab4e50 feat(seed): placeholder shop data with idempotent seed and index scripts
-- 84f559a test: unit and integration suites on an in-memory replica set
-- 123c1d1 feat(web): router stubs, layout and API-backed public pages
-- 541e971 docs: system architecture, data model, API contract and future features
-- (next) docs: foundation report
+- 4689360 chore: scaffold tooling, conventions and deployment config
+- 43eef66 feat(shared): zod schemas and helpers shared by client and server
+- be4ef5f feat(server): cached Mongo client, transactions, index registry and repositories
+- 2d32154 feat(server): HTTP router, one error format, health and public routes
+- ce06d1c feat(seed): placeholder shop data with idempotent seed and index scripts
+- c69b200 test: unit and integration suites on an in-memory replica set
+- da0fe07 feat(web): router stubs, layout and API-backed public pages
+- 99fb41f docs: system architecture, data model, API contract and future features
+- 2c6ddc2 docs: foundation report
   Env vars:
 - MONGODB_URI (now): replica set connection string
 - MONGODB_DB_NAME (now): database per environment, default exquisite
