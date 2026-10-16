@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import {
   ceilToStep,
@@ -5,6 +6,7 @@ import {
   floorToStep,
   formatShopDateTime,
   isIsoDate,
+  isoDateOf,
   lockSlotStarts,
   minutesBetween,
   rangesOverlap,
@@ -63,6 +65,13 @@ describe('time: shop day bounds and DST', () => {
 
   it('formats for humans in shop time', () => {
     expect(formatShopDateTime(new Date('2026-03-09T13:00:00.000Z'))).toBe('Mon, Mar 9 at 9:00 AM');
+  });
+
+  it('isoDateOf throws on an invalid DateTime', () => {
+    expect(isoDateOf(DateTime.fromISO('2026-03-10', { zone: 'America/New_York' }))).toBe(
+      '2026-03-10',
+    );
+    expect(() => isoDateOf(DateTime.invalid('nope'))).toThrow(RangeError);
   });
 
   it('rejects invalid dates and times', () => {
