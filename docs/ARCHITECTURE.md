@@ -134,17 +134,18 @@ when the day passes.
 
 ### services
 
-| Field                | Type               | Notes                 |
-| -------------------- | ------------------ | --------------------- |
-| name, description    | string             |                       |
-| group                | Barber, Beauty     |                       |
-| priceCents           | int                |                       |
-| priceFrom            | boolean            | "From $x"             |
-| durationMinutes      | int, multiple of 5 |                       |
-| sortOrder            | int                |                       |
-| isActive             | boolean            | hide without deleting |
-| deletedAt            | Date or null       | soft delete           |
-| createdAt, updatedAt | Date               |                       |
+| Field                | Type               | Notes                                                       |
+| -------------------- | ------------------ | ----------------------------------------------------------- |
+| name, description    | string             |                                                             |
+| group                | Barber, Beauty     |                                                             |
+| priceCents           | int                |                                                             |
+| priceFrom            | boolean            | "From $x"                                                   |
+| durationMinutes      | int, multiple of 5 |                                                             |
+| bufferMinutes        | int or null        | cleanup gap after this service; null means the shop default |
+| sortOrder            | int                |                                                             |
+| isActive             | boolean            | hide without deleting                                       |
+| deletedAt            | Date or null       | soft delete                                                 |
+| createdAt, updatedAt | Date               |                                                             |
 
 | Index          | Keys                                  | Why        |
 | -------------- | ------------------------------------- | ---------- |
@@ -403,17 +404,24 @@ Failure modes and handling
 | Clock skew between app instances                     | Lock keys are derived from the requested start, not from `now` | Only lead time checks use `now`, with a 60s tolerance                                    |
 | Service duration edited after booking                | Booking keeps its snapshot and its locks                       | Nothing changes                                                                          |
 
+Learned while building: inside a MongoDB transaction, a duplicate key error
+aborts the whole transaction on the server (later operations fail with
+NoSuchTransaction). Two consequences shape the code: "first available" fallback
+runs one transaction per candidate chair rather than retrying inside one, and
+the outbox dedupe check runs a query before the insert instead of catching
+E11000.
+
 ## 5. API contract
 
 Base path `/api`. JSON in and out. Auth levels: `public`, `barber` (any signed-in
 staff; barber routes are scoped to the caller's own staffId), `owner`, `internal`
-(bearer `CRON_SECRET`).
+(`Authorization: Bearer <CRON_SECRET>`).
 
 Common behaviour
 
 - Every response carries `X-Request-Id`.
 - Mutating methods require an allowed `Origin` (or no Origin with a same-origin
-  `Sec-Fetch-Site`), else 403 ORIGIN_NOT_ALLOWED.
+  `Sec-Fetch-Site`), else 403 ORIGIN_NOT_ALLOWED. The check runs before routing.
 - Bodies over 64 KB: 413. Non-JSON content type: 415.
 - Error body, always:
 
@@ -421,52 +429,55 @@ Common behaviour
 {
   "error": {
     "code": "SLOT_TAKEN",
-    "message": "That time is no longer available",
+    "message": "That time was just taken. Here are the next open times.",
     "details": [{ "path": "customer.phone", "message": "Enter a valid US phone number" }],
     "requestId": "a1b2c3d4e5f60718",
-    "retryAfterSeconds": 30
+    "retryAfterSeconds": 30,
+    "alternatives": [{ "startAt": "...", "endAt": "...", "staffId": "..." }]
   }
 }
 ```
 
 `details` appears only for VALIDATION_ERROR; `retryAfterSeconds` only for
-RATE_LIMITED and ACCOUNT_LOCKED (also sent as a `Retry-After` header).
+RATE_LIMITED and ACCOUNT_LOCKED (also sent as a `Retry-After` header);
+`alternatives` only for SLOT_TAKEN (up to five next open times).
 
 Error codes and HTTP status (`shared/api/errors.ts`): VALIDATION_ERROR 400,
 BAD_REQUEST 400, AUTH_REQUIRED 401, INVALID_CREDENTIALS 401, SESSION_EXPIRED 401,
 FORBIDDEN 403, ORIGIN_NOT_ALLOWED 403, INVALID_TOKEN 403, TOKEN_EXPIRED 403,
 NOT_FOUND 404, METHOD_NOT_ALLOWED 405, CONFLICT 409, SLOT_TAKEN 409,
-SLUG_TAKEN 409, IDEMPOTENCY_MISMATCH 409, IDEMPOTENCY_IN_PROGRESS 409,
-BOOKING_NOT_CANCELLABLE 409, BOOKING_NOT_RESCHEDULABLE 409, SHOP_CLOSED 409,
+SLUG_TAKEN 409, IDEMPOTENCY_MISMATCH 409 (reserved, unused),
+IDEMPOTENCY_IN_PROGRESS 409, BOOKING_NOT_CANCELLABLE 409,
+BOOKING_NOT_RESCHEDULABLE 409, BOOKING_CANCELLED 410, SHOP_CLOSED 409,
 OUTSIDE_BOOKING_WINDOW 409, STAFF_UNAVAILABLE 409, SERVICE_UNAVAILABLE 409,
 TOO_MANY_OPEN_BOOKINGS 409, PAYLOAD_TOO_LARGE 413, UNSUPPORTED_MEDIA_TYPE 415,
-ACCOUNT_LOCKED 423, RATE_LIMITED 429, INTERNAL_ERROR 500, NOT_IMPLEMENTED 501,
-DATABASE_UNAVAILABLE 503.
+IDEMPOTENCY_BODY_MISMATCH 422, ACCOUNT_LOCKED 423, RATE_LIMITED 429,
+INTERNAL_ERROR 500, NOT_IMPLEMENTED 501, DATABASE_UNAVAILABLE 503.
 
-### Built in prompt 1
+### Built (prompts 1 and 2)
 
-| Method | Path             | Auth   | Request       | Response                                                          |
-| ------ | ---------------- | ------ | ------------- | ----------------------------------------------------------------- |
-| GET    | /api/health      | public | none          | `healthResponseSchema` (200 ok, 503 degraded)                     |
-| GET    | /api/shop        | public | none          | `publicShopSchema`                                                |
-| GET    | /api/services    | public | none          | `{ services: PublicService[] }`                                   |
-| GET    | /api/staff       | public | none          | `{ staff: PublicStaff[] }`                                        |
-| GET    | /api/staff/:slug | public | slug or alias | `{ staff, requestedSlug, canonical }`; 404 when deleted or hidden |
+| Method    | Path                            | Auth                                                                     | Request                                                                                                               | Response and errors                                                                                                                                                                                                                                                                                       |
+| --------- | ------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET       | /api/health                     | public                                                                   | none                                                                                                                  | `healthResponseSchema` (200 ok, 503 degraded)                                                                                                                                                                                                                                                             |
+| GET       | /api/shop                       | public                                                                   | none                                                                                                                  | `publicShopSchema`, cached 60s                                                                                                                                                                                                                                                                            |
+| GET       | /api/services                   | public                                                                   | none                                                                                                                  | `{ services: PublicService[] }`, cached 60s                                                                                                                                                                                                                                                               |
+| GET       | /api/staff                      | public                                                                   | none                                                                                                                  | `{ staff: PublicStaff[] }`, cached 60s                                                                                                                                                                                                                                                                    |
+| GET       | /api/staff/:slug                | public                                                                   | slug or alias                                                                                                         | `{ staff, requestedSlug, canonical }`; 404 when deleted or hidden                                                                                                                                                                                                                                         |
+| GET       | /api/availability               | public                                                                   | query `date`, `serviceIds` (comma list), `staff` (any, slug, alias or id)                                             | `availabilityResponseSchema`: slots, `reason`, `closedReason`; cached 10s; 404 unknown staff; SERVICE_UNAVAILABLE                                                                                                                                                                                         |
+| GET       | /api/availability/days          | public                                                                   | query `serviceIds`, `staff`, optional `from`, `to` (default: today to the end of the booking window, at most 62 days) | `availabilityDaysResponseSchema`: `days[{date, available, reason}]` and `availableDates`; cached 30s                                                                                                                                                                                                      |
+| POST      | /api/bookings                   | public, rate limited, `Idempotency-Key` header required (8 to 128 chars) | `createBookingRequestSchema` (`website` is a honeypot)                                                                | 201 `createBookingResponseSchema` plus `Idempotent-Replayed` header; 400 missing key or honeypot; SLOT_TAKEN with alternatives, SHOP_CLOSED, OUTSIDE_BOOKING_WINDOW, STAFF_UNAVAILABLE, SERVICE_UNAVAILABLE, TOO_MANY_OPEN_BOOKINGS, IDEMPOTENCY_IN_PROGRESS, IDEMPOTENCY_BODY_MISMATCH 422, RATE_LIMITED |
+| GET       | /api/bookings/manage            | public (signed token), rate limited                                      | query `token`                                                                                                         | `manageBookingResponseSchema`; INVALID_TOKEN, TOKEN_EXPIRED, NOT_FOUND, BOOKING_CANCELLED                                                                                                                                                                                                                 |
+| POST      | /api/bookings/manage/cancel     | public (signed token), rate limited                                      | `cancelBookingRequestSchema`                                                                                          | `manageBookingResponseSchema`; BOOKING_NOT_CANCELLABLE, BOOKING_CANCELLED                                                                                                                                                                                                                                 |
+| POST      | /api/bookings/manage/reschedule | public (signed token), rate limited                                      | `rescheduleBookingRequestSchema`                                                                                      | `rescheduleBookingResponseSchema` (new manage path); BOOKING_NOT_RESCHEDULABLE, SLOT_TAKEN with alternatives, BAD_REQUEST when nothing changes                                                                                                                                                            |
+| GET, POST | /api/internal/outbox/deliver    | internal                                                                 | none                                                                                                                  | `{ sent, failed, remaining }`                                                                                                                                                                                                                                                                             |
 
-### Prompt 2: availability and booking
+Rate limits (`server/services/bookingService.ts`, `DEFAULT_LIMITS`): POST
+/api/bookings 10 per IP per 10 minutes and 5 per phone per day (counted even when
+the booking is refused); manage endpoints 30 per IP per 10 minutes.
 
-| Method | Path                            | Auth                                                    | Request                                                        | Response and errors                                                                                                                                                                                             |
-| ------ | ------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | /api/availability               | public                                                  | query `availabilityQuerySchema` (date, serviceIds, staff)      | `availabilityResponseSchema`; SERVICE_UNAVAILABLE, STAFF_UNAVAILABLE                                                                                                                                            |
-| GET    | /api/availability/days          | public                                                  | query `availabilityDaysQuerySchema` (month, serviceIds, staff) | `availabilityDaysResponseSchema`                                                                                                                                                                                |
-| POST   | /api/bookings                   | public, rate limited, `Idempotency-Key` header required | `createBookingRequestSchema`                                   | 201 `createBookingResponseSchema`; SLOT_TAKEN, SHOP_CLOSED, OUTSIDE_BOOKING_WINDOW, STAFF_UNAVAILABLE, SERVICE_UNAVAILABLE, TOO_MANY_OPEN_BOOKINGS, IDEMPOTENCY_MISMATCH, IDEMPOTENCY_IN_PROGRESS, RATE_LIMITED |
-| GET    | /api/bookings/manage            | public (signed token)                                   | query `manageTokenQuerySchema`                                 | `manageBookingResponseSchema`; INVALID_TOKEN, TOKEN_EXPIRED, NOT_FOUND                                                                                                                                          |
-| POST   | /api/bookings/manage/cancel     | public (signed token)                                   | `cancelBookingRequestSchema`                                   | `manageBookingResponseSchema`; BOOKING_NOT_CANCELLABLE                                                                                                                                                          |
-| POST   | /api/bookings/manage/reschedule | public (signed token)                                   | `rescheduleBookingRequestSchema`                               | `rescheduleBookingResponseSchema` (new manage path); BOOKING_NOT_RESCHEDULABLE, SLOT_TAKEN                                                                                                                      |
-| POST   | /api/internal/outbox/deliver    | internal                                                | none                                                           | `{ sent, failed, remaining }`                                                                                                                                                                                   |
-
-Rate limits (defaults): POST /api/bookings 10 per IP per 10 minutes and 5 per
-phone per day; manage endpoints 30 per IP per 10 minutes.
+Idempotency: the key is scoped to the route; the body hash excludes the honeypot
+field. A replay returns the stored status and body with `Idempotent-Replayed:
+true`. A failed attempt releases the key so the client may retry with it.
 
 ### Prompt 3: auth, barber and owner
 
@@ -519,59 +530,64 @@ Owners can call every barber route. Barber routes always scope to
 
 ## 6. Availability rules and settings
 
-The availability engine (prompt 2, `server/services/availability.ts`) answers:
-for a date, a list of services and a chair (or "any"), which start times are
-bookable. It is pure given its inputs so it can be unit tested without a database.
+The availability engine (`server/services/availability.ts`) answers: for a date
+range, a list of services and a chair (or "any"), which start times are bookable.
+It is pure: `loadAvailabilityContext` (`availabilityData.ts`) loads everything
+with one query per collection (seven in total for any range) and the engine
+never touches I/O, so it is unit tested with explicit clocks, including both DST
+transitions.
 
-Inputs: shop settings, shop weekly hours, the closure for that date, each chair's
-weekly hours, each chair's time blocks for the day, each chair's existing locks
-for the day, the service list (durations, which chairs perform them), `now`.
+Inputs: booking settings, the chosen services, every staff record, shop and
+staff weekly hours, closures, time blocks, confirmed bookings overlapping the
+range, `now`, and optionally a booking id to ignore (reschedule).
 
-Algorithm
+Algorithm, per shop-local day
 
-1. Resolve the shop's open intervals for the date: the closure's `specialHours`
-   if present, nothing if `closed`, else the weekly hours for that weekday.
-2. For each candidate chair (the requested one, or every chair that accepts
-   online booking and performs all requested services): intersect the chair's
-   weekly hours with the shop intervals; apply `extraHours` blocks as additional
-   intervals (still clipped to shop hours); remove `timeOff` and `dayOff` ranges.
-3. Total duration = sum of service durations, performed back to back by the same
-   chair (multi-service chaining). Locked range = duration + bufferMinutes.
-4. Candidate starts: every `slotStepMinutes` step within each open interval where
-   start + duration fits inside the interval.
-5. Drop starts earlier than `now + leadTimeMinutes` and dates beyond
-   `now + bookingWindowDays`.
-6. Drop starts whose locked range overlaps any existing lock (bookings and
-   blocks) for that chair.
-7. For "first available", merge the chairs' slots by start time. For each start
-   with more than one free chair pick by `firstAvailableStrategy`:
-   `leastBookedThatDay` chooses the chair with the fewest confirmed minutes that
-   day (ties by `sortOrder`), spreading work fairly; `roundRobin` cycles by
-   `sortOrder` from the last assigned chair. The chosen `staffId` is returned
-   with each slot so the booking request names a chair explicitly. The booking
-   service re-validates and, if that chair was taken in the meantime, tries the
-   next free chair for that start before returning SLOT_TAKEN.
-8. The response includes `closedReason` ("Closed on Mondays", "Closed for
-   Christmas Day", "Fully booked") when no slots exist.
+1. Window: a date before today or after `today + bookingWindowDays` is
+   `outsideWindow`.
+2. Qualification: a chair counts only when it is not deleted, shown on the
+   website, accepts online booking and performs every chosen service. Nobody
+   left is `noQualifiedStaff`. A specific selector resolves by current slug,
+   former slug or id.
+3. Shop hours: the closure for the date (`closed` or `specialHours`) else the
+   weekly hours; none is `closed`.
+4. Per chair: weekly hours plus `extraHours` blocks, intersected with shop hours,
+   minus `timeOff` and `dayOff` blocks. Nothing left is `dayOff` for that chair;
+   if every chair is off, the day is `dayOff`.
+5. Busy: confirmed bookings (each with its own captured buffer) and `block` time
+   blocks.
+6. Total = sum of service durations + effective buffer, where the effective
+   buffer is the largest of each service's override or the shop default. Starts
+   step by `slotStepMinutes` from each working range start (rounded up to the
+   grid); a start is kept only when start + total ends inside the range and
+   overlaps nothing busy. So the buffer must fit before closing time too.
+7. Lead time: starts earlier than `now + leadTimeMinutes` are dropped. When that
+   alone empties a day it reads `outsideWindow`; otherwise an empty day is
+   `fullyBooked`.
+8. First available: free chairs for one start are ranked by
+   `firstAvailableStrategy`: `leastBookedThatDay` (fewest confirmed minutes that
+   day, then display order, then id) or `roundRobin` (rotating by slot index).
+   Each slot carries the pick and every candidate, best first. The booking
+   service uses that order for fallback when the pick's lock insert conflicts.
 
-Settings (all in `shopSettings.booking`, owner-editable)
+Settings (`shopSettings.booking`, owner-editable)
 
-| Setting                 | Default            | Meaning                                         |
-| ----------------------- | ------------------ | ----------------------------------------------- |
-| slotStepMinutes         | 15                 | start-time granularity; multiple of 15          |
-| bufferMinutes           | 0                  | cleanup gap locked after every booking          |
-| leadTimeMinutes         | 60                 | earliest online start relative to now           |
-| bookingWindowDays       | 30                 | how far ahead customers may book                |
-| cancelCutoffMinutes     | 120                | customers cannot cancel online closer than this |
-| rescheduleCutoffMinutes | 120                | same for reschedule                             |
-| maxServicesPerBooking   | 3                  |                                                 |
-| allowFirstAvailable     | true               | show the "first available" option               |
-| firstAvailableStrategy  | leastBookedThatDay | or roundRobin                                   |
-| requireEmail            | false              | email optional at checkout                      |
-| maxOpenBookingsPerPhone | 3                  | confirmed future bookings a phone may hold      |
+| Setting                 | Default            | Meaning                                                                                      |
+| ----------------------- | ------------------ | -------------------------------------------------------------------------------------------- |
+| slotStepMinutes         | 15                 | start-time granularity; multiple of 15                                                       |
+| bufferMinutes           | 10                 | cleanup gap locked after every booking; a service may override with `services.bufferMinutes` |
+| leadTimeMinutes         | 60                 | earliest online start relative to now                                                        |
+| bookingWindowDays       | 30                 | how far ahead customers may book                                                             |
+| cancelCutoffMinutes     | 120                | customers cannot cancel online closer than this                                              |
+| rescheduleCutoffMinutes | 120                | same for reschedule                                                                          |
+| maxServicesPerBooking   | 3                  |                                                                                              |
+| allowFirstAvailable     | true               | show the "first available" option                                                            |
+| firstAvailableStrategy  | leastBookedThatDay | or roundRobin                                                                                |
+| requireEmail            | false              | email optional at checkout                                                                   |
+| maxOpenBookingsPerPhone | 3                  | confirmed future bookings a phone may hold                                                   |
 
-Owner and barber bookings (walk-ins, manual entries) bypass lead time, booking
-window and the per-phone cap, but never bypass locks.
+Owner and barber bookings (walk-ins, manual entries, prompt 3) bypass lead time,
+booking window and the per-phone cap, but never bypass locks.
 
 ## 7. Customer manage link
 
@@ -579,20 +595,21 @@ Format `v1.<payload>.<signature>` where `payload` is base64url of
 `{ "b": bookingId, "v": manageTokenVersion, "exp": unixSeconds }` and `signature`
 is base64url of HMAC-SHA256 over `"v1." + payload` with `MANAGE_LINK_SECRET`.
 
-- Issued inside the confirmation email as `APP_BASE_URL/manage?token=...`. The
-  token is only ever in the query string of that page and in POST bodies, never in
-  a path, so it does not appear in access logs as part of the route.
-- Expiry: booking `endAt` plus 7 days, so the page still shows a finished booking
-  for a week and then stops answering.
-- Verification: constant-time signature compare, then expiry, then the booking is
-  loaded and `v` must equal the booking's current `manageTokenVersion`. Cancel and
-  reschedule bump the version, so every earlier link stops working and the new
-  confirmation carries a fresh link.
-- Allows: view the booking; cancel if `now < startAt - cancelCutoffMinutes`;
-  reschedule under the same rule with `rescheduleCutoffMinutes`. Nothing else: no
-  customer data edits, no access to other bookings.
-- Rotation of `MANAGE_LINK_SECRET` invalidates every outstanding link; customers
-  can still call the shop. Acceptable for a one-shop deployment.
+- Issued in the confirmation email and on the success screen as
+  `APP_BASE_URL/manage?token=...`. The token only ever travels in the query
+  string of that page and in POST bodies.
+- Expiry: booking `endAt` plus 7 days.
+- Resolution order (`resolveManageToken`): signature and expiry first (no
+  database work for junk), then the booking must exist, then a cancelled
+  booking answers BOOKING_CANCELLED (410), then the token version must equal the
+  booking's current `manageTokenVersion` else INVALID_TOKEN (the link was
+  replaced by a reschedule).
+- Allows: view the booking; cancel if `now <= startAt - cancelCutoffMinutes`;
+  reschedule under the same rule with `rescheduleCutoffMinutes`, optionally to
+  another chair or "any". Nothing else.
+- Cancel and reschedule bump the version inside their transaction, so every
+  earlier link stops working and the new confirmation carries a fresh link.
+- Rotating `MANAGE_LINK_SECRET` invalidates every outstanding link.
 
 ## 8. Authentication and sessions (prompt 3)
 
@@ -620,17 +637,24 @@ is base64url of HMAC-SHA256 over `"v1." + payload` with `MANAGE_LINK_SECRET`.
 Pattern
 
 1. The transaction that creates, cancels or moves a booking also inserts outbox
-   rows (`enqueueOutboxMessage`) with a `dedupeKey` such as
-   `booking:<id>:confirmed:v1`. Booking and notification are committed together.
-2. Delivery is separate: `deliverOutbox()` claims one pending row at a time by
-   flipping it to `sending` (atomic `findOneAndUpdate`), renders the template,
-   calls the channel, then marks it sent or failed. Failed rows retry with
-   exponential backoff (2, 4, 8 ... minutes, capped at 60) up to `maxAttempts`,
-   then park as `failed` where the owner can retry them.
-3. Triggers: right after a booking request commits, the handler runs
-   `deliverOutbox()` once before responding (best effort, bounded to a few
-   seconds); a Vercel Cron hits `/api/internal/outbox/deliver` as a backstop; any
-   admin request may also drain a few messages opportunistically.
+   rows (`enqueueBookingNotifications`): the customer message when they gave an
+   email, and the owner alert. Dedupe keys are
+   `booking:<id>:<event>:v<sequence>:<customer|owner>`, so each reschedule gets
+   exactly one message and a retried transaction never doubles up. Booking and
+   notification commit together or not at all.
+2. Delivery (`server/notifications/deliver.ts`) claims one row at a time by
+   flipping it to `sending` with an atomic update, renders the template, calls
+   the channel, then marks it sent or failed. Retryable failures back off
+   exponentially (2, 4, 8 ... minutes, capped at 60) up to `maxAttempts` (5),
+   then park as `failed`; non-retryable failures (rejected address, bad
+   payload) park at once. A row stuck in `sending` for 10 minutes is reclaimed.
+   Sending is idempotent per row: a claimed or sent row is never sent twice, and
+   the row id is passed to the provider as its idempotency key.
+3. Triggers: right after a booking request commits, the route schedules
+   `deliverOutboxIds` through `waitUntil` from `@vercel/functions`, so the
+   response is not delayed (`OUTBOX_AFTER_RESPONSE=off` turns this off for
+   tests); Vercel Cron calls `GET /api/internal/outbox/deliver` once a day
+   (`vercel.json`) as a backstop; the owner dashboard will expose retry.
 
 Channel interface (`server/notifications/channel.ts`)
 
@@ -643,9 +667,19 @@ interface NotificationChannel {
 }
 ```
 
-Email implementations: `LogEmailChannel` (dev and tests, writes to the log) and
-`ResendEmailChannel` (production). Templates are plain text plus simple HTML in
-`server/notifications/templates/`, rendered from `payload` at send time.
+Implementations: `LogEmailChannel` (development and tests) and
+`ResendEmailChannel` (production, chosen by `EMAIL_PROVIDER=resend`). The
+registry (`registry.ts`) builds the channel from the environment and lets tests
+swap one in. An SMS channel registers the same way later.
+
+Templates (`server/notifications/templates`): bookingConfirmed,
+bookingRescheduled, bookingCancelled, ownerNewBooking, ownerBookingCancelled,
+ownerBookingRescheduled. Each renders plain text and simple HTML from a
+self-contained payload (booking view plus a shop snapshot) and attaches an
+`.ics` built by `shared/lib/ics.ts`: stable UID `booking-<id>@<host>`, SEQUENCE
+equal to the booking's version, METHOD:REQUEST for confirmations and
+reschedules, METHOD:CANCEL for cancellations, and a VTIMEZONE block for
+America/New_York. The success screen offers the same file from the browser.
 
 ## 10. Future features
 
