@@ -45,18 +45,28 @@ export async function enqueueOutboxMessage(
     updatedAt: now,
   });
   const col = await collection('emailOutbox');
+  // Inside a transaction a duplicate key aborts the whole transaction, so the
+  // dedupe check happens up front; the unique index still guards a true race.
+  if (doc.dedupeKey !== null) {
+    const existing = await col.findOne({ dedupeKey: doc.dedupeKey }, sessionOf(options));
+    if (existing) return null;
+  }
   try {
     await col.insertOne(doc, sessionOf(options));
   } catch (error) {
-    if (isDuplicateKeyError(error)) return null;
+    if (isDuplicateKeyError(error) && !options?.session) return null;
     throw error;
   }
   return doc;
 }
 
+/** A message stuck in "sending" longer than this is treated as abandoned and retried. */
+export const STALE_SENDING_MS = 10 * 60_000;
+
 /**
  * Atomically claims one due message by flipping it to "sending". Two deliverers
- * running at once can never pick the same message.
+ * running at once can never pick the same message. A message left in "sending"
+ * by a crashed process is reclaimed once it goes stale.
  */
 export async function claimNextOutboxMessage(
   now: Date,
@@ -64,9 +74,28 @@ export async function claimNextOutboxMessage(
 ): Promise<EmailOutboxDocument | null> {
   const col = await collection('emailOutbox');
   return col.findOneAndUpdate(
-    { status: 'pending', nextAttemptAt: { $lte: now } },
+    {
+      $or: [
+        { status: 'pending', nextAttemptAt: { $lte: now } },
+        { status: 'sending', updatedAt: { $lte: new Date(now.getTime() - STALE_SENDING_MS) } },
+      ],
+    },
     { $set: { status: 'sending', updatedAt: now }, $inc: { attempts: 1 } },
     { sort: { nextAttemptAt: 1 }, returnDocument: 'after', ...sessionOf(options) },
+  );
+}
+
+/** Claims one specific pending message, for delivery right after its transaction commits. */
+export async function claimOutboxMessageById(
+  id: string,
+  now: Date,
+  options?: RepoOptions,
+): Promise<EmailOutboxDocument | null> {
+  const col = await collection('emailOutbox');
+  return col.findOneAndUpdate(
+    { _id: id, status: 'pending', nextAttemptAt: { $lte: now } },
+    { $set: { status: 'sending', updatedAt: now }, $inc: { attempts: 1 } },
+    { returnDocument: 'after', ...sessionOf(options) },
   );
 }
 
@@ -79,17 +108,21 @@ export async function markOutboxSent(id: string, now: Date, options?: RepoOption
   );
 }
 
-/** Records a failure. Retries with backoff until maxAttempts, then parks the message as failed. */
+/**
+ * Records a failure. Retryable failures back off exponentially until maxAttempts;
+ * a non-retryable failure (bad address, rejected content) parks the message at once.
+ */
 export async function markOutboxFailed(
   id: string,
   error: string,
   now: Date,
-  options?: RepoOptions,
+  options?: RepoOptions & { retryable?: boolean },
 ): Promise<EmailOutboxDocument | null> {
   const col = await collection('emailOutbox');
   const current = await col.findOne({ _id: id }, sessionOf(options));
   if (!current) return null;
-  const exhausted = current.attempts >= current.maxAttempts;
+  const retryable = options?.retryable ?? true;
+  const exhausted = !retryable || current.attempts >= current.maxAttempts;
   const backoffMinutes = Math.min(2 ** current.attempts, 60);
   return col.findOneAndUpdate(
     { _id: id },

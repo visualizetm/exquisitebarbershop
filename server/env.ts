@@ -18,6 +18,8 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
   CRON_SECRET: z.string().min(32).optional(),
+  /** "off" lets tests drive outbox delivery by hand instead of right after the response. */
+  OUTBOX_AFTER_RESPONSE: z.enum(['on', 'off']).default('on'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
 
