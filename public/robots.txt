@@ -3,3 +3,4 @@ Allow: /
 Disallow: /admin
 Disallow: /manage
 Disallow: /api
+Disallow: /setup

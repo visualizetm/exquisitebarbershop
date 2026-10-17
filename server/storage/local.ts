@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { photoKeySchema } from '../../shared/schemas/photo';
+import { isObjectKey } from './keys';
 import type { PresignedUpload, StorageDriver, StoredObject } from './types';
 
 /** Local uploads live here, relative to the working directory. Git ignores it. */
@@ -35,9 +35,8 @@ export function verifyLocalUploadSignature(
 
 /** Keys are validated before they touch the file system, so no path can escape the folder. */
 export function localPathFor(key: string): string {
-  const parsed = photoKeySchema.safeParse(key);
-  if (!parsed.success) throw new Error('Invalid object key');
-  return join(LOCAL_UPLOADS_DIR, ...parsed.data.split('/'));
+  if (!isObjectKey(key)) throw new Error('Invalid object key');
+  return join(LOCAL_UPLOADS_DIR, ...key.split('/'));
 }
 
 export async function writeLocalObject(
@@ -83,6 +82,16 @@ export function createLocalDriver(config: LocalConfig): StorageDriver {
       const path = localPathFor(key);
       await rm(path, { force: true });
       await rm(`${path}.meta.json`, { force: true });
+    },
+    async put(key, bytes, contentType): Promise<void> {
+      await writeLocalObject(key, Buffer.from(bytes), contentType);
+    },
+    async get(key): Promise<Uint8Array | null> {
+      try {
+        return await readFile(localPathFor(key));
+      } catch {
+        return null;
+      }
     },
     publicUrl(key): string {
       return `${base}${LOCAL_UPLOAD_PATH}/${key}`;

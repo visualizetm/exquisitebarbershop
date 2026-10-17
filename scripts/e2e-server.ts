@@ -21,6 +21,8 @@ async function main(): Promise<void> {
   process.env.EMAIL_PROVIDER = 'log';
   process.env.OUTBOX_AFTER_RESPONSE = 'on';
   process.env.STORAGE_DRIVER = 'local';
+  process.env.CRON_SECRET = 'e2e-cron-secret-0123456789abcdef0123456789';
+  process.env.BOOTSTRAP_SECRET = 'e2e-bootstrap-secret-0123456789abcdef01234';
   process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'warn';
   process.env.API_PORT = API_PORT;
 

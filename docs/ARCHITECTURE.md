@@ -600,6 +600,21 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 | GET           | /api/admin/outbox                     | owner                    | query `status, cursor`; payloads are never returned                                                              |
 | POST          | /api/admin/outbox/:id/retry           | owner                    | failed messages only, else CONFLICT                                                                              |
 
+### Prompt 5: setup, doctor and operations
+
+| Method | Path                    | Auth                         | Notes                                                                                                                |
+| ------ | ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| GET    | /api/setup              | public                       | `{ enabled }`: whether BOOTSTRAP_SECRET is set, so the /setup page knows to exist                                    |
+| GET    | /api/internal/doctor    | internal (cron or bootstrap) | the checklist: settings, database, replica set, transactions, indexes, seed, storage, public URL, email, cron        |
+| POST   | /api/internal/bootstrap | internal (cron or bootstrap) | indexes, seed, owner from SEED_OWNER_*; once, then 409 unless `{ force: true }`; 404 while BOOTSTRAP_SECRET is unset |
+
+Routes flagged `alwaysOn` (health, doctor, bootstrap, setup) answer while the
+environment is incomplete; every other route answers 503 CONFIG_ERROR until the
+doctor is clean. With MAINTENANCE_MODE=true public routes answer 503 MAINTENANCE
+except /api/shop (the phone number for the message) and /api/auth/\*; staff routes
+keep working. `envProblems` in `server/env.ts` is the one list of what each
+environment (development, test, preview, production) needs.
+
 ### Prompt 4: photos, next opening, gallery
 
 | Method        | Path                         | Auth               | Notes                                                                                 |
@@ -904,23 +919,26 @@ SMS reminders
 
 Environments
 
-| Variable                                                                             | Needed          | Purpose                                    |
-| ------------------------------------------------------------------------------------ | --------------- | ------------------------------------------ |
-| MONGODB_URI                                                                          | now             | replica set connection string              |
-| MONGODB_DB_NAME                                                                      | now             | database name per environment              |
-| APP_BASE_URL                                                                         | now             | manage links, allowed Origin               |
-| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links                  |
-| EMAIL_PROVIDER                                                                       | later           | log or resend                              |
-| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                             |
-| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time           |
-| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email      |
-| CRON_SECRET                                                                          | later           | bearer token for internal routes           |
-| STORAGE_DRIVER                                                                       | now             | local or r2                                |
-| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                |
-| R2_KEY_PREFIX                                                                        | preview         | folder for every object key, e.g. preview/ |
-| LOG_LEVEL                                                                            | optional        |                                            |
-| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                     |
-| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin     |
+| Variable                                                                             | Needed          | Purpose                                                                  |
+| ------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------ |
+| MONGODB_URI                                                                          | now             | replica set connection string                                            |
+| MONGODB_DB_NAME                                                                      | now             | database name per environment                                            |
+| APP_BASE_URL                                                                         | now             | manage links, allowed Origin                                             |
+| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links                                                |
+| EMAIL_PROVIDER                                                                       | later           | log or resend                                                            |
+| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                                                           |
+| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time                                         |
+| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email                                    |
+| CRON_SECRET                                                                          | later           | bearer token for internal routes                                         |
+| STORAGE_DRIVER                                                                       | now             | local or r2                                                              |
+| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                                              |
+| R2_KEY_PREFIX                                                                        | preview         | folder for every object key, e.g. preview/                               |
+| BOOTSTRAP_SECRET                                                                     | until setup ran | enables POST /api/internal/bootstrap and /setup; remove afterwards       |
+| EMAIL_DISABLED_ACK                                                                   | production      | "true" allows EMAIL_PROVIDER=log in production, on purpose               |
+| MAINTENANCE_MODE                                                                     | when needed     | "true" shows the maintenance message site-wide; admin and health stay up |
+| LOG_LEVEL                                                                            | optional        |                                                                          |
+| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                                                   |
+| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin                                   |
 
 Deployment
 

@@ -41,6 +41,10 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: 500,
   NOT_IMPLEMENTED: 501,
   DATABASE_UNAVAILABLE: 503,
+  /** The deployment is missing settings; the doctor says which. */
+  CONFIG_ERROR: 503,
+  /** MAINTENANCE_MODE is on; the admin and the health check still answer. */
+  MAINTENANCE: 503,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

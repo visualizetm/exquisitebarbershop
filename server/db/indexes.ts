@@ -19,6 +19,7 @@ export const COLLECTIONS = {
   scheduleGuards: 'scheduleGuards',
   photos: 'photos',
   pendingUploads: 'pendingUploads',
+  systemState: 'systemState',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 

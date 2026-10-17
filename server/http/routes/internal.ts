@@ -1,4 +1,9 @@
+import { z } from 'zod';
+import { getEnv } from '../../env';
 import { deliverPendingOutbox } from '../../notifications/deliver';
+import { bootstrap } from '../../services/bootstrap';
+import { runDoctor } from '../../services/doctor';
+import { parseBody } from '../request';
 import { purgeDeletedPhotos, sweepAbandonedUploads } from '../../services/photosService';
 import type { RouteDefinition, RouteHandler } from '../types';
 
@@ -13,7 +18,46 @@ const deliver: RouteHandler = async (ctx) => {
   };
 };
 
+const bootstrapBodySchema = z.object({ force: z.boolean().default(false) });
+
 export const internalRoutes: RouteDefinition[] = [
   { method: 'GET', path: '/api/internal/outbox/deliver', auth: 'internal', handler: deliver },
   { method: 'POST', path: '/api/internal/outbox/deliver', auth: 'internal', handler: deliver },
+  {
+    // The checklist for a deployment. Takes CRON_SECRET or BOOTSTRAP_SECRET; answers while settings are missing.
+    method: 'GET',
+    path: '/api/internal/doctor',
+    auth: 'internal',
+    bootstrap: true,
+    alwaysOn: true,
+    handler: async (ctx) => ({
+      body: await runDoctor({ now: ctx.now }),
+      headers: { 'Cache-Control': 'no-store' },
+    }),
+  },
+  {
+    // First setup from the browser: indexes, seed, the owner login. 404 while BOOTSTRAP_SECRET is unset.
+    method: 'POST',
+    path: '/api/internal/bootstrap',
+    auth: 'internal',
+    bootstrap: true,
+    alwaysOn: true,
+    handler: async (ctx) => {
+      const { force } = await parseBody(ctx, bootstrapBodySchema);
+      const result = await bootstrap({ force, requestId: ctx.requestId }, ctx.now);
+      return { status: 201, body: result, headers: { 'Cache-Control': 'no-store' } };
+    },
+  },
+  {
+    // Lets the /setup page know whether setup exists at all. No secrets, no values.
+    method: 'GET',
+    path: '/api/setup',
+    auth: 'public',
+    alwaysOn: true,
+    handler: () =>
+      Promise.resolve({
+        body: { enabled: Boolean(getEnv().BOOTSTRAP_SECRET) },
+        headers: { 'Cache-Control': 'no-store' },
+      }),
+  },
 ];

@@ -182,3 +182,28 @@ win.
 - D5-15 The cancel note is built from `cancelCutoffMinutes`, now part of the
   public shop response (additive), through `cancelPolicyLabel`: whole hours
   read as hours, anything else as minutes, zero as "any time before".
+- D5-16 One env list, two layers. The zod schema checks shapes and the two
+  values nothing runs without (MONGODB_URI, MANAGE_LINK_SECRET); `envProblems`
+  holds what each environment needs and is what the doctor, the router gate and
+  `requireEnv` all read. A deployment with problems answers 503 everywhere but
+  the health check and the setup routes, so Rob sees the doctor instead of a
+  blank site.
+- D5-17 Bootstrap secret. Internal routes flagged `bootstrap` take
+  BOOTSTRAP_SECRET as well as CRON_SECRET; with a bearer that is not the cron's
+  they answer 404 while BOOTSTRAP_SECRET is unset, so the feature does not exist
+  once Rob removes the variable. Without any bearer they stay 403 like every
+  internal route, which keeps the authorization matrix uniform.
+- D5-18 `/api/setup` is a public `{ enabled }` flag so the /setup page can show
+  the 404 page before a secret is typed. It reveals only whether setup is on,
+  which the page would reveal on the first call anyway.
+- D5-19 The doctor's storage check uses the port's new `put` and `get`
+  (server-side, for the doctor and the backups), not a presigned PUT from the
+  server: one fewer signed URL to build and the same code path the backup uses.
+  The local driver accepts `_doctor/` and `_backups/` keys next to photo keys.
+- D5-20 The smoke test checks the app shell (200, root element, module script)
+  rather than rendering the SPA in a browser: a browser in the Action would
+  need Playwright's Chromium download on every run. Everything the SPA needs
+  (/api/shop, staff, next openings) is checked directly.
+- D5-21 Resend's domain status comes from GET /domains with the API key; no
+  email is sent. A missing domain, an unverified domain and a bad key each get
+  their own fix line.

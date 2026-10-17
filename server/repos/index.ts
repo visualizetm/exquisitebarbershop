@@ -16,3 +16,4 @@ export * as loginThrottleRepo from './loginThrottleRepo';
 export * as scheduleGuardsRepo from './scheduleGuardsRepo';
 export * as photosRepo from './photosRepo';
 export * as pendingUploadsRepo from './pendingUploadsRepo';
+export * as systemStateRepo from './systemStateRepo';

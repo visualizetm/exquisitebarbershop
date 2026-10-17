@@ -34,6 +34,7 @@ Last commit: see the bottom of this file.
 | /admin/\*     | sign in, today, schedule, bookings, new booking, block time, who's in, customers, settings, photos, audit, outbox, account | prompt 3; restyle in milestone 4            |
 | /kit          | every kit component in every state                                                                                         | development builds only                     |
 | /sitemap.xml  | public routes plus one entry per listed chair, from the API                                                                | milestone 5                                 |
+| /setup        | setup secret field, Run doctor, Run setup, checklist; exists only while BOOTSTRAP_SECRET is set; noindex                   | prompt 5                                    |
 
 ## Component inventory
 
@@ -74,7 +75,8 @@ Env var names (values never written here): MONGODB_URI, MONGODB_DB_NAME,
 APP_BASE_URL, MANAGE_LINK_SECRET, CRON_SECRET, EMAIL_PROVIDER, RESEND_API_KEY,
 EMAIL_FROM, SEED_OWNER_PASSWORD, SEED_OWNER_EMAIL, LOG_LEVEL,
 OUTBOX_AFTER_RESPONSE, MONGOMS_SYSTEM_BINARY, STORAGE_DRIVER, R2_ACCOUNT_ID,
-R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL, R2_KEY_PREFIX.
+R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL, R2_KEY_PREFIX,
+BOOTSTRAP_SECRET, EMAIL_DISABLED_ACK, MAINTENANCE_MODE.
 
 ## Forms
 

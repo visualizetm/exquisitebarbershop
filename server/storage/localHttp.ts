@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { PHOTO_MAX_BYTES, photoKeySchema } from '../../shared/schemas/photo';
+import { PHOTO_MAX_BYTES } from '../../shared/schemas/photo';
+import { isObjectKey } from './keys';
 import { getEnv } from '../env';
 import {
   LOCAL_UPLOAD_PATH,
@@ -32,7 +33,7 @@ export async function serveLocalUploads(
     return true;
   }
   const key = url.pathname.slice(LOCAL_UPLOAD_PATH.length + 1);
-  if (!photoKeySchema.safeParse(key).success) {
+  if (!isObjectKey(key)) {
     send(res, 404, 'Not found');
     return true;
   }

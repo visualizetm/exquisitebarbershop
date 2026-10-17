@@ -54,6 +54,20 @@ export function createR2Driver(config: R2Config): StorageDriver {
       if (!res.ok && res.status !== 404)
         throw new Error(`R2 DELETE ${key} failed with ${res.status}`);
     },
+    async put(key, bytes, contentType): Promise<void> {
+      const res = await client.fetch(objectUrl(key), {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: bytes,
+      });
+      if (!res.ok) throw new Error(`R2 PUT ${key} failed with ${res.status}`);
+    },
+    async get(key): Promise<Uint8Array | null> {
+      const res = await client.fetch(objectUrl(key), { method: 'GET' });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`R2 GET ${key} failed with ${res.status}`);
+      return new Uint8Array(await res.arrayBuffer());
+    },
     publicUrl(key): string {
       return `${publicBase}/${key}`;
     },

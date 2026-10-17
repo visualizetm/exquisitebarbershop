@@ -48,5 +48,13 @@ export interface RouteDefinition {
   auth: AuthLevel;
   /** Reachable while a temporary password is still in use (sign out, me, password change). */
   allowDuringPasswordChange?: boolean;
+  /**
+   * Internal routes that the /setup page may call with BOOTSTRAP_SECRET as well as
+   * the cron secret. They answer 404 while BOOTSTRAP_SECRET is unset and the
+   * caller is not the cron.
+   */
+  bootstrap?: boolean;
+  /** Keeps answering in maintenance mode and while the environment is incomplete. */
+  alwaysOn?: boolean;
   handler: RouteHandler;
 }

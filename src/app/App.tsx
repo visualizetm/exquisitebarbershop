@@ -9,6 +9,7 @@ import { HomePage } from '@/pages/HomePage';
 import { ManagePage } from '@/pages/ManagePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ServicesPage } from '@/pages/ServicesPage';
+import { SetupPage } from '@/pages/SetupPage';
 import { VisitPage } from '@/pages/VisitPage';
 import { Status } from '@/components/Status';
 
@@ -30,6 +31,7 @@ export function App() {
           <Route path="visit" element={<VisitPage />} />
           <Route path="book" element={<BookPage />} />
           <Route path="manage" element={<ManagePage />} />
+          <Route path="setup" element={<SetupPage />} />
           {KitPage ? (
             <Route
               path="kit"

@@ -143,3 +143,20 @@ commit, and what is still open.
   on a phone where the StickyCTA shows the total, and submits the booking on a
   wide screen.
 - Screens: `docs/screens/p5-m3/` (Book at 390 and 1280, light and dark).
+
+### Milestone 4: environment, doctor, bootstrap, setup page, smoke test
+
+- Shipped: one env schema with per-environment rules (development, test,
+  preview, production) and a router gate that answers 503 CONFIG_ERROR until
+  the environment is complete; GET /api/internal/doctor and `npm run doctor`
+  (settings, database, replica set, transactions, indexes, seed, storage round
+  trip, public URL, email provider and Resend domain status, cron secret, each
+  with a fix written for a non-developer); POST /api/internal/bootstrap behind
+  BOOTSTRAP_SECRET (indexes, seed, owner login, once, force to repeat,
+  audited); the /setup page (noindex, 404 while the secret is unset);
+  `npm run smoke -- --url=` and the manual Smoke test Action; MAINTENANCE_MODE
+  on the API (the public pages follow in milestone 5).
+- Tests: env rules (unit), the doctor on a healthy test deployment and on a
+  production deployment with missing settings, bootstrap once and forced, 404
+  while off, maintenance mode on the API, the setup page end to end; the
+  authorization matrix is 75 routes by 4 roles.
