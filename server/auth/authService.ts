@@ -50,6 +50,12 @@ export function emailKey(email: string): string {
   return sha256Hex(`login:${normalizeEmail(email)}`);
 }
 
+/** Seconds until the current fixed window of a limit ends. */
+function retryAfter(windowMs: number, now: Date): number {
+  const windowEnd = (Math.floor(now.getTime() / windowMs) + 1) * windowMs;
+  return Math.max(1, Math.ceil((windowEnd - now.getTime()) / 1000));
+}
+
 /** A keyed hash of the client address, so the stored list holds no addresses. */
 export function ipHashOf(ip: string): string {
   return sha256Hex(`ip:${ip}:${getEnv().MANAGE_LINK_SECRET}`);
@@ -114,26 +120,21 @@ export async function login(
   if (ipCount >= LOGIN_IP_LIMIT.limit) {
     await auditLogin('failure', { email, userId: null, reason: 'ipRateLimited' }, meta);
     throw new AppError('RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.', {
-      retryAfterSeconds: Math.max(
-        1,
-        Math.ceil(
-          (Math.floor(meta.now.getTime() / LOGIN_IP_LIMIT.windowMs + 1) * LOGIN_IP_LIMIT.windowMs -
-            meta.now.getTime()) /
-            1000,
-        ),
-      ),
+      retryAfterSeconds: retryAfter(LOGIN_IP_LIMIT.windowMs, meta.now),
     });
   }
   const key = emailKey(email);
-  const accountHit = await rateLimitsRepo.hitRateLimit(
-    `login:account:${key}`,
+  // The same rule per email: a guess is a failure, a sign-in from a known phone is not an attempt.
+  const accountKey = `login:account:${key}`;
+  const accountCount = await rateLimitsRepo.peekRateLimit(
+    accountKey,
     LOGIN_ACCOUNT_LIMIT,
     meta.now,
   );
-  if (!accountHit.allowed) {
+  if (accountCount >= LOGIN_ACCOUNT_LIMIT.limit) {
     await auditLogin('failure', { email, userId: null, reason: 'accountRateLimited' }, meta);
     throw new AppError('RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.', {
-      retryAfterSeconds: accountHit.retryAfterSeconds,
+      retryAfterSeconds: retryAfter(LOGIN_ACCOUNT_LIMIT.windowMs, meta.now),
     });
   }
   const ipHash = ipHashOf(meta.ip);
@@ -162,6 +163,7 @@ export async function login(
   const usable = user !== null && passwordOk && (await loginIsUsable(user));
   if (!user || !usable) {
     await rateLimitsRepo.hitRateLimit(ipKey, LOGIN_IP_LIMIT, meta.now);
+    await rateLimitsRepo.hitRateLimit(accountKey, LOGIN_ACCOUNT_LIMIT, meta.now);
     await loginThrottleRepo.recordLoginFailure(key, LOCKOUT_RULE, meta.now);
     const reason = !user ? 'unknownEmail' : !passwordOk ? 'badPassword' : 'disabled';
     await auditLogin('failure', { email, userId: user?._id ?? null, reason }, meta);

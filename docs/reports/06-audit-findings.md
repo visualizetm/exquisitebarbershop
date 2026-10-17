@@ -165,3 +165,23 @@ Milestone 3 (1 scores, small and safe): tap targets to 44px on touch
 manage URL on the done screen; reserve the Today chair list height while it
 loads. Not small, left as documented: responsive photo variants (two sizes per
 upload) and the unused JavaScript on first paint.
+
+## After milestones 2 and 3 (re-measured, same script)
+
+- Clickables under 44px on every public page: none (the skip link, 40px, is
+  keyboard-only and sits off screen). Admin: none.
+- Home on the production build with a hero photo: performance 95, CLS 0
+  (was 91 and 0.103). Profile 97 and Book 96 unchanged.
+- The admin CLS figures (0.74 Today, 0.32 Schedule, 0.20 Photos) are a dev
+  server artifact: the lazy admin chunk's stylesheet is injected after the
+  first paint there, so the side nav renders in flow for a frame. On the
+  production build the same screens load their CSS before the chunk runs; the
+  sign-in page measures CLS 0 on `vite preview` against 0.0005 on the dev
+  server. The Today page itself cannot be signed into from the preview origin
+  in this sandbox, so it is inferred from the same mechanism, not measured.
+- Booking flow at 390: Continue stays after tapping a service, one Confirm
+  button on the review step, no raw URL on the done screen.
+- Vitest 321, Playwright 19 (one new e2e for the sticky bar and the single
+  Confirm, one new integration case for the failure-only login counters, the
+  idempotency case pinned to an open slot). Two e2e runs in a row against the
+  same server pass the same 19 tests.

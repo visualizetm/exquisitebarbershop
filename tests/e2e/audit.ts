@@ -67,9 +67,7 @@ async function settle(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
-/** Audit finding: the sticky bar hides while a checkbox has focus, so blur before Continue. */
 async function pressContinue(page: Page): Promise<void> {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.getByRole('button', { name: 'Continue' }).first().click();
 }
 

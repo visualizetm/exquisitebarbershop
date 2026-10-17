@@ -23,45 +23,37 @@
     "radii": ["16px", "999px", "999px 999px 16px 16px"],
     "buttons": [
       "a.exq-btn[inverse] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 52",
-      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 52",
       "a.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44",
       "button.exq-chip[] bg rgb(17, 17, 17) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-chip[] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 44",
       "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
     ],
-    "smallClickables": [
-      "a. 106x23 \"See the gallery\"",
-      "a. 107x23 \"(610) 555-0100\"",
-      "a. 161x23 \"@exquisitebarberbeauty\"",
-      "a. 68x23 \"Full menu\"",
-      "a.exq-btn 111x36 \"Book a chair\"",
-      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
-      "a.exq-skip-link 132x40 \"Skip to content\""
-    ],
+    "smallClickables": ["a.exq-skip-link 132x40 \"Skip to content\""],
     "imagesWithoutAlt": [],
     "oversizedImages": [
-      "81113b1-982a-4967-a39c-e2cd33a54ca9.webp 1600px for 780px",
-      "5ec040c-e822-424d-9c4f-bb73897a9ec3.webp 1200px for 508px",
-      "d5bf8ea-c5c1-41f7-a162-c2010dee3293.webp 1200px for 508px",
-      "4413dd0-4ebf-4261-bcd3-6451e8651e40.webp 1200px for 508px",
-      "0f00664-7c2b-438a-ab98-a021ff8bbdd7.webp 1200px for 508px",
-      "04df6a4-485a-4e04-9d62-4d3256c6d418.webp 1200px for 508px",
-      "f41683f-28dd-4c2c-98ae-01a1020fe3ce.webp 1200px for 508px",
-      "de1ae26-daa1-446c-8744-b315fe87b74f.webp 1200px for 346px",
-      "3bf04d6-a386-4636-b781-52d94cbf25a3.webp 1200px for 346px",
-      "93d40bf-2cc3-469b-9aa1-4bfced24d913.webp 1200px for 346px",
-      "8dfa160-bb67-462b-8bbc-fbe4384c7ee7.webp 1200px for 346px",
-      "ebe74c5-724c-498e-b457-04b990824dd2.webp 1200px for 346px",
-      "6e5ce1b-5720-4033-811e-c766f1616c85.webp 1200px for 346px"
+      "07a1c1f-4efe-4501-b7bf-97f5bcf7d95d.webp 1600px for 780px",
+      "8dac148-e543-4ff8-bfc3-c970632b0daa.webp 1200px for 508px",
+      "c68526d-794c-4748-b7ba-73c1b7bedac0.webp 1200px for 508px",
+      "cdcfc0f-50e5-498a-999b-e65cb27e8147.webp 1200px for 508px",
+      "0a0a26e-1e80-4abd-9d7d-65d032351ed3.webp 1200px for 508px",
+      "1936d23-8027-478f-92ad-d18654cf75d4.webp 1200px for 508px",
+      "66a8a21-a9bb-463c-b643-1485bf18080e.webp 1200px for 508px",
+      "9e834ec-9385-44f6-b465-01ad73531304.webp 1200px for 346px",
+      "eda99e4-35c8-4945-ba00-14438f5f7fb7.webp 1200px for 346px",
+      "f1505d0-23e6-49de-86e4-9133bb9c7569.webp 1200px for 346px",
+      "1f5afdf-b7b2-4904-a0fe-57180f6c23e1.webp 1200px for 346px",
+      "9c26623-f570-42ea-a72d-45bfe42c11ed.webp 1200px for 346px",
+      "e4f72dd-d383-4dac-a3b4-3b6b55d6db61.webp 1200px for 346px"
     ],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [
       "linear-gradient(to top, rgba(17, 17, 17, 0.92) 0%, rgba(17, 17, 17, 0.55) 45%, rgba(17, 17, 17, 0.05) 100%)"
     ],
-    "lcp": 580,
-    "cls": 0.034,
+    "lcp": 628,
+    "cls": 0.002,
     "consoleErrors": []
   },
   {
@@ -81,24 +73,18 @@
     "backgrounds": ["rgb(17, 17, 17)", "rgb(200, 16, 46)", "rgb(255, 255, 255)"],
     "radii": ["999px"],
     "buttons": [
-      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-chip[] bg rgb(17, 17, 17) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-chip[] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 44",
       "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
     ],
-    "smallClickables": [
-      "a. 107x23 \"(610) 555-0100\"",
-      "a. 161x23 \"@exquisitebarberbeauty\"",
-      "a.exq-btn 111x36 \"Book a chair\"",
-      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
-      "a.exq-skip-link 132x40 \"Skip to content\""
-    ],
+    "smallClickables": ["a.exq-skip-link 132x40 \"Skip to content\""],
     "imagesWithoutAlt": [],
     "oversizedImages": [],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 432,
+    "lcp": 332,
     "cls": 0.001,
     "consoleErrors": []
   },
@@ -125,29 +111,23 @@
     ],
     "radii": ["16px", "999px", "999px 999px 16px 16px"],
     "buttons": [
-      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
     ],
-    "smallClickables": [
-      "a. 107x23 \"(610) 555-0100\"",
-      "a. 161x23 \"@exquisitebarberbeauty\"",
-      "a.exq-btn 111x36 \"Book a chair\"",
-      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
-      "a.exq-skip-link 132x40 \"Skip to content\""
-    ],
+    "smallClickables": ["a.exq-skip-link 132x40 \"Skip to content\""],
     "imagesWithoutAlt": [],
     "oversizedImages": [
-      "5ec040c-e822-424d-9c4f-bb73897a9ec3.webp 1200px for 290px",
-      "d5bf8ea-c5c1-41f7-a162-c2010dee3293.webp 1200px for 290px",
-      "4413dd0-4ebf-4261-bcd3-6451e8651e40.webp 1200px for 290px",
-      "0f00664-7c2b-438a-ab98-a021ff8bbdd7.webp 1200px for 290px",
-      "04df6a4-485a-4e04-9d62-4d3256c6d418.webp 1200px for 290px",
-      "f41683f-28dd-4c2c-98ae-01a1020fe3ce.webp 1200px for 290px"
+      "8dac148-e543-4ff8-bfc3-c970632b0daa.webp 1200px for 290px",
+      "c68526d-794c-4748-b7ba-73c1b7bedac0.webp 1200px for 290px",
+      "cdcfc0f-50e5-498a-999b-e65cb27e8147.webp 1200px for 290px",
+      "0a0a26e-1e80-4abd-9d7d-65d032351ed3.webp 1200px for 290px",
+      "1936d23-8027-478f-92ad-d18654cf75d4.webp 1200px for 290px",
+      "66a8a21-a9bb-463c-b643-1485bf18080e.webp 1200px for 290px"
     ],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 636,
+    "lcp": 516,
     "cls": 0.001,
     "consoleErrors": []
   },
@@ -173,25 +153,17 @@
     ],
     "radii": ["16px", "999px", "999px 999px 16px 16px"],
     "buttons": [
-      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
       "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 52",
       "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
     ],
-    "smallClickables": [
-      "a. 107x23 \"(610) 555-0100\"",
-      "a. 161x23 \"@exquisitebarberbeauty\"",
-      "a. 170x23 \"See all of Marcus's work\"",
-      "a.exq-btn 111x36 \"Book a chair\"",
-      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
-      "a.exq-skip-link 132x40 \"Skip to content\""
-    ],
+    "smallClickables": ["a.exq-skip-link 132x40 \"Skip to content\""],
     "imagesWithoutAlt": [],
-    "oversizedImages": ["ebe74c5-724c-498e-b457-04b990824dd2.webp 1200px for 346px"],
+    "oversizedImages": ["9c26623-f570-42ea-a72d-45bfe42c11ed.webp 1200px for 346px"],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 576,
+    "lcp": 484,
     "cls": 0.001,
     "consoleErrors": []
   },
@@ -216,29 +188,23 @@
     ],
     "radii": ["16px", "999px"],
     "buttons": [
-      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
     ],
-    "smallClickables": [
-      "a. 107x23 \"(610) 555-0100\"",
-      "a. 161x23 \"@exquisitebarberbeauty\"",
-      "a.exq-btn 111x36 \"Book a chair\"",
-      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
-      "a.exq-skip-link 132x40 \"Skip to content\""
-    ],
+    "smallClickables": ["a.exq-skip-link 132x40 \"Skip to content\""],
     "imagesWithoutAlt": [],
     "oversizedImages": [
-      "de1ae26-daa1-446c-8744-b315fe87b74f.webp 1200px for 346px",
-      "3bf04d6-a386-4636-b781-52d94cbf25a3.webp 1200px for 346px",
-      "93d40bf-2cc3-469b-9aa1-4bfced24d913.webp 1200px for 346px",
-      "8dfa160-bb67-462b-8bbc-fbe4384c7ee7.webp 1200px for 346px",
-      "ebe74c5-724c-498e-b457-04b990824dd2.webp 1200px for 346px",
-      "6e5ce1b-5720-4033-811e-c766f1616c85.webp 1200px for 346px"
+      "9e834ec-9385-44f6-b465-01ad73531304.webp 1200px for 346px",
+      "eda99e4-35c8-4945-ba00-14438f5f7fb7.webp 1200px for 346px",
+      "f1505d0-23e6-49de-86e4-9133bb9c7569.webp 1200px for 346px",
+      "1f5afdf-b7b2-4904-a0fe-57180f6c23e1.webp 1200px for 346px",
+      "9c26623-f570-42ea-a72d-45bfe42c11ed.webp 1200px for 346px",
+      "e4f72dd-d383-4dac-a3b4-3b6b55d6db61.webp 1200px for 346px"
     ],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 524,
+    "lcp": 456,
     "cls": 0.001,
     "consoleErrors": []
   },
@@ -259,25 +225,17 @@
     "backgrounds": ["rgb(17, 17, 17)", "rgb(200, 16, 46)", "rgb(255, 255, 255)"],
     "radii": ["999px"],
     "buttons": [
-      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
       "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "a.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44",
       "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
     ],
-    "smallClickables": [
-      "a. 107x23 \"(610) 555-0100\"",
-      "a. 161x23 \"@exquisitebarberbeauty\"",
-      "a. 226x23 \"hello@exquisitebarberbeauty.co\"",
-      "a.exq-btn 111x36 \"Book a chair\"",
-      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
-      "a.exq-skip-link 132x40 \"Skip to content\""
-    ],
+    "smallClickables": ["a.exq-skip-link 132x40 \"Skip to content\""],
     "imagesWithoutAlt": [],
     "oversizedImages": [],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 508,
+    "lcp": 436,
     "cls": 0.001,
     "consoleErrors": []
   },
@@ -303,25 +261,19 @@
     ],
     "radii": ["16px", "999px"],
     "buttons": [
-      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44",
       "button.exq-stepbar__button[] bg rgba(0, 0, 0, 0) fg rgb(107, 107, 107) r 0px h 44",
       "button.exq-stepbar__button[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 49"
     ],
-    "smallClickables": [
-      "a. 107x23 \"(610) 555-0100\"",
-      "a. 161x23 \"@exquisitebarberbeauty\"",
-      "a.exq-btn 111x36 \"Book a chair\"",
-      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
-      "a.exq-skip-link 132x40 \"Skip to content\""
-    ],
+    "smallClickables": ["a.exq-skip-link 132x40 \"Skip to content\""],
     "imagesWithoutAlt": [],
     "oversizedImages": [],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 480,
+    "lcp": 452,
     "cls": 0.001,
     "consoleErrors": []
   },
@@ -348,7 +300,7 @@
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 592,
+    "lcp": 616,
     "cls": 0.737,
     "consoleErrors": [
       "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
@@ -366,23 +318,19 @@
     "backgrounds": ["rgb(255, 255, 255)"],
     "radii": ["16px", "999px"],
     "buttons": [
-      "button.exq-adm-schedule__next[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 40",
-      "button.exq-adm-schedule__prev[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 40",
+      "button.exq-adm-schedule__next[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44",
+      "button.exq-adm-schedule__prev[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44",
       "button.exq-adm-tabs__tab[] bg rgba(0, 0, 0, 0) fg rgb(74, 74, 74) r 0px h 56",
-      "button.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 36"
+      "button.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44"
     ],
-    "smallClickables": [
-      "button.exq-adm-schedule__next 358x40 \"Next day\"",
-      "button.exq-adm-schedule__prev 358x40 \"Previous day\"",
-      "button.exq-btn 358x36 \"Block time\""
-    ],
+    "smallClickables": [],
     "imagesWithoutAlt": [],
     "oversizedImages": [],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 532,
-    "cls": 0.334,
+    "lcp": 556,
+    "cls": 0.315,
     "consoleErrors": [
       "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
       "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
@@ -411,23 +359,18 @@
     "buttons": [
       "button.exq-adm-tabs__tab[] bg rgba(0, 0, 0, 0) fg rgb(74, 74, 74) r 0px h 56",
       "button.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
-      "button.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 36",
+      "button.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44",
       "button.exq-chip[] bg rgb(17, 17, 17) fg rgb(255, 255, 255) r 999px h 44",
       "button.exq-chip[] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 44"
     ],
-    "smallClickables": [
-      "button.exq-btn 108x36 \"Remove\"",
-      "button.exq-btn 224x36 \"Save\"",
-      "button.exq-btn 77x36 \"Up\"",
-      "button.exq-btn 95x36 \"Down\""
-    ],
+    "smallClickables": [],
     "imagesWithoutAlt": [],
-    "oversizedImages": ["81113b1-982a-4967-a39c-e2cd33a54ca9.webp 1600px for 192px"],
+    "oversizedImages": ["07a1c1f-4efe-4501-b7bf-97f5bcf7d95d.webp 1600px for 192px"],
     "scrollListeners": 5,
     "fadeInHidden": [],
     "gradients": [],
-    "lcp": 584,
-    "cls": 0.2,
+    "lcp": 592,
+    "cls": 0.198,
     "consoleErrors": [
       "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
       "Failed to load resource: the server responded with a status of 401 (Unauthorized)"

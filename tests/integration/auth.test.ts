@@ -453,7 +453,7 @@ describe('the per-address limit', () => {
     const tablet = '198.51.100.250';
     for (let i = 0; i < 25; i += 1) {
       await db().collection('loginThrottle').deleteMany({});
-      // The per-email limit is separate; keep it out of the way here.
+      // Neither counter moves on a success; the clears below only prove that nothing else interferes.
       await db()
         .collection('rateLimits')
         .deleteMany({ key: { $regex: /^login:account:/ } });
