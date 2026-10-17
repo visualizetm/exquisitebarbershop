@@ -185,3 +185,7 @@ upload) and the unused JavaScript on first paint.
   Confirm, one new integration case for the failure-only login counters, the
   idempotency case pinned to an open slot). Two e2e runs in a row against the
   same server pass the same 19 tests.
+- Found by the regression suite after the fixes, and fixed: the count on a
+  selected red chip ("New online bookings 3") was drawn at 80 percent opacity,
+  which is 4.2:1 on red; axe only saw it once the e2e data left a count above
+  zero. It is now full white (5.9:1).

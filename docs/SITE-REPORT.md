@@ -104,7 +104,15 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
   time; set it in Vercel before the first production build.
 - The owner's own password can only be reset from a shell (`npm run user:reset`)
   when nobody can sign in; see docs/OPERATIONS.md.
+- Photos are stored at one size (up to 2000px) and shown at 290 to 780 device
+  pixels; responsive variants would cut gallery weight by about two thirds
+  (audit finding, not done: two uploads per photo and an additive `thumbKey`).
+- The admin sign-in page logs two expected 401s in the console (the session
+  probe before signing in).
+- Handoff docs: `docs/OWNER-GUIDE.md` (and `.pdf`), `docs/BARBER-GUIDE.md`,
+  screenshots in `docs/guide/` from `tests/e2e/guide.ts`; audit tooling in
+  `tests/e2e/audit.ts` and `docs/screens/audit/`.
 
 ## Last commit
 
-Prompt 5 milestone 6, 2026-10-17; see `docs/reports/05-go-live.md` for the hashes.
+Prompt 6 milestone 4, 2026-10-17; see `docs/reports/06-final.md` for the hashes.

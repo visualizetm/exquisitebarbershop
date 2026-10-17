@@ -95,7 +95,9 @@ passes in both themes on Home, Book, admin Today and Account
 - Transitions only on state changes, 150 to 180ms, and off under
   `prefers-reduced-motion`. No reveals, parallax, scroll or cursor effects.
 - Text on photos only over a scrim; names and prices sit under photos.
-- Tap targets 44px or larger. Every image has alt text and dimensions.
+- Tap targets 44px or larger, including the small button size (44px tall,
+  slim padding) and inline text links in the footer and the "more" lines.
+  Every image has alt text and dimensions.
 
 ## Brand assets
 

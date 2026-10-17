@@ -268,3 +268,16 @@ win.
 - D6-09 The manualBookings idempotency case now books a fixed open slot
   tomorrow instead of "seven hours from now"; the old value fell after closing
   when the suite ran late in the day.
+- D6-10 The owner and barber guides are Markdown with phone screenshots taken
+  on the e2e server by `tests/e2e/guide.ts` (never production). The PDF is
+  rendered by `scripts/guide-pdf.ts` with Playwright from a small Markdown
+  subset (headings, lists, bold, links, images) rather than a Markdown
+  dependency: the guide uses nothing else and the renderer is forty lines.
+- D6-11 Small buttons grew from 36 to 44px tall everywhere rather than only on
+  touch screens, so the measurement in the audit script (a desktop Chromium)
+  and the phone agree and the kit has one answer. The padding keeps the
+  button slim; the kit API is unchanged.
+- D6-12 The admin Today, Schedule and Photos layout shift numbers from the dev
+  server are recorded as a dev artifact (lazy chunk CSS injected after the
+  first paint there) and not fixed: the production build loads the chunk's
+  stylesheet first and the sign-in page measures 0 there.

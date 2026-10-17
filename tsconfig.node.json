@@ -17,5 +17,5 @@
     "eslint.config.js",
     "playwright.config.ts"
   ],
-  "exclude": ["tests/e2e", "scripts/brand-assets.ts"]
+  "exclude": ["tests/e2e", "scripts/brand-assets.ts", "scripts/guide-pdf.ts"]
 }

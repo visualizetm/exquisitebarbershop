@@ -182,3 +182,34 @@ commit, and what is still open.
   restore, rotating each secret and what breaks, password resets, maintenance
   mode, logs, what to do if bookings stop), the living docs, the pull request
   into `main` and `docs/reports/05-go-live.md`.
+
+## Prompt 6
+
+### Milestone 1: audit
+
+- `docs/screens/audit/` with every page and Book step at 390 and 1280 in light
+  and dark, four montages and `facts.json` (`tests/e2e/audit.ts`);
+  `docs/reports/06-audit-findings.md` with the page facts, the 14-category
+  scorecard (22 of 28 before fixes), the flows walked, and the security review
+  re-derived from the routes, the bundle, the history, the cookie, ten reruns
+  of each race and the restore drill.
+
+### Milestone 2: fixes with regression tests
+
+- Failure-only login counters (per address and per email); the e2e reset hook
+  called once per Playwright run; the sticky bar no longer hides on a checkbox
+  or radio; one Confirm per screen; no raw manage URL on the done screen; the
+  phone hero keeps its ratio (Home CLS 0); the idempotency test pinned to an
+  open slot; the selected chip count at full contrast.
+
+### Milestone 3: small fixes and recaptures
+
+- 44px tap targets for small buttons, admin buttons and inline text links; the
+  Today chair list keeps its height while loading; audit captures and facts
+  retaken (no clickable under 44px remains).
+
+### Milestone 4: handoff
+
+- `docs/OWNER-GUIDE.md` and `.pdf`, `docs/BARBER-GUIDE.md` with phone
+  screenshots in `docs/guide/`; the living docs; the pull request;
+  `docs/reports/06-final.md`.

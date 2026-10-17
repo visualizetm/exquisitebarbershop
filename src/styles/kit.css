@@ -214,8 +214,8 @@ select.exq-field__control {
   font-variant-numeric: tabular-nums;
 }
 .exq-chip[data-state='selected'] .exq-chip__count {
+  /* Full strength: at 80 percent the count on a red chip fell under 4.5:1. */
   color: inherit;
-  opacity: 0.8;
 }
 .exq-chip__sub {
   font-size: var(--fs-1);

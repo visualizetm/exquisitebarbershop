@@ -547,3 +547,10 @@
 .exq-adm-login__submit {
   width: 100%;
 }
+
+/* Toasts sit above the bottom tab bar on phones, so Undo is never under a tab. */
+@media (max-width: 1023px) {
+  .exq-app[data-state='admin'] .exq-toasts {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}

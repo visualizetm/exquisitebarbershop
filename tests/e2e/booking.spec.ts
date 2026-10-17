@@ -45,7 +45,7 @@ test('book from a chair link, then reschedule and cancel through the manage link
   const code = await page.locator('.exq-book-done__code').textContent();
   expect(code).toMatch(REFERENCE);
   await expect(page.locator('.exq-ics-download')).toHaveAttribute('href', /^data:text\/calendar/);
-  await expect(page.locator('.exq-book-done__manage-url a')).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Manage this booking' })).toHaveAttribute(
     'href',
     /\/manage\?token=v1\./,
   );
