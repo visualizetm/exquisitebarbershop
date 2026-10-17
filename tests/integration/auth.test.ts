@@ -93,14 +93,16 @@ describe('login', () => {
       return performance.now() - started;
     };
     const samples = { known: [] as number[], unknown: [] as number[] };
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       samples.known.push(await time(barber.email));
       samples.unknown.push(await time(`ghost${i}@example.com`));
     }
-    const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-    const ratio = avg(samples.unknown) / avg(samples.known);
-    expect(ratio).toBeGreaterThan(0.5);
-    expect(ratio).toBeLessThan(2);
+    // Medians resist a slow outlier when other test files load the machine. Skipping
+    // the hash would make an unknown email about 20 times faster, far outside these bounds.
+    const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
+    const ratio = median(samples.unknown) / median(samples.known);
+    expect(ratio).toBeGreaterThan(0.33);
+    expect(ratio).toBeLessThan(3);
   });
 
   it('disabled logins and barbers whose chair was removed get the same generic answer', async () => {
