@@ -94,3 +94,34 @@ win.
 - D4-26 Admin buttons. Prompt 3 admin forms used plain buttons; a scoped rule in
   admin.css gives every non-kit button the pill look rather than touching each
   form, with kit Buttons used where a form was rewritten anyway.
+- D4-27 Sitemap from the API. `/sitemap.xml` is a rewrite to
+  `GET /api/sitemap.xml` (vercel.json in production, the Vite proxy in dev),
+  built from the live chair list with APP_BASE_URL. Rejected a static file
+  written at build time: it would go stale when a chair is added or renamed.
+  The router gained one line so a string body with its own Content-Type is
+  sent as is.
+- D4-28 Layout shift. Lighthouse measured CLS 0.2 on Home and 0.5 on Book and
+  profiles: the Jost swap re-flowed the hero and the footer sat in the first
+  viewport while a page loaded. A Vite plugin preloads the three Jost files and
+  `.exq-main` has a 100svh minimum height. Rejected a metric-matched fallback
+  font (guesswork) and hiding content until fonts load (slower first paint).
+- D4-29 Meta tags. index.html carries the site-wide title, description and Open
+  Graph card (crawlers that build social cards do not run JavaScript), with
+  `%SITE_URL%` filled from APP_BASE_URL at build time. `usePageMeta` then sets
+  the per-route title, description, canonical, og:url and robots in the
+  browser, which is what Google indexes. Rejected server rendering for this.
+- D4-30 JSON-LD from the shop API. The BarberShop script is built in the public
+  layout from `/api/shop` (name, address, phone, hours) so a change in the
+  dashboard reaches search engines without a deploy. Rejected a hardcoded
+  block in index.html.
+- D4-31 Brand assets rendered once. `scripts/brand-assets.ts` renders the OG
+  image, favicons, the maskable icon and the apple touch icon with Playwright
+  and the outputs are committed to `public/`. ImageMagick here has no SVG
+  delegate, and a one-time render keeps the build free of a browser.
+- D4-32 One shop fetch. `/api/shop` is fetched once in the public layout and
+  shared through `ShopContext` (`useShop`), so Home, Visit, Book, Manage, the
+  footer, the titles and JSON-LD read the same data and the home page makes
+  one request fewer. Rejected a second fetch per page.
+- D4-33 robots.txt stays static and has no Sitemap line, because that line must
+  be an absolute URL and the domain is not known yet. Search Console can take
+  the sitemap directly; the line is a one-word change once the domain exists.

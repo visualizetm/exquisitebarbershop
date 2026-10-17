@@ -4,12 +4,16 @@ import { PhotoGrid } from '@/components/site/PhotoGrid';
 import { Button, ButtonAnchor, ChipLink, Chips, EmptyState, ErrorState } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { usePagedList } from '@/lib/usePagedList';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
 
 const pickPhotos = (page: GalleryResponse) => page.photos;
 
 export function GalleryPage() {
-  usePageTitle('Gallery');
+  usePageMeta({
+    title: 'The work',
+    description:
+      'Recent cuts and styles from the chairs at Exquisite Barber & Beauty Lounge in Brookhaven, PA.',
+  });
   const [params] = useSearchParams();
   const staff = params.get('staff') ?? '';
   const query = new URLSearchParams({ limit: '30' });

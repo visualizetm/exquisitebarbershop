@@ -1,16 +1,21 @@
 import Phone from '@untitled-ui/icons-react/build/esm/Phone';
-import { publicShopSchema } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
 import { HoursTable } from '@/components/site/HoursTable';
 import { ButtonAnchor, ErrorState } from '@/components/ui';
 import { Status } from '@/components/Status';
-import { useApi } from '@/lib/useApi';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
+import { useShop } from '@/app/useShop';
 import { directionsUrl } from '@/lib/shop';
 
 export function VisitPage() {
-  usePageTitle('Visit');
-  const result = useApi('/api/shop', publicShopSchema);
+  const result = useShop();
+  usePageMeta({
+    title: 'Visit',
+    description:
+      result.status === 'ready'
+        ? `Hours, address and phone for ${result.data.name} at ${result.data.address.line1}, ${result.data.address.city}, ${result.data.address.state} ${result.data.address.postalCode}.`
+        : undefined,
+  });
   return (
     <article className="exq-visit exq-wrap exq-section" data-state={result.status}>
       <p className="exq-label">Visit</p>

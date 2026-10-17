@@ -3,10 +3,14 @@ import { ServiceRows } from '@/components/site/ServiceRows';
 import { ErrorState } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { useApi } from '@/lib/useApi';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
 
 export function ServicesPage() {
-  usePageTitle('Services');
+  usePageMeta({
+    title: 'Services',
+    description:
+      'Barber and beauty services with prices at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Book any service online.',
+  });
   const result = useApi('/api/services', publicServicesResponseSchema);
   return (
     <article className="exq-services exq-wrap exq-section" data-state={result.status}>

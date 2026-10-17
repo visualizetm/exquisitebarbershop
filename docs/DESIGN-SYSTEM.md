@@ -51,6 +51,15 @@ red text #FF5470). The admin (`.exq-app[data-state="admin"]`) follows
 - Text on photos only over a scrim; names and prices sit under photos.
 - Tap targets 44px or larger. Every image has alt text and dimensions.
 
+## Brand assets
+
+- `public/brand/` holds the marks (placeholders until the real SVGs arrive).
+- `public/og.png` (1200x630, white primary logo on ink), `favicon.ico`,
+  `favicon.svg`, `icon-192.png`, `icon-512.png`, `icon-512-maskable.png` and
+  `apple-touch-icon.png` are rendered from the marks by
+  `npx tsx scripts/brand-assets.ts`; rerun it when the marks change.
+- `site.webmanifest` uses ink (#111111) for theme and background.
+
 ## Kit
 
 | Component                        | Props                                                                               | States (data-state)                                 | Used by                                   |

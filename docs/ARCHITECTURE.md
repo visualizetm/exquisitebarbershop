@@ -598,6 +598,7 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 | POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket    |
 | POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201           |
 | PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal              |
+| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus `/chairs/:slug`        |
 
 `/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
 `/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`.

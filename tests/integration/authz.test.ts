@@ -22,6 +22,7 @@ let server: TestServer;
 const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'GET /api/health': 'public',
   'GET /api/shop': 'public',
+  'GET /api/sitemap.xml': 'public',
   'GET /api/services': 'public',
   'GET /api/staff': 'public',
   'GET /api/staff/:slug': 'public',

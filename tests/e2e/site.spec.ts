@@ -87,3 +87,31 @@ test('the gallery opens a photo in the lightbox with the barber and a book link'
   await page.goto('/');
   await expect(page.locator('.exq-home__work .exq-photo-grid__item').first()).toBeVisible();
 });
+
+test('a profile page carries its own title, description, canonical and the shop JSON-LD', async ({
+  page,
+}) => {
+  await page.goto('/chairs/marcus');
+  await expect(page.locator('.exq-chair__name')).toHaveText('Marcus');
+  await expect(page).toHaveTitle('Marcus | Exquisite Barber & Beauty Lounge');
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    /^Marcus, .* at Exquisite Barber & Beauty Lounge in Brookhaven, PA\./,
+  );
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/chairs\/marcus$/);
+  await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
+    'content',
+    /\/chairs\/marcus$/,
+  );
+  const jsonLd = JSON.parse(
+    (await page.locator('script[type="application/ld+json"]').textContent()) ?? '{}',
+  ) as { '@type': string; name: string; openingHoursSpecification: unknown[] };
+  expect(jsonLd['@type']).toBe('BarberShop');
+  expect(jsonLd.name).toBe('Exquisite Barber & Beauty Lounge');
+  expect(jsonLd.openingHoursSpecification.length).toBeGreaterThan(0);
+
+  // The sitemap built by the API lists the profile.
+  const sitemap = await page.request.get('/sitemap.xml');
+  expect(sitemap.headers()['content-type']).toContain('application/xml');
+  expect(await sitemap.text()).toContain('/chairs/marcus</loc>');
+});

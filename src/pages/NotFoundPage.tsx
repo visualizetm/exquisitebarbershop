@@ -1,8 +1,8 @@
 import { ButtonLink, EmptyState } from '@/components/ui';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
 
 export function NotFoundPage() {
-  usePageTitle('Page not found');
+  usePageMeta({ title: 'Page not found', noindex: true });
   return (
     <article className="exq-not-found exq-wrap exq-section" data-state="not-found">
       <h1 className="exq-not-found__title">Page not found</h1>

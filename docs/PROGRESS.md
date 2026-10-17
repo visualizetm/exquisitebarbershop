@@ -77,3 +77,24 @@ commit, and what is still open.
   photos, services at 390 and 1280, plus montages).
 - Open: SEO, icons, the OG image, JSON-LD, the sitemap and Lighthouse are
   milestone 5.
+
+### Milestone 5: SEO, icons, OG, JSON-LD, sitemap, Lighthouse
+
+- Shipped: per-route title, description, canonical, Open Graph and robots meta
+  from shop data (`usePageMeta`); the 1200x630 OG image, favicons, apple touch
+  icon, maskable icon and web manifest rendered from the brand marks by
+  `scripts/brand-assets.ts`; JSON-LD BarberShop built from `/api/shop` with
+  `openingHoursSpecification`; `/sitemap.xml` served by the API from the live
+  chair list; robots.txt kept; one `/api/shop` fetch shared through a context;
+  Jost preloaded by a Vite plugin and a minimum main height to remove layout
+  shift.
+- Lighthouse mobile (production build, simulated throttling): Home 97 / 100 /
+  100 / 100, profile 96 / 100 / 100 / 100, Book 97 / 100 / 100 / 100
+  (performance, accessibility, best practices, SEO), CLS 0 on all three.
+- Tests: sitemap integration test, JSON-LD unit test, an e2e check of the
+  profile meta, JSON-LD and sitemap; the authorization matrix is 72 routes by
+  4 roles.
+- Screens: `docs/screens/m5/` (every public page, Manage, admin Today and
+  Photos at 390 and 1280, plus montages).
+- Open: the real brand SVGs, the domain (for the robots Sitemap line and the OG
+  URL), the real phone and hours, and a check on a real iPhone.

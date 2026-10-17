@@ -1,11 +1,7 @@
 import { Link } from 'react-router';
 import Phone from '@untitled-ui/icons-react/build/esm/Phone';
 import { galleryResponseSchema } from '@shared/api/photos';
-import {
-  publicServicesResponseSchema,
-  publicShopSchema,
-  publicStaffListResponseSchema,
-} from '@shared/api/public';
+import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
 import { HoursTable } from '@/components/site/HoursTable';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
@@ -13,12 +9,19 @@ import { ServiceRows } from '@/components/site/ServiceRows';
 import { TodaysChairs } from '@/components/site/TodaysChairs';
 import { ButtonAnchor, ButtonLink } from '@/components/ui';
 import { useApi } from '@/lib/useApi';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
+import { useShop } from '@/app/useShop';
 import { directionsUrl } from '@/lib/shop';
 
 export function HomePage() {
-  usePageTitle(null);
-  const shop = useApi('/api/shop', publicShopSchema);
+  const shop = useShop();
+  usePageMeta({
+    title: null,
+    description:
+      shop.status === 'ready'
+        ? `${shop.data.tagline}. Barbers and stylists under one roof at ${shop.data.address.line1}, ${shop.data.address.city}, ${shop.data.address.state}. Pick your chair and book online in under a minute.`
+        : undefined,
+  });
   const staff = useApi('/api/staff', publicStaffListResponseSchema);
   const services = useApi('/api/services', publicServicesResponseSchema);
   const gallery = useApi('/api/gallery?limit=6', galleryResponseSchema);

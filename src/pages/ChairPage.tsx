@@ -12,7 +12,7 @@ import { ButtonLink, Chips, ErrorState, PhotoArch, StickyCTA, TimeChipLink } fro
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
 
 export function ChairPage() {
   const { slug = '' } = useParams();
@@ -25,7 +25,13 @@ export function ChairPage() {
   );
   const services = useApi('/api/services', publicServicesResponseSchema);
   const work = useApi(slug ? `/api/gallery?staff=${encoded}&limit=6` : null, galleryResponseSchema);
-  usePageTitle(result.status === 'ready' ? result.data.staff.name : 'The Chairs');
+  const profile = result.status === 'ready' ? result.data.staff : null;
+  usePageMeta({
+    title: profile?.name ?? 'The chairs',
+    description: profile
+      ? `${profile.name}, ${profile.title} at Exquisite Barber & Beauty Lounge in Brookhaven, PA. ${profile.specialty}. See the next openings and book online.`
+      : undefined,
+  });
 
   // An old slug (from a printed card) resolves, then the address is replaced with the current one.
   useEffect(() => {

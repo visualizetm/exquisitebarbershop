@@ -6,7 +6,6 @@ import {
   rescheduleBookingResponseSchema,
   type ManageBookingResponse,
 } from '@shared/api/bookings';
-import { publicShopSchema } from '@shared/api/public';
 import { formatCents } from '@shared/lib/money';
 import { formatUsPhone } from '@shared/lib/phone';
 import { formatShopDateTime } from '@shared/lib/time';
@@ -19,7 +18,8 @@ import { Button, ButtonLink, Sheet, Ticket, TimeChip, useToast } from '@/compone
 import { ApiRequestError, apiRequest } from '@/lib/api';
 import { slotLabel } from '@/lib/booking/state';
 import { useApi } from '@/lib/useApi';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
+import { useShop } from '@/app/useShop';
 
 type Mode = 'view' | 'cancel' | 'reschedule' | 'cancelled' | 'rescheduled';
 
@@ -39,7 +39,7 @@ const STATUS_LABEL = {
 } as const;
 
 export function ManagePage() {
-  usePageTitle('Manage your booking');
+  usePageMeta({ title: 'Manage your booking', noindex: true });
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -53,7 +53,7 @@ export function ManagePage() {
   const [newSlot, setNewSlot] = useState<AvailabilitySlot | null>(null);
   const [override, setOverride] = useState<ManageBookingResponse | null>(null);
 
-  const shop = useApi('/api/shop', publicShopSchema);
+  const shop = useShop();
   const loaded = useApi(
     token ? `/api/bookings/manage?token=${encodeURIComponent(token)}` : null,
     manageBookingResponseSchema,

@@ -78,6 +78,9 @@ body {
 
 .exq-main {
   flex: 1 0 auto;
+  /* Keeps the footer below the first screen while a page loads, so nothing jumps. */
+  min-height: 100vh;
+  min-height: 100svh;
   outline: none;
 }
 

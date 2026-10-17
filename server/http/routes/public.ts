@@ -12,12 +12,20 @@ import {
 } from '../../../shared/api/public';
 import type { ServiceDocument } from '../../../shared/schemas/service';
 import type { StaffDocument } from '../../../shared/schemas/staff';
+import { getEnv } from '../../env';
 import { AppError } from '../../lib/errors';
 import { servicesRepo, shopSettingsRepo, staffRepo, weeklyHoursRepo } from '../../repos';
 import { staffOpenings } from '../../services/nextOpening';
 import { galleryPage, heroPhoto, staffPhotoMap } from '../../services/photosService';
 import { parseParams, parseQuery } from '../request';
 import type { RouteDefinition } from '../types';
+
+/** Public routes without parameters; chair profiles are added from the live staff list. */
+const SITEMAP_PATHS = ['/', '/services', '/chairs', '/gallery', '/visit', '/book'];
+
+function escapeXml(value: string): string {
+  return value.replace(/[<>&'"]/g, (c) => `&#${c.charCodeAt(0)};`);
+}
 
 export function toPublicService(doc: ServiceDocument): PublicService {
   return {
@@ -93,6 +101,26 @@ export const publicRoutes: RouteDefinition[] = [
       const services = await servicesRepo.listPublicServices();
       const body = publicServicesResponseSchema.parse({ services: services.map(toPublicService) });
       return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
+    },
+  },
+  {
+    // Served at /sitemap.xml by a rewrite (vercel.json in production, the Vite proxy in dev).
+    method: 'GET',
+    path: '/api/sitemap.xml',
+    auth: 'public',
+    handler: async () => {
+      const staff = await staffRepo.listPublicStaff();
+      const base = getEnv().APP_BASE_URL.replace(/\/$/, '');
+      const paths = [...SITEMAP_PATHS, ...staff.map((s) => `/chairs/${s.slug}`)];
+      const urls = paths.map((p) => `  <url><loc>${escapeXml(`${base}${p}`)}</loc></url>`);
+      const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+      return {
+        body,
+        headers: {
+          'Content-Type': 'application/xml; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      };
     },
   },
   {

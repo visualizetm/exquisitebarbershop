@@ -14,12 +14,16 @@ Last commit: see the bottom of this file.
 - Hosting: Vercel (Vite preset). `vercel.json` rewrites every non-API path to
   `index.html`, sets CSP and the security headers, and runs the outbox cron.
 - Tests: Vitest with mongodb-memory-server, Playwright for end to end.
+- SEO: per-route meta from `usePageMeta`, JSON-LD BarberShop from `/api/shop`,
+  `/sitemap.xml` from the API, `public/robots.txt`, `public/og.png` (1200x630),
+  favicons, apple touch icon and `site.webmanifest`. Brand assets are rendered
+  by `scripts/brand-assets.ts`.
 
 ## Routes and sections
 
 | Route         | Sections                                                                                                                   | Status                                      |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| /             | hero, today's chairs, services preview, the work, visit, ink band, footer                                                  | design pass in milestone 3                  |
+| /             | hero, today's chairs, services preview, the work, visit, ink band, footer                                                  | milestones 3 and 5                          |
 | /services     | heading, group chips, service rows with Book links                                                                         | milestone 3                                 |
 | /chairs       | heading, chair card grid                                                                                                   | milestone 3                                 |
 | /chairs/:slug | photo arch, badge, name, role, specialty, next openings, services, work strip, IG, sticky Book                             | milestone 3                                 |
@@ -29,6 +33,7 @@ Last commit: see the bottom of this file.
 | /manage       | ticket, reschedule, cancel sheet                                                                                           | milestone 4                                 |
 | /admin/\*     | sign in, today, schedule, bookings, new booking, block time, who's in, customers, settings, photos, audit, outbox, account | prompt 3; restyle in milestone 4            |
 | /kit          | every kit component in every state                                                                                         | development builds only                     |
+| /sitemap.xml  | public routes plus one entry per listed chair, from the API                                                                | milestone 5                                 |
 
 ## Component inventory
 
@@ -58,7 +63,9 @@ Older components still in use:
 Public: `GET /api/shop`, `/api/services`, `/api/staff`, `/api/staff/:slug`,
 `/api/availability`, `/api/availability/days` (with per day counts),
 `/api/availability/next`, `/api/staff/:slug/openings`, `/api/gallery`,
-`POST /api/bookings`, `/api/bookings/manage` (GET, cancel, reschedule). Staff
+`POST /api/bookings`, `/api/bookings/manage` (GET, cancel, reschedule),
+`/api/sitemap.xml` (rewritten from `/sitemap.xml`). `/api/shop` is fetched once
+per page load in the public layout and shared through `ShopContext`. Staff
 and owner routes, including photos, are listed in `docs/ARCHITECTURE.md`
 section 5. Photos are stored on Cloudflare R2 (local disk in development) and
 read through public URLs.
@@ -89,7 +96,10 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
 - Brand marks in `public/brand/` are placeholders until the real SVGs arrive
   (same file names).
 - The Visit policies and parking lines are placeholders until confirmed.
+- `robots.txt` has no Sitemap line until the domain is known (D4-33).
+- The OG image URL in index.html comes from APP_BASE_URL at build time; set it
+  in Vercel before the first production build.
 
 ## Last commit
 
-Milestone 4, see `docs/PROGRESS.md` for the hash and date.
+Milestone 5, 2026-10-17; see `docs/reports/04-design-photos.md` for the hashes.

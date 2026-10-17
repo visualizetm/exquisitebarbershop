@@ -58,10 +58,12 @@ export async function call(
   if (options.body !== undefined) init.body = JSON.stringify(options.body);
   const res = await fetch(`${baseUrl}${path}`, init);
   const text = await res.text();
+  const isJson = (res.headers.get('content-type') ?? '').includes('application/json');
   return {
     status: res.status,
     headers: res.headers,
-    body: text ? (JSON.parse(text) as Record<string, unknown>) : {},
+    // Non JSON responses (the sitemap) come back as { text }.
+    body: !text ? {} : isJson ? (JSON.parse(text) as Record<string, unknown>) : { text },
   };
 }
 

@@ -5,5 +5,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["tests/e2e", "scripts/e2e-accounts.ts", "shared", "seed"]
+  "include": ["tests/e2e", "scripts/e2e-accounts.ts", "scripts/brand-assets.ts", "shared", "seed"]
 }

@@ -8,7 +8,6 @@ import {
 } from '@shared/api/bookings';
 import {
   publicServicesResponseSchema,
-  publicShopSchema,
   publicStaffListResponseSchema,
   publicStaffResponseSchema,
 } from '@shared/api/public';
@@ -41,7 +40,8 @@ import {
   type CustomerDetails,
 } from '@/lib/booking/state';
 import { useApi } from '@/lib/useApi';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
+import { useShop } from '@/app/useShop';
 
 const STEPS = [
   { key: 'services', label: 'Services' },
@@ -68,14 +68,18 @@ interface ConflictState {
 }
 
 export function BookPage() {
-  usePageTitle('Book');
+  usePageMeta({
+    title: 'Book a chair',
+    description:
+      'Pick a service, a chair and a time at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Confirm in under a minute.',
+  });
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
   const selection = useMemo(() => readSelection(params), [params]);
   const step = resolveStep(selection);
 
-  const shop = useApi('/api/shop', publicShopSchema);
+  const shop = useShop();
   const services = useApi('/api/services', publicServicesResponseSchema);
   const staff = useApi('/api/staff', publicStaffListResponseSchema);
 
