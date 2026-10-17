@@ -142,7 +142,7 @@ test('a barber signs in and sees only their own schedule', async ({ page }) => {
   const body = myScheduleResponseSchema.parse(
     await page.evaluate(async () => {
       const res = await fetch('/api/me/schedule?days=7');
-      return res.json();
+      return res.json() as Promise<unknown>;
     }),
   );
   expect(body.staff.slug).toBe('marcus');

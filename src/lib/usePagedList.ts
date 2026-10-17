@@ -11,6 +11,7 @@ export function usePagedList<T, P extends { nextCursor: string | null }>(
   version = 0,
 ) {
   const [rows, setRows] = useState<T[]>([]);
+  const [page, setPage] = useState<P | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState<unknown>(null);
@@ -19,9 +20,10 @@ export function usePagedList<T, P extends { nextCursor: string | null }>(
     const controller = new AbortController();
     setStatus('loading');
     apiRequest(`${basePath}?${query}`, schema, { signal: controller.signal, fresh: true })
-      .then((page) => {
-        setRows(pick(page));
-        setCursor(page.nextCursor);
+      .then((first) => {
+        setRows(pick(first));
+        setPage(first);
+        setCursor(first.nextCursor);
         setStatus('ready');
       })
       .catch((err: unknown) => {
@@ -47,5 +49,5 @@ export function usePagedList<T, P extends { nextCursor: string | null }>(
     }
   }, [basePath, query, schema, cursor]);
 
-  return { rows, status, error, hasMore: cursor !== null, loadMore };
+  return { rows, page, status, error, hasMore: cursor !== null, loadMore };
 }

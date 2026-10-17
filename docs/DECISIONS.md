@@ -34,7 +34,7 @@ win.
 - D4-07 Kit page. `/kit` exists only in development builds (`import.meta.env.DEV`),
   as one lazy route, so every component state can be screenshotted and checked
   without a storybook dependency. It is not in the production bundle.
-- D4-08 Screenshots. `scripts/screens.ts` drives the e2e server with Playwright
+- D4-08 Screenshots. `tests/e2e/screens.ts` drives the e2e server with Playwright
   and builds the montage with the ImageMagick `montage` binary already on the
   machine. Rejected a Node image library (another dependency for one job).
 - D4-09 Nav. Solid paper bar, sticky, never transparent over photos, so the
@@ -63,3 +63,15 @@ win.
 - D4-16 Landing on a time from a link. `/book` with date and time checks the
   slot once against `/api/availability`; if it is gone it steps back to the
   time step with a notice. Rejected trusting the link and failing at confirm.
+- D4-17 Chairs page links. On the home strip the whole card goes to
+  /book?barber=<slug> as the brief says. On /chairs the card goes to the
+  profile, where the bio, openings and the Book button live; a card cannot hold
+  two links. Rejected a second Book link inside the card.
+- D4-18 Sample photos. Screenshots and the gallery e2e upload canvas-drawn
+  WebPs through the real upload flow from inside the browser (no image library
+  in Node, and the browser is what encodes WebP in production too).
+- D4-19 Service rows. The whole row is the Book link, with a red Book pill at
+  the end as the visible affordance, so the tap target is the full row and the
+  menu still reads as a list.
+- D4-20 Visit copy. The two policy lines and "Parking details coming soon"
+  carry the brief's placeholders unchanged; nothing was invented.

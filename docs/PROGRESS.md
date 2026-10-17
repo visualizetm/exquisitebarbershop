@@ -33,3 +33,23 @@ commit, and what is still open.
   service, off and closed days, openings, days count), a unit test for the
   label, and the authorization matrix at 71 routes x 4 roles.
 - Open: the Photos screen and the browser-side resize to WebP are milestone 4.
+
+### Milestone 3: public pages
+
+- Shipped: Home (hero with the R2 photo or the ink band, today's chairs strip
+  from `/api/availability/next`, services preview with group chips, the work
+  grid with the Lightbox, visit with today highlighted, the ink band), Services,
+  The chairs (grid in chair order), the profile (arch photo, badge, next
+  openings as TimeChips into /book with date and time, services, work strip,
+  Instagram, sticky Book on phones, alias redirect), Gallery (per chair chips
+  with counts, lazy grid with dimensions, Lightbox, load more), Visit (hours,
+  address, Directions, Call, policies, parking placeholder) and Not found.
+  Shared pieces in `src/components/site/`; layout in `src/styles/pages.css`.
+- Tests: e2e for the home strip linking to /book?barber, the profile chip
+  landing on details with the time selected, and the gallery lightbox after a
+  real upload from the browser. A prompt 3 test that booked ten hours ahead was
+  pinned to tomorrow so it never spills past midnight.
+- Screens: `docs/screens/m3/` (home, services, chairs, a profile, gallery,
+  visit at 390 and 1280 with sample photos, plus montages).
+- Open: Book, Manage and the dashboard keep their prompt 2 and 3 markup until
+  milestone 4.

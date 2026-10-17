@@ -1,0 +1,87 @@
+import { expect, test, type Page } from '@playwright/test';
+import { E2E_OWNER } from '../../scripts/e2e-accounts';
+import { staffIds, uploadSamplePhoto } from './photos';
+
+async function signInAsOwner(page: Page) {
+  await page.goto('/admin/login');
+  await page.getByLabel('Email').fill(E2E_OWNER.email);
+  await page.getByLabel('Password').fill(E2E_OWNER.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
+}
+
+test("the home strip shows today's chairs and each card books that chair", async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  const cards = page.locator(
+    '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
+  );
+  await expect(cards.first()).toBeVisible();
+  expect(await cards.count()).toBeGreaterThanOrEqual(6);
+  const marcus = cards.filter({ hasText: 'Marcus' });
+  await expect(marcus).toHaveAttribute('href', '/book?barber=marcus');
+  await expect(marcus.locator('.exq-chaircard__badge')).toHaveText(/Chair \d\d/);
+  await marcus.click();
+  await expect(page).toHaveURL(/\/book\?barber=marcus/);
+  await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeVisible();
+});
+
+test('a next-opening chip on the profile lands on the details step with that time', async ({
+  page,
+}) => {
+  await page.goto('/chairs/marcus');
+  await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
+  const chip = page.locator('.exq-chair__openings .exq-timechip').first();
+  await expect(chip).toBeVisible();
+  const startAt = (await chip.getAttribute('data-start')) ?? '';
+  expect(startAt).not.toBe('');
+  await chip.click();
+  await expect(page).toHaveURL(/\/book\?.*barber=marcus.*time=/);
+  await expect(page.getByRole('heading', { name: 'Your details' })).toBeFocused();
+  await expect(page.locator('.exq-book-summary, .exq-booking-summary').first()).toContainText(
+    'Marcus',
+  );
+  // Backing up to the time step shows the chosen time selected.
+  await page
+    .getByRole('button', { name: /Pick a time|Time/ })
+    .first()
+    .click();
+  await expect(
+    page.locator(`.exq-time-option[data-state="selected"] button[data-start="${startAt}"]`),
+  ).toBeVisible();
+});
+
+test('the gallery opens a photo in the lightbox with the barber and a book link', async ({
+  page,
+  context,
+}) => {
+  await signInAsOwner(page);
+  const ids = await staffIds(page);
+  await uploadSamplePhoto(page, {
+    kind: 'gallery',
+    staffId: ids.dee ?? '',
+    alt: 'Knotless braids by Dee',
+    label: 'DEE',
+    color: '#C8102E',
+  });
+  await context.clearCookies();
+
+  await page.goto('/gallery');
+  await expect(page.getByRole('heading', { name: 'The work' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Dee/ }).first()).toBeVisible();
+  const tile = page.locator('.exq-photo-grid__button').filter({ hasText: '' }).first();
+  await tile.click();
+  const dialog = page.locator('dialog.exq-sheet[open]');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'By Dee' })).toBeVisible();
+  await expect(dialog.locator('img')).toHaveAttribute('alt', 'Knotless braids by Dee');
+  await expect(dialog.getByRole('link', { name: 'Book Dee' })).toHaveAttribute(
+    'href',
+    '/book?barber=dee',
+  );
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  // The home page shows the work section once a photo exists.
+  await page.goto('/');
+  await expect(page.locator('.exq-home__work .exq-photo-grid__item')).toHaveCount(1);
+});

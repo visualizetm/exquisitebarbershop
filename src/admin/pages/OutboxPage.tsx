@@ -7,7 +7,7 @@ import { apiRequest } from '@/lib/api';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { ErrorNote } from '../components/ErrorNote';
 import { shopDateTime } from '../format';
-import { usePagedList } from '../usePagedList';
+import { usePagedList } from '@/lib/usePagedList';
 
 const pickMessages = (page: { messages: OutboxMessageView[] }) => page.messages;
 

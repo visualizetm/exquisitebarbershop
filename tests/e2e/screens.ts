@@ -1,20 +1,23 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium } from '@playwright/test';
+import { chromium, type Browser } from '@playwright/test';
 
 /**
  * Milestone screenshots: every given route at 390 and 1280 wide, saved under
  * docs/screens/<milestone>/, plus one montage per width built with ImageMagick.
  *
- *   npx tsx scripts/screens.ts m1 / /services /book
+ *   npx tsx tests/e2e/screens.ts m1 / /services /book
  *
  * Expects the e2e server (npm run e2e:server) on WEB_PORT, default 5174. Routes
  * under /admin sign in as the seeded owner first.
  */
 const WEB_PORT = process.env.WEB_PORT ?? '5174';
 const BASE = `http://127.0.0.1:${WEB_PORT}`;
-const [milestoneArg, ...routes] = process.argv.slice(2);
+const args = process.argv.slice(2);
+/** --photos uploads sample hero, chair and gallery photos first, so the pages show them. */
+const withPhotos = args.includes('--photos');
+const [milestoneArg, ...routes] = args.filter((a) => a !== '--photos');
 if (!milestoneArg || routes.length === 0) {
   console.error('Usage: tsx scripts/screens.ts <milestone> <route> [route...]');
   process.exit(1);
@@ -40,6 +43,7 @@ async function main(): Promise<void> {
   const browser = await chromium.launch(
     process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   );
+  if (withPhotos) await seedPhotos(browser);
   for (const size of WIDTHS) {
     const context = await browser.newContext({
       viewport: { width: size.width, height: size.height },
@@ -48,7 +52,7 @@ async function main(): Promise<void> {
     });
     const page = await context.newPage();
     if (routes.some((r) => r.startsWith('/admin'))) {
-      const { E2E_OWNER } = await import('./e2e-accounts');
+      const { E2E_OWNER } = await import('../../scripts/e2e-accounts');
       await page.goto(`${BASE}/admin/login`);
       await page.getByLabel('Email').fill(E2E_OWNER.email);
       await page.getByLabel('Password').fill(E2E_OWNER.password);
@@ -57,10 +61,19 @@ async function main(): Promise<void> {
     }
     for (const route of routes) {
       await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(400);
+      // Walk down the page so lazy images load, then return to the top for the capture.
+      await page.evaluate(async () => {
+        for (let y = 0; y < document.body.scrollHeight; y += 600) {
+          window.scrollTo(0, y);
+          await new Promise((r) => setTimeout(r, 60));
+        }
+        window.scrollTo(0, 0);
+      });
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(300);
       const target = join(dir, `${fileName(route)}-${size.name}.png`);
       await page.screenshot({ path: target, fullPage: true });
-      console.log(target);
+      process.stdout.write(`${target}\n`);
     }
     await context.close();
   }
@@ -86,8 +99,50 @@ async function main(): Promise<void> {
       '#D9D9D9',
       out,
     ]);
-    console.log(out);
+    process.stdout.write(`${out}\n`);
   }
+}
+
+/** Signs in as the seeded owner and uploads one hero, one portrait per chair and six gallery photos. */
+async function seedPhotos(browser: Browser): Promise<void> {
+  const { E2E_OWNER } = await import('../../scripts/e2e-accounts');
+  const { staffIds, uploadSamplePhoto } = await import('./photos');
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto(`${BASE}/admin/login`);
+  await page.getByLabel('Email').fill(E2E_OWNER.email);
+  await page.getByLabel('Password').fill(E2E_OWNER.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(/\/admin(?!\/login)/);
+  const ids = await staffIds(page);
+  const tones = ['#1F1F1F', '#333333', '#4A4A4A', '#650818', '#870A1F', '#A80D27'];
+  await uploadSamplePhoto(page, {
+    kind: 'hero',
+    alt: 'The shop floor',
+    label: 'EXQ',
+    color: '#1F1F1F',
+  });
+  let i = 0;
+  for (const [slug, id] of Object.entries(ids)) {
+    await uploadSamplePhoto(page, {
+      kind: 'staff',
+      staffId: id,
+      alt: `Portrait of ${slug}`,
+      label: slug.toUpperCase(),
+      color: tones[i % tones.length] ?? '#333333',
+    });
+    if (i < 6) {
+      await uploadSamplePhoto(page, {
+        kind: 'gallery',
+        staffId: id,
+        alt: `Work by ${slug}`,
+        label: `${slug.toUpperCase()} CUT`,
+        color: tones[(i + 3) % tones.length] ?? '#333333',
+      });
+    }
+    i += 1;
+  }
+  await context.close();
 }
 
 main().catch((error: unknown) => {

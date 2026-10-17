@@ -33,6 +33,9 @@ Last commit: see the bottom of this file.
 ## Component inventory
 
 See `docs/DESIGN-SYSTEM.md` for the kit table (name, props, states, where used).
+Site pieces built from the kit: `src/components/site/TodaysChairs.tsx`
+(staff, linkTo, layout), `ServiceRows.tsx` (services, limit, showDescription),
+`PhotoGrid.tsx` (photos, columns, firstPriority), `HoursTable.tsx` (hours).
 Older components still in use until their page is restyled:
 
 - `src/components/Status.tsx`: loading, error and empty line.
@@ -80,9 +83,9 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
 
 - Brand marks in `public/brand/` are placeholders until the real SVGs arrive
   (same file names).
-- Pages other than the layout chrome keep their unstyled markup until
-  milestones 3 and 4.
+- Book, Manage and the dashboard keep their unstyled markup until milestone 4.
+- The Visit policies and parking lines are placeholders until confirmed.
 
 ## Last commit
 
-Milestone 2, see `docs/PROGRESS.md` for the hash and date.
+Milestone 3, see `docs/PROGRESS.md` for the hash and date.

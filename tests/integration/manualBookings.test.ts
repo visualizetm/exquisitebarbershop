@@ -18,6 +18,7 @@ import {
   call,
   idemKey,
   phone,
+  slotAt,
   startTestServer,
   type TestServer,
 } from '../helpers/bookingApi';
@@ -225,11 +226,13 @@ describe('walk-ins', () => {
 
 describe('owner reschedule', () => {
   it('moves a booking, can override lead time, and notifies only when asked', async () => {
-    // Jay has no walk-ins from the tests above, so the early slot is free.
+    // Jay has no walk-ins from the tests above, so the early slot is free. Tomorrow
+    // at ten, rather than hours from now, so the booking never spills past midnight.
+    const tomorrow = shopDayStart(shopDateOf(new Date())).plus({ days: 1 }).toISODate() ?? '';
     const created = await bookPublic(server.baseUrl, {
       staff: 'jay',
       serviceIds: [cut],
-      startAt: startIn(600),
+      startAt: slotAt(tomorrow, '10:00'),
       email: 'move@example.com',
     });
     const quiet = await asOwner('POST', `/api/admin/bookings/${created.id}/reschedule`, {
@@ -244,7 +247,7 @@ describe('owner reschedule', () => {
     expect(templates).not.toContain('bookingRescheduled');
     expect(templates).not.toContain('ownerBookingRescheduled');
     const loud = await asOwner('POST', `/api/admin/bookings/${created.id}/reschedule`, {
-      startAt: startIn(660),
+      startAt: slotAt(tomorrow, '11:00'),
       notify: true,
     });
     expect(loud.status).toBe(200);

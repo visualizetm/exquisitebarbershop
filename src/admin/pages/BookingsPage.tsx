@@ -10,7 +10,7 @@ import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { BookingList } from '../components/BookingList';
 import { ErrorNote } from '../components/ErrorNote';
-import { usePagedList } from '../usePagedList';
+import { usePagedList } from '@/lib/usePagedList';
 
 const pickBookings = (page: { bookings: AdminBookingView[] }) => page.bookings;
 

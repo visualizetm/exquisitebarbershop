@@ -5,7 +5,7 @@ import { Status } from '@/components/Status';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { ErrorNote } from '../components/ErrorNote';
 import { shopDateTime } from '../format';
-import { usePagedList } from '../usePagedList';
+import { usePagedList } from '@/lib/usePagedList';
 
 const pickEntries = (page: { entries: AuditEntryView[] }) => page.entries;
 const FILTER_KEYS = ['action', 'entityType', 'entityId', 'actorType', 'from', 'to'] as const;
