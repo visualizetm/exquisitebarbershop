@@ -227,9 +227,9 @@ button.exq-chaircard:hover {
     color 150ms;
 }
 .exq-day-option[data-state='selected'] .exq-day-option__button {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  background: var(--selected-bg);
+  border-color: var(--selected-bg);
+  color: var(--selected-fg);
 }
 .exq-day-option[data-state='unavailable'] .exq-day-option__button {
   opacity: 0.5;
@@ -254,7 +254,8 @@ button.exq-chaircard:hover {
   color: var(--fg-3);
 }
 .exq-day-option[data-state='selected'] .exq-day-option__count {
-  color: var(--line);
+  color: inherit;
+  opacity: 0.8;
 }
 .exq-day-option[data-state='available'] .exq-day-option__count {
   color: var(--accent-text);

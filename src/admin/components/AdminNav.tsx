@@ -5,7 +5,7 @@ import DotsHorizontal from '@untitled-ui/icons-react/build/esm/DotsHorizontal';
 import Home02 from '@untitled-ui/icons-react/build/esm/Home02';
 import Plus from '@untitled-ui/icons-react/build/esm/Plus';
 import { okResponseSchema } from '@shared/api/auth';
-import { Button, Sheet } from '@/components/ui';
+import { Button, Mark, Sheet } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { NewBookingPage } from '../pages/NewBookingPage';
 import { useMe, useSession } from '../useSession';
@@ -85,12 +85,12 @@ export function AdminNav() {
     <header className="exq-adm-nav" data-state={me.user.role}>
       {/* Side nav, 1024px and up */}
       <nav className="exq-adm-nav__side" aria-label="Staff">
-        <img
+        <Mark
+          name="wordmark"
           className="exq-adm-nav__logo"
-          src="/brand/exq-wordmark-black.svg"
           alt="Exquisite"
-          width="200"
-          height="38"
+          width={200}
+          height={51}
         />
         {who}
         <ul className="exq-adm-nav__list">

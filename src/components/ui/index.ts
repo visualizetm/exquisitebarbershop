@@ -15,3 +15,5 @@ export { Ticket, type TicketRow } from './Ticket';
 export { TimeChip, TimeChipLink } from './TimeChip';
 export { ToastProvider, type ToastInput } from './Toast';
 export { useToast } from './useToast';
+export { Mark } from './Mark';
+export { ThemeMenu, ThemeSwitch } from './Theme';

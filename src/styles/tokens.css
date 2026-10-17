@@ -47,6 +47,117 @@
   --shadow-1: 0 1px 2px rgba(17, 17, 17, 0.06), 0 4px 16px rgba(17, 17, 17, 0.06);
   --shadow-2: 0 8px 32px rgba(17, 17, 17, 0.14);
 }
+
+/*
+ * Semantic surfaces. Light by default; .exq-dark scopes an ink band inside a
+ * light page. Selected states invert: ink on paper in light, paper on ink in dark.
+ */
+:root,
+.exq-light {
+  --bg: var(--paper);
+  --card: var(--paper);
+  --card-2: var(--surface-2);
+  --border: var(--line);
+  --fg: var(--ink);
+  --fg-2: var(--text-2);
+  --fg-3: var(--text-3);
+  --accent: var(--red-500);
+  --accent-strong: var(--red-600);
+  --accent-text: var(--red-500);
+  --accent-soft: var(--red-50);
+  --selected-bg: var(--ink);
+  --selected-fg: var(--paper);
+  --band-border: transparent;
+  --card-shadow: var(--shadow-1);
+  color-scheme: light;
+}
+.exq-dark {
+  --bg: var(--ink);
+  --card: var(--ink-2);
+  --card-2: var(--ink-3);
+  --border: var(--ink-3);
+  --fg: var(--paper);
+  --fg-2: var(--line);
+  --fg-3: #a6a6a6;
+  --accent: var(--red-500);
+  --accent-strong: var(--red-400);
+  --accent-text: var(--red-on-dark);
+  --accent-soft: var(--red-900);
+  --selected-bg: var(--paper);
+  --selected-fg: var(--ink);
+  --card-shadow: none;
+  color-scheme: dark;
+}
+
+/* Dark theme: chosen (data-theme) or System (prefers-color-scheme with no choice). */
+[data-theme='dark'] {
+  --bg: #111111;
+  --card: #1a1a1a;
+  --card-2: #222222;
+  --border: #2e2e2e;
+  --fg: #f4f4f4;
+  --fg-2: #b8b8b8;
+  --fg-3: #8c8c8c;
+  --accent: #c8102e;
+  --accent-strong: #e04c66;
+  --accent-text: #ff5470;
+  --accent-soft: #440510;
+  --selected-bg: #ffffff;
+  --selected-fg: #111111;
+  --band-border: #2e2e2e;
+  --ok: #5cc98a;
+  --warn: #e3b341;
+  --info: #7fb2ff;
+  --danger: #ff5470;
+  --card-shadow: none;
+  --shadow-1: none;
+  --shadow-2: none;
+  color-scheme: dark;
+}
+[data-theme='dark'] .exq-dark {
+  --bg: #1a1a1a;
+  --card: #222222;
+  --card-2: #2e2e2e;
+  --border: #2e2e2e;
+  --fg: #f4f4f4;
+  --fg-2: #b8b8b8;
+  --fg-3: #8c8c8c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #111111;
+    --card: #1a1a1a;
+    --card-2: #222222;
+    --border: #2e2e2e;
+    --fg: #f4f4f4;
+    --fg-2: #b8b8b8;
+    --fg-3: #8c8c8c;
+    --accent: #c8102e;
+    --accent-strong: #e04c66;
+    --accent-text: #ff5470;
+    --accent-soft: #440510;
+    --selected-bg: #ffffff;
+    --selected-fg: #111111;
+    --band-border: #2e2e2e;
+    --ok: #5cc98a;
+    --warn: #e3b341;
+    --info: #7fb2ff;
+    --danger: #ff5470;
+    --card-shadow: none;
+    --shadow-1: none;
+    --shadow-2: none;
+    color-scheme: dark;
+  }
+  :root:not([data-theme='light']) .exq-dark {
+    --bg: #1a1a1a;
+    --card: #222222;
+    --card-2: #2e2e2e;
+    --border: #2e2e2e;
+    --fg: #f4f4f4;
+    --fg-2: #b8b8b8;
+    --fg-3: #8c8c8c;
+  }
+}
 @media (min-width: 1024px) {
   :root {
     --fs-3: 20px;

@@ -8,7 +8,10 @@
       name="description"
       content="Barbers and stylists under one roof in Brookhaven, PA. Gifted Hands. Pick your chair and book online in under a minute."
     />
-    <meta name="theme-color" content="#111111" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <!-- Applies the stored theme before the first paint. Its sha256 is in the CSP (vercel.json). -->
+    <!-- prettier-ignore -->
+    <script>(function(){try{var t=localStorage.getItem('exq-theme');var r=document.documentElement;if(t==='light'||t==='dark'){r.setAttribute('data-theme',t)}var d=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);var m=document.querySelector('meta[name="theme-color"]');if(m){m.setAttribute('content',d?'#111111':'#FFFFFF')}}catch(e){}})();</script>
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

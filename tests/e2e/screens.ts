@@ -17,7 +17,9 @@ const BASE = `http://127.0.0.1:${WEB_PORT}`;
 const args = process.argv.slice(2);
 /** --photos uploads sample hero, chair and gallery photos first, so the pages show them. */
 const withPhotos = args.includes('--photos');
-const [milestoneArg, ...routes] = args.filter((a) => a !== '--photos');
+/** --theme=light|dark stores that choice before each page loads and suffixes the file names. */
+const theme = args.find((a) => a.startsWith('--theme='))?.slice('--theme='.length) ?? null;
+const [milestoneArg, ...routes] = args.filter((a) => a !== '--photos' && !a.startsWith('--theme='));
 if (!milestoneArg || routes.length === 0) {
   console.error('Usage: tsx scripts/screens.ts <milestone> <route> [route...]');
   process.exit(1);
@@ -51,6 +53,11 @@ async function main(): Promise<void> {
       reducedMotion: 'reduce',
     });
     const page = await context.newPage();
+    if (theme) {
+      await page.addInitScript((t) => {
+        localStorage.setItem('exq-theme', t);
+      }, theme);
+    }
     if (routes.some((r) => r.startsWith('/admin'))) {
       const { E2E_OWNER } = await import('../../scripts/e2e-accounts');
       await page.goto(`${BASE}/admin/login`);
@@ -71,7 +78,8 @@ async function main(): Promise<void> {
       });
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(300);
-      const target = join(dir, `${fileName(route)}-${size.name}.png`);
+      const suffix = theme ? `-${theme}` : '';
+      const target = join(dir, `${fileName(route)}${suffix}-${size.name}.png`);
       await page.screenshot({ path: target, fullPage: true });
       process.stdout.write(`${target}\n`);
     }
@@ -80,11 +88,12 @@ async function main(): Promise<void> {
   await browser.close();
 
   for (const size of WIDTHS) {
+    const suffix = theme ? `-${theme}` : '';
     const files = readdirSync(dir)
-      .filter((f) => f.endsWith(`-${size.name}.png`) && !f.startsWith('montage'))
+      .filter((f) => f.endsWith(`${suffix}-${size.name}.png`) && !f.startsWith('montage'))
       .map((f) => join(dir, f));
     if (files.length === 0) continue;
-    const out = join(dir, `montage-${size.name}.png`);
+    const out = join(dir, `montage${suffix}-${size.name}.png`);
     // Full-page shots differ in height; cap each tile so the montage stays readable.
     const tile = size.name === '390' ? '390x1600' : '1280x1400';
     execFileSync('montage', [

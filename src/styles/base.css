@@ -1,55 +1,35 @@
 /*
- * Semantic surfaces and global type. Light by default. The admin follows the
- * system scheme and ink bands on the public site opt in with .exq-dark.
+ * Global type and layout. Colors come from the semantic tokens in tokens.css,
+ * which also carry the dark theme; nothing here names a color.
  */
-:root,
-.exq-light {
-  --bg: var(--paper);
-  --card: var(--paper);
-  --card-2: var(--surface-2);
-  --border: var(--line);
-  --fg: var(--ink);
-  --fg-2: var(--text-2);
-  --fg-3: var(--text-3);
-  --accent: var(--red-500);
-  --accent-strong: var(--red-600);
-  --accent-text: var(--red-500);
-  --accent-soft: var(--red-50);
-  --card-shadow: var(--shadow-1);
-  color-scheme: light;
-}
 
-.exq-dark {
-  --bg: var(--ink);
-  --card: var(--ink-2);
-  --card-2: var(--ink-3);
-  --border: var(--ink-3);
-  --fg: var(--paper);
-  --fg-2: var(--line);
-  --fg-3: #a6a6a6;
-  --accent: var(--red-500);
-  --accent-strong: var(--red-400);
-  --accent-text: var(--red-on-dark);
-  --accent-soft: var(--red-900);
-  --card-shadow: none;
-  color-scheme: dark;
+/* Brand marks follow the theme without JavaScript: one file per theme, the other hidden. */
+.exq-mark--dark {
+  display: none;
 }
-
+[data-theme='dark'] .exq-mark--light {
+  display: none;
+}
+[data-theme='dark'] .exq-mark--dark {
+  display: inline-block;
+}
 @media (prefers-color-scheme: dark) {
-  .exq-app[data-state='admin'] {
-    --bg: var(--ink);
-    --card: var(--ink-2);
-    --card-2: var(--ink-3);
-    --border: var(--ink-3);
-    --fg: var(--paper);
-    --fg-2: var(--line);
-    --fg-3: #a6a6a6;
-    --accent: var(--red-500);
-    --accent-strong: var(--red-400);
-    --accent-text: var(--red-on-dark);
-    --accent-soft: var(--red-900);
-    --card-shadow: none;
-    color-scheme: dark;
+  :root:not([data-theme='light']) .exq-mark--light {
+    display: none;
+  }
+  :root:not([data-theme='light']) .exq-mark--dark {
+    display: inline-block;
+  }
+}
+
+/* A short color fade only while the theme switches, never under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme-switching],
+  html[data-theme-switching] * {
+    transition:
+      background-color 150ms,
+      color 150ms,
+      border-color 150ms !important;
   }
 }
 
@@ -149,8 +129,8 @@ a:hover {
   top: -100px;
   z-index: 100;
   padding: var(--s2) var(--s4);
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--selected-bg);
+  color: var(--selected-fg);
   border-radius: var(--r-pill);
 }
 .exq-skip-link:focus {
@@ -161,6 +141,7 @@ a:hover {
 .exq-band {
   background: var(--bg);
   color: var(--fg);
+  border-top: 1px solid var(--band-border);
 }
 
 /* Page width and gutters. */

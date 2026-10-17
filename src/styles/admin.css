@@ -121,14 +121,6 @@
   height: auto;
   margin-bottom: var(--s5);
 }
-.exq-dark .exq-adm-nav__logo {
-  filter: invert(1);
-}
-@media (prefers-color-scheme: dark) {
-  .exq-app[data-state='admin'] .exq-adm-nav__logo {
-    filter: invert(1);
-  }
-}
 .exq-adm-nav__signout {
   margin-top: auto;
   padding-top: var(--s5);
@@ -475,9 +467,9 @@
   font-size: var(--fs-1);
 }
 .exq-adm-conflict__option:has(input:checked) {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  background: var(--selected-bg);
+  border-color: var(--selected-bg);
+  color: var(--selected-fg);
 }
 .exq-adm-conflict__option[data-state='disabled'] {
   opacity: 0.45;

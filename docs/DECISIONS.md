@@ -143,3 +143,22 @@ win.
   public/ stays as it was, so a build without the variable is unchanged.
 - D5-05 Brand assets: Rob's real SVGs landed on the branch (commit 4054fe1), so
   `scripts/brand-assets.ts` was run and the icons and OG image regenerated.
+- D5-06 Theme tokens. The semantic surface variables moved from base.css into
+  tokens.css next to the brand tokens, and two new ones (`--selected-bg`,
+  `--selected-fg`) replace the `.exq-dark` overrides that components carried
+  for inverted selected states. The dark values are listed twice, under the
+  attribute and under the media query, exactly as the brief asks; a shared
+  block would need a preprocessor.
+- D5-07 Logo swap. `Mark` renders both files and CSS hides one, so the swap
+  happens with the first paint and needs no JavaScript. The invert filter on
+  the admin wordmark was dropped. There is no barber pole divider on the site
+  today; `Mark` already serves the pole for when one is added.
+- D5-08 The pre-paint script stays a one-liner guarded by `prettier-ignore`, so
+  the sha256 in vercel.json matches what the build emits. A unit test hashes
+  index.html against the CSP on every run.
+- D5-09 Toast and ticket head use the selected tokens (ink on paper in light,
+  paper on ink in dark) rather than hardcoded ink, so they stay readable on a
+  dark page and match the inverted selection rule from the brand boards.
+- D5-10 New dependency: @axe-core/playwright (dev only) for the accessibility
+  checks in both themes. It is the standard axe engine behind a Playwright
+  builder; nothing else was added.

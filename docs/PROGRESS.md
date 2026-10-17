@@ -112,3 +112,19 @@ commit, and what is still open.
   for everyone else); the real brand marks rendered into the icons and OG image.
 - Tests: sweep, mismatch cleanup, key prefix end to end, lockout bypass with the
   attacker still locked, the ten address cap and the 30 day expiry.
+
+### Milestone 2: three themes everywhere
+
+- Shipped: System, Light and Dark on the public site and the admin, stored
+  under `exq-theme`, applied as `data-theme` on `<html>` by an inline script
+  before the first paint (its sha256 is in the CSP); dark values in tokens.css
+  under the attribute and the media query; `theme-color` live; `ThemeMenu` in
+  the Nav and `ThemeSwitch` in the mobile menu and the admin Account page;
+  `Mark` swaps the black and white marks with CSS; ink bands get a #1A1A1A
+  surface and a #2E2E2E top border in dark; selected states invert.
+- Tests: persistence across reloads, System following an emulated scheme, the
+  first paint carrying the stored theme, the keyboard flow, axe in both themes
+  on Home, Book, admin Today and Account, and the CSP hash unit test.
+- Screens: `docs/screens/theme/` (Home, a profile, Book, Manage, admin Today and
+  Photos at 390 and 1280 in light and dark; `montage-light-*` and
+  `montage-dark-*`).

@@ -184,11 +184,10 @@ select.exq-field__control {
   color: var(--fg);
 }
 .exq-chip[data-state='selected'] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  background: var(--selected-bg);
+  border-color: var(--selected-bg);
+  color: var(--selected-fg);
 }
-.exq-dark .exq-chip[data-state='selected'],
 .exq-chip[data-tone='accent'][data-state='selected'] {
   background: var(--accent);
   border-color: var(--accent);
@@ -343,8 +342,8 @@ select.exq-field__control {
   width: 100%;
   padding: var(--s3) var(--s4);
   border-radius: var(--r-md);
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--selected-bg);
+  color: var(--selected-fg);
   box-shadow: var(--shadow-2);
   pointer-events: auto;
   animation: exq-sheet-up 180ms ease-out;
@@ -398,9 +397,9 @@ select.exq-field__control {
   position: sticky;
   top: 0;
   z-index: 40;
-  background: var(--paper);
-  color: var(--ink);
-  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
 }
 .exq-nav__inner {
   display: flex;
@@ -486,8 +485,9 @@ select.exq-field__control {
 
 /* Footer ------------------------------------------------------------------ */
 .exq-footer {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--bg);
+  color: var(--fg);
+  border-top: 1px solid var(--band-border);
   padding-block: var(--s7) var(--s5);
 }
 .exq-footer__grid {
@@ -503,7 +503,7 @@ select.exq-field__control {
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--line);
+  color: var(--fg-2);
   margin-bottom: var(--s2);
 }
 .exq-footer__hours {
@@ -516,7 +516,7 @@ select.exq-field__control {
   margin: 0;
 }
 .exq-footer a:hover {
-  color: var(--red-on-dark);
+  color: var(--accent-text);
 }
 .exq-footer__meta {
   display: flex;
@@ -524,9 +524,9 @@ select.exq-field__control {
   gap: var(--s2) var(--s4);
   margin-top: var(--s6);
   padding-top: var(--s4);
-  border-top: 1px solid var(--ink-3);
+  border-top: 1px solid var(--border);
   font-size: var(--fs-1);
-  color: var(--line);
+  color: var(--fg-2);
 }
 @media (min-width: 768px) {
   .exq-footer__grid {
@@ -793,15 +793,15 @@ a.exq-chaircard:hover {
 }
 .exq-ticket__head {
   padding: var(--s5) var(--s4);
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--selected-bg);
+  color: var(--selected-fg);
 }
 .exq-ticket__label {
   font-size: var(--fs-1);
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--line);
+  opacity: 0.75;
 }
 .exq-ticket__code {
   font-size: var(--fs-5);
@@ -839,7 +839,8 @@ a.exq-chaircard:hover {
   padding: 0 var(--s4) var(--s4);
 }
 .exq-ticket[data-state='cancelled'] .exq-ticket__head {
-  background: var(--ink-3);
+  background: var(--fg-3);
+  color: var(--bg);
 }
 
 /* Lightbox ---------------------------------------------------------------- */
@@ -887,12 +888,8 @@ a.exq-chaircard:hover {
   cursor: pointer;
 }
 .exq-seg__btn[data-state='selected'] {
-  background: var(--ink);
-  color: var(--paper);
-}
-.exq-dark .exq-seg__btn[data-state='selected'] {
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--selected-bg);
+  color: var(--selected-fg);
 }
 .exq-seg__btn:disabled {
   opacity: 0.45;
@@ -953,4 +950,90 @@ a.exq-chaircard:hover {
   .exq-strip {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
+}
+
+/* Theme menu and switch ---------------------------------------------------- */
+.exq-theme {
+  position: relative;
+}
+.exq-theme__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+}
+.exq-theme__button:hover,
+.exq-theme[data-state='open'] .exq-theme__button {
+  border-color: var(--border);
+  background: var(--card-2);
+}
+.exq-theme__button > svg,
+.exq-theme__item > svg,
+.exq-theme-switch__option > svg {
+  width: 20px;
+  height: 20px;
+}
+.exq-theme__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--s1));
+  z-index: 50;
+  display: grid;
+  min-width: 160px;
+  padding: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--fg);
+  box-shadow: var(--card-shadow);
+}
+.exq-theme__menu[hidden] {
+  display: none;
+}
+.exq-theme__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-theme__item:hover,
+.exq-theme__item:focus-visible {
+  background: var(--card-2);
+}
+.exq-theme__item[data-state='selected'] {
+  color: var(--accent-text);
+}
+.exq-theme-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2) var(--s4);
+}
+.exq-theme-switch__label {
+  font-weight: 500;
+}
+.exq-theme-switch__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-height: 44px;
 }

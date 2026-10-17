@@ -17,12 +17,57 @@ in every state on `/kit` (development builds only).
 | Shape   | `--r-sm` 8, `--r-md` 16, `--r-pill` 999; the arch frame is `999px 999px 16px 16px`                                                                                  |
 | Shadow  | `--shadow-1` soft card, `--shadow-2` sheets and toasts                                                                                                              |
 
-Semantic surfaces (base.css) derive from the tokens: `--bg`, `--card`, `--card-2`,
-`--border`, `--fg`, `--fg-2`, `--fg-3`, `--accent`, `--accent-strong`,
-`--accent-text`, `--accent-soft`, `--card-shadow`. Light by default. `.exq-dark`
-switches a block to ink (bg #111, cards #1F1F1F with no shadow, borders #333,
-red text #FF5470). The admin (`.exq-app[data-state="admin"]`) follows
-`prefers-color-scheme`.
+Semantic surfaces (tokens.css) derive from the tokens: `--bg`, `--card`,
+`--card-2`, `--border`, `--fg`, `--fg-2`, `--fg-3`, `--accent`,
+`--accent-strong`, `--accent-text`, `--accent-soft`, `--selected-bg`,
+`--selected-fg`, `--band-border`, `--card-shadow`. Light by default. `.exq-dark`
+switches a block to ink inside a light page (bg #111, cards #1F1F1F with no
+shadow, borders #333, red text #FF5470).
+
+## Themes
+
+Three modes everywhere, public site and admin: System (default, follows
+`prefers-color-scheme`), Light and Dark. The choice is stored in localStorage
+under `exq-theme` and applied as `data-theme="light|dark"` on `<html>`; with no
+attribute, System applies. An inline script in `index.html` sets the attribute
+and the `theme-color` meta before the first paint; its sha256 is listed in the
+CSP (`vercel.json`), checked by `tests/unit/csp.test.ts`. `theme-color` is
+#FFFFFF in light and #111111 in dark, kept live by `src/lib/theme.ts`.
+
+Dark values (same list under `[data-theme="dark"]` and under
+`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`;
+values change, names never):
+
+| Token           | Dark    | Notes                                              |
+| --------------- | ------- | -------------------------------------------------- |
+| `--bg`          | #111111 | page                                               |
+| `--card`        | #1A1A1A | cards, sheets, the nav                             |
+| `--card-2`      | #222222 | nested surfaces, hover                             |
+| `--border`      | #2E2E2E | lines, 3:1 against the page                        |
+| `--fg`          | #F4F4F4 | text                                               |
+| `--fg-2`        | #B8B8B8 | secondary text                                     |
+| `--fg-3`        | #8C8C8C | tertiary text, 5.6:1 on #111                       |
+| `--accent`      | #C8102E | red buttons keep white text                        |
+| `--accent-text` | #FF5470 | red text and live dots                             |
+| `--selected-bg` | #FFFFFF | selected chips, days, segments invert to paper     |
+| `--selected-fg` | #111111 |                                                    |
+| `--band-border` | #2E2E2E | top border of ink bands (the CTA band, the footer) |
+| `--ok` etc      | lighter | #5CC98A, #E3B341, #7FB2FF, danger #FF5470          |
+| `--card-shadow` | none    | cards are lighter than the page instead            |
+
+Inside `.exq-dark` bands the dark theme uses bg #1A1A1A and border #2E2E2E so
+they still read as bands. Photos and scrims never change. Brand marks swap with
+CSS: the `Mark` component renders the black and white files and
+`.exq-mark--light` or `.exq-mark--dark` hides the other one. Switching is
+instant; `html[data-theme-switching]` fades background, color and border for
+150ms and not at all under reduced motion. Nothing moves on a switch.
+
+Toggle: `ThemeMenu` (icon button with sun, moon and monitor; `aria-label`
+"Theme: System"; a menu of `menuitemradio` items with arrow keys, Enter, Space
+and Escape) in the public Nav, and `ThemeSwitch` (a `.exq-seg` radiogroup) in
+the mobile menu Sheet and on the admin Account page. Axe (wcag2a and wcag2aa)
+passes in both themes on Home, Book, admin Today and Account
+(`tests/e2e/theme.spec.ts`).
 
 ## Type
 
@@ -53,7 +98,7 @@ red text #FF5470). The admin (`.exq-app[data-state="admin"]`) follows
 
 ## Brand assets
 
-- `public/brand/` holds the marks (placeholders until the real SVGs arrive).
+- `public/brand/` holds the real marks (black and white of each, plus the pill).
 - `public/og.png` (1200x630, white primary logo on ink), `favicon.ico`,
   `favicon.svg`, `icon-192.png`, `icon-512.png`, `icon-512-maskable.png` and
   `apple-touch-icon.png` are rendered from the marks by
@@ -80,6 +125,8 @@ red text #FF5470). The admin (`.exq-app[data-state="admin"]`) follows
 | TimeChip, TimeChipLink           | label, sub, selected, disabled, startAt, onClick or to                              | default, selected, disabled                         | Book, profile openings                    |
 | Ticket                           | code, heading, rows, total, actions, state                                          | confirmed, cancelled, completed                     | Book done, Manage                         |
 | Lightbox                         | photos, index, onClose, onIndex                                                     | open (via Sheet)                                    | Home work, Gallery, profile               |
+| ThemeMenu, ThemeSwitch           | none (read the stored choice); ThemeSwitch label                                    | open, closed; per item selected, idle               | Nav, mobile menu, admin Account           |
+| Mark                             | name (primary, wordmark, stacked, q-icon, seal, pole, pill), alt, width, height     | light or dark file shown by CSS                     | Nav, admin side nav                       |
 
 Layout helpers: `.exq-wrap` (1200px, 16px gutters, 32px from 768px),
 `.exq-section`, `.exq-grid[data-cols][data-md][data-lg]`, `.exq-strip` (sideways

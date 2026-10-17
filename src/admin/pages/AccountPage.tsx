@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { logoutAllResponseSchema } from '@shared/api/auth';
+import { ThemeSwitch } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { ErrorNote } from '../components/ErrorNote';
@@ -46,6 +47,11 @@ export function AccountPage() {
           </>
         ) : null}
       </dl>
+      <section className="exq-adm-account__theme" aria-labelledby="exq-adm-account-theme">
+        <h2 id="exq-adm-account-theme">Appearance</h2>
+        <p>System follows your phone or computer. Light and Dark stay put.</p>
+        <ThemeSwitch />
+      </section>
       <ChangePasswordPage />
       <section className="exq-adm-account__sessions" aria-labelledby="exq-adm-account-sessions">
         <h2 id="exq-adm-account-sessions">Sign out everywhere</h2>

@@ -93,8 +93,6 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
 
 ## Known bugs and TODOs
 
-- Brand marks in `public/brand/` are placeholders until the real SVGs arrive
-  (same file names).
 - The Visit policies and parking lines are placeholders until confirmed.
 - `robots.txt` has no Sitemap line until the domain is known (D4-33).
 - The OG image URL in index.html comes from APP_BASE_URL at build time; set it

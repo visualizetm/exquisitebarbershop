@@ -11,6 +11,9 @@
   background: var(--ink);
   color: var(--paper);
 }
+.exq-hero[data-state='ink'] {
+  background: var(--bg);
+}
 .exq-hero__img {
   position: absolute;
   inset: 0;
@@ -44,13 +47,13 @@
   gap: var(--s4);
 }
 .exq-hero__title {
-  color: var(--paper);
+  color: var(--fg);
   max-width: 14ch;
 }
 .exq-hero__lead {
   font-size: var(--fs-3);
   max-width: 36ch;
-  color: var(--line);
+  color: var(--fg-2);
 }
 .exq-hero__actions {
   display: flex;
@@ -97,7 +100,7 @@
   font-weight: 500;
 }
 .exq-home__cta h2 {
-  color: var(--paper);
+  color: var(--fg);
   margin-bottom: var(--s5);
 }
 .exq-chairs__fallback {

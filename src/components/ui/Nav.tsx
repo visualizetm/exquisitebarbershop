@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import Menu01 from '@untitled-ui/icons-react/build/esm/Menu01';
 import { ButtonLink } from './Button';
+import { Mark } from './Mark';
 import { Sheet } from './Sheet';
+import { ThemeMenu, ThemeSwitch } from './Theme';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home', end: true },
@@ -33,13 +35,7 @@ export function Nav() {
           className="exq-nav__brand exq-site-header__brand"
           aria-label="Exquisite Barber & Beauty Lounge, home"
         >
-          <img
-            className="exq-nav__logo"
-            src="/brand/exq-primary-black.svg"
-            alt=""
-            width="200"
-            height="32"
-          />
+          <Mark name="primary" className="exq-nav__logo" width={200} height={81} />
         </NavLink>
         <nav id="exq-primary-nav" className="exq-nav__links exq-primary-nav" aria-label="Primary">
           {NAV_ITEMS.map((item) => (
@@ -56,6 +52,7 @@ export function Nav() {
           ))}
         </nav>
         <div className="exq-nav__actions">
+          <ThemeMenu />
           <ButtonLink to="/book" size="sm">
             Book a chair
           </ButtonLink>
@@ -91,6 +88,7 @@ export function Nav() {
           <ButtonLink to="/book" block>
             Book a chair
           </ButtonLink>
+          <ThemeSwitch />
         </nav>
       </Sheet>
     </header>
