@@ -103,7 +103,11 @@ function toApiSlot(slot: OpenSlot): AvailabilitySlot {
   };
 }
 
-function reasonError(result: AvailabilityResult, startAt: Date, ctx: AvailabilityContext): AppError {
+function reasonError(
+  result: AvailabilityResult,
+  startAt: Date,
+  ctx: AvailabilityContext,
+): AppError {
   // Too soon is reported as such even when later times that day are open.
   if (startAt.getTime() < addMinutes(ctx.now, ctx.settings.leadTimeMinutes).getTime()) {
     return new AppError('OUTSIDE_BOOKING_WINDOW', 'That time is too soon to book online');
