@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DateTime } from 'luxon';
 import { E2E_BARBER, E2E_OWNER } from '../../scripts/e2e-accounts';
+import { myScheduleResponseSchema } from '../../shared/api/admin';
 
 const SHOP_ZONE = 'America/New_York';
 
@@ -136,13 +137,12 @@ test('a barber signs in and sees only their own schedule', async ({ page }) => {
   await page.getByRole('button', { name: 'Week' }).click();
   await expect(page.locator('.exq-adm-mine')).toHaveAttribute('data-view', 'week');
   await expect(page.locator('.exq-adm-mine__day')).toHaveCount(7);
-  const body = (await page.evaluate(async () => {
-    const res = await fetch('/api/me/schedule?days=7');
-    return (await res.json()) as unknown;
-  })) as {
-    staff: { slug: string };
-    days: { bookings: { staff: { slug: string } }[] }[];
-  };
+  const body = myScheduleResponseSchema.parse(
+    await page.evaluate(async () => {
+      const res = await fetch('/api/me/schedule?days=7');
+      return res.json();
+    }),
+  );
   expect(body.staff.slug).toBe('marcus');
   expect(body.days.flatMap((d) => d.bookings).every((b) => b.staff.slug === 'marcus')).toBe(true);
 });
