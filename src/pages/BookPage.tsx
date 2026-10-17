@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import type { AvailabilitySlot } from '@shared/api/availability';
+import { availabilityResponseSchema, type AvailabilitySlot } from '@shared/api/availability';
 import {
   createBookingResponseSchema,
   type CreateBookingRequest,
@@ -8,13 +8,15 @@ import {
 } from '@shared/api/bookings';
 import {
   publicServicesResponseSchema,
-  publicShopSchema,
   publicStaffListResponseSchema,
   publicStaffResponseSchema,
 } from '@shared/api/public';
 import { Status } from '@/components/Status';
+import { Button, StepBar, StickyCTA, Ticket, TimeChip, useToast } from '@/components/ui';
+import { formatCents } from '@shared/lib/money';
+import { formatShopDateTime } from '@shared/lib/time';
+import { BookingCard } from '@/components/booking/BookingCard';
 import { BookingSummary } from '@/components/booking/BookingSummary';
-import { viewToSummary } from '@/lib/booking/helpers';
 import { CustomerForm } from '@/components/booking/CustomerForm';
 import { DayPicker } from '@/components/booking/DayPicker';
 import { IcsDownload } from '@/components/booking/IcsDownload';
@@ -39,7 +41,17 @@ import {
   type CustomerDetails,
 } from '@/lib/booking/state';
 import { useApi } from '@/lib/useApi';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { usePageMeta } from '@/lib/usePageTitle';
+import { useShop } from '@/app/useShop';
+
+const STEPS = [
+  { key: 'services', label: 'Services' },
+  { key: 'barber', label: 'Chair' },
+  { key: 'day', label: 'Day' },
+  { key: 'time', label: 'Time' },
+  { key: 'details', label: 'Details' },
+  { key: 'confirm', label: 'Confirm' },
+] as const;
 
 const STEP_TITLES: Record<BookStep, string> = {
   services: 'Choose your services',
@@ -57,13 +69,18 @@ interface ConflictState {
 }
 
 export function BookPage() {
-  usePageTitle('Book');
+  usePageMeta({
+    title: 'Book a chair',
+    description:
+      'Pick a service, a chair and a time at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Confirm in under a minute.',
+  });
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const selection = useMemo(() => readSelection(params), [params]);
   const step = resolveStep(selection);
 
-  const shop = useApi('/api/shop', publicShopSchema);
+  const shop = useShop();
   const services = useApi('/api/services', publicServicesResponseSchema);
   const staff = useApi('/api/staff', publicStaffListResponseSchema);
 
@@ -75,6 +92,10 @@ export function BookPage() {
   const [confirmation, setConfirmation] = useState<CreateBookingResponse | null>(() =>
     loadConfirmation(),
   );
+  // A time that arrived in the URL (a profile opening chip) is checked once; if it has gone,
+  // the flow steps back to the times with a notice instead of failing at confirm.
+  const [staleTime, setStaleTime] = useState<string | null>(null);
+  const checkedTime = useRef<string | null>(null);
 
   const update = (patch: Partial<BookSelection>, nextStep?: BookStep) => {
     const next: BookSelection = { ...selection, ...patch, step: nextStep ?? null };
@@ -93,6 +114,26 @@ export function BookPage() {
     setParams(writeSelection({ ...selection, step: target }));
   };
 
+  const latestStartAt = useRef<string | null>(null);
+  latestStartAt.current = selection.startAt;
+  useEffect(() => {
+    const { date, startAt, staff: who, serviceIds } = selection;
+    if (!date || !startAt || !who || serviceIds.length === 0) return;
+    if (step !== 'details' && step !== 'confirm') return;
+    if (checkedTime.current === startAt) return;
+    checkedTime.current = startAt;
+    const query = new URLSearchParams({ date, serviceIds: serviceIds.join(','), staff: who });
+    // Not aborted on cleanup: StrictMode runs effects twice in development and the check must land.
+    apiRequest(`/api/availability?${query.toString()}`, availabilityResponseSchema)
+      .then((result) => {
+        if (latestStartAt.current !== startAt) return;
+        if (result.slots.some((slot) => slot.startAt === startAt)) return;
+        setStaleTime(startAt);
+        setParams(writeSelection({ ...selection, startAt: null, step: 'time' }), { replace: true });
+      })
+      .catch(() => undefined);
+  }, [selection, step, setParams]);
+
   // An alias slug on a printed card resolves to the current slug and the address is corrected.
   useEffect(() => {
     if (staff.status !== 'ready' || !selection.staff || selection.staff === 'any') return;
@@ -109,16 +150,16 @@ export function BookPage() {
 
   if (shop.status === 'error' || services.status === 'error' || staff.status === 'error') {
     return (
-      <article className="exq-book" data-state="error">
-        <h1 className="exq-book__title">Book a chair</h1>
+      <article className="exq-book exq-wrap exq-section" data-state="error">
+        <h1 className="exq-book__title">Book your chair</h1>
         <Status state="error" />
       </article>
     );
   }
   if (shop.status !== 'ready' || services.status !== 'ready' || staff.status !== 'ready') {
     return (
-      <article className="exq-book" data-state="loading">
-        <h1 className="exq-book__title">Book a chair</h1>
+      <article className="exq-book exq-wrap exq-section" data-state="loading">
+        <h1 className="exq-book__title">Book your chair</h1>
         <Status state="loading" />
       </article>
     );
@@ -128,10 +169,11 @@ export function BookPage() {
   const chosenServices = selection.serviceIds
     .map((id) => allServices.find((s) => s.id === id))
     .filter((s) => s !== undefined);
-  const staffName =
+  const chosenStaff =
     selection.staff === 'any'
-      ? 'First available'
-      : (staff.data.staff.find((s) => s.slug === selection.staff)?.name ?? 'Not chosen yet');
+      ? 'Anyone available'
+      : (staff.data.staff.find((s) => s.slug === selection.staff)?.name ?? null);
+  const staffName = chosenStaff ?? 'Not chosen yet';
   const fingerprint = JSON.stringify([
     selection.serviceIds,
     selection.staff,
@@ -172,6 +214,7 @@ export function BookPage() {
         clearIdempotencyKey();
         setRefreshVersion((v) => v + 1);
         setConflict({ message: error.message, alternatives: error.alternatives ?? [] });
+        toast({ text: 'That time was just taken. Pick one of the fresh times.', tone: 'warn' });
       } else if (error instanceof ApiRequestError) {
         clearIdempotencyKey();
         setSubmitError(error.message);
@@ -229,16 +272,24 @@ export function BookPage() {
         );
       case 'time':
         return (
-          <TimePicker
-            date={selection.date ?? ''}
-            serviceIds={selection.serviceIds}
-            staff={selection.staff ?? 'any'}
-            selected={selection.startAt}
-            version={refreshVersion}
-            onPick={(slot) => {
-              update({ startAt: slot.startAt }, 'details');
-            }}
-          />
+          <>
+            {staleTime ? (
+              <p className="exq-book-notice" role="alert" data-state="stale-time">
+                That time was just taken. Here are the times still open.
+              </p>
+            ) : null}
+            <TimePicker
+              date={selection.date ?? ''}
+              serviceIds={selection.serviceIds}
+              staff={selection.staff ?? 'any'}
+              selected={selection.startAt}
+              version={refreshVersion}
+              onPick={(slot) => {
+                setStaleTime(null);
+                update({ startAt: slot.startAt }, 'details');
+              }}
+            />
+          </>
         );
       case 'details':
         return (
@@ -277,9 +328,14 @@ export function BookPage() {
                         key={`${slot.staffId}-${slot.startAt}`}
                         className="exq-book-conflict__option"
                       >
-                        <button
-                          type="button"
-                          className="exq-button"
+                        <TimeChip
+                          label={`${new Date(slot.startAt).toLocaleDateString('en-US', {
+                            timeZone: 'America/New_York',
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                          })} ${slotLabel(slot)}`}
+                          startAt={slot.startAt}
                           onClick={() => {
                             setConflict(null);
                             setParams(
@@ -291,29 +347,20 @@ export function BookPage() {
                               }),
                             );
                           }}
-                        >
-                          {new Date(slot.startAt).toLocaleDateString('en-US', {
-                            timeZone: 'America/New_York',
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                          })}{' '}
-                          at {slotLabel(slot)}
-                        </button>
+                        />
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <p>
-                    <button
-                      type="button"
-                      className="exq-button"
+                    <Button
+                      variant="secondary"
                       onClick={() => {
                         goTo('day');
                       }}
                     >
                       Pick another day
-                    </button>
+                    </Button>
                   </p>
                 )}
               </div>
@@ -323,25 +370,26 @@ export function BookPage() {
                 {submitError}
               </p>
             ) : null}
-            <p className="exq-book-confirm__actions">
-              <button
-                type="button"
-                className="exq-button exq-button--primary"
-                disabled={submitting}
-                onClick={() => void submit()}
-              >
+            <StickyCTA
+              primary={`${chosenServices.some((s) => s.priceFrom) ? 'From ' : ''}${formatCents(
+                chosenServices.reduce((sum, s) => sum + s.priceCents, 0),
+              )}`}
+              secondary={`${String(chosenServices.reduce((sum, s) => sum + s.durationMinutes, 0))} min with ${staffName}`}
+            >
+              <Button loading={submitting} onClick={() => void submit()}>
                 {submitting ? 'Booking' : 'Confirm booking'}
-              </button>
-              <button
-                type="button"
-                className="exq-button"
+              </Button>
+            </StickyCTA>
+            <p className="exq-book-confirm__actions">
+              <Button
+                variant="secondary"
                 disabled={submitting}
                 onClick={() => {
                   goTo('details');
                 }}
               >
                 Edit details
-              </button>
+              </Button>
             </p>
           </div>
         );
@@ -354,33 +402,55 @@ export function BookPage() {
           );
         }
         const manageUrl = `${window.location.origin}${confirmation.managePath}`;
+        const booked = confirmation.booking;
         return (
           <div className="exq-book-done" data-state="booked">
-            <p className="exq-book-done__reference">
-              Reference code{' '}
-              <strong className="exq-book-done__code">{confirmation.booking.referenceCode}</strong>
-            </p>
-            <BookingSummary
-              services={viewToSummary(confirmation.booking)}
-              staffName={confirmation.booking.staff.name}
-              startAt={confirmation.booking.startAt}
-              endAt={confirmation.booking.endAt}
-              customer={confirmation.booking.customer}
-              notes={confirmation.booking.notes}
+            <Ticket
+              code={booked.referenceCode}
+              heading="You are booked"
+              rows={[
+                {
+                  label: 'Chair',
+                  value: `${booked.staff.name}${booked.staffRequested ? '' : ' (first available)'}`,
+                },
+                { label: 'When', value: formatShopDateTime(new Date(booked.startAt)) },
+                { label: 'Services', value: booked.services.map((s) => s.name).join(', ') },
+                {
+                  label: 'For',
+                  value: `${booked.customer.name}, ${booked.customer.phone}`,
+                },
+              ]}
+              total={formatCents(booked.totalPriceCents)}
+              actions={
+                <>
+                  <IcsDownload booking={booked} shop={shop.data} manageUrl={manageUrl} />
+                  <Link
+                    className="exq-btn"
+                    data-variant="secondary"
+                    data-size="md"
+                    to={confirmation.managePath}
+                  >
+                    Manage this booking
+                  </Link>
+                </>
+              }
             />
-            {confirmation.booking.customer.email ? (
+            <p className="exq-book-done__reference exq-visually-hidden">
+              Reference code <strong className="exq-book-done__code">{booked.referenceCode}</strong>
+            </p>
+            {booked.customer.email ? (
               <p className="exq-book-done__email">
-                A confirmation is on its way to {confirmation.booking.customer.email}.
+                A confirmation is on its way to {booked.customer.email}.
               </p>
             ) : null}
-            <p className="exq-book-done__actions">
-              <Link className="exq-button" to={confirmation.managePath}>
-                Cancel or reschedule
-              </Link>
-              <IcsDownload booking={confirmation.booking} shop={shop.data} manageUrl={manageUrl} />
-            </p>
             <p className="exq-book-done__manage-url">
-              Keep this link to manage your booking: <a href={manageUrl}>{manageUrl}</a>
+              Keep the confirmation email: its link lets you move or cancel this booking.
+              {booked.customer.email ? null : (
+                <>
+                  {' '}
+                  No email was given, so <a href={manageUrl}>save this manage link</a>.
+                </>
+              )}
             </p>
             <p>
               <Link
@@ -399,49 +469,41 @@ export function BookPage() {
     }
   };
 
-  const stepIndex = ['services', 'barber', 'day', 'time', 'details', 'confirm'].indexOf(step);
   return (
-    <article className="exq-book" data-state={step}>
-      <h1 className="exq-book__title">Book a chair</h1>
+    <article className="exq-book exq-wrap exq-section" data-state={step}>
+      <div className="exq-book__main">
+        <h1 className="exq-book__title">Book your chair</h1>
+        <p className="exq-book__sub">Takes about a minute.</p>
+        {step !== 'done' ? (
+          <div className="exq-book-steps">
+            <StepBar steps={STEPS} current={step} onJump={goTo} />
+          </div>
+        ) : null}
+        <StepHeading step={step} focusKey={selection.startAt ?? ''}>
+          {STEP_TITLES[step]}
+        </StepHeading>
+        {step !== 'services' && step !== 'done' ? (
+          <section className="exq-book-selection" aria-label="Your selection">
+            <BookingSummary
+              services={chosenServices}
+              staffName={staffName}
+              startAt={selection.startAt}
+            />
+          </section>
+        ) : null}
+        {renderStep()}
+      </div>
       {step !== 'done' ? (
-        <ol className="exq-book-steps" aria-label="Progress">
-          {(['services', 'barber', 'day', 'time', 'details', 'confirm'] as const).map((s, i) => (
-            <li
-              key={s}
-              className="exq-book-steps__item"
-              data-state={i < stepIndex ? 'done' : i === stepIndex ? 'current' : 'todo'}
-              aria-current={i === stepIndex ? 'step' : undefined}
-            >
-              {i < stepIndex ? (
-                <button
-                  type="button"
-                  className="exq-book-steps__link"
-                  onClick={() => {
-                    goTo(s);
-                  }}
-                >
-                  {STEP_TITLES[s]}
-                </button>
-              ) : (
-                STEP_TITLES[s]
-              )}
-            </li>
-          ))}
-        </ol>
+        <BookingCard
+          services={chosenServices}
+          staffName={chosenStaff}
+          startAt={selection.startAt}
+          cancelCutoffMinutes={shop.data.booking.cancelCutoffMinutes}
+          canConfirm={step === 'confirm' && !submitting}
+          submitting={submitting}
+          onConfirm={() => void submit()}
+        />
       ) : null}
-      <StepHeading step={step} focusKey={selection.startAt ?? ''}>
-        {STEP_TITLES[step]}
-      </StepHeading>
-      {step !== 'services' && step !== 'done' ? (
-        <section className="exq-book-selection" aria-label="Your selection">
-          <BookingSummary
-            services={chosenServices}
-            staffName={staffName}
-            startAt={selection.startAt}
-          />
-        </section>
-      ) : null}
-      {renderStep()}
     </article>
   );
 }

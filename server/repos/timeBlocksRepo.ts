@@ -58,3 +58,15 @@ export async function deleteTimeBlock(id: string, options?: RepoOptions): Promis
   const result = await col.deleteOne({ _id: id }, sessionOf(options));
   return result.deletedCount === 1;
 }
+
+/** Blocks that have not ended yet, for every chair or some. */
+export async function listTimeBlocksEndingAfter(
+  instant: Date,
+  staffIds: readonly string[] | null,
+  options?: RepoOptions,
+): Promise<TimeBlockDocument[]> {
+  const col = await collection('timeBlocks');
+  const query: Record<string, unknown> = { endAt: { $gt: instant } };
+  if (staffIds) query.staffId = { $in: [...staffIds] };
+  return col.find(query, sessionOf(options)).sort({ startAt: 1 }).toArray();
+}

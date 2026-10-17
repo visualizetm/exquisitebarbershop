@@ -9,6 +9,7 @@ export const healthRoutes: RouteDefinition[] = [
     method: 'GET',
     path: '/api/health',
     auth: 'public',
+    alwaysOn: true,
     handler: async (ctx) => {
       const db = await pingDb();
       const body: HealthResponse = healthResponseSchema.parse({

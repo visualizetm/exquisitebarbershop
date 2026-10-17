@@ -4,7 +4,6 @@ import { newId } from '../../server/lib/ids';
 import { NOW, useTestDb } from '../helpers/db';
 
 useTestDb();
-const rule = { maxFailures: 3, lockMinutes: 15 };
 
 describe('usersRepo', () => {
   it('inserts, normalizes email, and finds by email or id', async () => {
@@ -46,27 +45,14 @@ describe('usersRepo', () => {
     );
   });
 
-  it('locks after repeated failures and clears on success', async () => {
+  it('records a successful login and defaults mustChangePassword to false', async () => {
     const u = await usersRepo.insertUser(
-      { email: 'lock@example.com', passwordHash: 'h', role: 'barber', staffId: null },
+      { email: 'ok@example.com', passwordHash: 'h', role: 'barber', staffId: null },
       NOW,
     );
-    await usersRepo.recordFailedLogin(u._id, rule, NOW);
-    const second = await usersRepo.recordFailedLogin(u._id, rule, NOW);
-    expect(second.failedLoginCount).toBe(2);
-    expect(second.lockedUntil).toBeNull();
-    const third = await usersRepo.recordFailedLogin(u._id, rule, NOW);
-    expect(third.lockedUntil?.toISOString()).toBe(
-      new Date(NOW.getTime() + 15 * 60_000).toISOString(),
-    );
-    expect(third.failedLoginCount).toBe(0);
+    expect(u.mustChangePassword).toBe(false);
     await usersRepo.recordSuccessfulLogin(u._id, NOW);
-    const after = await usersRepo.findUserById(u._id);
-    expect(after?.lockedUntil).toBeNull();
-    expect(after?.lastLoginAt).toEqual(NOW);
-    await expect(usersRepo.recordFailedLogin(newId(), rule, NOW)).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    });
+    expect((await usersRepo.findUserById(u._id))?.lastLoginAt).toEqual(NOW);
   });
 
   it('changes password hash and active flag', async () => {

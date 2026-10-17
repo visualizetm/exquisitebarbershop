@@ -2,9 +2,11 @@ import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  plugins: [tsconfigPaths({ projects: ['./tsconfig.node.json'] })],
+  // The app project is listed so unit tests can import pure helpers from src/lib.
+  plugins: [tsconfigPaths({ projects: ['./tsconfig.node.json', './tsconfig.app.json'] })],
   define: {
     __BUILD_SHA__: JSON.stringify('test'),
+    __SHOP_PHONE__: JSON.stringify('(610) 555-0100'),
   },
   test: {
     environment: 'node',

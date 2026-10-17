@@ -1,0 +1,235 @@
+/*
+ * Global type and layout. Colors come from the semantic tokens in tokens.css,
+ * which also carry the dark theme; nothing here names a color.
+ */
+
+/* Brand marks follow the theme without JavaScript: one file per theme, the other hidden. */
+.exq-mark--dark {
+  display: none;
+}
+[data-theme='dark'] .exq-mark--light {
+  display: none;
+}
+[data-theme='dark'] .exq-mark--dark {
+  display: inline-block;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .exq-mark--light {
+    display: none;
+  }
+  :root:not([data-theme='light']) .exq-mark--dark {
+    display: inline-block;
+  }
+}
+
+/* A short color fade only while the theme switches, never under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme-switching],
+  html[data-theme-switching] * {
+    transition:
+      background-color 150ms,
+      color 150ms,
+      border-color 150ms !important;
+  }
+}
+
+html {
+  font-family: var(--font);
+  font-size: var(--fs-2);
+  line-height: var(--lh-body);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.exq-app {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.exq-main {
+  flex: 1 0 auto;
+  /* Keeps the footer below the first screen while a page loads, so nothing jumps. */
+  min-height: 100vh;
+  min-height: 100svh;
+  outline: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+.exq-h {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-tight);
+}
+h1,
+.exq-h1 {
+  font-size: var(--fs-6);
+}
+h2,
+.exq-h2 {
+  font-size: var(--fs-5);
+}
+h3,
+.exq-h3 {
+  font-size: var(--fs-4);
+}
+h4,
+.exq-h4 {
+  font-size: var(--fs-3);
+}
+
+/* Section labels sit above a heading and never above the hero H1. */
+.exq-label {
+  font-size: var(--fs-1);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+.exq-price,
+.exq-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.exq-muted {
+  color: var(--fg-2);
+}
+
+a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+a:hover {
+  color: var(--accent-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.exq-skip-link {
+  position: absolute;
+  left: var(--s4);
+  top: -100px;
+  z-index: 100;
+  padding: var(--s2) var(--s4);
+  background: var(--selected-bg);
+  color: var(--selected-fg);
+  border-radius: var(--r-pill);
+}
+.exq-skip-link:focus {
+  top: var(--s4);
+}
+
+/* A full-bleed surface that takes its colors from the current scope (ink when .exq-dark). */
+.exq-band {
+  background: var(--bg);
+  color: var(--fg);
+  border-top: 1px solid var(--band-border);
+}
+
+/* Page width and gutters. */
+.exq-wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--s4);
+}
+@media (min-width: 768px) {
+  .exq-wrap {
+    padding-inline: var(--s6);
+  }
+}
+
+.exq-section {
+  padding-block: var(--s7);
+}
+@media (min-width: 1024px) {
+  .exq-section {
+    padding-block: var(--s8);
+  }
+}
+
+/* Transitions only on state changes, short, and off when motion is reduced. */
+.exq-t {
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms,
+    filter 150ms,
+    transform 150ms,
+    opacity 150ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Loading placeholders. */
+.exq-skeleton {
+  background: var(--card-2);
+  border-radius: var(--r-sm);
+  color: transparent;
+}
+
+/* The existing unstyled status line. */
+.exq-status {
+  padding: var(--s4);
+  color: var(--fg-2);
+}
+.exq-status[data-state='error'] {
+  color: var(--danger);
+}
+
+/* Legacy public buttons and links from prompts 1 and 2 pick up the kit look. */
+.exq-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 44px;
+  padding: var(--s2) var(--s5);
+  border: 1px solid var(--fg);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--fg);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.exq-button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+}
+.exq-button:hover {
+  filter: brightness(1.1);
+  color: inherit;
+}
+.exq-button--primary:hover {
+  color: var(--paper);
+}
+.exq-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

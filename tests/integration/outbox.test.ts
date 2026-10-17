@@ -318,7 +318,7 @@ describe('outbox', () => {
       headers: { authorization: `Bearer ${CRON}` },
     });
     expect(ok.status).toBe(200);
-    expect(ok.body).toEqual({ sent: 2, failed: 0, remaining: 0 });
+    expect(ok.body).toEqual({ sent: 2, failed: 0, remaining: 0, photosPurged: 0, uploadsSwept: 0 });
   });
 
   it('bookings made through the API deliver after the response when enabled', async () => {

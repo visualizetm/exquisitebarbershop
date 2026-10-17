@@ -1,14 +1,17 @@
-import { Link } from 'react-router';
-import { usePageTitle } from '@/lib/usePageTitle';
+import { ButtonLink, EmptyState } from '@/components/ui';
+import { usePageMeta } from '@/lib/usePageTitle';
 
 export function NotFoundPage() {
-  usePageTitle('Page not found');
+  usePageMeta({ title: 'Page not found', noindex: true });
   return (
-    <article className="exq-not-found" data-state="not-found">
+    <article className="exq-not-found exq-wrap exq-section" data-state="not-found">
       <h1 className="exq-not-found__title">Page not found</h1>
-      <p>
-        <Link to="/">Back to the home page</Link>
-      </p>
+      <EmptyState
+        title="That page is not here"
+        action={<ButtonLink to="/">Back to the home page</ButtonLink>}
+      >
+        Check the address, or start from the home page.
+      </EmptyState>
     </article>
   );
 }

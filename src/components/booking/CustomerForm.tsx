@@ -1,6 +1,7 @@
 import { useState, type SyntheticEvent } from 'react';
 import { normalizeUsPhone } from '@shared/lib/phone';
 import type { CustomerDetails } from '@/lib/booking/state';
+import { Button } from '@/components/ui';
 
 export interface CustomerFormProps {
   initial: CustomerDetails;
@@ -144,9 +145,7 @@ export function CustomerForm({ initial, requireEmail, onSubmit }: CustomerFormPr
           }}
         />
       </div>
-      <button type="submit" className="exq-button exq-button--primary">
-        Review booking
-      </button>
+      <Button type="submit">Review booking</Button>
     </form>
   );
 }

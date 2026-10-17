@@ -178,3 +178,130 @@ export async function updateBookingNotes(
   if (!updated) throw new AppError('NOT_FOUND', 'Booking was not found');
   return updated;
 }
+
+/**
+ * Moves a booking from one status to another only if it is still in `from`, so
+ * two people acting at once cannot both succeed. Returns null when it was not.
+ */
+export async function transitionBookingStatus(
+  id: string,
+  from: BookingStatus,
+  to: BookingStatus,
+  now: Date,
+  options?: RepoOptions,
+): Promise<BookingDocument | null> {
+  const col = await collection('bookings');
+  return col.findOneAndUpdate(
+    { _id: id, status: from },
+    { $set: { status: to, updatedAt: now } },
+    { returnDocument: 'after', ...sessionOf(options) },
+  );
+}
+
+/** Undoes a cancellation. The caller re-takes the slot locks in the same transaction. */
+export async function restoreBooking(
+  id: string,
+  now: Date,
+  options?: RepoOptions,
+): Promise<BookingDocument | null> {
+  const col = await collection('bookings');
+  return col.findOneAndUpdate(
+    { _id: id, status: 'cancelled' },
+    {
+      $set: { status: 'confirmed', cancellation: null, updatedAt: now },
+      $inc: { manageTokenVersion: 1 },
+    },
+    { returnDocument: 'after', ...sessionOf(options) },
+  );
+}
+
+/** Marks a booking as opened by the owner. First view wins. */
+export async function markOwnerSeen(id: string, now: Date, options?: RepoOptions): Promise<void> {
+  const col = await collection('bookings');
+  await col.updateOne(
+    { _id: id, $or: [{ ownerSeenAt: null }, { ownerSeenAt: { $exists: false } }] },
+    { $set: { ownerSeenAt: now } },
+    sessionOf(options),
+  );
+}
+
+/** Online bookings, not cancelled, the owner has not opened. */
+export async function countUnseenOnline(options?: RepoOptions): Promise<number> {
+  const col = await collection('bookings');
+  return col.countDocuments(
+    {
+      source: 'online',
+      status: { $ne: 'cancelled' },
+      $or: [{ ownerSeenAt: null }, { ownerSeenAt: { $exists: false } }],
+    },
+    sessionOf(options),
+  );
+}
+
+/** Confirmed bookings that have not ended yet, optionally for some chairs only. */
+export async function listUpcomingConfirmed(
+  now: Date,
+  staffIds: readonly string[] | null,
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  const query: Filter<BookingDocument> = { status: 'confirmed', endAt: { $gt: now } };
+  if (staffIds) query.staffId = { $in: [...staffIds] };
+  return col.find(query, sessionOf(options)).sort({ startAt: 1 }).toArray();
+}
+
+export interface BookingPageFilter {
+  start?: Date;
+  end?: Date;
+  staffId?: string;
+  status?: BookingStatus;
+  source?: BookingDocument['source'];
+  referenceCode?: string;
+  phoneDigits?: string;
+  /** Digits that also read as a reference code: match either one. */
+  codeOrPhone?: { referenceCode: string; phoneDigits: string };
+  name?: string;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** A page of bookings ordered by start, then id, after an optional cursor position. */
+export async function listBookingsPage(
+  filter: BookingPageFilter,
+  after: { startAt: Date; id: string } | null,
+  limit: number,
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  const and: Filter<BookingDocument>[] = [];
+  if (filter.start) and.push({ startAt: { $gte: filter.start } });
+  if (filter.end) and.push({ startAt: { $lt: filter.end } });
+  if (filter.staffId) and.push({ staffId: filter.staffId });
+  if (filter.status) and.push({ status: filter.status });
+  if (filter.source) and.push({ source: filter.source });
+  if (filter.referenceCode) and.push({ referenceCode: filter.referenceCode });
+  if (filter.phoneDigits)
+    and.push({ 'customer.phone': { $regex: escapeRegex(filter.phoneDigits) } });
+  if (filter.codeOrPhone) {
+    and.push({
+      $or: [
+        { referenceCode: filter.codeOrPhone.referenceCode },
+        { 'customer.phone': { $regex: escapeRegex(filter.codeOrPhone.phoneDigits) } },
+      ],
+    });
+  }
+  if (filter.name)
+    and.push({ 'customer.name': { $regex: escapeRegex(filter.name), $options: 'i' } });
+  if (after) {
+    and.push({
+      $or: [
+        { startAt: { $gt: after.startAt } },
+        { startAt: after.startAt, _id: { $gt: after.id } },
+      ],
+    });
+  }
+  const query: Filter<BookingDocument> = and.length > 0 ? { $and: and } : {};
+  return col.find(query, sessionOf(options)).sort({ startAt: 1, _id: 1 }).limit(limit).toArray();
+}

@@ -53,6 +53,15 @@ export const shopSettingsSeed: ShopSettingsInput = {
   },
 };
 
+/**
+ * The owner login the seed creates when SEED_OWNER_PASSWORD is set. The password
+ * itself never lives in the repository; SEED_OWNER_EMAIL overrides the address.
+ */
+export const ownerLoginSeed = {
+  email: 'owner@exquisitebarberbeauty.com', // PLACEHOLDER
+  staffKey: 'dontrise',
+};
+
 const closed: WeekHours[keyof WeekHours] = [];
 
 // PLACEHOLDER shop hours

@@ -45,10 +45,13 @@ export async function enqueueBookingNotifications(
     managePath: string | null;
     previousStartAt: Date | null;
     cancelReason: string | null;
+    /** Who hears about it. Defaults to both; owner actions usually skip the owner alert. */
+    audience?: { customer: boolean; owner: boolean };
   },
   now: Date,
   session: ClientSession,
 ): Promise<string[]> {
+  const audience = input.audience ?? { customer: true, owner: true };
   const ids: string[] = [];
   const base = {
     booking: input.view,
@@ -57,7 +60,11 @@ export async function enqueueBookingNotifications(
     cancelReason: input.cancelReason,
   };
   const customerEmail = input.view.customer.email;
-  if (customerEmail && input.settings.notifications.customerConfirmationEmail) {
+  if (
+    audience.customer &&
+    customerEmail &&
+    input.settings.notifications.customerConfirmationEmail
+  ) {
     const payload: BookingEmailPayload = { ...base, managePath: input.managePath };
     const row = await emailOutboxRepo.enqueueOutboxMessage(
       {
@@ -73,7 +80,7 @@ export async function enqueueBookingNotifications(
     );
     if (row) ids.push(row._id);
   }
-  if (input.settings.notifications.ownerNewBookingEmail) {
+  if (audience.owner && input.settings.notifications.ownerNewBookingEmail) {
     const payload: BookingEmailPayload = { ...base, managePath: null };
     const row = await emailOutboxRepo.enqueueOutboxMessage(
       {

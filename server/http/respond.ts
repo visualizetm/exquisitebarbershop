@@ -10,7 +10,9 @@ export function sendJson(
   body: unknown,
   headers: Record<string, string> = {},
 ): void {
-  const payload = JSON.stringify(body);
+  // A string body with its own Content-Type (the sitemap) is sent as is.
+  const payload =
+    typeof body === 'string' && headers['Content-Type'] !== undefined ? body : JSON.stringify(body);
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');

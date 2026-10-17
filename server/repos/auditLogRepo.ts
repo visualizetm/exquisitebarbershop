@@ -38,3 +38,37 @@ export async function listRecentAudit(
   const col = await collection('auditLog');
   return col.find({}, sessionOf(options)).sort({ at: -1 }).limit(limit).toArray();
 }
+
+export interface AuditPageFilter {
+  entityType?: string;
+  entityId?: string;
+  actionPrefix?: string;
+  actorType?: AuditLogDocument['actor']['type'];
+  start?: Date;
+  end?: Date;
+}
+
+/** Newest first, after an optional cursor position. */
+export async function listAuditPage(
+  filter: AuditPageFilter,
+  before: { at: Date; id: string } | null,
+  limit: number,
+  options?: RepoOptions,
+): Promise<AuditLogDocument[]> {
+  const col = await collection('auditLog');
+  const and: Record<string, unknown>[] = [];
+  if (filter.entityType) and.push({ entityType: filter.entityType });
+  if (filter.entityId) and.push({ entityId: filter.entityId });
+  if (filter.actionPrefix) {
+    and.push({
+      action: { $regex: `^${filter.actionPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}` },
+    });
+  }
+  if (filter.actorType) and.push({ 'actor.type': filter.actorType });
+  if (filter.start) and.push({ at: { $gte: filter.start } });
+  if (filter.end) and.push({ at: { $lt: filter.end } });
+  if (before)
+    and.push({ $or: [{ at: { $lt: before.at } }, { at: before.at, _id: { $lt: before.id } }] });
+  const query = and.length > 0 ? { $and: and } : {};
+  return col.find(query, sessionOf(options)).sort({ at: -1, _id: -1 }).limit(limit).toArray();
+}

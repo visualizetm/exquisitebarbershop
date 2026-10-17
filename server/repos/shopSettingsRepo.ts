@@ -1,5 +1,6 @@
 import { SHOP_SETTINGS_ID } from '../../shared/lib/constants';
 import {
+  DEFAULT_STAFF_PERMISSIONS,
   shopSettingsDocumentSchema,
   shopSettingsInputSchema,
   type ShopSettingsDocument,
@@ -9,9 +10,23 @@ import { collection } from '../db/collections';
 import { AppError } from '../lib/errors';
 import { sessionOf, type RepoOptions } from './types';
 
+/** Fills groups added after the settings document was written. */
+function fill(doc: ShopSettingsDocument): ShopSettingsDocument {
+  const stored = doc as Partial<ShopSettingsDocument>;
+  return {
+    ...doc,
+    permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
+    nextOpenServiceId: stored.nextOpenServiceId ?? null,
+  };
+}
+
+function withDefaults(doc: ShopSettingsDocument | null): ShopSettingsDocument | null {
+  return doc ? fill(doc) : null;
+}
+
 export async function getShopSettings(options?: RepoOptions): Promise<ShopSettingsDocument | null> {
   const col = await collection('shopSettings');
-  return col.findOne({ _id: SHOP_SETTINGS_ID }, sessionOf(options));
+  return withDefaults(await col.findOne({ _id: SHOP_SETTINGS_ID }, sessionOf(options)));
 }
 
 /** Like getShopSettings but fails loudly: the app cannot run without settings. */
@@ -58,5 +73,5 @@ export async function updateShopSettings(
     { returnDocument: 'after', ...sessionOf(options) },
   );
   if (!updated) throw new AppError('NOT_FOUND', 'Shop settings were not found');
-  return updated;
+  return fill(updated);
 }

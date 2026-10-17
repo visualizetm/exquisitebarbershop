@@ -29,12 +29,14 @@ export function IcsDownload({
   const href = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
   return (
     <a
-      className="exq-ics-download exq-button"
+      className="exq-ics-download exq-btn"
+      data-variant="secondary"
+      data-size="md"
       href={href}
       download={`appointment-${booking.referenceCode}.ics`}
       data-state="ready"
     >
-      Add to calendar (.ics)
+      Add to calendar
     </a>
   );
 }

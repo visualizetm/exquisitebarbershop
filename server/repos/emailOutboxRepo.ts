@@ -169,3 +169,37 @@ export async function listOutboxByStatus(
   const col = await collection('emailOutbox');
   return col.find({ status }, sessionOf(options)).sort({ createdAt: -1 }).limit(limit).toArray();
 }
+
+export async function findOutboxMessageById(
+  id: string,
+  options?: RepoOptions,
+): Promise<EmailOutboxDocument | null> {
+  const col = await collection('emailOutbox');
+  return col.findOne({ _id: id }, sessionOf(options));
+}
+
+/** Newest first, optionally one status, after an optional cursor position. */
+export async function listOutboxPage(
+  status: EmailOutboxDocument['status'] | undefined,
+  before: { createdAt: Date; id: string } | null,
+  limit: number,
+  options?: RepoOptions,
+): Promise<EmailOutboxDocument[]> {
+  const col = await collection('emailOutbox');
+  const and: Record<string, unknown>[] = [];
+  if (status) and.push({ status });
+  if (before) {
+    and.push({
+      $or: [
+        { createdAt: { $lt: before.createdAt } },
+        { createdAt: before.createdAt, _id: { $lt: before.id } },
+      ],
+    });
+  }
+  const query = and.length > 0 ? { $and: and } : {};
+  return col
+    .find(query, sessionOf(options))
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit)
+    .toArray();
+}

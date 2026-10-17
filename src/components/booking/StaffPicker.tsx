@@ -1,5 +1,7 @@
 import type { PublicStaff } from '@shared/api/public';
+import { Button, ChairCard } from '@/components/ui';
 import { qualifiedStaff } from '@/lib/booking/helpers';
+import { inChairOrder } from '@/lib/chairStatus';
 
 export interface StaffPickerProps {
   staff: PublicStaff[];
@@ -10,6 +12,7 @@ export interface StaffPickerProps {
   onContinue: () => void;
 }
 
+/** Chairs as cards plus a "first available" card. Only chairs that do every chosen service appear. */
 export function StaffPicker({
   staff,
   serviceIds,
@@ -18,7 +21,7 @@ export function StaffPicker({
   onChange,
   onContinue,
 }: StaffPickerProps) {
-  const qualified = qualifiedStaff(staff, serviceIds);
+  const qualified = inChairOrder(qualifiedStaff(staff, serviceIds));
   return (
     <div
       className="exq-staff-picker"
@@ -30,26 +33,32 @@ export function StaffPicker({
         </p>
       ) : (
         <fieldset className="exq-staff-picker__group">
-          <legend className="exq-staff-picker__legend">Who would you like?</legend>
-          <ul className="exq-staff-picker__list">
+          <legend className="exq-staff-picker__legend exq-label">Who would you like?</legend>
+          <ul className="exq-staff-picker__list exq-grid" data-cols="2" data-lg="4">
             {allowFirstAvailable ? (
               <li
-                className="exq-staff-option"
+                className="exq-staff-option exq-staff-option--any"
                 data-state={selected === 'any' ? 'selected' : 'idle'}
               >
-                <label className="exq-staff-option__label">
-                  <input
-                    type="radio"
-                    name="staff"
-                    value="any"
-                    checked={selected === 'any'}
-                    onChange={() => {
-                      onChange('any');
-                    }}
-                  />
-                  <span className="exq-staff-option__name">First available</span>
-                  <span className="exq-staff-option__meta">We will pick a chair for you</span>
-                </label>
+                <button
+                  type="button"
+                  className="exq-chaircard exq-staff-option__any"
+                  data-state={selected === 'any' ? 'selected' : 'none'}
+                  aria-pressed={selected === 'any'}
+                  onClick={() => {
+                    onChange('any');
+                  }}
+                >
+                  <span className="exq-arch exq-staff-option__any-mark" data-state="placeholder">
+                    <span className="exq-arch__placeholder" aria-hidden="true">
+                      Any
+                    </span>
+                  </span>
+                  <span className="exq-chaircard__body">
+                    <span className="exq-chaircard__name exq-h">Anyone available</span>
+                    <span className="exq-chaircard__specialty">We pick the least booked chair</span>
+                  </span>
+                </button>
               </li>
             ) : null}
             {qualified.map((member) => (
@@ -58,35 +67,26 @@ export function StaffPicker({
                 className="exq-staff-option"
                 data-state={selected === member.slug ? 'selected' : 'idle'}
               >
-                <label className="exq-staff-option__label">
-                  <input
-                    type="radio"
-                    name="staff"
-                    value={member.slug}
-                    checked={selected === member.slug}
-                    onChange={() => {
-                      onChange(member.slug);
-                    }}
-                  />
-                  <span className="exq-staff-option__name">{member.name}</span>
-                  <span className="exq-staff-option__meta">
-                    {member.title}
-                    {member.chairNumber !== null ? `, chair ${member.chairNumber}` : ''}
-                  </span>
-                </label>
+                <ChairCard
+                  name={member.name}
+                  specialty={member.specialty || member.title}
+                  chairNumber={member.chairNumber}
+                  photo={member.photo ?? null}
+                  selected={selected === member.slug}
+                  onSelect={() => {
+                    onChange(member.slug);
+                  }}
+                />
               </li>
             ))}
           </ul>
         </fieldset>
       )}
-      <button
-        type="button"
-        className="exq-button exq-button--primary"
-        disabled={!selected || qualified.length === 0}
-        onClick={onContinue}
-      >
-        Continue
-      </button>
+      <p className="exq-book__inline-action">
+        <Button disabled={!selected || qualified.length === 0} onClick={onContinue}>
+          Continue
+        </Button>
+      </p>
     </div>
   );
 }

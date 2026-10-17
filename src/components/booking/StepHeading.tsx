@@ -13,7 +13,11 @@ export function StepHeading({
 }) {
   const ref = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    ref.current?.focus();
+    // A tick later, so a closing dialog's focus restore does not win over the new heading.
+    const id = window.setTimeout(() => ref.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(id);
+    };
   }, [step, focusKey]);
   return (
     <h2 ref={ref} tabIndex={-1} className="exq-step-heading" data-state={step}>

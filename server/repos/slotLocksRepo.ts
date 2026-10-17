@@ -75,3 +75,44 @@ export async function listSlotLocksForHolder(
   const col = await collection('slotLocks');
   return col.find({ holderId }, sessionOf(options)).sort({ slotStart: 1 }).toArray();
 }
+
+/**
+ * Locks only the blocks in [start, end) that nobody holds yet. Used for blocked
+ * time that shares slots with bookings the owner chose to keep, and to re-lock a
+ * blocked period once a booking inside it is cancelled. Returns how many it took.
+ */
+export async function acquireUnheldSlotLocks(
+  staffId: string,
+  range: { start: Date; end: Date },
+  holder: LockHolder,
+  now: Date,
+  options?: RepoOptions,
+): Promise<number> {
+  const starts = lockSlotStarts(range.start, range.end);
+  const first = starts[0];
+  const last = starts[starts.length - 1];
+  if (!first || !last) return 0;
+  const col = await collection('slotLocks');
+  const held = await col
+    .find(
+      { staffId, slotStart: { $gte: first, $lte: last } },
+      { projection: { slotStart: 1 }, ...sessionOf(options) },
+    )
+    .toArray();
+  const taken = new Set(held.map((l) => l.slotStart.getTime()));
+  const docs = starts
+    .filter((s) => !taken.has(s.getTime()))
+    .map((slotStart) =>
+      slotLockDocumentSchema.parse({
+        _id: newId(),
+        staffId,
+        slotStart,
+        holderType: holder.holderType,
+        holderId: holder.holderId,
+        createdAt: now,
+      }),
+    );
+  if (docs.length === 0) return 0;
+  await col.insertMany(docs, { ordered: true, ...sessionOf(options) });
+  return docs.length;
+}

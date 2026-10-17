@@ -1,6 +1,8 @@
 import type { Db } from 'mongodb';
 import { ensureIndexes } from '../db/indexes';
+import { ensureOwnerLogin } from '../auth/authService';
 import {
+  ownerLoginSeed,
   servicesSeed,
   serviceSeedId,
   shopHoursSeed,
@@ -16,6 +18,13 @@ export interface SeedSummary {
   servicesCreated: number;
   staffCreated: number;
   staffHoursCreated: number;
+  ownerLogin: 'created' | 'exists' | 'skipped';
+}
+
+export interface SeedOptions {
+  /** Creates the owner login when set and no owner exists. Weak passwords are refused. */
+  ownerPassword?: string | null;
+  ownerEmail?: string | null;
 }
 
 /**
@@ -23,7 +32,11 @@ export interface SeedSummary {
  * safe on a database the owner has already edited. Also ensures indexes first so
  * uniqueness holds from the first insert.
  */
-export async function runSeed(db: Db, now: Date = new Date()): Promise<SeedSummary> {
+export async function runSeed(
+  db: Db,
+  now: Date = new Date(),
+  options: SeedOptions = {},
+): Promise<SeedSummary> {
   await ensureIndexes(db);
   const summary: SeedSummary = {
     settingsCreated: false,
@@ -31,6 +44,7 @@ export async function runSeed(db: Db, now: Date = new Date()): Promise<SeedSumma
     servicesCreated: 0,
     staffCreated: 0,
     staffHoursCreated: 0,
+    ownerLogin: 'skipped',
   };
 
   summary.settingsCreated = (
@@ -59,6 +73,18 @@ export async function runSeed(db: Db, now: Date = new Date()): Promise<SeedSumma
       await weeklyHoursRepo.setStaffHours(id, member.hours, now);
       summary.staffHoursCreated += 1;
     }
+  }
+
+  if (options.ownerPassword) {
+    const { created } = await ensureOwnerLogin(
+      {
+        email: options.ownerEmail ?? ownerLoginSeed.email,
+        password: options.ownerPassword,
+        staffId: staffSeedId(ownerLoginSeed.staffKey),
+      },
+      now,
+    );
+    summary.ownerLogin = created ? 'created' : 'exists';
   }
 
   return summary;

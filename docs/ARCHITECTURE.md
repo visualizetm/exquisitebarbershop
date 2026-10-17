@@ -54,8 +54,11 @@ server/              Everything that runs on the server.
                      indexes (the index registry), collections (typed access).
   repos/             One module per collection. The only code that touches the
                      driver. Validates documents with the shared schemas.
-  services/          Business logic composed from repos inside transactions
-                     (seedService now; booking, availability, auth, outbox later).
+  services/          Business logic composed from repos inside transactions:
+                     availability, bookings, schedule changes and the conflict
+                     rule, admin catalog, access scopes, seed.
+  auth/              passwords (argon2id), session cookies, login throttling,
+                     login management.
   http/              router, request parsing, the one error responder, the
                      Origin guard, route modules under http/routes/.
   lib/               errors, logger, ids, manageToken, small utilities.
@@ -65,6 +68,8 @@ shared/              Imported by both client and server. No Node or DOM APIs.
   api/               zod request and response schemas plus the error contract.
 src/                 The React app.
   app/               App (routes) and layouts.
+  admin/             The staff dashboard, loaded as its own chunk (React.lazy).
+                     Classes use the exq-adm- prefix.
   pages/             One component per route.
   components/        Shared UI. Each has an exq-* class prefix and data-state.
   lib/               api client, hooks.
@@ -101,6 +106,7 @@ timestamp is a BSON Date in UTC. Index definitions are the source of truth in
 | booking              | BookingSettings                                                                                           | see section 6         |
 | notifications        | { ownerAlertEmail, fromName, replyToEmail, customerConfirmationEmail, ownerNewBookingEmail, customerSms } |                       |
 | features             | { giftCards, rewards, smsReminders }                                                                      | all false until built |
+| permissions          | { barbersCanBlockTime }                                                                                   | default false         |
 | createdAt, updatedAt | Date                                                                                                      |                       |
 
 Indexes: none beyond `_id`.
@@ -219,19 +225,21 @@ in on a day they do not normally work, with the hours in startAt and endAt.
 | totalPriceCents      | int                                                                  |                                                         |
 | customer             | { name, phone (E.164), email or null }                               |                                                         |
 | status               | confirmed, cancelled, completed, noShow                              |                                                         |
-| source               | online, walkIn, owner, barber                                        |                                                         |
+| source               | online, phone, walkIn, owner, barber                                 | phone and walkIn are entered by the owner               |
 | notes                | string or null                                                       |                                                         |
 | cancellation         | { at, by, reason } or null                                           |                                                         |
 | rescheduledFromId    | string or null                                                       |                                                         |
-| manageTokenVersion   | int                                                                  | bumped on cancel and reschedule                         |
+| manageTokenVersion   | int                                                                  | bumped on cancel, reschedule and restore                |
+| ownerSeenAt          | Date or null (optional)                                              | set when the owner first opens it; drives the New flag  |
 | createdAt, updatedAt | Date                                                                 |                                                         |
 
-| Index                       | Keys                         | Why                                             |
-| --------------------------- | ---------------------------- | ----------------------------------------------- |
-| uniq_referenceCode (unique) | referenceCode                | human handle must be unique                     |
-| staff_start                 | staffId, startAt             | one chair's day; availability reads             |
-| start_status                | startAt, status              | owner's day view; reminder jobs                 |
-| customer_phone              | customer.phone, startAt desc | open-bookings-per-phone guard; customer history |
+| Index                       | Keys                                 | Why                                               |
+| --------------------------- | ------------------------------------ | ------------------------------------------------- |
+| uniq_referenceCode (unique) | referenceCode                        | human handle must be unique                       |
+| staff_start                 | staffId, startAt                     | one chair's day; availability reads               |
+| start_status                | startAt, status                      | owner's day view; reminder jobs                   |
+| customer_phone              | customer.phone, startAt desc         | open-bookings-per-phone guard; customer history   |
+| unseen_new                  | status, source, ownerSeenAt, startAt | count of online bookings the owner has not opened |
 
 Reserved for later (not present yet, additive): `payment` subdocument for gift
 card redemption, `rewardsStampId`, `reminders: { smsSentAt }`.
@@ -253,18 +261,20 @@ card redemption, `rewardsStampId`, `reminders: { smsSentAt }`.
 
 ### users
 
-| Field                | Type              | Notes                              |
-| -------------------- | ----------------- | ---------------------------------- |
-| email                | string, lowercase | login identity                     |
-| passwordHash         | string            | argon2id PHC string                |
-| role                 | owner, barber     |                                    |
-| staffId              | string or null    | barbers link to their staff record |
-| isActive             | boolean           |                                    |
-| failedLoginCount     | int               |                                    |
-| lockedUntil          | Date or null      |                                    |
-| lastLoginAt          | Date or null      |                                    |
-| passwordChangedAt    | Date              |                                    |
-| createdAt, updatedAt | Date              |                                    |
+| Field                | Type              | Notes                                        |
+| -------------------- | ----------------- | -------------------------------------------- |
+| email                | string, lowercase | login identity                               |
+| passwordHash         | string            | argon2id PHC string                          |
+| role                 | owner, barber     |                                              |
+| staffId              | string or null    | barbers link to their staff record           |
+| isActive             | boolean           | false: cannot sign in, sessions end          |
+| mustChangePassword   | boolean           | temporary password from the owner            |
+| failedLoginCount     | int               | unused since prompt 3, see loginThrottle     |
+| lockedUntil          | Date or null      | unused since prompt 3, see loginThrottle     |
+| lastLoginAt          | Date or null      |                                              |
+| passwordChangedAt    | Date              |                                              |
+| recentLoginIps       | [{ ipHash, at }]  | keyed hashes, at most 10, 30 days (prompt 5) |
+| createdAt, updatedAt | Date              |                                              |
 
 | Index                                        | Keys    | Why                         |
 | -------------------------------------------- | ------- | --------------------------- |
@@ -287,6 +297,35 @@ card redemption, `rewardsStampId`, `reminders: { smsSentAt }`.
 | uniq_tokenHash (unique) | tokenHash | lookup on every authenticated request |
 | ttl_expiresAt (TTL 0s)  | expiresAt | MongoDB deletes expired sessions      |
 | by_user                 | userId    | revoke all for a user                 |
+
+### loginThrottle (prompt 3)
+
+One document per sign-in identity, keyed by `sha256("login:" + email)` so
+unknown emails are throttled exactly like real ones and no email is stored.
+
+| Field        | Type         | Notes                                    |
+| ------------ | ------------ | ---------------------------------------- |
+| \_id         | hex sha256   | of the normalized email                  |
+| failures     | int          | consecutive failures since the last lock |
+| lockoutLevel | int          | how many locks in a row; grows the wait  |
+| lockedUntil  | Date or null |                                          |
+| updatedAt    | Date         |                                          |
+| expiresAt    | Date         | 24 hours after the last failure          |
+
+| Index                  | Keys      | Why                                        |
+| ---------------------- | --------- | ------------------------------------------ |
+| ttl_expiresAt (TTL 0s) | expiresAt | forget failure history a day after it ends |
+
+### scheduleGuards (prompt 3)
+
+One tiny document per chair (`_id` = staffId, `version`, `updatedAt`). Every
+write that changes what a chair is booked for or when it works bumps the
+version inside its transaction: placing, restoring and moving bookings, and
+every schedule change (hours, closures, time blocks, day status, staff and
+service changes). Two such transactions on one chair therefore write the same
+document and MongoDB aborts one of them (write conflict, retried by
+`withTransaction`). This is what stops a booking from slipping in between the
+conflict check of a schedule change and its commit. Indexes: `_id` only.
 
 ### auditLog
 
@@ -343,6 +382,38 @@ card redemption, `rewardsStampId`, `reminders: { smsSentAt }`.
 | ----------------------- | ---------- | -------------------------------------- |
 | uniq_scope_key (unique) | scope, key | atomic claim across concurrent retries |
 | ttl_expiresAt (TTL 0s)  | expiresAt  | automatic cleanup                      |
+
+### photos (prompt 4)
+
+| Field         | Type                 | Notes                                                                                |
+| ------------- | -------------------- | ------------------------------------------------------------------------------------ |
+| kind          | staff, gallery, hero |                                                                                      |
+| staffId       | string or null       | the chair for staff photos and credited gallery photos                               |
+| key           | string               | server generated: staff/<staffId>/<uuid>.webp, gallery/<uuid>.webp, hero/<uuid>.webp |
+| width, height | int                  | from the browser after the resize                                                    |
+| alt           | string               | required                                                                             |
+| sortOrder     | int                  | display order within a kind (and chair)                                              |
+| createdBy     | actor                |                                                                                      |
+| createdAt     | Date                 |                                                                                      |
+| deletedAt     | Date or null         | soft delete                                                                          |
+| purgedAt      | Date or null         | set once the object is removed from storage                                          |
+
+| Index           | Keys                       | Why                                  |
+| --------------- | -------------------------- | ------------------------------------ |
+| kind_live_order | kind, deletedAt, sortOrder | gallery and hero reads in order      |
+| by_staff_kind   | staffId, kind              | one chair's portrait and work photos |
+
+### pendingUploads (prompt 5)
+
+An upload URL that was issued but not confirmed yet: `key`, `kind`, `staffId`,
+`contentType`, `size`, `issuedAt`. Confirming removes the record; the daily cron
+deletes the object behind any record older than an hour (`uploadsSwept`). Keys
+sit under `R2_KEY_PREFIX` when it is set, so previews can share a bucket.
+
+| Index     | Keys     | Why                               |
+| --------- | -------- | --------------------------------- |
+| uniq_key  | key      | confirm removes the record by key |
+| by_issued | issuedAt | the sweep reads the oldest first  |
 
 ### rateLimits
 
@@ -481,52 +552,92 @@ true`. A failed attempt releases the key so the client may retry with it.
 
 ### Prompt 3: auth, barber and owner
 
-| Method | Path                               | Auth                 | Request                                                                                   | Response and errors                                                                    |
-| ------ | ---------------------------------- | -------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| POST   | /api/auth/login                    | public, rate limited | `{ email, password }`                                                                     | `{ user: PublicUser }` + Set-Cookie; INVALID_CREDENTIALS, ACCOUNT_LOCKED, RATE_LIMITED |
-| POST   | /api/auth/logout                   | barber               | none                                                                                      | `{ ok: true }`                                                                         |
-| GET    | /api/auth/me                       | barber               | none                                                                                      | `{ user: PublicUser, staff: PublicStaff or null }`                                     |
-| POST   | /api/auth/change-password          | barber               | `{ currentPassword, newPassword }`                                                        | `{ ok: true }`; INVALID_CREDENTIALS                                                    |
-| GET    | /api/me/schedule                   | barber               | query `{ date }`                                                                          | `{ date, bookings: BookingView[], timeBlocks }` for the caller's chair only            |
-| GET    | /api/me/bookings/:id               | barber               |                                                                                           | `{ booking }`; FORBIDDEN if another chair                                              |
-| POST   | /api/me/bookings/:id/status        | barber               | `{ status: completed or noShow }`                                                         | `{ booking }`                                                                          |
-| GET    | /api/admin/schedule                | owner                | query `{ date }`                                                                          | all chairs for the day with bookings and blocks                                        |
-| GET    | /api/admin/bookings                | owner                | query `{ from, to, staffId?, status?, q? }`                                               | `{ bookings, total }`                                                                  |
-| GET    | /api/admin/bookings/:id            | owner                |                                                                                           | `{ booking, audit, outbox }`                                                           |
-| POST   | /api/admin/bookings                | owner                | `{ staffId, serviceIds, startAt, customer, source: walkIn or owner, notes?, sendEmail? }` | 201 `{ booking }`; SLOT_TAKEN                                                          |
-| PATCH  | /api/admin/bookings/:id            | owner                | `{ notes?, status? }`                                                                     | `{ booking }`                                                                          |
-| POST   | /api/admin/bookings/:id/cancel     | owner                | `{ reason?, notify? }`                                                                    | `{ booking }`                                                                          |
-| POST   | /api/admin/bookings/:id/reschedule | owner                | `{ staffId?, startAt, notify? }`                                                          | `{ booking }`; SLOT_TAKEN                                                              |
-| GET    | /api/admin/time-blocks             | owner                | query `{ from, to, staffId? }`                                                            | `{ timeBlocks }`                                                                       |
-| POST   | /api/admin/time-blocks             | owner                | `{ staffId, kind, startAt, endAt, reason? }`                                              | 201 `{ timeBlock, conflicts: BookingView[] }`; SLOT_TAKEN for kind block               |
-| DELETE | /api/admin/time-blocks/:id         | owner                |                                                                                           | `{ ok: true }`                                                                         |
-| POST   | /api/admin/staff/:id/day-status    | owner                | `{ date, status: in or out, start?, end? }`                                               | `{ timeBlock or null, conflicts }`                                                     |
-| GET    | /api/admin/services                | owner                |                                                                                           | `{ services }` including inactive, excluding deleted                                   |
-| POST   | /api/admin/services                | owner                | `serviceInputSchema`                                                                      | 201 `{ service }`                                                                      |
-| PATCH  | /api/admin/services/:id            | owner                | `serviceUpdateSchema`                                                                     | `{ service }`                                                                          |
-| DELETE | /api/admin/services/:id            | owner                |                                                                                           | `{ service }` soft deleted                                                             |
-| GET    | /api/admin/staff                   | owner                |                                                                                           | `{ staff }`                                                                            |
-| POST   | /api/admin/staff                   | owner                | `staffInputSchema`                                                                        | 201 `{ staff }`; SLUG_TAKEN                                                            |
-| PATCH  | /api/admin/staff/:id               | owner                | `staffUpdateSchema` (no slug)                                                             | `{ staff }`                                                                            |
-| POST   | /api/admin/staff/:id/slug          | owner                | `{ slug }`                                                                                | `{ staff }`; SLUG_TAKEN                                                                |
-| DELETE | /api/admin/staff/:id               | owner                |                                                                                           | `{ staff }` soft deleted; future bookings listed in audit                              |
-| GET    | /api/admin/hours                   | owner                |                                                                                           | `{ shop: WeekHours, staff: Record<staffId, WeekHours> }`                               |
-| PUT    | /api/admin/hours                   | owner                | `weeklyHoursInputSchema`                                                                  | `{ hours }`                                                                            |
-| PUT    | /api/admin/staff/:id/hours         | owner                | `weeklyHoursInputSchema`                                                                  | `{ hours }`                                                                            |
-| GET    | /api/admin/closures                | owner                | query `{ from, to }`                                                                      | `{ closures }`                                                                         |
-| PUT    | /api/admin/closures                | owner                | `closureInputSchema`                                                                      | `{ closure }` upsert by date                                                           |
-| DELETE | /api/admin/closures/:id            | owner                |                                                                                           | `{ ok: true }`                                                                         |
-| GET    | /api/admin/settings                | owner                |                                                                                           | `{ settings }`                                                                         |
-| PATCH  | /api/admin/settings                | owner                | partial `shopSettingsInputSchema`                                                         | `{ settings }`                                                                         |
-| GET    | /api/admin/users                   | owner                |                                                                                           | `{ users: PublicUser[] }`                                                              |
-| POST   | /api/admin/users                   | owner                | `{ email, role, staffId, password }`                                                      | 201 `{ user }`; CONFLICT                                                               |
-| PATCH  | /api/admin/users/:id               | owner                | `{ isActive?, password? }`                                                                | `{ user }`                                                                             |
-| GET    | /api/admin/audit                   | owner                | query `{ entityType?, entityId?, limit? }`                                                | `{ entries }`                                                                          |
-| GET    | /api/admin/outbox                  | owner                | query `{ status? }`                                                                       | `{ messages }`                                                                         |
-| POST   | /api/admin/outbox/:id/retry        | owner                |                                                                                           | `{ ok: true }`                                                                         |
+Auth levels: `barber` means any signed-in login (owner or barber) and every
+`/api/me` route is scoped to the caller's own chair in the service layer;
+`owner` routes also re-check the role in the service layer (`ownerScope`). A
+login with a temporary password gets 403 PASSWORD_CHANGE_REQUIRED on every
+route except the four marked "forced change ok". Every request and response
+schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 
-Owners can call every barber route. Barber routes always scope to
-`principal.staffId`; a barber with no linked staff record gets FORBIDDEN.
+| Method        | Path                                  | Auth                     | Notes                                                                                                            |
+| ------------- | ------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| POST          | /api/auth/login                       | public, throttled        | `{ email, password }`; `meResponseSchema` plus Set-Cookie; INVALID_CREDENTIALS, ACCOUNT_LOCKED 423, RATE_LIMITED |
+| POST          | /api/auth/logout                      | barber, forced change ok | ends this session                                                                                                |
+| POST          | /api/auth/logout-all                  | barber, forced change ok | ends every session of this login; `{ ok, sessionsEnded }`                                                        |
+| GET           | /api/auth/me                          | barber, forced change ok | `{ user, staff, permissions }`                                                                                   |
+| POST          | /api/me/password                      | barber, forced change ok | `{ currentPassword, newPassword }`; ends the login's other sessions                                              |
+| GET           | /api/me/schedule                      | barber                   | query `date`, `days` 1 to 7; own chair only                                                                      |
+| GET           | /api/me/bookings/:id                  | barber                   | own chair only; another chair's id is NOT_FOUND                                                                  |
+| POST          | /api/me/bookings/:id/status           | barber                   | completed or noShow, and back to confirmed; never cancel                                                         |
+| POST, DELETE  | /api/me/time-blocks, /:id             | barber                   | only when `permissions.barbersCanBlockTime`; conflicts may only be kept                                          |
+| GET           | /api/admin/today                      | owner                    | counts, chairs booked, revenue, next up per chair, who's in, new online count                                    |
+| GET           | /api/admin/schedule                   | owner                    | query `date`, `staffId?`                                                                                         |
+| GET           | /api/admin/whos-in                    | owner                    | query `date`                                                                                                     |
+| GET           | /api/admin/bookings                   | owner                    | query `from, to, staffId, status, source, q, cursor, limit`; cursor paged                                        |
+| POST          | /api/admin/bookings                   | owner, Idempotency-Key   | phone or walkIn; `override` audited; never takes a held slot                                                     |
+| GET, PATCH    | /api/admin/bookings/:id               | owner                    | detail with audit, emails and allowed transitions (marks it seen); PATCH edits notes                             |
+| POST          | /api/admin/bookings/:id/status        | owner                    | allowed transitions only, else INVALID_TRANSITION; restore re-takes locks or SLOT_TAKEN                          |
+| POST          | /api/admin/bookings/:id/cancel        | owner                    | `{ reason?, notify }`                                                                                            |
+| POST          | /api/admin/bookings/:id/reschedule    | owner                    | `{ startAt, staff?, notify, override }`                                                                          |
+| GET           | /api/admin/customers                  | owner                    | query `phone`; names, counts, spend, history                                                                     |
+| GET, POST     | /api/admin/time-blocks                | owner                    | conflict rule                                                                                                    |
+| DELETE        | /api/admin/time-blocks/:id            | owner                    | conflict rule (removing extra hours)                                                                             |
+| POST          | /api/admin/staff/:id/day              | owner                    | `{ date, status: in or out, start?, end? }`; conflict rule                                                       |
+| GET, POST     | /api/admin/services                   | owner                    |                                                                                                                  |
+| PATCH, DELETE | /api/admin/services/:id               | owner                    | DELETE is a soft delete through the conflict rule                                                                |
+| GET, POST     | /api/admin/staff                      | owner                    | SLUG_TAKEN                                                                                                       |
+| PATCH, DELETE | /api/admin/staff/:id                  | owner                    | conflict rule; DELETE soft deletes and disables the login                                                        |
+| POST          | /api/admin/staff/:id/slug             | owner                    | old slug becomes an alias                                                                                        |
+| PUT           | /api/admin/staff/:id/hours            | owner                    | conflict rule                                                                                                    |
+| GET, PUT      | /api/admin/hours                      | owner                    | PUT is the shop hours; conflict rule                                                                             |
+| GET, PUT      | /api/admin/closures                   | owner                    | upsert by date; conflict rule                                                                                    |
+| DELETE        | /api/admin/closures/:id               | owner                    | conflict rule (removing special hours)                                                                           |
+| GET, PUT      | /api/admin/settings                   | owner                    | full `shopSettingsInputSchema`                                                                                   |
+| GET, POST     | /api/admin/users                      | owner                    | POST `{ email, staffId }` returns a one-time temporary password                                                  |
+| POST          | /api/admin/users/:id/reset-password   | owner                    | new temporary password; ends the login's sessions                                                                |
+| POST          | /api/admin/users/:id/disable, /enable | owner                    | disable ends every session                                                                                       |
+| GET           | /api/admin/audit                      | owner                    | query `entityType, entityId, action (prefix), actorType, from, to, cursor`                                       |
+| GET           | /api/admin/outbox                     | owner                    | query `status, cursor`; payloads are never returned                                                              |
+| POST          | /api/admin/outbox/:id/retry           | owner                    | failed messages only, else CONFLICT                                                                              |
+
+### Prompt 5: setup, doctor and operations
+
+| Method    | Path                     | Auth                         | Notes                                                                                                                |
+| --------- | ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| GET       | /api/setup               | public                       | `{ enabled }`: whether BOOTSTRAP_SECRET is set, so the /setup page knows to exist                                    |
+| GET       | /api/internal/doctor     | internal (cron or bootstrap) | the checklist: settings, database, replica set, transactions, indexes, seed, storage, public URL, email, cron        |
+| GET, POST | /api/internal/cron/daily | internal                     | the one daily job: outbox backstop, photo purge, upload sweep, backup, prune; `vercel.json` cron at 13:00 UTC        |
+| POST      | /api/internal/bootstrap  | internal (cron or bootstrap) | indexes, seed, owner from SEED_OWNER_*; once, then 409 unless `{ force: true }`; 404 while BOOTSTRAP_SECRET is unset |
+
+Routes flagged `alwaysOn` (health, doctor, bootstrap, setup) answer while the
+environment is incomplete; every other route answers 503 CONFIG_ERROR until the
+doctor is clean. With MAINTENANCE_MODE=true public routes answer 503 MAINTENANCE
+except /api/shop (the phone number for the message) and /api/auth/\*; staff routes
+keep working. `envProblems` in `server/env.ts` is the one list of what each
+environment (development, test, preview, production) needs.
+
+### Prompt 4: photos, next opening, gallery
+
+| Method        | Path                         | Auth               | Notes                                                                                 |
+| ------------- | ---------------------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId |
+| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service               |
+| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`; photos with per chair counts        |
+| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                 |
+| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket    |
+| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201           |
+| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal              |
+| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus `/chairs/:slug`        |
+
+`/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
+`/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`.
+`/api/internal/outbox/deliver` also purges deleted photo objects (`photosPurged`) and
+sweeps abandoned uploads (`uploadsSwept`). A confirm whose object does not match the
+ticket (size, type, or over 10 MB) deletes the object before answering 409.
+
+Prompt 3 error codes: PASSWORD_CHANGE_REQUIRED 403, SCHEDULE_CONFLICT 409 (with
+`affected`: bookingId, referenceCode, staffId, staffName, startAt, endAt,
+customerName, services, hasEmail) and INVALID_TRANSITION 409.
 
 ## 6. Availability rules and settings
 
@@ -554,19 +665,22 @@ Algorithm, per shop-local day
 4. Per chair: weekly hours plus `extraHours` blocks, intersected with shop hours,
    minus `timeOff` and `dayOff` blocks. Nothing left is `dayOff` for that chair;
    if every chair is off, the day is `dayOff`.
-5. Busy: confirmed bookings (each with its own captured buffer) and `block` time
-   blocks.
+5. Busy: every booking that is not cancelled (each with its own captured
+   buffer) and `block` time blocks. Completed and no-show bookings keep their
+   slot locks, so they stay busy too.
 6. Total = sum of service durations + effective buffer, where the effective
    buffer is the largest of each service's override or the shop default. Starts
    step by `slotStepMinutes` from each working range start (rounded up to the
-   grid); a start is kept only when start + total ends inside the range and
-   overlaps nothing busy. So the buffer must fit before closing time too.
+   grid); a start is kept only when the services (start + durations) end inside
+   the range and start + total overlaps nothing busy. The cleanup buffer after
+   the last booking of the day may run past closing time (prompt 3); it still
+   may never overlap another booking or a block.
 7. Lead time: starts earlier than `now + leadTimeMinutes` are dropped. When that
    alone empties a day it reads `outsideWindow`; otherwise an empty day is
    `fullyBooked`.
 8. First available: free chairs for one start are ranked by
-   `firstAvailableStrategy`: `leastBookedThatDay` (fewest confirmed minutes that
-   day, then display order, then id) or `roundRobin` (rotating by slot index).
+   `firstAvailableStrategy`: `leastBookedThatDay` (fewest booked minutes that
+   day, cancelled ones aside, then display order, then id) or `roundRobin` (rotating by slot index).
    Each slot carries the pick and every candidate, best first. The booking
    service uses that order for fallback when the pick's lock insert conflicts.
 
@@ -586,8 +700,31 @@ Settings (`shopSettings.booking`, owner-editable)
 | requireEmail            | false              | email optional at checkout                                                                   |
 | maxOpenBookingsPerPhone | 3                  | confirmed future bookings a phone may hold                                                   |
 
-Owner and barber bookings (walk-ins, manual entries, prompt 3) bypass lead time,
-booking window and the per-phone cap, but never bypass locks.
+Owner bookings (prompt 3): a phone booking follows the same rules as online
+(including which chairs take bookings) except the per-phone cap, unless the
+owner ticks the override, which relaxes only lead time (to 0) and the booking
+window (to 365 days) and is recorded in the audit entry. Walk-ins start now or
+at a given time today on a named chair that performs the services, skip the
+online-only checks and the per-phone cap, and are flagged when they fall
+outside working time. Nothing ever bypasses a slot lock.
+
+### Schedule changes: the conflict rule
+
+Any change that would leave existing future bookings outside working time is
+refused with 409 SCHEDULE_CONFLICT listing the affected bookings, instead of
+being applied. That covers shop and staff hours, closures, time blocks, a day
+off, removing extra hours, deleting a staff member, removing a service from a
+chair and deleting a service someone booked. The owner resends the same change
+with `resolutions`: for each affected booking, `keep` (an exception, audited),
+`cancel` (no email) or `cancelAndNotify`. Barbers may only keep.
+
+`applyScheduleChange` (`server/services/scheduleChanges.ts`) does it in one
+transaction: bump the schedule guards of the chairs involved, note which
+upcoming confirmed bookings are inside working time, apply the change, check
+again, and treat every booking that moved from inside to outside (plus any the
+change names directly) as affected. Any affected booking without a resolution
+aborts the whole transaction. Bookings that were already outside working time
+(earlier exceptions, walk-ins) are not raised again.
 
 ## 7. Customer manage link
 
@@ -611,26 +748,91 @@ is base64url of HMAC-SHA256 over `"v1." + payload` with `MANAGE_LINK_SECRET`.
   earlier link stops working and the new confirmation carries a fresh link.
 - Rotating `MANAGE_LINK_SECRET` invalidates every outstanding link.
 
-## 8. Authentication and sessions (prompt 3)
+## 8. Authentication, sessions and access (prompt 3)
 
-- Two roles, owner and barber. Barber logins are created by the owner and linked
-  to a staff record. No self-signup, no customer accounts.
-- Passwords hashed with argon2id (`argon2` package): memory 64 MiB, 3 iterations,
-  parallelism 1. Minimum 10 characters; the owner can reset any barber password.
-- Sessions are opaque 256-bit random tokens (`randomToken()`). Only the SHA-256
-  of the token is stored (`sessions.tokenHash`). Cookie `exq_session`: HttpOnly,
-  Secure (outside local dev), SameSite=Lax, Path=/, 30 day sliding expiry
-  refreshed when more than a day has passed since `lastSeenAt`.
-- Every authenticated request: read cookie, hash, `findActiveSession`, load the
-  user, check `isActive`, build the `Principal`. Logout revokes the session;
-  password change revokes every session of that user.
-- CSRF: SameSite=Lax plus the Origin check on all mutating requests. No separate
-  CSRF token is needed because the API only accepts JSON and never form posts.
-- Login limits: 10 attempts per IP per 15 minutes (`rateLimits`), and per account
-  5 failures lock the account for 15 minutes (`users.lockedUntil`). Failures
-  return the same INVALID_CREDENTIALS message whether or not the email exists.
-- The router already denies every non-public route; the auth prompt replaces
-  `denyAllAuthenticator` with the cookie authenticator and nothing else changes.
+Passwords (`server/auth/password.ts`)
+
+- argon2id through `@node-rs/argon2`: memory 19456 KiB (19 MiB), 2 iterations,
+  parallelism 1, 32-byte output. This is the OWASP baseline; about 75 ms per
+  verify on the CI runner, which keeps a serverless function well inside its
+  budget while making offline guessing expensive. `needsRehash` upgrades old
+  hashes at the next successful login when these numbers change.
+- Policy: 12 to 128 characters, at least 5 distinct characters, not digits
+  only, no common fragments (password, qwerty, the shop's own words) and not the
+  email's local part. The seed refuses a weak SEED_OWNER_PASSWORD.
+- Temporary passwords: four groups of four from an alphabet without look-alikes,
+  shown once to the owner, and the login must change it before anything else.
+
+Sessions (`server/auth/sessions.ts`, `cookies.ts`)
+
+- Cookie `__Host-exq_session`: Secure, HttpOnly, SameSite=Lax, Path=/, no
+  Domain. The value is a 32-byte random token; only its SHA-256 is stored.
+- Expiry slides to 14 days after the last use, renewed at most once an hour,
+  and never past 60 days after the session was created. Every login starts a
+  new session with a new token. Logout ends the session; logout everywhere,
+  a password reset, disabling the login or deleting its chair end all of them;
+  a password change ends all but the current one.
+- A tampered, unknown, expired or revoked cookie is cleared and answered as
+  signed out. `localhost` and `127.0.0.1` count as secure origins in browsers,
+  so the `__Host-` cookie works in local development and the e2e suite.
+
+Login throttling (`server/auth/authService.ts`)
+
+- Per IP: 20 attempts per 15 minutes (`rateLimits`). Per email, existing or
+  not: 10 attempts per 15 minutes, plus 5 failures in a row lock that email for
+  5, 15, 60 then 240 minutes (`loginThrottle`). A success clears the history.
+- A wrong password, an unknown email and a disabled login all answer the same
+  INVALID_CREDENTIALS message, and an unknown email still runs a verify against
+  a dummy hash so the timing matches.
+- Every attempt writes `auth.login.success` or `auth.login.failure` to the audit
+  log with the email, IP and a reason, never the password.
+
+Access
+
+- The router refuses to start when a route has no known auth level, and its
+  request-time switch denies anything it does not recognise.
+- Services check again: `ownerScope` requires the owner role, `chairScope`
+  pins a barber to their own staffId. Another chair's record reads as
+  NOT_FOUND, exactly like an id that does not exist.
+- A barber login must be linked to exactly one live staff record (unique index
+  on `users.staffId` plus the service check at login and on every scope).
+- CSRF: SameSite=Lax plus the Origin check on every mutating request; the API
+  only accepts JSON.
+- Operator recovery: `npm run user:reset -- --email owner@... [--password-stdin]`
+  sets a new password (or prints a temporary one) and ends every session.
+
+## 8b. Photos and storage (prompt 4)
+
+Storage is a port (`server/storage/types.ts`) with two drivers chosen by
+STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,
+presigned PUT URLs valid for five minutes, public reads through
+R2_PUBLIC_BASE_URL) and `local` (files under `.data/uploads`, a signed PUT URL
+and public reads at `/uploads/<key>` served by `serveLocalUploads` in the dev
+server; Vite proxies `/uploads` to the API).
+
+Upload flow
+
+1. `POST /api/admin/photos/upload-url` with kind, staffId, contentType (jpeg,
+   png or webp) and size (10 MB at most). The server makes the key and returns
+   the presigned URL plus a signed ticket (`u1.<payload>.<sig>`, HMAC with
+   MANAGE_LINK_SECRET) binding key, kind, chair, type, size and expiry. A key
+   sent by the client is ignored.
+2. The browser resizes to a 2000px long edge and re-encodes to WebP at about
+   0.82 quality before the PUT, which also strips EXIF and location data.
+3. `POST /api/admin/photos/confirm` with the ticket, width, height and alt. The
+   server HEADs the object, requires the declared size and type, inserts the
+   document and audits `photo.create`.
+4. PATCH edits alt and sortOrder (`photo.update`); DELETE soft deletes
+   (`photo.delete`) and the cron purges the object (`purgedAt`).
+
+Access: the owner manages every photo. A barber may upload to their own chair
+only while `permissions.barbersCanUploadPhotos` is on (default off); any other
+photo reads as not found for them.
+
+Next opening: `server/services/nextOpening.ts` loads one availability context
+for the next 14 days (bounded by the booking window) with every active service,
+then runs the engine once per chair with that chair's shortest service, or
+`shopSettings.nextOpenServiceId` when set. No second engine.
 
 ## 9. Notifications: outbox and channels
 
@@ -714,23 +916,55 @@ SMS reminders
 - Consent: a `customer.smsOptIn` boolean on bookings and a STOP handler webhook.
   `features.smsReminders` gates it all.
 
+## 10b. Backups, logs and maintenance (prompt 5)
+
+- Backups: the daily cron (`/api/internal/cron/daily`) exports every business
+  collection (everything except sessions, rateLimits and idempotencyKeys) as
+  canonical EJSON, one gzipped NDJSON file per collection plus a manifest, to
+  `_backups/YYYY-MM-DD/` in the photo bucket (under R2_KEY_PREFIX when set).
+  Thirty days are kept; the ten days past the window are deleted on each run
+  (keys are deterministic, so nothing is listed). `npm run restore --
+--date=YYYY-MM-DD --to=<db name>` restores into another database; the live
+  name is refused without `--force`.
+- Cron: Vercel Hobby allows one run a day, so every scheduled job is in one
+  route. Vercel Pro allows more frequent schedules; split the route or add a
+  second cron entry then. `/api/internal/outbox/deliver` still exists for a
+  manual backstop.
+- Logs: one JSON object per line with `requestId`, `code` and `status`; every
+  error is logged once by the response helper. The logger scrubs every field
+  (`server/lib/pii.ts`): emails keep one letter and the domain, phone numbers
+  keep the last two digits. The log email channel never logs the body above
+  debug level.
+- API down and maintenance: the public layout shows one kit ErrorState with
+  the shop phone (from `/api/shop`, or the seed placeholder compiled in as
+  `__SHOP_PHONE__`) when `/api/shop` fails or reports `maintenance: true`.
+  MAINTENANCE_MODE=true makes public routes answer 503 MAINTENANCE except
+  `/api/shop` and `/api/auth/*`; the staff area and `/api/health` keep working.
+
 ## 11. Operations
 
 Environments
 
-| Variable                                      | Needed          | Purpose                                |
-| --------------------------------------------- | --------------- | -------------------------------------- |
-| MONGODB_URI                                   | now             | replica set connection string          |
-| MONGODB_DB_NAME                               | now             | database name per environment          |
-| APP_BASE_URL                                  | now             | manage links, allowed Origin           |
-| MANAGE_LINK_SECRET                            | now             | HMAC key for manage links              |
-| EMAIL_PROVIDER                                | later           | log or resend                          |
-| RESEND_API_KEY, EMAIL_FROM                    | later           | email delivery                         |
-| SEED_OWNER_PASSWORD                           | later           | initial owner login at seed time       |
-| CRON_SECRET                                   | later           | bearer token for internal routes       |
-| LOG_LEVEL                                     | optional        |                                        |
-| MONGOMS_SYSTEM_BINARY                         | optional, tests | use an existing mongod                 |
-| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL | set by Vercel   | build sha, environment, preview origin |
+| Variable                                                                             | Needed          | Purpose                                                                  |
+| ------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------ |
+| MONGODB_URI                                                                          | now             | replica set connection string                                            |
+| MONGODB_DB_NAME                                                                      | now             | database name per environment                                            |
+| APP_BASE_URL                                                                         | now             | manage links, allowed Origin                                             |
+| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links                                                |
+| EMAIL_PROVIDER                                                                       | later           | log or resend                                                            |
+| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                                                           |
+| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time                                         |
+| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email                                    |
+| CRON_SECRET                                                                          | later           | bearer token for internal routes                                         |
+| STORAGE_DRIVER                                                                       | now             | local or r2                                                              |
+| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                                              |
+| R2_KEY_PREFIX                                                                        | preview         | folder for every object key, e.g. preview/                               |
+| BOOTSTRAP_SECRET                                                                     | until setup ran | enables POST /api/internal/bootstrap and /setup; remove afterwards       |
+| EMAIL_DISABLED_ACK                                                                   | production      | "true" allows EMAIL_PROVIDER=log in production, on purpose               |
+| MAINTENANCE_MODE                                                                     | when needed     | "true" shows the maintenance message site-wide; admin and health stay up |
+| LOG_LEVEL                                                                            | optional        |                                                                          |
+| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                                                   |
+| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin                                   |
 
 Deployment
 
@@ -745,7 +979,8 @@ rev-parse HEAD` locally) and is defined as `__BUILD_SHA__` for the client and
   proxies `/api` to the API so cookies and Origin behave as in production.
 
 Scripts: `dev`, `build`, `typecheck`, `lint`, `format`, `format:check`, `test`,
-`test:watch`, `test:coverage`, `db:indexes`, `db:seed`.
+`test:watch`, `test:coverage`, `test:e2e`, `db:indexes`, `db:seed`,
+`user:reset`.
 
 ## 12. Risks and open questions
 
@@ -755,8 +990,9 @@ Risks
   the cron backstop covers the rest. On Hobby, crons run at most daily, so a
   failed first attempt could wait a day. Pro plan or a tiny external pinger fixes
   that.
-- The client bundle is about 137 KB gzipped, mostly Luxon and zod. Acceptable now;
-  route-level code splitting and a lighter date formatter are options later.
+- The public bundle is about 147 KB gzipped, mostly Luxon and zod. The staff
+  dashboard is a separate lazy chunk (about 22 KB gzipped) that public visitors
+  never download. A lighter date formatter is an option later.
 - Atlas free tier has no point-in-time restore. Take a daily `mongodump` or use
   M10 before launch.
 - `MANAGE_LINK_SECRET` rotation invalidates all links at once.

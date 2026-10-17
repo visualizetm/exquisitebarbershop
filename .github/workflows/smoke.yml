@@ -1,0 +1,26 @@
+name: Smoke test
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: The deployed site to check, for example https://example.com
+        required: true
+        type: string
+
+jobs:
+  smoke:
+    name: Smoke test a deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm run smoke -- --url=${{ inputs.url }}

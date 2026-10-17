@@ -3,6 +3,7 @@ import {
   availabilityDaysResponseSchema,
   availabilityQuerySchema,
   availabilityResponseSchema,
+  nextOpeningsResponseSchema,
 } from '../../../shared/api/availability';
 import { shopDateOf, shopDayStart } from '../../../shared/lib/time';
 import { AppError } from '../../lib/errors';
@@ -13,6 +14,7 @@ import {
   resolveStaffSelector,
 } from '../../services/availability';
 import { loadAvailabilityContext } from '../../services/availabilityData';
+import { nextOpenings } from '../../services/nextOpening';
 import { parseQuery } from '../request';
 import type { RouteDefinition } from '../types';
 
@@ -20,6 +22,15 @@ import type { RouteDefinition } from '../types';
 const MAX_DAYS = 62;
 
 export const availabilityRoutes: RouteDefinition[] = [
+  {
+    method: 'GET',
+    path: '/api/availability/next',
+    auth: 'public',
+    handler: async (ctx) => {
+      const body = nextOpeningsResponseSchema.parse(await nextOpenings(ctx.now));
+      return { body, headers: { 'Cache-Control': 'public, max-age=30' } };
+    },
+  },
   {
     method: 'GET',
     path: '/api/availability',
@@ -93,6 +104,7 @@ export const availabilityRoutes: RouteDefinition[] = [
         date: d.date,
         available: d.slots.length > 0,
         reason: d.reason,
+        count: d.slots.length,
       }));
       const body = availabilityDaysResponseSchema.parse({
         from: fromDate,

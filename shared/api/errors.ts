@@ -14,11 +14,14 @@ export const ERROR_CODES = {
   FORBIDDEN: 403,
   ORIGIN_NOT_ALLOWED: 403,
   INVALID_TOKEN: 403,
+  PASSWORD_CHANGE_REQUIRED: 403,
   TOKEN_EXPIRED: 403,
   NOT_FOUND: 404,
   METHOD_NOT_ALLOWED: 405,
   CONFLICT: 409,
   SLOT_TAKEN: 409,
+  SCHEDULE_CONFLICT: 409,
+  INVALID_TRANSITION: 409,
   SLUG_TAKEN: 409,
   IDEMPOTENCY_MISMATCH: 409,
   IDEMPOTENCY_IN_PROGRESS: 409,
@@ -38,6 +41,10 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: 500,
   NOT_IMPLEMENTED: 501,
   DATABASE_UNAVAILABLE: 503,
+  /** The deployment is missing settings; the doctor says which. */
+  CONFIG_ERROR: 503,
+  /** MAINTENANCE_MODE is on; the admin and the health check still answer. */
+  MAINTENANCE: 503,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;
@@ -57,6 +64,22 @@ export const apiErrorSchema = z.object({
     requestId: z.string(),
     /** Seconds until a rate-limited or locked client may retry. */
     retryAfterSeconds: z.int().optional(),
+    /** For SCHEDULE_CONFLICT: future bookings the change would leave outside working time. */
+    affected: z
+      .array(
+        z.object({
+          bookingId: z.string(),
+          referenceCode: z.string(),
+          staffId: z.string(),
+          staffName: z.string(),
+          startAt: z.iso.datetime(),
+          endAt: z.iso.datetime(),
+          customerName: z.string(),
+          services: z.array(z.string()),
+          hasEmail: z.boolean(),
+        }),
+      )
+      .optional(),
     /** For SLOT_TAKEN: the next open times so the UI can offer them right away. */
     alternatives: z
       .array(z.object({ startAt: z.iso.datetime(), endAt: z.iso.datetime(), staffId: z.string() }))

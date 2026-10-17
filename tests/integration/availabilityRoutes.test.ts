@@ -132,7 +132,7 @@ describe('GET /api/availability/days', () => {
         )
       ).body,
     );
-    expect(res.days).toEqual([{ date: wed, available: false, reason: 'closed' }]);
+    expect(res.days).toEqual([{ date: wed, available: false, reason: 'closed', count: 0 }]);
     const inverted = await call(
       server.baseUrl,
       'GET',

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import { getEnv } from '../env';
+import { currentEnvProblems, getEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { randomRequestId } from '../lib/ids';
 import { logger } from '../lib/logger';
@@ -44,24 +44,68 @@ function matchSegments(pattern: string[], actual: string[]): Record<string, stri
   return params;
 }
 
-/** Internal routes (cron, maintenance) carry `Authorization: Bearer <CRON_SECRET>`. */
-function assertCronSecret(req: IncomingMessage): void {
-  const secret = getEnv().CRON_SECRET;
+function bearerOf(req: IncomingMessage): string {
   const header = req.headers.authorization ?? '';
-  const provided = header.startsWith('Bearer ') ? header.slice(7) : '';
-  if (!secret) throw new AppError('FORBIDDEN', 'Not allowed');
-  if (
-    provided.length !== secret.length ||
-    !timingSafeEqual(Buffer.from(provided), Buffer.from(secret))
-  ) {
-    throw new AppError('FORBIDDEN', 'Not allowed');
+  return header.startsWith('Bearer ') ? header.slice(7) : '';
+}
+
+function sameSecret(provided: string, secret: string | undefined): boolean {
+  if (!secret) return false;
+  return (
+    provided.length === secret.length && timingSafeEqual(Buffer.from(provided), Buffer.from(secret))
+  );
+}
+
+/**
+ * Internal routes (cron, maintenance) carry `Authorization: Bearer <CRON_SECRET>`.
+ * Bootstrap routes also take BOOTSTRAP_SECRET, and do not exist while it is unset.
+ */
+function assertInternalSecret(req: IncomingMessage, route: RouteDefinition): void {
+  const env = getEnv();
+  const provided = bearerOf(req);
+  if (sameSecret(provided, env.CRON_SECRET)) return;
+  if (route.bootstrap === true && provided !== '') {
+    if (!env.BOOTSTRAP_SECRET) throw new AppError('NOT_FOUND', 'No such endpoint');
+    if (sameSecret(provided, env.BOOTSTRAP_SECRET)) return;
+  }
+  throw new AppError('FORBIDDEN', 'Not allowed');
+}
+
+let configWarned = false;
+
+/**
+ * A deployment with missing settings answers 503 everywhere except the health
+ * check and the setup routes, which say what is missing. In maintenance mode
+ * the public routes answer 503 too, while the staff area keeps working.
+ */
+function assertServing(route: RouteDefinition, pathname: string): void {
+  if (route.alwaysOn === true) return;
+  const problems = currentEnvProblems();
+  if (problems.length > 0) {
+    if (!configWarned) {
+      configWarned = true;
+      logger.error('environment incomplete', { problems: problems.map((p) => p.message) });
+    }
+    throw new AppError('CONFIG_ERROR', 'The site is not set up yet. Run the doctor at /setup.');
+  }
+  if (getEnv().MAINTENANCE_MODE === 'true' && route.auth === 'public') {
+    if (pathname === '/api/shop' || pathname.startsWith('/api/auth/')) return;
+    throw new AppError('MAINTENANCE', 'Online booking is having a moment. Please call the shop.');
   }
 }
 
+const KNOWN_LEVELS: ReadonlySet<string> = new Set(['public', 'barber', 'owner', 'internal']);
+
+/** Deny by default: building a router with a route that has no valid auth level fails at startup. */
 export function createRouter(
   definitions: readonly RouteDefinition[],
   authenticate: Authenticator,
 ): Router {
+  for (const d of definitions) {
+    if (!KNOWN_LEVELS.has(d.auth)) {
+      throw new Error(`Route ${d.method} ${d.path} has no valid auth level`);
+    }
+  }
   const compiled: CompiledRoute[] = definitions.map((d) => ({
     ...d,
     segments: d.path.split('/').filter(Boolean),
@@ -112,15 +156,29 @@ export function createRouter(
         now: new Date(),
       };
 
-      if (route.auth === 'internal') {
-        assertCronSecret(req);
-      } else if (route.auth !== 'public') {
-        const principal = await authenticate(ctx);
-        if (!principal) throw new AppError('AUTH_REQUIRED', 'Please sign in');
-        if (route.auth === 'owner' && principal.role !== 'owner') {
-          throw new AppError('FORBIDDEN', 'Owner access is required');
+      assertServing(route, url.pathname);
+      switch (route.auth) {
+        case 'public':
+          break;
+        case 'internal':
+          assertInternalSecret(req, route);
+          break;
+        case 'barber':
+        case 'owner': {
+          const principal = await authenticate(ctx);
+          if (!principal) throw new AppError('AUTH_REQUIRED', 'Please sign in');
+          if (principal.mustChangePassword && route.allowDuringPasswordChange !== true) {
+            throw new AppError('PASSWORD_CHANGE_REQUIRED', 'Please choose a new password first');
+          }
+          if (route.auth === 'owner' && principal.role !== 'owner') {
+            throw new AppError('FORBIDDEN', 'Owner access is required');
+          }
+          ctx.principal = principal;
+          break;
         }
-        ctx.principal = principal;
+        default:
+          // Unreachable for typed routes; a route cast past the type check is denied.
+          throw new AppError('FORBIDDEN', 'Not allowed');
       }
 
       const result = await route.handler(ctx);

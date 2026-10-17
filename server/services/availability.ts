@@ -219,6 +219,85 @@ export function shopRangesFor(
   return intervals.length === 0 ? null : intervalsToRanges(date, intervals);
 }
 
+/** The parts of the context that decide when a chair works. */
+export type ScheduleSource = Pick<
+  AvailabilityContext,
+  'shopHours' | 'staffHours' | 'closures' | 'timeBlocks'
+>;
+
+/**
+ * Ranges a chair works inside known shop ranges: weekly hours plus extra hours,
+ * clipped to the shop, minus time off and days off. Empty means not working.
+ */
+function chairRanges(
+  staffId: string,
+  date: string,
+  dayKey: DayKey,
+  dayBounds: Range,
+  shopRanges: readonly Range[],
+  source: ScheduleSource,
+): Range[] {
+  const blocks = source.timeBlocks.filter(
+    (b) => b.staffId === staffId && overlaps({ start: b.startAt, end: b.endAt }, dayBounds),
+  );
+  const base = intervalsToRanges(date, source.staffHours.get(staffId)?.[dayKey] ?? []);
+  const extra = blocks
+    .filter((b) => b.kind === 'extraHours')
+    .map((b) => clip({ start: b.startAt, end: b.endAt }, dayBounds))
+    .filter((r): r is Range => r !== null);
+  const scheduled = intersectRanges(mergeRanges([...base, ...extra]), shopRanges);
+  const off = blocks
+    .filter((b) => b.kind === 'timeOff' || b.kind === 'dayOff')
+    .map((b) => ({ start: b.startAt, end: b.endAt }));
+  return subtractRanges(scheduled, off);
+}
+
+export interface WorkingDay {
+  ranges: Range[];
+  /** Why there are no ranges: the shop is closed, or this chair is off. */
+  reason: 'closed' | 'dayOff' | null;
+}
+
+/** When one chair works on one shop-local date. Used by the conflict rule and the dashboard. */
+export function workingRangesFor(
+  staffId: string,
+  date: string,
+  source: ScheduleSource,
+): WorkingDay {
+  const dayKey = dayKeyOfIsoDate(date);
+  const shopRanges = shopRangesFor(date, dayKey, source.shopHours, source.closures);
+  if (!shopRanges) return { ranges: [], reason: 'closed' };
+  const ranges = chairRanges(staffId, date, dayKey, shopDayBounds(date), shopRanges, source);
+  return { ranges, reason: ranges.length === 0 ? 'dayOff' : null };
+}
+
+/**
+ * True when a booking sits inside its chair's working time: the chair exists and
+ * is not deleted, the services (not the buffer) fit inside one working range, and
+ * no blocked period overlaps them. The conflict rule compares this before and
+ * after a schedule change.
+ */
+export function isWithinWorkingTime(
+  booking: Pick<BookingDocument, 'staffId' | 'startAt' | 'endAt'>,
+  staff: Pick<StaffDocument, 'deletedAt'> | undefined,
+  source: ScheduleSource,
+): boolean {
+  // A missing chair reads as undefined, which is not null, so it fails too.
+  if (staff?.deletedAt !== null) return false;
+  const { ranges } = workingRangesFor(booking.staffId, shopDateOf(booking.startAt), source);
+  const span = { start: booking.startAt, end: booking.endAt };
+  const inside = ranges.some(
+    (r) => r.start.getTime() <= span.start.getTime() && span.end.getTime() <= r.end.getTime(),
+  );
+  if (!inside) return false;
+  return !source.timeBlocks.some(
+    (b) =>
+      b.staffId === booking.staffId &&
+      b.kind === 'block' &&
+      overlaps({ start: b.startAt, end: b.endAt }, span),
+  );
+}
+
 interface StaffDayInput {
   staff: StaffDocument;
   date: string;
@@ -233,30 +312,19 @@ interface StaffDayInput {
 
 function computeStaffDay(input: StaffDayInput): StaffDay {
   const { staff, date, dayKey, dayBounds, shopRanges, ctx, totalMinutes } = input;
+  const working = chairRanges(staff._id, date, dayKey, dayBounds, shopRanges, ctx);
+  if (working.length === 0) return { staffId: staff._id, starts: [], reason: 'dayOff' };
   const blocks = ctx.timeBlocks.filter(
     (b) => b.staffId === staff._id && overlaps({ start: b.startAt, end: b.endAt }, dayBounds),
   );
-
-  const base = intervalsToRanges(date, ctx.staffHours.get(staff._id)?.[dayKey] ?? []);
-  const extra = blocks
-    .filter((b) => b.kind === 'extraHours')
-    .map((b) => clip({ start: b.startAt, end: b.endAt }, dayBounds))
-    .filter((r): r is Range => r !== null);
-  const scheduled = intersectRanges(mergeRanges([...base, ...extra]), shopRanges);
-  if (scheduled.length === 0) return { staffId: staff._id, starts: [], reason: 'dayOff' };
-
-  const off = blocks
-    .filter((b) => b.kind === 'timeOff' || b.kind === 'dayOff')
-    .map((b) => ({ start: b.startAt, end: b.endAt }));
-  const working = subtractRanges(scheduled, off);
-  if (working.length === 0) return { staffId: staff._id, starts: [], reason: 'dayOff' };
 
   const busy: Range[] = [
     ...ctx.bookings
       .filter(
         (b) =>
           b.staffId === staff._id &&
-          b.status === 'confirmed' &&
+          // Completed and no-show bookings keep their slot locks, so their time stays taken.
+          b.status !== 'cancelled' &&
           b._id !== input.excludeBookingId &&
           overlaps({ start: b.startAt, end: addMinutes(b.endAt, b.bufferMinutes) }, dayBounds),
       )
@@ -270,8 +338,11 @@ function computeStaffDay(input: StaffDayInput): StaffDay {
   let freeBeforeLead = 0;
   for (const range of working) {
     for (let t = ceilToStep(range.start, step); ; t = addMinutes(t, step)) {
+      // The services must finish inside working time. The cleanup buffer after them
+      // may run past the end of the range (closing time, the start of time off), but
+      // it still may not overlap anything busy, so the next booking keeps its gap.
+      if (addMinutes(t, input.serviceMinutes).getTime() > range.end.getTime()) break;
       const candidate: Range = { start: t, end: addMinutes(t, totalMinutes) };
-      if (candidate.end.getTime() > range.end.getTime()) break;
       if (busy.some((b) => overlaps(b, candidate))) continue;
       if (t.getTime() < earliest.getTime()) {
         freeBeforeLead += 1;
@@ -290,7 +361,7 @@ function computeStaffDay(input: StaffDayInput): StaffDay {
   return { staffId: staff._id, starts, reason: null };
 }
 
-/** Minutes of confirmed work each chair already has on a day, for the fairness pick. */
+/** Minutes of booked work (anything not cancelled) each chair has on a day, for the fairness pick. */
 function bookedMinutesByStaff(
   ctx: AvailabilityContext,
   dayBounds: Range,
@@ -298,7 +369,7 @@ function bookedMinutesByStaff(
 ): Map<string, number> {
   const out = new Map<string, number>();
   for (const b of ctx.bookings) {
-    if (b.status !== 'confirmed' || b._id === exclude) continue;
+    if (b.status === 'cancelled' || b._id === exclude) continue;
     if (!overlaps({ start: b.startAt, end: b.endAt }, dayBounds)) continue;
     out.set(b.staffId, (out.get(b.staffId) ?? 0) + b.durationMinutes);
   }

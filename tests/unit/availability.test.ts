@@ -6,6 +6,7 @@ import {
   findSlot,
   intersectRanges,
   isDateInWindow,
+  isWithinWorkingTime,
   isOnSlotGrid,
   mergeRanges,
   nextOpenSlots,
@@ -14,6 +15,7 @@ import {
   shopRangesFor,
   staffQualifies,
   subtractRanges,
+  workingRangesFor,
 } from '../../server/services/availability';
 import { shopLocalToUtc } from '../../shared/lib/time';
 import {
@@ -181,7 +183,7 @@ describe('availability: one chair, one day', () => {
     expect(day.slots[0]?.candidates).toEqual([b._id]);
   });
 
-  it('closing edge: duration plus buffer must fit inside the working range', () => {
+  it('closing edge: the services must end by closing but the buffer may run past it', () => {
     const b = barber();
     const ctx = context({
       services: [cut],
@@ -191,7 +193,39 @@ describe('availability: one chair, one day', () => {
     });
     const { day, result } = oneDay(ctx, b.slug);
     expect(result.totalMinutes).toBe(40);
-    expect(hhmmList(day.slots.map((s) => s.startAt)).at(-1)).toBe('16:15');
+    // 16:30 + 30 min ends exactly at 17:00; its 10 minute buffer runs to 17:10.
+    expect(hhmmList(day.slots.map((s) => s.startAt)).at(-1)).toBe('16:30');
+    expect(hhmmList(day.slots.map((s) => s.startAt))).not.toContain('16:45');
+  });
+
+  it('the buffer past the end of one range still may not overlap a booking', () => {
+    const b = barber();
+    // Working 09:00 to 12:00 and 12:15 to 17:00 because of a short time off at 12:00.
+    const ctx = context({
+      services: [cut],
+      staff: [b],
+      staffHours: new Map([[b._id, nineToFive]]),
+      settings: settings({ bufferMinutes: 10 }),
+      timeBlocks: [
+        block({
+          staffId: b._id,
+          kind: 'timeOff',
+          startAt: at(DATE, '12:00'),
+          endAt: at(DATE, '12:15'),
+        }),
+      ],
+      bookings: [booking({ staffId: b._id, startAt: at(DATE, '12:15'), durationMinutes: 30 })],
+    });
+    const times = hhmmList(oneDay(ctx, b.slug).day.slots.map((s) => s.startAt));
+    // 11:30 ends at 12:00 and its buffer reaches only 12:10, before the 12:15 booking.
+    expect(times).toContain('11:30');
+    const tight = context({
+      ...ctx,
+      bookings: [booking({ staffId: b._id, startAt: at(DATE, '12:00'), durationMinutes: 30 })],
+      timeBlocks: [],
+    });
+    // With the chair booked from 12:00, an 11:30 start would push its buffer into that booking.
+    expect(hhmmList(oneDay(tight, b.slug).day.slots.map((s) => s.startAt))).not.toContain('11:30');
   });
 
   it('per-service buffer widens the total and the busy ranges of existing bookings count their own buffer', () => {
@@ -215,8 +249,8 @@ describe('availability: one chair, one day', () => {
     const times = hhmmList(day.slots.map((s) => s.startAt));
     // 09:00 booking blocks until 09:40; first grid start after that is 09:45.
     expect(times[0]).toBe('09:45');
-    // 110 minutes must end by 17:00: last start 15:10 rounds down to the 15:00 grid slot.
-    expect(times.at(-1)).toBe('15:00');
+    // The 90 minutes of services must end by 17:00; the 20 minute buffer may run past.
+    expect(times.at(-1)).toBe('15:30');
   });
 
   it('multi-service chaining uses the sum of durations on the same chair', () => {
@@ -622,5 +656,65 @@ describe('availability: first available', () => {
       at('2026-03-16', '09:15'),
     ]);
     expect(nextOpenSlots(result, at('2026-03-17', '00:00'), 3)).toEqual([]);
+  });
+});
+
+describe('availability: working time for the conflict rule', () => {
+  const b = barber();
+  const source = {
+    shopHours: nineToFive,
+    staffHours: new Map([[b._id, nineToFive]]),
+    closures: [closure('2026-03-13')],
+    timeBlocks: [
+      block({
+        staffId: b._id,
+        kind: 'timeOff',
+        startAt: at(DATE, '12:00'),
+        endAt: at(DATE, '13:00'),
+      }),
+      block({
+        staffId: b._id,
+        kind: 'block',
+        startAt: at(DATE, '15:00'),
+        endAt: at(DATE, '15:30'),
+      }),
+    ],
+  };
+
+  it('workingRangesFor reports ranges, a closed shop and a chair that is off', () => {
+    expect(workingRangesFor(b._id, DATE, source)).toEqual({
+      ranges: [
+        { start: at(DATE, '09:00'), end: at(DATE, '12:00') },
+        { start: at(DATE, '13:00'), end: at(DATE, '17:00') },
+      ],
+      reason: null,
+    });
+    expect(workingRangesFor(b._id, '2026-03-13', source)).toEqual({ ranges: [], reason: 'closed' });
+    expect(workingRangesFor('nobody', DATE, source)).toEqual({ ranges: [], reason: 'dayOff' });
+  });
+
+  it('isWithinWorkingTime needs a live chair, a range holding the services and no block', () => {
+    const inside = { staffId: b._id, startAt: at(DATE, '10:00'), endAt: at(DATE, '10:30') };
+    expect(isWithinWorkingTime(inside, b, source)).toBe(true);
+    expect(isWithinWorkingTime(inside, undefined, source)).toBe(false);
+    expect(isWithinWorkingTime(inside, { deletedAt: FIXTURE_NOW }, source)).toBe(false);
+    const acrossLunch = { ...inside, startAt: at(DATE, '11:45'), endAt: at(DATE, '12:15') };
+    expect(isWithinWorkingTime(acrossLunch, b, source)).toBe(false);
+    const endsAtClose = { ...inside, startAt: at(DATE, '16:30'), endAt: at(DATE, '17:00') };
+    expect(isWithinWorkingTime(endsAtClose, b, source)).toBe(true);
+    const onBlock = { ...inside, startAt: at(DATE, '15:15'), endAt: at(DATE, '15:45') };
+    expect(isWithinWorkingTime(onBlock, b, source)).toBe(false);
+    const otherChairBlock = {
+      ...source,
+      timeBlocks: [
+        block({
+          staffId: 'other',
+          kind: 'block',
+          startAt: at(DATE, '10:00'),
+          endAt: at(DATE, '11:00'),
+        }),
+      ],
+    };
+    expect(isWithinWorkingTime(inside, b, otherChairBlock)).toBe(true);
   });
 });
