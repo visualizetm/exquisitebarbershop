@@ -400,3 +400,49 @@ describe('sessions', () => {
     expect((await me(cookie)).status).toBe(401);
   });
 });
+
+describe('lockout bypass for known addresses', () => {
+  it('lets an address that signed in recently pass a lockout caused by someone else', async () => {
+    const owner = await createLogin({ role: 'owner', staffId: null });
+    const home = '198.51.100.7';
+    const attacker = '203.0.113.9';
+    expect((await login(owner.email, OWNER_PASSWORD, home)).status).toBe(200);
+    const stored = await usersRepo.findUserById(owner._id);
+    expect(stored?.recentLoginIps).toHaveLength(1);
+    expect(JSON.stringify(stored?.recentLoginIps)).not.toContain(home);
+
+    for (let i = 0; i < 5; i += 1)
+      expect((await login(owner.email, `wrong-guess-${i}`, attacker)).status).toBe(401);
+    expect((await login(owner.email, OWNER_PASSWORD, attacker)).status).toBe(423);
+
+    // The owner gets in from home, and the lock stays for everyone else.
+    expect((await login(owner.email, OWNER_PASSWORD, home)).status).toBe(200);
+    expect((await login(owner.email, OWNER_PASSWORD, attacker)).status).toBe(423);
+    expect((await login(owner.email, OWNER_PASSWORD, '192.0.2.44')).status).toBe(423);
+
+    // A wrong password from home is still a wrong password, and the IP limit still applies.
+    await db().collection('rateLimits').deleteMany({});
+    expect((await login(owner.email, 'not-the-password-1', home)).status).toBe(401);
+    for (let i = 0; i < 25; i += 1) await login(`other${i}@example.com`, 'x-wrong-1', home);
+    expect((await login(owner.email, OWNER_PASSWORD, home)).status).toBe(429);
+  });
+
+  it('keeps at most ten addresses and forgets the old ones', async () => {
+    const owner = await createLogin({ role: 'owner', staffId: null });
+    for (let i = 1; i <= 12; i += 1) {
+      await db().collection('rateLimits').deleteMany({});
+      expect((await login(owner.email, OWNER_PASSWORD, `198.51.100.${i}`)).status).toBe(200);
+    }
+    const stored = await usersRepo.findUserById(owner._id);
+    expect(stored?.recentLoginIps).toHaveLength(10);
+    await db()
+      .collection<{ _id: string }>('users')
+      .updateOne(
+        { _id: owner._id },
+        { $set: { 'recentLoginIps.0.at': new Date(Date.now() - 31 * 24 * 60 * 60_000) } },
+      );
+    await db().collection('rateLimits').deleteMany({});
+    expect((await login(owner.email, OWNER_PASSWORD, '198.51.100.12')).status).toBe(200);
+    expect((await usersRepo.findUserById(owner._id))?.recentLoginIps).toHaveLength(9);
+  });
+});

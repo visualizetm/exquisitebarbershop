@@ -18,6 +18,7 @@ export const COLLECTIONS = {
   loginThrottle: 'loginThrottle',
   scheduleGuards: 'scheduleGuards',
   photos: 'photos',
+  pendingUploads: 'pendingUploads',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -240,6 +241,19 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { staffId: 1, kind: 1 },
     options: { name: 'by_staff_kind' },
     reason: "A chair's portrait and work photos.",
+  },
+  // pendingUploads (prompt 5)
+  {
+    collection: 'pendingUploads',
+    keys: { key: 1 },
+    options: { name: 'uniq_key', unique: true },
+    reason: 'Confirming an upload removes its record by key.',
+  },
+  {
+    collection: 'pendingUploads',
+    keys: { issuedAt: 1 },
+    options: { name: 'by_issued' },
+    reason: 'The daily sweep picks up uploads issued over an hour ago that were never confirmed.',
   },
   // bookings (prompt 3)
   {

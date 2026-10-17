@@ -84,7 +84,8 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
   await page.getByLabel(/Beard Trim/).click();
   await expect(page.getByLabel(/Beard Trim/)).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
-  const startAt = await pickFirstDayAndTime(page);
+  // The second open day, so the taken time has fresh alternatives whatever the clock says.
+  const startAt = await pickFirstDayAndTime(page, 1);
   await fillDetails(page, 'conflict@example.com');
 
   // Someone else grabs that exact time while this customer is reviewing.

@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newId } from '../../server/lib/ids';
 import { shopSettingsRepo } from '../../server/repos';
-import { purgeDeletedPhotos } from '../../server/services/photosService';
+import { resetEnvCache } from '../../server/env';
+import { purgeDeletedPhotos, sweepAbandonedUploads } from '../../server/services/photosService';
 import { runSeed } from '../../server/services/seedService';
 import { localPathFor } from '../../server/storage/local';
 import { shopSettingsSeed, staffSeedId } from '../../seed/shop';
@@ -133,9 +134,12 @@ describe('confirm', () => {
     });
     const wrongSize = await owner('POST', '/api/admin/photos/confirm', body);
     expect(wrongSize.status).toBe(409);
+    // A mismatch leaves nothing behind in storage.
+    expect(existsSync(localPathFor(issued.key))).toBe(false);
     await put(issued, BYTES, 'image/png');
     const wrongType = await owner('POST', '/api/admin/photos/confirm', body);
     expect(wrongType.status).toBe(409);
+    expect(existsSync(localPathFor(issued.key))).toBe(false);
     await put(issued, BYTES);
     const tampered = await owner('POST', '/api/admin/photos/confirm', {
       ...body,
@@ -146,6 +150,36 @@ describe('confirm', () => {
     expect(noAlt.status).toBe(400);
     const ok = await owner('POST', '/api/admin/photos/confirm', body);
     expect(ok.status).toBe(201);
+  });
+
+  it('sweeps uploads that were issued over an hour ago and never confirmed', async () => {
+    const { issued: stale } = await issue(ownerCookie, { kind: 'gallery' });
+    const { issued: fresh } = await issue(ownerCookie, { kind: 'gallery' });
+    if (!stale || !fresh) throw new Error('no upload url');
+    await put(stale, BYTES);
+    await put(fresh, BYTES);
+    await db()
+      .collection<{ key: string }>('pendingUploads')
+      .updateOne(
+        { key: stale.key },
+        // The test server issues at NOW; only this record is stale when the sweep runs at NOW.
+        { $set: { issuedAt: new Date(NOW.getTime() - 2 * 60 * 60_000) } },
+      );
+    expect(await sweepAbandonedUploads(NOW)).toBe(1);
+    expect(existsSync(localPathFor(stale.key))).toBe(false);
+    expect(existsSync(localPathFor(fresh.key))).toBe(true);
+    expect(await db().collection('pendingUploads').countDocuments({ key: stale.key })).toBe(0);
+    // Confirming the fresh one removes its record, so a later sweep leaves it alone.
+    const ok = await owner('POST', '/api/admin/photos/confirm', {
+      ticket: fresh.ticket,
+      width: 10,
+      height: 10,
+      alt: 'kept',
+    });
+    expect(ok.status).toBe(201);
+    expect(await db().collection('pendingUploads').countDocuments({ key: fresh.key })).toBe(0);
+    await sweepAbandonedUploads(new Date(NOW.getTime() + 3 * 60 * 60_000));
+    expect(existsSync(localPathFor(fresh.key))).toBe(true);
   });
 
   it('the PUT itself needs a valid signature', async () => {
@@ -165,6 +199,34 @@ describe('confirm', () => {
       { method: 'PUT', body: BYTES },
     );
     expect(otherKey.status).toBe(403);
+  });
+});
+
+describe('R2_KEY_PREFIX', () => {
+  it('puts every generated key under the prefix and the flow still works end to end', async () => {
+    process.env.R2_KEY_PREFIX = 'preview/';
+    resetEnvCache();
+    try {
+      const { issued, photo } = await uploadAndConfirm(ownerCookie, { kind: 'hero' }, 'Prefixed');
+      expect(issued.key.startsWith('preview/hero/')).toBe(true);
+      expect(photoKeySchema.safeParse(issued.key).success).toBe(true);
+      expect(photo.url.endsWith(`/uploads/${issued.key}`)).toBe(true);
+      expect(existsSync(localPathFor(issued.key))).toBe(true);
+      expect((await owner('DELETE', `/api/admin/photos/${photo.id}`)).status).toBe(200);
+      await purgeDeletedPhotos(new Date());
+      expect(existsSync(localPathFor(issued.key))).toBe(false);
+    } finally {
+      delete process.env.R2_KEY_PREFIX;
+      resetEnvCache();
+    }
+  });
+
+  it('refuses a prefix that does not end in a slash', () => {
+    expect(
+      photoKeySchema.safeParse(
+        'Preview/hero/' + '0'.repeat(8) + '-0000-0000-0000-000000000000.webp',
+      ).success,
+    ).toBe(false);
   });
 });
 

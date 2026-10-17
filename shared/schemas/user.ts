@@ -20,6 +20,12 @@ export const userDocumentSchema = z
     lockedUntil: z.date().nullable(),
     lastLoginAt: z.date().nullable(),
     passwordChangedAt: z.date(),
+    /**
+     * Keyed hashes of the addresses this login last succeeded from (at most 10,
+     * 30 days). A sign-in from one of them may pass an email lockout caused by
+     * someone else, so an attacker cannot keep the owner out by guessing wrong.
+     */
+    recentLoginIps: z.array(z.object({ ipHash: z.string().min(1), at: z.date() })).default([]),
   })
   .extend(timestampsSchema.shape);
 export type UserDocument = z.infer<typeof userDocumentSchema>;

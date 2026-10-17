@@ -98,3 +98,17 @@ commit, and what is still open.
   Photos at 390 and 1280, plus montages).
 - Open: the real brand SVGs, the domain (for the robots Sitemap line and the OG
   URL), the real phone and hours, and a check on a real iPhone.
+
+## Prompt 5
+
+### Milestone 1: report 04 carryover fixes and brand assets
+
+- Shipped: a photo confirm that deletes a mismatched or oversized object before
+  answering; a `pendingUploads` record per issued URL and a daily sweep of
+  uploads older than an hour (`uploadsSwept` in the cron summary);
+  `R2_KEY_PREFIX` for previews sharing a bucket; the robots Sitemap line from
+  APP_BASE_URL at build time; a login lockout bypass for addresses that signed
+  in to the account within 30 days (keyed hashes, at most ten, the lock stays
+  for everyone else); the real brand marks rendered into the icons and OG image.
+- Tests: sweep, mismatch cleanup, key prefix end to end, lockout bypass with the
+  attacker still locked, the ten address cap and the 30 day expiry.

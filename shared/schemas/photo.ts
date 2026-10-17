@@ -9,14 +9,17 @@ export type PhotoKind = z.infer<typeof photoKindSchema>;
 export const PHOTO_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 export const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 
+/** An optional folder every key sits under, so preview deployments can share a bucket. */
+export const KEY_PREFIX_PATTERN = /^[a-z0-9][a-z0-9-]*\/$/;
+
 /**
  * Object keys are always server generated: `staff/<staffId>/<uuid>.webp`,
- * `gallery/<uuid>.webp` or `hero/<uuid>.webp`.
+ * `gallery/<uuid>.webp` or `hero/<uuid>.webp`, under R2_KEY_PREFIX when set.
  */
 export const photoKeySchema = z
   .string()
   .regex(
-    /^(?:staff\/[0-9a-f]{24}|gallery|hero)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/,
+    /^(?:[a-z0-9][a-z0-9-]*\/)?(?:staff\/[0-9a-f]{24}|gallery|hero)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/,
   );
 
 export const photoDocumentSchema = z.object({

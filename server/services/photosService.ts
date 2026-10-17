@@ -12,6 +12,7 @@ import type {
 import { idSchema } from '../../shared/schemas/common';
 import {
   PHOTO_CONTENT_TYPES,
+  PHOTO_MAX_BYTES,
   photoKindSchema,
   type PhotoDocument,
   type PhotoKind,
@@ -21,14 +22,22 @@ import { getEnv } from '../env';
 import type { Principal } from '../http/types';
 import { AppError } from '../lib/errors';
 import { signPayload, verifyPayload } from '../lib/signedPayload';
-import { auditLogRepo, photosRepo, shopSettingsRepo, staffRepo } from '../repos';
-import { getStorage } from '../storage';
+import {
+  auditLogRepo,
+  pendingUploadsRepo,
+  photosRepo,
+  shopSettingsRepo,
+  staffRepo,
+} from '../repos';
+import { getStorage, keyPrefix } from '../storage';
 import { actorOf } from './access';
 import type { ServiceMeta } from './adminBookings';
 import { cursors } from './adminBookings';
 
 /** How long an issued upload URL and its ticket stay valid. */
 export const UPLOAD_TTL_SECONDS = 5 * 60;
+/** An issued upload that is not confirmed within this time is swept from storage. */
+export const ABANDONED_UPLOAD_MS = 60 * 60_000;
 const TICKET_PREFIX = 'u1';
 
 const ticketSchema = z.object({
@@ -129,13 +138,18 @@ export async function issueUploadUrl(
 
   const uuid = randomUUID();
   const key =
-    input.kind === 'staff' ? `staff/${staffId ?? ''}/${uuid}.webp` : `${input.kind}/${uuid}.webp`;
+    keyPrefix() +
+    (input.kind === 'staff' ? `staff/${staffId ?? ''}/${uuid}.webp` : `${input.kind}/${uuid}.webp`);
   const upload = await getStorage().presignUpload({
     key,
     contentType: input.contentType,
     size: input.size,
     expiresInSeconds: UPLOAD_TTL_SECONDS,
   });
+  await pendingUploadsRepo.insertPendingUpload(
+    { key, kind: input.kind, staffId, contentType: input.contentType, size: input.size },
+    meta.now,
+  );
   const exp = Math.floor(meta.now.getTime() / 1000) + UPLOAD_TTL_SECONDS;
   const ticket = signPayload(getEnv().MANAGE_LINK_SECRET, TICKET_PREFIX, {
     k: key,
@@ -172,9 +186,17 @@ export async function confirmUpload(
 
   const stored = await getStorage().head(issued.k);
   if (!stored) throw new AppError('CONFLICT', 'The file was not uploaded');
-  if (stored.size !== issued.n || stored.contentType !== issued.ct) {
+  if (
+    stored.size !== issued.n ||
+    stored.contentType !== issued.ct ||
+    stored.size > PHOTO_MAX_BYTES
+  ) {
+    // The object stays nowhere: a mismatch is removed before the caller hears about it.
+    await getStorage().delete(issued.k);
+    await pendingUploadsRepo.deletePendingUploadByKey(issued.k);
     throw new AppError('CONFLICT', 'The uploaded file does not match what was declared');
   }
+  await pendingUploadsRepo.deletePendingUploadByKey(issued.k);
 
   const sortOrder = await photosRepo.nextSortOrder({ kind: issued.kind, staffId: issued.s });
   const photo = await photosRepo.insertPhoto(
@@ -264,6 +286,17 @@ export async function purgeDeletedPhotos(now: Date, limit = 50): Promise<number>
     purged += 1;
   }
   return purged;
+}
+
+/** Removes objects behind upload URLs that were issued over an hour ago and never confirmed. */
+export async function sweepAbandonedUploads(now: Date, limit = 50): Promise<number> {
+  const cutoff = new Date(now.getTime() - ABANDONED_UPLOAD_MS);
+  const stale = await pendingUploadsRepo.listPendingUploadsBefore(cutoff, limit);
+  for (const upload of stale) {
+    await getStorage().delete(upload.key);
+    await pendingUploadsRepo.deletePendingUploadByKey(upload.key);
+  }
+  return stale.length;
 }
 
 export async function listManagedPhotos(

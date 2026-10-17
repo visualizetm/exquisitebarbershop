@@ -23,6 +23,11 @@ export function getStorage(): StorageDriver {
   return cached;
 }
 
+/** The folder every generated key sits under (R2_KEY_PREFIX), or nothing. */
+export function keyPrefix(): string {
+  return getEnv().R2_KEY_PREFIX ?? '';
+}
+
 /** Test helper: forget the driver so the next call re-reads the environment. */
 export function resetStorageCache(): void {
   cached = null;

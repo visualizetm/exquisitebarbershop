@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KEY_PREFIX_PATTERN } from '../shared/schemas/photo';
 
 /**
  * Server-side environment. Parsed lazily on first use so importing modules in
@@ -28,6 +29,14 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
   R2_PUBLIC_BASE_URL: z.url().optional(),
+  /** Folder every object key sits under, for example "preview/". Lets previews share a bucket. */
+  R2_KEY_PREFIX: z
+    .string()
+    .regex(
+      KEY_PREFIX_PATTERN,
+      'R2_KEY_PREFIX must be lowercase letters, digits or hyphens ending in "/"',
+    )
+    .optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

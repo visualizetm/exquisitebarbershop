@@ -2,6 +2,7 @@ import type { ServerResponse } from 'node:http';
 import type { Actor } from '../../shared/schemas/timeBlock';
 import type { UserDocument } from '../../shared/schemas/user';
 import type { Principal } from '../http/types';
+import { getEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { sha256Hex } from '../lib/ids';
 import {
@@ -47,6 +48,11 @@ export function normalizeEmail(email: string): string {
 /** Throttle key for an email. Hashed so the throttle table holds no addresses. */
 export function emailKey(email: string): string {
   return sha256Hex(`login:${normalizeEmail(email)}`);
+}
+
+/** A keyed hash of the client address, so the stored list holds no addresses. */
+export function ipHashOf(ip: string): string {
+  return sha256Hex(`ip:${ip}:${getEnv().MANAGE_LINK_SECRET}`);
 }
 
 function actorOf(principal: Principal): Actor {
@@ -121,14 +127,20 @@ export async function login(
       retryAfterSeconds: accountHit.retryAfterSeconds,
     });
   }
+  const ipHash = ipHashOf(meta.ip);
   const throttle = await loginThrottleRepo.getLoginThrottle(key);
-  if (throttle?.lockedUntil && throttle.lockedUntil.getTime() > meta.now.getTime()) {
+  const lockedUntil = throttle?.lockedUntil ?? null;
+  const locked = lockedUntil !== null && lockedUntil.getTime() > meta.now.getTime();
+  // An address this login succeeded from recently may pass a lockout someone else caused.
+  const known = locked ? await usersRepo.findUserByEmail(email) : null;
+  const bypass = locked && known !== null && usersRepo.hasRecentLoginIp(known, ipHash, meta.now);
+  if (locked && !bypass) {
     await auditLogin('failure', { email, userId: null, reason: 'locked' }, meta);
     throw new AppError(
       'ACCOUNT_LOCKED',
       'Too many failed attempts. Please wait before trying again.',
       {
-        retryAfterSeconds: Math.ceil((throttle.lockedUntil.getTime() - meta.now.getTime()) / 1000),
+        retryAfterSeconds: Math.ceil((lockedUntil.getTime() - meta.now.getTime()) / 1000),
       },
     );
   }
@@ -146,8 +158,9 @@ export async function login(
     throw new AppError('INVALID_CREDENTIALS', GENERIC_FAILURE);
   }
 
-  await loginThrottleRepo.clearLoginThrottle(key);
-  await usersRepo.recordSuccessfulLogin(user._id, meta.now);
+  // A sign-in that passed a lockout leaves it in place, so the guesser stays locked out.
+  if (!bypass) await loginThrottleRepo.clearLoginThrottle(key);
+  await usersRepo.recordSuccessfulLogin(user._id, meta.now, ipHash);
   if (needsRehash(user.passwordHash)) {
     await usersRepo.setUserPasswordHash(user._id, await hashPassword(input.password), meta.now, {
       mustChangePassword: user.mustChangePassword,

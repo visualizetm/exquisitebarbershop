@@ -38,6 +38,8 @@ test('the owner uploads a chair photo through the Photos screen with the local d
 }) => {
   await signInAsOwner(page);
   const png = await samplePng(page);
+  // Unique per run, so a reused server with earlier uploads never matches twice.
+  const alt = `Tre at chair four ${Date.now()}`;
   await page.goto('/admin/photos');
   await page.getByRole('button', { name: 'Chairs' }).click();
   await page.getByLabel('Chair', { exact: true }).selectOption({ label: 'Tre' });
@@ -46,10 +48,10 @@ test('the owner uploads a chair photo through the Photos screen with the local d
     mimeType: 'image/png',
     buffer: png,
   });
-  await page.getByLabel('Describe the photo (alt text)').fill('Tre at chair four');
+  await page.getByLabel('Describe the photo (alt text)').fill(alt);
   await page.getByRole('button', { name: 'Upload photo' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Photo added.' })).toBeVisible();
-  const thumb = page.locator('.exq-adm-photos__thumb[alt="Tre at chair four"]');
+  const thumb = page.locator(`.exq-adm-photos__thumb[alt="${alt}"]`);
   await expect(thumb).toBeVisible();
   // The browser resized the 2400 by 3000 PNG to a 2000px long edge, as WebP.
   await expect(thumb).toHaveAttribute('width', '1600');
@@ -64,5 +66,5 @@ test('the owner uploads a chair photo through the Photos screen with the local d
 
   // It is live on the site right away.
   await page.goto('/chairs/tre');
-  await expect(page.locator('.exq-chair__photo img')).toHaveAttribute('alt', 'Tre at chair four');
+  await expect(page.locator('.exq-chair__photo img')).toHaveAttribute('alt', /^Tre at chair four/);
 });

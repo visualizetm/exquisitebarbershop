@@ -261,19 +261,20 @@ card redemption, `rewardsStampId`, `reminders: { smsSentAt }`.
 
 ### users
 
-| Field                | Type              | Notes                                    |
-| -------------------- | ----------------- | ---------------------------------------- |
-| email                | string, lowercase | login identity                           |
-| passwordHash         | string            | argon2id PHC string                      |
-| role                 | owner, barber     |                                          |
-| staffId              | string or null    | barbers link to their staff record       |
-| isActive             | boolean           | false: cannot sign in, sessions end      |
-| mustChangePassword   | boolean           | temporary password from the owner        |
-| failedLoginCount     | int               | unused since prompt 3, see loginThrottle |
-| lockedUntil          | Date or null      | unused since prompt 3, see loginThrottle |
-| lastLoginAt          | Date or null      |                                          |
-| passwordChangedAt    | Date              |                                          |
-| createdAt, updatedAt | Date              |                                          |
+| Field                | Type              | Notes                                        |
+| -------------------- | ----------------- | -------------------------------------------- |
+| email                | string, lowercase | login identity                               |
+| passwordHash         | string            | argon2id PHC string                          |
+| role                 | owner, barber     |                                              |
+| staffId              | string or null    | barbers link to their staff record           |
+| isActive             | boolean           | false: cannot sign in, sessions end          |
+| mustChangePassword   | boolean           | temporary password from the owner            |
+| failedLoginCount     | int               | unused since prompt 3, see loginThrottle     |
+| lockedUntil          | Date or null      | unused since prompt 3, see loginThrottle     |
+| lastLoginAt          | Date or null      |                                              |
+| passwordChangedAt    | Date              |                                              |
+| recentLoginIps       | [{ ipHash, at }]  | keyed hashes, at most 10, 30 days (prompt 5) |
+| createdAt, updatedAt | Date              |                                              |
 
 | Index                                        | Keys    | Why                         |
 | -------------------------------------------- | ------- | --------------------------- |
@@ -401,6 +402,18 @@ conflict check of a schedule change and its commit. Indexes: `_id` only.
 | --------------- | -------------------------- | ------------------------------------ |
 | kind_live_order | kind, deletedAt, sortOrder | gallery and hero reads in order      |
 | by_staff_kind   | staffId, kind              | one chair's portrait and work photos |
+
+### pendingUploads (prompt 5)
+
+An upload URL that was issued but not confirmed yet: `key`, `kind`, `staffId`,
+`contentType`, `size`, `issuedAt`. Confirming removes the record; the daily cron
+deletes the object behind any record older than an hour (`uploadsSwept`). Keys
+sit under `R2_KEY_PREFIX` when it is set, so previews can share a bucket.
+
+| Index     | Keys     | Why                               |
+| --------- | -------- | --------------------------------- |
+| uniq_key  | key      | confirm removes the record by key |
+| by_issued | issuedAt | the sweep reads the oldest first  |
 
 ### rateLimits
 
@@ -602,7 +615,9 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 
 `/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
 `/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`.
-`/api/internal/outbox/deliver` also purges deleted photo objects (`photosPurged`).
+`/api/internal/outbox/deliver` also purges deleted photo objects (`photosPurged`) and
+sweeps abandoned uploads (`uploadsSwept`). A confirm whose object does not match the
+ticket (size, type, or over 10 MB) deletes the object before answering 409.
 
 Prompt 3 error codes: PASSWORD_CHANGE_REQUIRED 403, SCHEDULE_CONFLICT 409 (with
 `affected`: bookingId, referenceCode, staffId, staffName, startAt, endAt,
@@ -889,22 +904,23 @@ SMS reminders
 
 Environments
 
-| Variable                                                                             | Needed          | Purpose                                |
-| ------------------------------------------------------------------------------------ | --------------- | -------------------------------------- |
-| MONGODB_URI                                                                          | now             | replica set connection string          |
-| MONGODB_DB_NAME                                                                      | now             | database name per environment          |
-| APP_BASE_URL                                                                         | now             | manage links, allowed Origin           |
-| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links              |
-| EMAIL_PROVIDER                                                                       | later           | log or resend                          |
-| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                         |
-| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time       |
-| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email  |
-| CRON_SECRET                                                                          | later           | bearer token for internal routes       |
-| STORAGE_DRIVER                                                                       | now             | local or r2                            |
-| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage            |
-| LOG_LEVEL                                                                            | optional        |                                        |
-| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                 |
-| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin |
+| Variable                                                                             | Needed          | Purpose                                    |
+| ------------------------------------------------------------------------------------ | --------------- | ------------------------------------------ |
+| MONGODB_URI                                                                          | now             | replica set connection string              |
+| MONGODB_DB_NAME                                                                      | now             | database name per environment              |
+| APP_BASE_URL                                                                         | now             | manage links, allowed Origin               |
+| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links                  |
+| EMAIL_PROVIDER                                                                       | later           | log or resend                              |
+| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                             |
+| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time           |
+| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email      |
+| CRON_SECRET                                                                          | later           | bearer token for internal routes           |
+| STORAGE_DRIVER                                                                       | now             | local or r2                                |
+| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                |
+| R2_KEY_PREFIX                                                                        | preview         | folder for every object key, e.g. preview/ |
+| LOG_LEVEL                                                                            | optional        |                                            |
+| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                     |
+| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin     |
 
 Deployment
 

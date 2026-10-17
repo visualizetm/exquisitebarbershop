@@ -1,3 +1,4 @@
+import type { Collection } from 'mongodb';
 import { userDocumentSchema, type UserDocument } from '../../shared/schemas/user';
 import { collection } from '../db/collections';
 import { AppError, isDuplicateKeyError } from '../lib/errors';
@@ -15,8 +16,12 @@ export interface UserInput {
 
 /** Fills fields added after a document was written, so older records read safely. */
 function fill(doc: UserDocument): UserDocument {
-  const stored = (doc as Partial<UserDocument>).mustChangePassword;
-  return { ...doc, mustChangePassword: stored ?? false };
+  const stored = doc as Partial<UserDocument>;
+  return {
+    ...doc,
+    mustChangePassword: stored.mustChangePassword ?? false,
+    recentLoginIps: stored.recentLoginIps ?? [],
+  };
 }
 
 function withDefaults(doc: UserDocument | null): UserDocument | null {
@@ -40,6 +45,7 @@ export async function insertUser(
     lockedUntil: null,
     lastLoginAt: null,
     passwordChangedAt: now,
+    recentLoginIps: [],
     createdAt: now,
     updatedAt: now,
   });
@@ -92,9 +98,14 @@ export async function listUsers(options?: RepoOptions): Promise<UserDocument[]> 
   return docs.map(fill);
 }
 
+/** How long a successful sign-in address is remembered. */
+export const RECENT_LOGIN_IP_MS = 30 * 24 * 60 * 60_000;
+export const RECENT_LOGIN_IP_MAX = 10;
+
 export async function recordSuccessfulLogin(
   id: string,
   now: Date,
+  ipHash: string | null = null,
   options?: RepoOptions,
 ): Promise<void> {
   const col = await collection('users');
@@ -103,6 +114,35 @@ export async function recordSuccessfulLogin(
     { $set: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: now, updatedAt: now } },
     sessionOf(options),
   );
+  if (!ipHash) return;
+  // Forget expired entries and this address's older entry, then keep the newest ten.
+  const raw = col as unknown as Collection<{
+    _id: string;
+    recentLoginIps: { ipHash: string; at: Date }[];
+  }>;
+  await raw.updateOne(
+    { _id: id },
+    {
+      $pull: {
+        // The driver types a pull condition as a partial entry; $or is valid MongoDB here.
+        recentLoginIps: {
+          $or: [{ ipHash }, { at: { $lt: new Date(now.getTime() - RECENT_LOGIN_IP_MS) } }],
+        } as unknown as { ipHash: string },
+      },
+    },
+    sessionOf(options),
+  );
+  await raw.updateOne(
+    { _id: id },
+    { $push: { recentLoginIps: { $each: [{ ipHash, at: now }], $slice: -RECENT_LOGIN_IP_MAX } } },
+    sessionOf(options),
+  );
+}
+
+/** True when this login succeeded from the address within the memory window. */
+export function hasRecentLoginIp(user: UserDocument, ipHash: string, now: Date): boolean {
+  const since = now.getTime() - RECENT_LOGIN_IP_MS;
+  return user.recentLoginIps.some((e) => e.ipHash === ipHash && e.at.getTime() >= since);
 }
 
 /** Replaces the password hash. `mustChangePassword` marks a temporary password. */

@@ -125,3 +125,21 @@ win.
 - D4-33 robots.txt stays static and has no Sitemap line, because that line must
   be an absolute URL and the domain is not known yet. Search Console can take
   the sitemap directly; the line is a one-word change once the domain exists.
+
+## Prompt 5: themes, desktop booking, production readiness
+
+- D5-01 Abandoned uploads are tracked in a `pendingUploads` collection written
+  when a URL is issued and removed on confirm, so the sweep is a query. Rejected
+  listing the bucket: the storage port has no list operation and R2 listing is
+  slow and paged.
+- D5-02 Address hashes for the lockout bypass are keyed with MANAGE_LINK_SECRET
+  (plain SHA-256 of an IPv4 address is reversible in seconds). Rotating that
+  secret also forgets the trusted addresses, which is harmless: they refill on
+  the next sign-in.
+- D5-03 A sign-in that passed a lockout leaves the lockout in place. Clearing it
+  would let the guesser try five more times the moment the owner signs in.
+- D5-04 The robots Sitemap line is written into dist/robots.txt by the build
+  plugin only when APP_BASE_URL (or Vercel's production URL) is set; the file in
+  public/ stays as it was, so a build without the variable is unchanged.
+- D5-05 Brand assets: Rob's real SVGs landed on the branch (commit 4054fe1), so
+  `scripts/brand-assets.ts` was run and the icons and OG image regenerated.
