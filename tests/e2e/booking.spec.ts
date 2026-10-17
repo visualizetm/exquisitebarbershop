@@ -54,7 +54,7 @@ test('book from a chair link, then reschedule and cancel through the manage link
   await page.reload();
   await expect(page.locator('.exq-book-done__code')).toHaveText(code ?? '');
 
-  await page.getByRole('link', { name: 'Cancel or reschedule' }).click();
+  await page.getByRole('link', { name: 'Manage this booking' }).click();
   await expect(page.getByRole('heading', { name: 'Your appointment' })).toBeFocused();
   await expect(page.locator('.exq-manage__reference')).toContainText(code ?? '');
 

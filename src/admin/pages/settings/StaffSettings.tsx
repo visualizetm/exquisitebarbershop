@@ -14,9 +14,11 @@ import {
 import type { WeekHours } from '@shared/schemas/common';
 import { slugify } from '@shared/lib/slug';
 import { Status } from '@/components/Status';
+import { Button, Sheet } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { ConflictResolver } from '../../components/ConflictResolver';
+import { PhotoManager } from '../../components/PhotoManager';
 import { ErrorNote } from '../../components/ErrorNote';
 import { WeekHoursEditor } from '../../components/WeekHoursEditor';
 import { useConflictAction } from '../../useConflictAction';
@@ -90,6 +92,7 @@ function bodyOf(d: StaffDraft) {
 
 export function StaffSettings() {
   const [version, setVersion] = useState(0);
+  const [creating, setCreating] = useState(false);
   const staff = useApi('/api/admin/staff', staffListResponseSchema, { version });
   const services = useApi('/api/admin/services', serviceListResponseSchema);
   const hours = useApi('/api/admin/hours', hoursResponseSchema, { version });
@@ -111,10 +114,32 @@ export function StaffSettings() {
   return (
     <section className="exq-adm-staff" data-state="ready" aria-labelledby="exq-adm-staff-title">
       <h2 id="exq-adm-staff-title">Staff</h2>
-      <details className="exq-adm-staff__create">
-        <summary>Add a staff member</summary>
-        <CreateStaff services={live} onCreated={refresh} />
-      </details>
+      <p>
+        <Button
+          size="sm"
+          onClick={() => {
+            setCreating(true);
+          }}
+        >
+          Add a staff member
+        </Button>
+      </p>
+      <Sheet
+        open={creating}
+        title="Add a staff member"
+        size="lg"
+        onClose={() => {
+          setCreating(false);
+        }}
+      >
+        <CreateStaff
+          services={live}
+          onCreated={() => {
+            setCreating(false);
+            refresh();
+          }}
+        />
+      </Sheet>
       <ul className="exq-adm-staff__list">
         {staff.data.staff.map((s) => (
           <StaffRow
@@ -182,27 +207,49 @@ function StaffRow({
   hours: WeekHours;
   onChanged: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   const deleted = staff.deletedAt !== null;
   return (
     <li className="exq-adm-staff__item" data-state={deleted ? 'deleted' : 'active'}>
-      <details>
-        <summary>
-          {staff.name}, {staff.title}
+      <span className="exq-adm-staff__name">
+        <strong>{staff.name}</strong>
+        <span className="exq-muted">
+          {' '}
+          {staff.title}
           {staff.chairNumber !== null ? `, chair ${String(staff.chairNumber)}` : ''}
-          {deleted ? ' (removed)' : ''}
+          {deleted ? ', removed' : ''}
           {staff.hasLogin ? ', has a login' : ''}
-        </summary>
-        {deleted ? (
-          <p>Removed staff stay on their past bookings. Their old links still resolve.</p>
-        ) : (
-          <>
-            <EditStaff staff={staff} services={services} onChanged={onChanged} />
-            <SlugForm staff={staff} onChanged={onChanged} />
-            <StaffHours staff={staff} hours={hours} onChanged={onChanged} />
-            <RemoveStaff staff={staff} onChanged={onChanged} />
-          </>
-        )}
-      </details>
+        </span>
+      </span>
+      {deleted ? null : (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setOpen(true);
+          }}
+        >
+          Edit
+        </Button>
+      )}
+      <Sheet
+        open={open}
+        title={staff.name}
+        size="lg"
+        onClose={() => {
+          setOpen(false);
+        }}
+      >
+        <EditStaff staff={staff} services={services} onChanged={onChanged} />
+        <section className="exq-adm-staff__photos" aria-label="Photos">
+          <h3>Photos</h3>
+          <p className="exq-muted">The first photo is the portrait on the site.</p>
+          <PhotoManager kind="staff" staffId={staff.id} title={`Photos of ${staff.name}`} />
+        </section>
+        <SlugForm staff={staff} onChanged={onChanged} />
+        <StaffHours staff={staff} hours={hours} onChanged={onChanged} />
+        <RemoveStaff staff={staff} onChanged={onChanged} />
+      </Sheet>
     </li>
   );
 }

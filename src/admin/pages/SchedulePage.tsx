@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { scheduleResponseSchema, staffListResponseSchema } from '@shared/api/admin';
 import { Status } from '@/components/Status';
+import { Button, Sheet } from '@/components/ui';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
+import { BlockTimeForm } from '../components/BlockTimeForm';
 import { BookingList } from '../components/BookingList';
 import { TimeBlockItem } from '../components/TimeBlockItem';
 import { addDays, shopDateLabel, shopTime, todayInShop } from '../format';
@@ -15,6 +17,7 @@ export function SchedulePage() {
   const date = params.get('date') ?? todayInShop();
   const staffId = params.get('staffId') ?? '';
   const [version, setVersion] = useState(0);
+  const [blocking, setBlocking] = useState(false);
   const staff = useApi('/api/admin/staff', staffListResponseSchema);
   const query = new URLSearchParams({ date });
   if (staffId) query.set('staffId', staffId);
@@ -85,8 +88,32 @@ export function SchedulePage() {
               {s.name}
             </option>
           ))}
-        </select>
+        </select>{' '}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setBlocking(true);
+          }}
+        >
+          Block time
+        </Button>
       </form>
+      <Sheet
+        open={blocking}
+        title="Block time"
+        onClose={() => {
+          setBlocking(false);
+        }}
+      >
+        <BlockTimeForm
+          postPath="/api/admin/time-blocks"
+          chairs={chairs}
+          onDone={() => {
+            setVersion((v) => v + 1);
+          }}
+        />
+      </Sheet>
       {schedule.status !== 'ready' ? (
         <Status state={schedule.status} />
       ) : (

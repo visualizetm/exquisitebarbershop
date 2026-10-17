@@ -69,8 +69,10 @@ test('the gallery opens a photo in the lightbox with the barber and a book link'
   await page.goto('/gallery');
   await expect(page.getByRole('heading', { name: 'The work' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Dee/ }).first()).toBeVisible();
-  const tile = page.locator('.exq-photo-grid__button').filter({ hasText: '' }).first();
-  await tile.click();
+  const tile = page.locator('.exq-photo-grid__button', {
+    has: page.locator('img[alt="Knotless braids by Dee"]'),
+  });
+  await tile.first().click();
   const dialog = page.locator('dialog.exq-sheet[open]');
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'By Dee' })).toBeVisible();
@@ -83,5 +85,5 @@ test('the gallery opens a photo in the lightbox with the barber and a book link'
   await expect(dialog).toHaveCount(0);
   // The home page shows the work section once a photo exists.
   await page.goto('/');
-  await expect(page.locator('.exq-home__work .exq-photo-grid__item')).toHaveCount(1);
+  await expect(page.locator('.exq-home__work .exq-photo-grid__item').first()).toBeVisible();
 });

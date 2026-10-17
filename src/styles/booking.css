@@ -1,0 +1,381 @@
+/* Book and Manage. The prompt 2 class names stay; this file gives them the kit look. */
+
+.exq-book,
+.exq-manage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+}
+.exq-book__title,
+.exq-manage__title {
+  font-size: var(--fs-5);
+}
+.exq-book-steps {
+  position: sticky;
+  top: 64px;
+  z-index: 20;
+  margin-inline: calc(-1 * var(--s4));
+  padding: var(--s2) var(--s4);
+  background: var(--bg);
+}
+.exq-step-heading {
+  font-size: var(--fs-4);
+  outline: none;
+}
+.exq-book__inline-action {
+  margin-top: var(--s4);
+}
+@media (max-width: 1023px) {
+  .exq-service-picker .exq-book__inline-action {
+    display: none;
+  }
+}
+
+/* Selection summary, shown from the chair step on */
+.exq-book-selection {
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card-2);
+}
+.exq-booking-summary {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+}
+.exq-booking-summary__row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: var(--s3);
+}
+.exq-booking-summary__row dt {
+  color: var(--fg-3);
+  font-size: var(--fs-1);
+  padding-top: 2px;
+}
+.exq-booking-summary__row dd {
+  margin: 0;
+  font-weight: 500;
+}
+.exq-booking-summary__services {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Services as rows */
+.exq-service-picker__group {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--s5);
+  min-width: 0;
+}
+.exq-service-picker__legend {
+  margin-bottom: var(--s3);
+  padding: 0;
+}
+.exq-service-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.exq-service-option__label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 64px;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  cursor: pointer;
+  transition:
+    border-color 150ms,
+    background-color 150ms;
+}
+.exq-service-option[data-state='selected'] .exq-service-option__label {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.exq-service-option[data-state='disabled'] .exq-service-option__label {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.exq-service-option__label:hover {
+  filter: brightness(1.03);
+}
+.exq-service-option__input {
+  /* Covers the whole row: the row is the control, the check mark only shows the state. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.exq-service-option__input:disabled {
+  cursor: not-allowed;
+}
+.exq-service-option__check {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-radius: var(--r-pill);
+  position: relative;
+}
+.exq-service-option[data-state='selected'] .exq-service-option__check {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.exq-service-option[data-state='selected'] .exq-service-option__check::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 3px;
+  width: 6px;
+  height: 11px;
+  border: solid var(--paper);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.exq-service-option__input:focus-visible + .exq-service-option__check {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.exq-service-option__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.exq-service-option__name {
+  font-weight: 500;
+}
+.exq-service-option__description {
+  font-size: var(--fs-1);
+  color: var(--fg-2);
+}
+.exq-service-option__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  white-space: nowrap;
+}
+.exq-service-option__duration {
+  font-size: var(--fs-1);
+  color: var(--fg-3);
+}
+.exq-service-option__price {
+  font-weight: 700;
+}
+.exq-service-picker__total {
+  font-weight: 500;
+}
+
+/* Chairs */
+.exq-staff-picker__group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.exq-staff-picker__legend {
+  margin-bottom: var(--s3);
+  padding: 0;
+}
+.exq-staff-option__any {
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.exq-staff-option__any-mark .exq-arch__placeholder {
+  font-size: var(--fs-4);
+}
+.exq-chaircard[aria-pressed='true'],
+button.exq-chaircard:hover {
+  filter: brightness(1.03);
+}
+
+/* Days as chips */
+.exq-day-picker__list {
+  padding-block: var(--s1);
+}
+.exq-day-option__button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 92px;
+  min-height: 72px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms;
+}
+.exq-day-option[data-state='selected'] .exq-day-option__button {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.exq-day-option[data-state='unavailable'] .exq-day-option__button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.exq-day-option__button:hover:not(:disabled) {
+  filter: brightness(1.05);
+  border-color: var(--fg);
+}
+.exq-day-option__weekday {
+  font-size: var(--fs-1);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.exq-day-option__date {
+  font-weight: 700;
+}
+.exq-day-option__count,
+.exq-day-option__reason {
+  font-size: var(--fs-1);
+  color: var(--fg-3);
+}
+.exq-day-option[data-state='selected'] .exq-day-option__count {
+  color: var(--line);
+}
+.exq-day-option[data-state='available'] .exq-day-option__count {
+  color: var(--accent-text);
+}
+
+/* Times */
+.exq-time-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.exq-time-picker__part-title {
+  margin-bottom: var(--s2);
+}
+.exq-book-notice {
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--fg);
+  border: 1px solid var(--red-200);
+}
+
+/* Details form */
+.exq-customer-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  max-width: 520px;
+}
+.exq-customer-form .exq-field__input {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+}
+.exq-customer-form .exq-field[data-state='invalid'] .exq-field__input {
+  border-color: var(--danger);
+}
+.exq-customer-form .exq-field__input:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 0;
+  border-color: var(--accent);
+}
+.exq-customer-form .exq-field__error {
+  font-size: var(--fs-1);
+  color: var(--danger);
+}
+.exq-customer-form__summary {
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  border: 1px solid var(--red-200);
+}
+.exq-field--trap {
+  position: absolute;
+  left: -10000px;
+}
+
+/* Confirm and conflicts */
+.exq-book-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.exq-book-confirm__actions,
+.exq-manage-view__actions,
+.exq-manage-reschedule__actions,
+.exq-manage-cancel__actions,
+.exq-book-done__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.exq-book-conflict {
+  padding: var(--s4);
+  border: 1px solid var(--red-200);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.exq-book-conflict__message {
+  font-weight: 500;
+  margin-bottom: var(--s3);
+}
+.exq-book-conflict__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.exq-book-confirm__error,
+.exq-manage__error {
+  color: var(--danger);
+}
+
+/* Done */
+.exq-book-done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  max-width: 560px;
+}
+.exq-book-done__manage-url {
+  font-size: var(--fs-1);
+  color: var(--fg-2);
+  overflow-wrap: anywhere;
+}
+.exq-manage__reference {
+  color: var(--fg-2);
+}
+.exq-manage-view,
+.exq-manage-reschedule,
+.exq-manage-rescheduled,
+.exq-manage-cancelled {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  max-width: 640px;
+}
+.exq-manage-view__cutoff {
+  color: var(--fg-2);
+}

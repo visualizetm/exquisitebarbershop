@@ -53,3 +53,27 @@ commit, and what is still open.
   visit at 390 and 1280 with sample photos, plus montages).
 - Open: Book, Manage and the dashboard keep their prompt 2 and 3 markup until
   milestone 4.
+
+### Milestone 4: Book, Manage, the dashboard and Photos
+
+- Shipped: Book with a StepBar, selectable service rows, chair cards with a
+  first-available card, day chips with counts and reasons, times grouped into
+  morning, afternoon and evening, the details form with tel and email types, a
+  sticky total bar on phones that hides while typing, a Ticket on confirmation
+  and fresh times inline with a Toast on a 409. Manage with the same Ticket,
+  reschedule reusing the pickers, and cancel as a confirm Sheet. The dashboard
+  with a bottom tab bar (Today, Schedule, New, More) and a side nav from 1024px,
+  Today as one card per chair with Now, Next and a status switch with Undo, a
+  New online bookings chip, the new booking form as a Sheet, block time as a
+  Sheet on the schedule, the conflict resolver as a list with chip choices,
+  services and staff as lists with edit Sheets, a Photos screen (Hero, Chairs,
+  Gallery) with resize to 2000px WebP in the browser, upload progress, required
+  alt text, up and down reordering and removal, and a photo picker on each
+  staff member. Dark mode follows the system in the admin.
+- Tests: e2e for the owner uploading a chair photo through the Photos screen
+  with the local driver; the existing booking, admin and site flows pass on the
+  restyled screens.
+- Screens: `docs/screens/m4/` (book, book with a chair, admin today, schedule,
+  photos, services at 390 and 1280, plus montages).
+- Open: SEO, icons, the OG image, JSON-LD, the sitemap and Lighthouse are
+  milestone 5.

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { Status } from '@/components/Status';
+import '@/styles/admin.css';
 import { AdminNav } from './components/AdminNav';
 import { AccountPage } from './pages/AccountPage';
 import { AuditPage } from './pages/AuditPage';
@@ -12,6 +13,7 @@ import { LoginPage } from './pages/LoginPage';
 import { MySchedulePage } from './pages/MySchedulePage';
 import { NewBookingPage } from './pages/NewBookingPage';
 import { OutboxPage } from './pages/OutboxPage';
+import { PhotosPage } from './pages/PhotosPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { TodayPage } from './pages/TodayPage';
 import { WhosInPage } from './pages/WhosInPage';
@@ -85,6 +87,7 @@ function OwnerRoutes() {
       <Route path="block" element={<BlockTimePage />} />
       <Route path="whos-in" element={<WhosInPage />} />
       <Route path="customers" element={<CustomersPage />} />
+      <Route path="photos" element={<PhotosPage />} />
       <Route path="settings/*" element={<SettingsPage />} />
       <Route path="audit" element={<AuditPage />} />
       <Route path="outbox" element={<OutboxPage />} />

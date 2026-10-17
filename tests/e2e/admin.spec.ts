@@ -61,7 +61,7 @@ test('a public booking shows as new for the owner, who marks it completed', asyn
 
   await signIn(page, E2E_OWNER);
   await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
-  await expect(page.locator('.exq-adm-today__new')).toContainText('new online');
+  await expect(page.locator('.exq-adm-today__new')).toContainText('New online bookings');
 
   await page.getByRole('link', { name: 'Bookings', exact: true }).click();
   await page.getByLabel('Search name, phone or reference').fill(code);

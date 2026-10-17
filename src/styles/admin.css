@@ -1,0 +1,553 @@
+/* The staff dashboard. Loaded with the admin chunk. 14 to 24px type only. */
+
+.exq-app[data-state='admin'] {
+  font-size: var(--fs-2);
+}
+.exq-main--admin {
+  display: block;
+}
+.exq-adm {
+  display: grid;
+  min-height: 100vh;
+  grid-template-rows: 1fr;
+}
+.exq-adm__content {
+  padding: var(--s4) var(--s4) calc(96px + env(safe-area-inset-bottom));
+  max-width: 1100px;
+  width: 100%;
+}
+.exq-adm h1 {
+  font-size: var(--fs-4);
+  margin-bottom: var(--s4);
+}
+.exq-adm h2 {
+  font-size: var(--fs-3);
+  margin-bottom: var(--s3);
+}
+.exq-adm h3 {
+  font-size: var(--fs-2);
+  margin-bottom: var(--s2);
+}
+.exq-adm section {
+  margin-bottom: var(--s6);
+}
+.exq-adm p {
+  margin-bottom: var(--s3);
+}
+.exq-adm dl {
+  margin: 0;
+}
+
+/* Side nav (1024px and up) and tab bar (below) ---------------------------- */
+.exq-adm-nav__side {
+  display: none;
+}
+.exq-adm-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.exq-adm-tabs__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: var(--fs-1);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.exq-adm-tabs__tab > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.exq-adm-tabs__tab > span[data-state='active'] {
+  color: var(--accent-text);
+}
+.exq-adm-tabs__tab svg {
+  width: 22px;
+  height: 22px;
+}
+.exq-adm-nav__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-1);
+  color: var(--fg-2);
+  margin-bottom: var(--s4);
+}
+.exq-adm-nav__email {
+  font-weight: 500;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.exq-adm-nav__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  margin-bottom: var(--s4);
+}
+.exq-adm-nav__link {
+  display: block;
+  text-decoration: none;
+}
+.exq-adm-nav__link > span {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--s3);
+  border-radius: var(--r-sm);
+  font-weight: 500;
+}
+.exq-adm-nav__link > span[data-state='active'] {
+  background: var(--card-2);
+  color: var(--accent-text);
+}
+.exq-adm-nav__logo {
+  width: 160px;
+  height: auto;
+  margin-bottom: var(--s5);
+}
+.exq-dark .exq-adm-nav__logo {
+  filter: invert(1);
+}
+@media (prefers-color-scheme: dark) {
+  .exq-app[data-state='admin'] .exq-adm-nav__logo {
+    filter: invert(1);
+  }
+}
+.exq-adm-nav__signout {
+  margin-top: auto;
+  padding-top: var(--s5);
+}
+@media (min-width: 1024px) {
+  .exq-adm {
+    grid-template-columns: 260px 1fr;
+  }
+  .exq-adm-nav__side {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: var(--s5) var(--s4);
+    border-right: 1px solid var(--border);
+    background: var(--card);
+    overflow: auto;
+  }
+  .exq-adm-tabs {
+    display: none;
+  }
+  .exq-adm__content {
+    padding: var(--s6) var(--s7);
+  }
+}
+
+/* Generic admin surfaces -------------------------------------------------- */
+.exq-adm-error {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--red-200);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  margin-bottom: var(--s4);
+}
+.exq-adm-error__details {
+  margin-top: var(--s2);
+  padding-left: var(--s4);
+  list-style: disc;
+  font-size: var(--fs-1);
+}
+.exq-adm form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+.exq-adm form p {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+}
+.exq-adm form fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s3) var(--s4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+}
+.exq-adm form legend {
+  font-weight: 500;
+  padding: 0 var(--s1);
+}
+.exq-adm label {
+  font-weight: 500;
+}
+.exq-adm input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.exq-adm select,
+.exq-adm textarea {
+  min-height: 44px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  max-width: 100%;
+}
+.exq-adm input[type='checkbox'],
+.exq-adm input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.exq-adm
+  button:not(.exq-btn):not(.exq-chip):not(.exq-seg__btn):not(.exq-sheet__close):not(
+    .exq-toast__action
+  ):not(.exq-adm-tabs__tab):not(.exq-stepbar__button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: var(--s1) var(--s4);
+  border: 1px solid var(--fg);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--fs-1);
+  font-weight: 500;
+  cursor: pointer;
+}
+.exq-adm button[type='submit']:not(.exq-btn) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+}
+.exq-adm button:not(.exq-btn):hover {
+  filter: brightness(1.1);
+}
+.exq-adm button:not(.exq-btn):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+.exq-adm details {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s2);
+}
+.exq-adm summary {
+  cursor: pointer;
+  font-weight: 500;
+  min-height: 32px;
+}
+.exq-adm ol,
+.exq-adm ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.exq-adm .exq-chips,
+.exq-adm .exq-adm-photos__actions,
+.exq-adm .exq-adm-nav__list {
+  flex-direction: row;
+}
+.exq-adm .exq-adm-nav__list {
+  flex-direction: column;
+}
+
+/* Lists as stacked rows ----------------------------------------------------- */
+.exq-adm-bookings__item,
+.exq-adm-audit__entry,
+.exq-adm-outbox__message,
+.exq-adm-logins__item,
+.exq-adm-services__item,
+.exq-adm-staff__item,
+.exq-adm-closures__item,
+.exq-adm-whosin__row,
+.exq-adm-blocktime__entry {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.exq-adm-bookings__link {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  align-items: baseline;
+  text-decoration: none;
+}
+.exq-adm-bookings__time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.exq-adm-bookings__customer {
+  font-weight: 500;
+}
+.exq-adm-bookings__services,
+.exq-adm-bookings__chair {
+  color: var(--fg-2);
+  font-size: var(--fs-1);
+}
+.exq-adm-bookings__status,
+.exq-adm-bookings__source,
+.exq-adm-bookings__new,
+.exq-adm-booking__status {
+  display: inline-block;
+  padding: 0 var(--s2);
+  border-radius: var(--r-pill);
+  background: var(--card-2);
+  font-size: var(--fs-1);
+  font-weight: 500;
+}
+.exq-adm-bookings__status[data-state='completed'],
+.exq-adm-booking__status[data-state='completed'] {
+  color: var(--ok);
+}
+.exq-adm-bookings__status[data-state='noShow'],
+.exq-adm-booking__status[data-state='noShow'] {
+  color: var(--warn);
+}
+.exq-adm-bookings__status[data-state='cancelled'],
+.exq-adm-booking__status[data-state='cancelled'] {
+  color: var(--fg-3);
+}
+.exq-adm-bookings__new {
+  background: var(--accent);
+  color: var(--paper);
+}
+.exq-adm-bookings__item[data-new='true'] {
+  border-color: var(--accent);
+}
+
+/* Today ------------------------------------------------------------------- */
+.exq-adm-today__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  margin-bottom: var(--s5);
+}
+.exq-adm-today__stats > div {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.exq-adm-today__stats dt {
+  font-size: var(--fs-1);
+  color: var(--fg-3);
+}
+.exq-adm-today__stats dd {
+  font-size: var(--fs-4);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.exq-adm-today__chairs {
+  display: grid;
+  gap: var(--s3);
+}
+.exq-adm-chair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.exq-adm-chair__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s3);
+}
+.exq-adm-chair__name {
+  font-size: var(--fs-3);
+  margin: 0;
+}
+.exq-adm-chair__hours {
+  font-size: var(--fs-1);
+  color: var(--fg-3);
+}
+.exq-adm-chair__slot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s3);
+  border-radius: var(--r-sm);
+  background: var(--card-2);
+}
+.exq-adm-chair__slot[data-state='now'] {
+  border-left: 4px solid var(--accent);
+}
+.exq-adm-chair__label {
+  font-size: var(--fs-1);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.exq-adm-chair__slot[data-state='now'] .exq-adm-chair__label {
+  color: var(--accent-text);
+}
+.exq-adm-chair__client {
+  font-weight: 500;
+  text-decoration: none;
+}
+.exq-adm-chair__services {
+  font-size: var(--fs-1);
+  color: var(--fg-2);
+}
+.exq-adm-chair__empty {
+  color: var(--fg-3);
+}
+@media (min-width: 768px) {
+  .exq-adm-today__stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .exq-adm-today__chairs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .exq-adm-today__chairs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Conflict resolver --------------------------------------------------------- */
+.exq-adm-conflict {
+  margin-top: var(--s4);
+  padding: var(--s4);
+  border: 1px solid var(--red-200);
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+}
+.exq-adm-conflict__title {
+  font-size: var(--fs-3);
+}
+.exq-adm-conflict__list {
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+.exq-adm-conflict__item {
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.exq-adm-conflict__fieldset {
+  border: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.exq-adm-conflict__booking {
+  font-weight: 500;
+  margin-bottom: var(--s2);
+  padding: 0;
+  width: 100%;
+}
+.exq-adm-conflict__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 40px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-size: var(--fs-1);
+}
+.exq-adm-conflict__option:has(input:checked) {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.exq-adm-conflict__option[data-state='disabled'] {
+  opacity: 0.45;
+}
+.exq-adm-conflict__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+/* Photos ------------------------------------------------------------------- */
+.exq-adm-photos__list {
+  margin-top: var(--s4);
+}
+.exq-adm-photos__item {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: var(--s3);
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.exq-adm-photos__thumb {
+  width: 96px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: var(--card-2);
+}
+.exq-adm-photos__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+.exq-adm-photos__alt {
+  margin: 0;
+}
+.exq-adm-photos__progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--accent);
+}
+.exq-adm-photos__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.exq-adm-photos-page .exq-chips {
+  margin-bottom: var(--s4);
+}
+
+/* Sign in ------------------------------------------------------------------- */
+.exq-adm-login {
+  max-width: 420px;
+  margin: var(--s8) auto;
+  padding: var(--s5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.exq-adm-login__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.exq-adm-login__error {
+  color: var(--danger);
+}
+.exq-adm-login__submit {
+  width: 100%;
+}

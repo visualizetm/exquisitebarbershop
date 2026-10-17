@@ -25,11 +25,11 @@ type Source = 'phone' | 'walkIn';
 
 /**
  * Phone bookings follow normal availability unless the owner overrides lead
- * time or the booking window. Walk-ins start now or later today and take the
- * chair's slot locks like any booking; no override ever takes a held slot.
+ * time or the booking window; walk-ins start now or later today. `embedded`
+ * drops the page heading so the same form sits inside a sheet.
  */
-export function NewBookingPage() {
-  usePageTitle('New booking');
+export function NewBookingPage({ embedded = false }: { embedded?: boolean }) {
+  usePageTitle(embedded ? null : 'New booking');
   const services = useApi('/api/admin/services', serviceListResponseSchema);
   const staff = useApi('/api/admin/staff', staffListResponseSchema);
   const [source, setSource] = useState<Source>('phone');
@@ -52,7 +52,7 @@ export function NewBookingPage() {
   if (services.status !== 'ready' || staff.status !== 'ready') {
     return (
       <article className="exq-adm-new" data-state="loading">
-        <h1 className="exq-adm-new__title">New booking</h1>
+        {embedded ? null : <h1 className="exq-adm-new__title">New booking</h1>}
         <Status
           state={services.status === 'error' || staff.status === 'error' ? 'error' : 'loading'}
         />
@@ -116,7 +116,7 @@ export function NewBookingPage() {
       className="exq-adm-new"
       data-state={working ? 'working' : created ? 'created' : 'idle'}
     >
-      <h1 className="exq-adm-new__title">New booking</h1>
+      {embedded ? null : <h1 className="exq-adm-new__title">New booking</h1>}
       {created ? (
         <p className="exq-adm-new__created" role="status" data-state="created">
           Booked {created.booking.customer.name} with {created.booking.staff.name},{' '}

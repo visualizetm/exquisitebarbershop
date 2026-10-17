@@ -75,3 +75,22 @@ win.
   menu still reads as a list.
 - D4-20 Visit copy. The two policy lines and "Parking details coming soon"
   carry the brief's placeholders unchanged; nothing was invented.
+- D4-21 Book rows. The service checkbox now covers its whole row (opacity 0),
+  so the row is the tap target and the custom check only shows state. Rejected
+  a visually hidden 1px input: clicks on the row never reached it.
+- D4-22 Sheets and focus. The Sheet focuses its own title on open, and the
+  booking step heading takes focus a tick after it mounts, so a closing dialog's
+  focus restore never wins over the next screen. Rejected hand-managed focus
+  order per screen.
+- D4-23 Today cards. Now and Next come from the schedule endpoint (every
+  booking of the day) rather than a new API: the page already needed the day's
+  counts, and the status switch posts to the existing status route with an
+  Undo toast that posts the previous status back. No new routes.
+- D4-24 Admin edit sheets. Services and staff became lists with an Edit button
+  that opens a sheet holding the existing forms unchanged. The staff sheet also
+  carries the photo picker. Rejected rewriting the forms as modal-first.
+- D4-25 Upload progress. The PUT goes through XMLHttpRequest because fetch
+  cannot report upload progress; everything else stays on fetch.
+- D4-26 Admin buttons. Prompt 3 admin forms used plain buttons; a scoped rule in
+  admin.css gives every non-kit button the pill look rather than touching each
+  form, with kit Buttons used where a form was rewritten anyway.

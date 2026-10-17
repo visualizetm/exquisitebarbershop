@@ -1,5 +1,6 @@
 import type { PublicService } from '@shared/api/public';
 import { formatCents, priceLabel } from '@shared/lib/money';
+import { Button, StickyCTA } from '@/components/ui';
 
 export interface ServicePickerProps {
   services: PublicService[];
@@ -9,6 +10,7 @@ export interface ServicePickerProps {
   onContinue: () => void;
 }
 
+/** Services as selectable rows with price and duration. The total rides in a sticky bar on phones. */
 export function ServicePicker({
   services,
   selected,
@@ -21,6 +23,7 @@ export function ServicePicker({
   const totalMinutes = chosen.reduce((sum, s) => sum + s.durationMinutes, 0);
   const anyFrom = chosen.some((s) => s.priceFrom);
   const full = selected.length >= max;
+  const totalLabel = `${anyFrom ? 'From ' : ''}${formatCents(totalCents)}`;
 
   const toggle = (id: string) => {
     onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
@@ -37,7 +40,7 @@ export function ServicePicker({
         if (items.length === 0) return null;
         return (
           <fieldset key={group} className="exq-service-picker__group">
-            <legend className="exq-service-picker__legend">{group}</legend>
+            <legend className="exq-service-picker__legend exq-label">{group}</legend>
             <ul className="exq-service-picker__list">
               {items.map((service) => {
                 const checked = selected.includes(service.id);
@@ -58,14 +61,24 @@ export function ServicePicker({
                           toggle(service.id);
                         }}
                       />
-                      <span className="exq-service-option__name">{service.name}</span>
+                      <span className="exq-service-option__check" aria-hidden="true" />
+                      <span className="exq-service-option__text">
+                        <span className="exq-service-option__name">{service.name}</span>
+                        {service.description ? (
+                          <span className="exq-service-option__description">
+                            {service.description}
+                          </span>
+                        ) : null}
+                      </span>
                       <span className="exq-service-option__meta">
-                        {priceLabel(service)}, {service.durationMinutes} min
+                        <span className="exq-service-option__duration">
+                          {service.durationMinutes} min
+                        </span>
+                        <span className="exq-service-option__price exq-price">
+                          {priceLabel(service)}
+                        </span>
                       </span>
                     </label>
-                    {service.description ? (
-                      <p className="exq-service-option__description">{service.description}</p>
-                    ) : null}
                   </li>
                 );
               })}
@@ -73,20 +86,27 @@ export function ServicePicker({
           </fieldset>
         );
       })}
-      <p className="exq-service-picker__hint">Choose up to {max} services.</p>
+      <p className="exq-service-picker__hint exq-muted">Choose up to {max} services.</p>
       <p className="exq-service-picker__total" aria-live="polite">
         {chosen.length === 0
           ? 'Nothing selected yet.'
-          : `${chosen.length} selected: ${anyFrom ? 'from ' : ''}${formatCents(totalCents)}, about ${totalMinutes} minutes.`}
+          : `${chosen.length} selected: ${totalLabel}, about ${totalMinutes} minutes.`}
       </p>
-      <button
-        type="button"
-        className="exq-button exq-button--primary"
-        disabled={chosen.length === 0}
-        onClick={onContinue}
+      <p className="exq-book__inline-action">
+        <Button disabled={chosen.length === 0} onClick={onContinue}>
+          Continue
+        </Button>
+      </p>
+      <StickyCTA
+        primary={chosen.length === 0 ? 'Pick a service' : totalLabel}
+        secondary={
+          chosen.length === 0 ? undefined : `${totalMinutes} min, ${chosen.length} selected`
+        }
       >
-        Continue
-      </button>
+        <Button disabled={chosen.length === 0} onClick={onContinue}>
+          Continue
+        </Button>
+      </StickyCTA>
     </div>
   );
 }

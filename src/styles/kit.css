@@ -289,6 +289,7 @@ select.exq-field__control {
 }
 .exq-sheet__title {
   font-size: var(--fs-4);
+  outline: none;
 }
 .exq-sheet__close {
   display: inline-flex;

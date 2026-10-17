@@ -25,10 +25,14 @@ export function Sheet({
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
+  const titleRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      titleRef.current?.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
@@ -47,7 +51,7 @@ export function Sheet({
     >
       <div className="exq-sheet__inner">
         <div className="exq-sheet__head">
-          <h2 id={titleId} className="exq-sheet__title">
+          <h2 id={titleId} ref={titleRef} tabIndex={-1} className="exq-sheet__title">
             {title}
           </h2>
           <button
