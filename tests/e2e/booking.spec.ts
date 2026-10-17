@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 const REFERENCE = /[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{4}/;
 
-async function pickFirstDayAndTime(page: Page): Promise<string> {
+async function pickFirstDayAndTime(page: Page, dayIndex = 0): Promise<string> {
   await expect(page.getByRole('heading', { name: 'Pick a day' })).toBeFocused();
-  await page.locator('.exq-day-option[data-state="available"] button').first().click();
+  await page.locator('.exq-day-option[data-state="available"] button').nth(dayIndex).click();
   await expect(page.getByRole('heading', { name: 'Pick a time' })).toBeFocused();
   const first = page.locator('.exq-time-option button').first();
   const startAt = (await first.getAttribute('data-start')) ?? '';
@@ -33,8 +33,10 @@ test('book from a chair link, then reschedule and cancel through the manage link
   await expect(page.locator('.exq-service-picker__total')).toContainText('1 selected');
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  // The chair came from the link, so the flow skips straight to the calendar.
-  await pickFirstDayAndTime(page);
+  // The chair came from the link, so the flow skips straight to the calendar. The
+  // second open day is never today, so the booking is always outside the online
+  // reschedule cutoff whatever time the suite runs.
+  await pickFirstDayAndTime(page, 1);
   await fillDetails(page, 'playwright@example.com');
   await expect(page.locator('.exq-book-confirm .exq-booking-summary')).toContainText('Marcus');
   await page.getByRole('button', { name: 'Confirm booking' }).click();
@@ -101,7 +103,7 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
       customer: { name: 'Faster Customer', phone: '2155550199', email: null },
     },
   });
-  expect(taken.status()).toBe(201);
+  expect(taken.status(), await taken.text()).toBe(201);
 
   await page.getByRole('button', { name: 'Confirm booking' }).click();
   const conflict = page.locator('.exq-book-conflict');

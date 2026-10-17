@@ -36,9 +36,6 @@ export function BookingDetailPage({ mine = false }: { mine?: boolean }) {
   const loaded = useApi(`${base}/${id}`, bookingDetailResponseSchema, { version });
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [lastChange, setLastChange] = useState<{ from: BookingStatus; to: BookingStatus } | null>(
-    null,
-  );
 
   if (loaded.status !== 'ready') {
     const notFound = loaded.error instanceof ApiRequestError && loaded.error.status === 404;
@@ -69,24 +66,17 @@ export function BookingDetailPage({ mine = false }: { mine?: boolean }) {
   }
 
   function changeStatus(to: BookingStatus, notify = false) {
-    const from = b.status;
-    void act(async () => {
-      await apiRequest(`${base}/${b.id}/status`, bookingResponseSchema, {
+    void act(() =>
+      apiRequest(`${base}/${b.id}/status`, bookingResponseSchema, {
         method: 'POST',
         body: { status: to, notify },
-      });
-      setLastChange({ from, to });
-    });
+      }),
+    );
   }
 
   const simpleTransitions = detail.transitions.filter(
     (t) => t !== 'cancelled' && !(t === 'confirmed' && b.status === 'cancelled'),
   );
-  const canUndo =
-    lastChange !== null &&
-    lastChange.to === b.status &&
-    detail.transitions.includes(lastChange.from);
-
   return (
     <article
       className="exq-adm-booking"
@@ -147,20 +137,6 @@ export function BookingDetailPage({ mine = false }: { mine?: boolean }) {
 
       <section className="exq-adm-booking__actions" aria-labelledby="exq-adm-booking-actions">
         <h2 id="exq-adm-booking-actions">Actions</h2>
-        {canUndo ? (
-          <p className="exq-adm-booking__undo" data-state="available">
-            Marked {STATUS_LABEL[b.status].toLowerCase()}.{' '}
-            <button
-              type="button"
-              disabled={working}
-              onClick={() => {
-                changeStatus(lastChange.from);
-              }}
-            >
-              Undo
-            </button>
-          </p>
-        ) : null}
         <p className="exq-adm-booking__transitions">
           {simpleTransitions.map((t) => (
             <button
@@ -191,14 +167,12 @@ export function BookingDetailPage({ mine = false }: { mine?: boolean }) {
             working={working}
             hasEmail={b.customer.email !== null}
             onCancel={(input) => {
-              const from = b.status;
-              void act(async () => {
-                await apiRequest(`${base}/${b.id}/cancel`, bookingResponseSchema, {
+              void act(() =>
+                apiRequest(`${base}/${b.id}/cancel`, bookingResponseSchema, {
                   method: 'POST',
                   body: input,
-                });
-                setLastChange({ from, to: 'cancelled' });
-              });
+                }),
+              );
             }}
           />
         ) : null}

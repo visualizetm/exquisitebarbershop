@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { E2E_BARBER, E2E_OWNER } from './e2e-accounts';
 
 /**
  * Everything the end to end tests need, in one process tree: an in-memory
@@ -25,7 +26,24 @@ async function main(): Promise<void> {
   const { getDb, closeMongoClient } = await import('../server/db/client');
   const { runSeed } = await import('../server/services/seedService');
   const { createDevServer } = await import('../server/http/dev-adapter');
-  await runSeed(await getDb());
+  const { hashPassword } = await import('../server/auth/password');
+  const { usersRepo } = await import('../server/repos');
+  const { staffSeedId } = await import('../seed/shop');
+  await runSeed(await getDb(), new Date(), {
+    ownerEmail: E2E_OWNER.email,
+    ownerPassword: E2E_OWNER.password,
+  });
+  // A barber login that already chose its password, so the tests sign straight in.
+  await usersRepo.insertUser(
+    {
+      email: E2E_BARBER.email,
+      passwordHash: await hashPassword(E2E_BARBER.password),
+      role: 'barber',
+      staffId: staffSeedId(E2E_BARBER.staffKey),
+      mustChangePassword: false,
+    },
+    new Date(),
+  );
 
   const api = createDevServer();
   await new Promise<void>((resolve) => api.listen(Number(API_PORT), '127.0.0.1', resolve));
