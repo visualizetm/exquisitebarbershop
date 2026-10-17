@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
+const NOT_TYPED = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file']);
+
+/** True for controls that open the keyboard; a checkbox or radio never does. */
 function isTextControl(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  return tag === 'INPUT' && !NOT_TYPED.has((el as HTMLInputElement).type);
 }
 
 /**

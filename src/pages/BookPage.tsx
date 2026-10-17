@@ -382,13 +382,6 @@ export function BookPage() {
             </StickyCTA>
             <p className="exq-book-confirm__actions">
               <Button
-                className="exq-book-confirm__submit"
-                loading={submitting}
-                onClick={() => void submit()}
-              >
-                {submitting ? 'Booking' : 'Confirm booking'}
-              </Button>
-              <Button
                 variant="secondary"
                 disabled={submitting}
                 onClick={() => {
@@ -451,7 +444,13 @@ export function BookPage() {
               </p>
             ) : null}
             <p className="exq-book-done__manage-url">
-              Keep this link to manage your booking: <a href={manageUrl}>{manageUrl}</a>
+              Keep the confirmation email: its link lets you move or cancel this booking.
+              {booked.customer.email ? null : (
+                <>
+                  {' '}
+                  No email was given, so <a href={manageUrl}>save this manage link</a>.
+                </>
+              )}
             </p>
             <p>
               <Link

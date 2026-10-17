@@ -31,8 +31,7 @@
     align-items: start;
     gap: var(--s7);
   }
-  .exq-book-selection,
-  .exq-book-confirm__submit {
+  .exq-book-selection {
     display: none;
   }
   .exq-book .exq-service-picker__list {

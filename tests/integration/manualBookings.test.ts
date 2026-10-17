@@ -141,10 +141,11 @@ describe('phone bookings', () => {
   it('is idempotent and validates its input', async () => {
     const key = idemKey();
     // The same customer both times: a different body under the same key is a 422.
+    // A fixed open slot tomorrow: seven hours from now can land after closing late in the day.
     const payload = {
       source: 'phone',
       staff: 'marcus',
-      startAt: startIn(420),
+      startAt: slotAt(shopDateOf(new Date(Date.now() + 24 * 60 * 60_000)), '12:00'),
       customer: { name: 'Same Caller', phone: phone(), email: null },
     };
     const first = await manual(payload, key);

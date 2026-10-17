@@ -233,3 +233,38 @@ win.
   every value's source and environment but never a value; OPERATIONS.md covers
   what breaks on each rotation. The one thing that still needs a shell is an
   owner password reset when nobody can sign in, documented rather than built.
+
+## Prompt 6: final audit and handoff
+
+- D6-01 The LIVE URL was not filled in and the Vercel preview host is refused
+  by this sandbox's proxy, so live-only checks are recorded as "not verifiable
+  here" with the exact command for Rob rather than guessed. Nothing was run
+  against production.
+- D6-02 `docs/brand/BRAND.md` and `DESIGN-DIRECTION.md` do not exist in the
+  repository; the audit uses `docs/DESIGN-SYSTEM.md` and the brief's design
+  rules as the reference.
+- D6-03 The findings are written before any fix (06-audit-findings.md) and the
+  scorecard is scored against evidence in `docs/screens/audit/facts.json`, so
+  every score can be rechecked by rerunning `npx tsx tests/e2e/audit.ts`.
+- D6-04 The per-address login limit is read before the attempt and written only
+  after a failure, so a shop tablet can sign in as often as it likes while
+  twenty wrong passwords from one address still answer 429. The per-email limit
+  keeps counting every attempt: it is the guard against guessing one account
+  from many addresses and a real user never hits ten sign-ins in fifteen
+  minutes on one email.
+- D6-05 The e2e rate-limit reset is a `POST /__e2e/reset` handler inside
+  `scripts/e2e-server.ts`, mounted through a `before` hook on the dev server,
+  and called once per Playwright run from `global-setup.ts`. No route was added
+  to the API and production limits are unchanged.
+- D6-06 StickyCTA hides only for controls that open a keyboard (text inputs,
+  textarea, select). A checkbox or radio keeps focus after a tap and never
+  needs the bar out of the way; treating every input the same was the bug.
+- D6-07 One Confirm button per screen: the inline one on the review step was
+  removed, leaving the sticky bar on phones and the summary card from 1024px.
+  The done screen stops printing the raw manage URL; the email carries the
+  link, and only a booking without an email shows a "save this manage link".
+- D6-08 The phone hero keeps the 4:5 ratio in both states, so the box does not
+  grow when the photo arrives (Home CLS 0.103 to 0 on the production build).
+- D6-09 The manualBookings idempotency case now books a fixed open slot
+  tomorrow instead of "seven hours from now"; the old value fell after closing
+  when the suite ran late in the day.

@@ -64,6 +64,26 @@ test('the owner uploads a chair photo through the Photos screen with the local d
   }, src);
   expect(served).toEqual({ status: 200, type: 'image/webp' });
 
+  // The portrait shown on the site is the first in the list: move the new one to the top.
+  const row = page.locator('.exq-adm-photos__item', { has: thumb });
+  for (let i = 0; i < 10; i += 1) {
+    const first = await page
+      .locator('.exq-adm-photos__item')
+      .first()
+      .locator('img')
+      .getAttribute('alt');
+    if (first === alt) break;
+    await row.getByRole('button', { name: 'Up' }).click();
+    await expect(page.locator('.exq-adm-photos__item').nth(i).locator('img')).not.toHaveAttribute(
+      'alt',
+      alt,
+    );
+  }
+  await expect(page.locator('.exq-adm-photos__item').first().locator('img')).toHaveAttribute(
+    'alt',
+    alt,
+  );
+
   // It is live on the site right away.
   await page.goto('/chairs/tre');
   await expect(page.locator('.exq-chair__photo img')).toHaveAttribute('alt', /^Tre at chair four/);

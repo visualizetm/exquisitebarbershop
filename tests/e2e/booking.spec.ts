@@ -144,3 +144,18 @@ test('the summary card is disabled until the details step and hidden on a phone'
   await expect(card).toBeHidden();
   await expect(page.locator('.exq-sticky')).toContainText('$30');
 });
+
+test('on a phone the Continue bar stays after tapping a service and Confirm appears once', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/book?barber=marcus');
+  await page.getByLabel(/Classic Cut/).click();
+  // The checkbox keeps focus; the bar must not treat it as typing.
+  await expect(page.locator('.exq-sticky')).toHaveAttribute('data-state', 'shown');
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await pickFirstDayAndTime(page, 1);
+  await fillDetails(page, 'phone@example.com');
+  await expect(page.getByRole('button', { name: 'Confirm booking' })).toHaveCount(1);
+});

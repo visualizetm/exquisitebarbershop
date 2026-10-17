@@ -446,3 +446,28 @@ describe('lockout bypass for known addresses', () => {
     expect((await usersRepo.findUserById(owner._id))?.recentLoginIps).toHaveLength(9);
   });
 });
+
+describe('the per-address limit', () => {
+  it('counts failed attempts only, so a busy shop tablet can sign in as often as it likes', async () => {
+    const owner = await createLogin({ role: 'owner', staffId: null });
+    const tablet = '198.51.100.250';
+    for (let i = 0; i < 25; i += 1) {
+      await db().collection('loginThrottle').deleteMany({});
+      // The per-email limit is separate; keep it out of the way here.
+      await db()
+        .collection('rateLimits')
+        .deleteMany({ key: { $regex: /^login:account:/ } });
+      expect((await login(owner.email, OWNER_PASSWORD, tablet)).status).toBe(200);
+    }
+    // Twenty failures from the same address do trip it, and the lockout answer comes first.
+    for (let i = 0; i < 20; i += 1) {
+      await db().collection('loginThrottle').deleteMany({});
+      await db()
+        .collection('rateLimits')
+        .deleteMany({ key: { $regex: /^login:account:/ } });
+      await login(owner.email, `wrong-${i}-xxxxxx`, tablet);
+    }
+    await db().collection('loginThrottle').deleteMany({});
+    expect((await login(owner.email, OWNER_PASSWORD, tablet)).status).toBe(429);
+  });
+});

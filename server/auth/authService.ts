@@ -108,11 +108,20 @@ export async function login(
   meta: RequestMeta,
 ): Promise<LoginResult> {
   const email = normalizeEmail(input.email);
-  const ipHit = await rateLimitsRepo.hitRateLimit(`login:ip:${meta.ip}`, LOGIN_IP_LIMIT, meta.now);
-  if (!ipHit.allowed) {
+  // Only failed attempts count toward the address limit; it is read first and written on failure.
+  const ipKey = `login:ip:${meta.ip}`;
+  const ipCount = await rateLimitsRepo.peekRateLimit(ipKey, LOGIN_IP_LIMIT, meta.now);
+  if (ipCount >= LOGIN_IP_LIMIT.limit) {
     await auditLogin('failure', { email, userId: null, reason: 'ipRateLimited' }, meta);
     throw new AppError('RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.', {
-      retryAfterSeconds: ipHit.retryAfterSeconds,
+      retryAfterSeconds: Math.max(
+        1,
+        Math.ceil(
+          (Math.floor(meta.now.getTime() / LOGIN_IP_LIMIT.windowMs + 1) * LOGIN_IP_LIMIT.windowMs -
+            meta.now.getTime()) /
+            1000,
+        ),
+      ),
     });
   }
   const key = emailKey(email);
@@ -152,6 +161,7 @@ export async function login(
   );
   const usable = user !== null && passwordOk && (await loginIsUsable(user));
   if (!user || !usable) {
+    await rateLimitsRepo.hitRateLimit(ipKey, LOGIN_IP_LIMIT, meta.now);
     await loginThrottleRepo.recordLoginFailure(key, LOCKOUT_RULE, meta.now);
     const reason = !user ? 'unknownEmail' : !passwordOk ? 'badPassword' : 'disabled';
     await auditLogin('failure', { email, userId: user?._id ?? null, reason }, meta);

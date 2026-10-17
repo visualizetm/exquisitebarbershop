@@ -74,7 +74,8 @@
   }
 }
 @media (max-width: 767px) {
-  .exq-hero[data-state='photo'] {
+  /* Both states share the ratio, so the hero does not grow when the photo arrives. */
+  .exq-hero {
     aspect-ratio: 4 / 5;
     max-height: 72vh;
   }

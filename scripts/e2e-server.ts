@@ -48,7 +48,20 @@ async function main(): Promise<void> {
     new Date(),
   );
 
-  const api = createDevServer();
+  // Playwright calls this once per run, so reruns never share rate-limit windows or lockouts.
+  // Test-only: it lives in this script, never in the API, and production limits are untouched.
+  const api = createDevServer({
+    before: async (req, res) => {
+      if (req.method !== 'POST' || req.url !== '/__e2e/reset') return false;
+      const db = await getDb();
+      await db.collection('rateLimits').deleteMany({});
+      await db.collection('loginThrottle').deleteMany({});
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end('{"ok":true}');
+      return true;
+    },
+  });
   await new Promise<void>((resolve) => api.listen(Number(API_PORT), '127.0.0.1', resolve));
   console.log(`e2e API on http://127.0.0.1:${API_PORT}`);
 
