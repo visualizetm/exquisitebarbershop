@@ -14,6 +14,8 @@ import { Status } from '@/components/Status';
 
 // The staff area is its own chunk: public visitors never download it.
 const AdminApp = lazy(() => import('@/admin/AdminApp'));
+// The kit showcase exists only in development builds, for visual checks and screenshots.
+const KitPage = import.meta.env.DEV ? lazy(() => import('@/pages/KitPage')) : null;
 
 export function App() {
   return (
@@ -28,6 +30,16 @@ export function App() {
           <Route path="visit" element={<VisitPage />} />
           <Route path="book" element={<BookPage />} />
           <Route path="manage" element={<ManagePage />} />
+          {KitPage ? (
+            <Route
+              path="kit"
+              element={
+                <Suspense fallback={<Status state="loading" />}>
+                  <KitPage />
+                </Suspense>
+              }
+            />
+          ) : null}
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route element={<AdminLayout />}>

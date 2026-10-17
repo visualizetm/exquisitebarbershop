@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Exquisite seal">
+<defs><path id="ring" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0"/></defs>
+<circle cx="60" cy="60" r="57" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+<circle cx="60" cy="60" r="34" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+<text font-family="Jost, system-ui, sans-serif" font-size="9.5" font-weight="500" letter-spacing="2.4" fill="#FFFFFF"><textPath href="#ring" startOffset="2%">EXQUISITE BARBER &amp; BEAUTY LOUNGE  &#183;  GIFTED HANDS  &#183;</textPath></text>
+<g transform="translate(40 40) scale(0.625)">
+<circle cx="32" cy="30" r="13" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+<path d="M40 38 L50 48" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+</g>
+</svg>

@@ -4,6 +4,7 @@ import { DAY_KEYS, type DayKey } from '@shared/lib/time';
 import { Status } from '@/components/Status';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
+import { hoursLabel } from '@/lib/hours';
 
 const DAY_LABELS: Record<DayKey, string> = {
   mon: 'Monday',
@@ -14,13 +15,6 @@ const DAY_LABELS: Record<DayKey, string> = {
   sat: 'Saturday',
   sun: 'Sunday',
 };
-
-function to12Hour(hhmm: string): string {
-  const [h = 0, m = 0] = hhmm.split(':').map(Number);
-  const suffix = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 === 0 ? 12 : h % 12;
-  return m === 0 ? `${hour} ${suffix}` : `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
-}
 
 export function VisitPage() {
   usePageTitle('Visit');
@@ -63,13 +57,7 @@ export function VisitPage() {
                     data-state={intervals.length === 0 ? 'closed' : 'open'}
                   >
                     <dt className="exq-hours__day">{DAY_LABELS[day]}</dt>
-                    <dd className="exq-hours__times">
-                      {intervals.length === 0
-                        ? 'Closed'
-                        : intervals
-                            .map((i) => `${to12Hour(i.start)} to ${to12Hour(i.end)}`)
-                            .join(', ')}
-                    </dd>
+                    <dd className="exq-hours__times">{hoursLabel(intervals)}</dd>
                   </div>
                 );
               })}
