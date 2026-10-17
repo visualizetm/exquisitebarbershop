@@ -173,3 +173,12 @@ commit, and what is still open.
   documents, Dates intact), pruning, the daily route, PII masking, the
   maintenance flag on `/api/shop`.
 - Screens: `docs/screens/p5-m5/` (the API-down and maintenance states at 390).
+
+### Milestone 6: merge path and docs
+
+- Shipped: `docs/DEPLOY.md` (secrets, the Vercel variable table by environment,
+  Atlas, merging the pull request, /setup, the domain, Resend, removing the
+  setup variables, the launch checklist), `docs/OPERATIONS.md` (backups and
+  restore, rotating each secret and what breaks, password resets, maintenance
+  mode, logs, what to do if bookings stop), the living docs, the pull request
+  into `main` and `docs/reports/05-go-live.md`.

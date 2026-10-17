@@ -225,3 +225,11 @@ win.
   the page for one ErrorState with a tel button. The phone falls back to the
   seed placeholder compiled in by Vite (`__SHOP_PHONE__`); the placeholder
   itself stays in seed/shop.ts.
+- D5-27 Production deploys only from `main`; the branch gets a pull request,
+  not a merge, so Rob merges after the variables are set. Preview deployments
+  use the Preview environment with their own MONGODB_DB_NAME and
+  R2_KEY_PREFIX, which the env rules require.
+- D5-28 DEPLOY.md is a numbered click path with a variable table that names
+  every value's source and environment but never a value; OPERATIONS.md covers
+  what breaks on each rotation. The one thing that still needs a shell is an
+  owner password reset when nobody can sign in, documented rather than built.
