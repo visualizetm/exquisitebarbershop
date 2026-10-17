@@ -1,0 +1,436 @@
+[
+  {
+    "url": "/",
+    "title": "Exquisite Barber & Beauty Lounge",
+    "description": "Gifted Hands. Barbers and stylists under one roof at 3309 Edgmont Ave, Brookhaven, PA. Pick your chair and book online in under a minute.",
+    "h1": ["Fresh cuts. Gifted hands."],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "18px", "34px", "48px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)",
+      "rgb(74, 74, 74)"
+    ],
+    "backgrounds": [
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(244, 244, 244)",
+      "rgb(255, 255, 255)"
+    ],
+    "radii": ["16px", "999px", "999px 999px 16px 16px"],
+    "buttons": [
+      "a.exq-btn[inverse] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 52",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 52",
+      "a.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44",
+      "button.exq-chip[] bg rgb(17, 17, 17) fg rgb(255, 255, 255) r 999px h 44",
+      "button.exq-chip[] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 44",
+      "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
+    ],
+    "smallClickables": [
+      "a. 106x23 \"See the gallery\"",
+      "a. 107x23 \"(610) 555-0100\"",
+      "a. 161x23 \"@exquisitebarberbeauty\"",
+      "a. 68x23 \"Full menu\"",
+      "a.exq-btn 111x36 \"Book a chair\"",
+      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
+      "a.exq-skip-link 132x40 \"Skip to content\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [
+      "81113b1-982a-4967-a39c-e2cd33a54ca9.webp 1600px for 780px",
+      "5ec040c-e822-424d-9c4f-bb73897a9ec3.webp 1200px for 508px",
+      "d5bf8ea-c5c1-41f7-a162-c2010dee3293.webp 1200px for 508px",
+      "4413dd0-4ebf-4261-bcd3-6451e8651e40.webp 1200px for 508px",
+      "0f00664-7c2b-438a-ab98-a021ff8bbdd7.webp 1200px for 508px",
+      "04df6a4-485a-4e04-9d62-4d3256c6d418.webp 1200px for 508px",
+      "f41683f-28dd-4c2c-98ae-01a1020fe3ce.webp 1200px for 508px",
+      "de1ae26-daa1-446c-8744-b315fe87b74f.webp 1200px for 346px",
+      "3bf04d6-a386-4636-b781-52d94cbf25a3.webp 1200px for 346px",
+      "93d40bf-2cc3-469b-9aa1-4bfced24d913.webp 1200px for 346px",
+      "8dfa160-bb67-462b-8bbc-fbe4384c7ee7.webp 1200px for 346px",
+      "ebe74c5-724c-498e-b457-04b990824dd2.webp 1200px for 346px",
+      "6e5ce1b-5720-4033-811e-c766f1616c85.webp 1200px for 346px"
+    ],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [
+      "linear-gradient(to top, rgba(17, 17, 17, 0.92) 0%, rgba(17, 17, 17, 0.55) 45%, rgba(17, 17, 17, 0.05) 100%)"
+    ],
+    "lcp": 580,
+    "cls": 0.034,
+    "consoleErrors": []
+  },
+  {
+    "url": "/services",
+    "title": "Services | Exquisite Barber & Beauty Lounge",
+    "description": "Barber and beauty services with prices at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Book any service online.",
+    "h1": ["Services"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "18px", "48px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)",
+      "rgb(74, 74, 74)"
+    ],
+    "backgrounds": ["rgb(17, 17, 17)", "rgb(200, 16, 46)", "rgb(255, 255, 255)"],
+    "radii": ["999px"],
+    "buttons": [
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "button.exq-chip[] bg rgb(17, 17, 17) fg rgb(255, 255, 255) r 999px h 44",
+      "button.exq-chip[] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 44",
+      "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
+    ],
+    "smallClickables": [
+      "a. 107x23 \"(610) 555-0100\"",
+      "a. 161x23 \"@exquisitebarberbeauty\"",
+      "a.exq-btn 111x36 \"Book a chair\"",
+      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
+      "a.exq-skip-link 132x40 \"Skip to content\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 432,
+    "cls": 0.001,
+    "consoleErrors": []
+  },
+  {
+    "url": "/chairs",
+    "title": "The chairs | Exquisite Barber & Beauty Lounge",
+    "description": "Meet the barbers and stylists at Exquisite Barber & Beauty Lounge in Brookhaven, PA. See who is in today and book a chair.",
+    "h1": ["The chairs"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "18px", "48px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)",
+      "rgb(74, 74, 74)"
+    ],
+    "backgrounds": [
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(244, 244, 244)",
+      "rgb(255, 255, 255)"
+    ],
+    "radii": ["16px", "999px", "999px 999px 16px 16px"],
+    "buttons": [
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
+    ],
+    "smallClickables": [
+      "a. 107x23 \"(610) 555-0100\"",
+      "a. 161x23 \"@exquisitebarberbeauty\"",
+      "a.exq-btn 111x36 \"Book a chair\"",
+      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
+      "a.exq-skip-link 132x40 \"Skip to content\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [
+      "5ec040c-e822-424d-9c4f-bb73897a9ec3.webp 1200px for 290px",
+      "d5bf8ea-c5c1-41f7-a162-c2010dee3293.webp 1200px for 290px",
+      "4413dd0-4ebf-4261-bcd3-6451e8651e40.webp 1200px for 290px",
+      "0f00664-7c2b-438a-ab98-a021ff8bbdd7.webp 1200px for 290px",
+      "04df6a4-485a-4e04-9d62-4d3256c6d418.webp 1200px for 290px",
+      "f41683f-28dd-4c2c-98ae-01a1020fe3ce.webp 1200px for 290px"
+    ],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 636,
+    "cls": 0.001,
+    "consoleErrors": []
+  },
+  {
+    "url": "/chairs/marcus",
+    "title": "Marcus | Exquisite Barber & Beauty Lounge",
+    "description": "Marcus, Barber at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Skin fades and designs. See the next openings and book online.",
+    "h1": ["Marcus"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "18px", "34px", "48px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)",
+      "rgb(74, 74, 74)"
+    ],
+    "backgrounds": [
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(244, 244, 244)",
+      "rgb(255, 255, 255)"
+    ],
+    "radii": ["16px", "999px", "999px 999px 16px 16px"],
+    "buttons": [
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 52",
+      "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
+    ],
+    "smallClickables": [
+      "a. 107x23 \"(610) 555-0100\"",
+      "a. 161x23 \"@exquisitebarberbeauty\"",
+      "a. 170x23 \"See all of Marcus's work\"",
+      "a.exq-btn 111x36 \"Book a chair\"",
+      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
+      "a.exq-skip-link 132x40 \"Skip to content\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": ["ebe74c5-724c-498e-b457-04b990824dd2.webp 1200px for 346px"],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 576,
+    "cls": 0.001,
+    "consoleErrors": []
+  },
+  {
+    "url": "/gallery",
+    "title": "The work | Exquisite Barber & Beauty Lounge",
+    "description": "Recent cuts and styles from the chairs at Exquisite Barber & Beauty Lounge in Brookhaven, PA.",
+    "h1": ["The work"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "48px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)"
+    ],
+    "backgrounds": [
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(244, 244, 244)",
+      "rgb(255, 255, 255)"
+    ],
+    "radii": ["16px", "999px"],
+    "buttons": [
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
+    ],
+    "smallClickables": [
+      "a. 107x23 \"(610) 555-0100\"",
+      "a. 161x23 \"@exquisitebarberbeauty\"",
+      "a.exq-btn 111x36 \"Book a chair\"",
+      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
+      "a.exq-skip-link 132x40 \"Skip to content\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [
+      "de1ae26-daa1-446c-8744-b315fe87b74f.webp 1200px for 346px",
+      "3bf04d6-a386-4636-b781-52d94cbf25a3.webp 1200px for 346px",
+      "93d40bf-2cc3-469b-9aa1-4bfced24d913.webp 1200px for 346px",
+      "8dfa160-bb67-462b-8bbc-fbe4384c7ee7.webp 1200px for 346px",
+      "ebe74c5-724c-498e-b457-04b990824dd2.webp 1200px for 346px",
+      "6e5ce1b-5720-4033-811e-c766f1616c85.webp 1200px for 346px"
+    ],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 524,
+    "cls": 0.001,
+    "consoleErrors": []
+  },
+  {
+    "url": "/visit",
+    "title": "Visit | Exquisite Barber & Beauty Lounge",
+    "description": "Hours, address and phone for Exquisite Barber & Beauty Lounge at 3309 Edgmont Ave, Brookhaven, PA 19015.",
+    "h1": ["Visit"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "18px", "24px", "34px", "48px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)"
+    ],
+    "backgrounds": ["rgb(17, 17, 17)", "rgb(200, 16, 46)", "rgb(255, 255, 255)"],
+    "radii": ["999px"],
+    "buttons": [
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
+      "a.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 44",
+      "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44"
+    ],
+    "smallClickables": [
+      "a. 107x23 \"(610) 555-0100\"",
+      "a. 161x23 \"@exquisitebarberbeauty\"",
+      "a. 226x23 \"hello@exquisitebarberbeauty.co\"",
+      "a.exq-btn 111x36 \"Book a chair\"",
+      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
+      "a.exq-skip-link 132x40 \"Skip to content\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 508,
+    "cls": 0.001,
+    "consoleErrors": []
+  },
+  {
+    "url": "/book",
+    "title": "Book a chair | Exquisite Barber & Beauty Lounge",
+    "description": "Pick a service, a chair and a time at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Confirm in under a minute.",
+    "h1": ["Book your chair"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "24px", "34px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)",
+      "rgb(74, 74, 74)"
+    ],
+    "backgrounds": [
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(217, 217, 217)",
+      "rgb(255, 255, 255)"
+    ],
+    "radii": ["16px", "999px"],
+    "buttons": [
+      "a.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 36",
+      "button.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
+      "button.exq-nav__toggle[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 44",
+      "button.exq-stepbar__button[] bg rgba(0, 0, 0, 0) fg rgb(107, 107, 107) r 0px h 44",
+      "button.exq-stepbar__button[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 0px h 49"
+    ],
+    "smallClickables": [
+      "a. 107x23 \"(610) 555-0100\"",
+      "a. 161x23 \"@exquisitebarberbeauty\"",
+      "a.exq-btn 111x36 \"Book a chair\"",
+      "a.exq-site-footer__links 70x21 \"Staff sign in\"",
+      "a.exq-skip-link 132x40 \"Skip to content\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 480,
+    "cls": 0.001,
+    "consoleErrors": []
+  },
+  {
+    "url": "/admin",
+    "title": "Today | Exquisite Barber & Beauty Lounge",
+    "description": "Barbers and stylists under one roof in Brookhaven, PA. Gifted Hands. Pick your chair and book online in under a minute.",
+    "h1": ["Today, Sat, Oct 17"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "18px", "24px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(255, 255, 255)",
+      "rgb(74, 74, 74)"
+    ],
+    "backgrounds": ["rgb(200, 16, 46)", "rgb(244, 244, 244)", "rgb(255, 255, 255)"],
+    "radii": ["16px", "8px", "999px"],
+    "buttons": ["button.exq-adm-tabs__tab[] bg rgba(0, 0, 0, 0) fg rgb(74, 74, 74) r 0px h 56"],
+    "smallClickables": [],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 592,
+    "cls": 0.737,
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ]
+  },
+  {
+    "url": "/admin/schedule",
+    "title": "Schedule | Exquisite Barber & Beauty Lounge",
+    "description": "Barbers and stylists under one roof in Brookhaven, PA. Gifted Hands. Pick your chair and book online in under a minute.",
+    "h1": ["Schedule, Sat, Oct 17"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "18px", "24px"],
+    "textColors": ["rgb(17, 17, 17)", "rgb(200, 16, 46)", "rgb(74, 74, 74)"],
+    "backgrounds": ["rgb(255, 255, 255)"],
+    "radii": ["16px", "999px"],
+    "buttons": [
+      "button.exq-adm-schedule__next[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 40",
+      "button.exq-adm-schedule__prev[] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 40",
+      "button.exq-adm-tabs__tab[] bg rgba(0, 0, 0, 0) fg rgb(74, 74, 74) r 0px h 56",
+      "button.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 36"
+    ],
+    "smallClickables": [
+      "button.exq-adm-schedule__next 358x40 \"Next day\"",
+      "button.exq-adm-schedule__prev 358x40 \"Previous day\"",
+      "button.exq-btn 358x36 \"Block time\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": [],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 532,
+    "cls": 0.334,
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ]
+  },
+  {
+    "url": "/admin/photos",
+    "title": "Photos | Exquisite Barber & Beauty Lounge",
+    "description": "Barbers and stylists under one roof in Brookhaven, PA. Gifted Hands. Pick your chair and book online in under a minute.",
+    "h1": ["Photos"],
+    "fontFamilies": ["Jost"],
+    "fontSizes": ["14px", "16px", "24px"],
+    "textColors": [
+      "rgb(107, 107, 107)",
+      "rgb(17, 17, 17)",
+      "rgb(255, 255, 255)",
+      "rgb(74, 74, 74)"
+    ],
+    "backgrounds": [
+      "rgb(17, 17, 17)",
+      "rgb(200, 16, 46)",
+      "rgb(244, 244, 244)",
+      "rgb(255, 255, 255)"
+    ],
+    "radii": ["16px", "8px", "999px"],
+    "buttons": [
+      "button.exq-adm-tabs__tab[] bg rgba(0, 0, 0, 0) fg rgb(74, 74, 74) r 0px h 56",
+      "button.exq-btn[primary] bg rgb(200, 16, 46) fg rgb(255, 255, 255) r 999px h 44",
+      "button.exq-btn[secondary] bg rgba(0, 0, 0, 0) fg rgb(17, 17, 17) r 999px h 36",
+      "button.exq-chip[] bg rgb(17, 17, 17) fg rgb(255, 255, 255) r 999px h 44",
+      "button.exq-chip[] bg rgb(255, 255, 255) fg rgb(17, 17, 17) r 999px h 44"
+    ],
+    "smallClickables": [
+      "button.exq-btn 108x36 \"Remove\"",
+      "button.exq-btn 224x36 \"Save\"",
+      "button.exq-btn 77x36 \"Up\"",
+      "button.exq-btn 95x36 \"Down\""
+    ],
+    "imagesWithoutAlt": [],
+    "oversizedImages": ["81113b1-982a-4967-a39c-e2cd33a54ca9.webp 1600px for 192px"],
+    "scrollListeners": 5,
+    "fadeInHidden": [],
+    "gradients": [],
+    "lcp": 584,
+    "cls": 0.2,
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ]
+  }
+]
