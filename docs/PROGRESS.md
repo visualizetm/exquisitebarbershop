@@ -128,3 +128,18 @@ commit, and what is still open.
 - Screens: `docs/screens/theme/` (Home, a profile, Book, Manage, admin Today and
   Photos at 390 and 1280 in light and dark; `montage-light-*` and
   `montage-dark-*`).
+
+### Milestone 3: Book on desktop
+
+- Shipped: two columns at 1024px and up with the H1 "Book your chair", the
+  sub line, the StepBar and the steps on the left (services in two columns of
+  selectable cards, "Anyone available" first among the chairs, the day strip,
+  grouped times, details) and a sticky ink summary card on the right (the
+  wordmark, "Your booking" in red, each service with its price, With, When,
+  the total, the Confirm button disabled until the review step, and "Pay in
+  the chair. Free to cancel up to 2 hours before." from the shop setting).
+  Under 1024px nothing changed except the heading text.
+- Tests: the card shows the choices, is disabled before the details, is hidden
+  on a phone where the StickyCTA shows the total, and submits the booking on a
+  wide screen.
+- Screens: `docs/screens/p5-m3/` (Book at 390 and 1280, light and dark).

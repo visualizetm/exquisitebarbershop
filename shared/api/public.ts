@@ -22,6 +22,8 @@ export const publicShopSchema = z.object({
     maxServicesPerBooking: z.int(),
     allowFirstAvailable: z.boolean(),
     requireEmail: z.boolean(),
+    /** Customers may cancel or move online until this many minutes before the start. */
+    cancelCutoffMinutes: z.int(),
   }),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),

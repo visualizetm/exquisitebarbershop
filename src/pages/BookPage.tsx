@@ -15,6 +15,7 @@ import { Status } from '@/components/Status';
 import { Button, StepBar, StickyCTA, Ticket, TimeChip, useToast } from '@/components/ui';
 import { formatCents } from '@shared/lib/money';
 import { formatShopDateTime } from '@shared/lib/time';
+import { BookingCard } from '@/components/booking/BookingCard';
 import { BookingSummary } from '@/components/booking/BookingSummary';
 import { CustomerForm } from '@/components/booking/CustomerForm';
 import { DayPicker } from '@/components/booking/DayPicker';
@@ -150,7 +151,7 @@ export function BookPage() {
   if (shop.status === 'error' || services.status === 'error' || staff.status === 'error') {
     return (
       <article className="exq-book exq-wrap exq-section" data-state="error">
-        <h1 className="exq-book__title">Book a chair</h1>
+        <h1 className="exq-book__title">Book your chair</h1>
         <Status state="error" />
       </article>
     );
@@ -158,7 +159,7 @@ export function BookPage() {
   if (shop.status !== 'ready' || services.status !== 'ready' || staff.status !== 'ready') {
     return (
       <article className="exq-book exq-wrap exq-section" data-state="loading">
-        <h1 className="exq-book__title">Book a chair</h1>
+        <h1 className="exq-book__title">Book your chair</h1>
         <Status state="loading" />
       </article>
     );
@@ -168,10 +169,11 @@ export function BookPage() {
   const chosenServices = selection.serviceIds
     .map((id) => allServices.find((s) => s.id === id))
     .filter((s) => s !== undefined);
-  const staffName =
+  const chosenStaff =
     selection.staff === 'any'
-      ? 'First available'
-      : (staff.data.staff.find((s) => s.slug === selection.staff)?.name ?? 'Not chosen yet');
+      ? 'Anyone available'
+      : (staff.data.staff.find((s) => s.slug === selection.staff)?.name ?? null);
+  const staffName = chosenStaff ?? 'Not chosen yet';
   const fingerprint = JSON.stringify([
     selection.serviceIds,
     selection.staff,
@@ -379,7 +381,11 @@ export function BookPage() {
               </Button>
             </StickyCTA>
             <p className="exq-book-confirm__actions">
-              <Button loading={submitting} onClick={() => void submit()}>
+              <Button
+                className="exq-book-confirm__submit"
+                loading={submitting}
+                onClick={() => void submit()}
+              >
                 {submitting ? 'Booking' : 'Confirm booking'}
               </Button>
               <Button
@@ -466,25 +472,39 @@ export function BookPage() {
 
   return (
     <article className="exq-book exq-wrap exq-section" data-state={step}>
-      <h1 className="exq-book__title">Book a chair</h1>
+      <div className="exq-book__main">
+        <h1 className="exq-book__title">Book your chair</h1>
+        <p className="exq-book__sub">Takes about a minute.</p>
+        {step !== 'done' ? (
+          <div className="exq-book-steps">
+            <StepBar steps={STEPS} current={step} onJump={goTo} />
+          </div>
+        ) : null}
+        <StepHeading step={step} focusKey={selection.startAt ?? ''}>
+          {STEP_TITLES[step]}
+        </StepHeading>
+        {step !== 'services' && step !== 'done' ? (
+          <section className="exq-book-selection" aria-label="Your selection">
+            <BookingSummary
+              services={chosenServices}
+              staffName={staffName}
+              startAt={selection.startAt}
+            />
+          </section>
+        ) : null}
+        {renderStep()}
+      </div>
       {step !== 'done' ? (
-        <div className="exq-book-steps">
-          <StepBar steps={STEPS} current={step} onJump={goTo} />
-        </div>
+        <BookingCard
+          services={chosenServices}
+          staffName={chosenStaff}
+          startAt={selection.startAt}
+          cancelCutoffMinutes={shop.data.booking.cancelCutoffMinutes}
+          canConfirm={step === 'confirm' && !submitting}
+          submitting={submitting}
+          onConfirm={() => void submit()}
+        />
       ) : null}
-      <StepHeading step={step} focusKey={selection.startAt ?? ''}>
-        {STEP_TITLES[step]}
-      </StepHeading>
-      {step !== 'services' && step !== 'done' ? (
-        <section className="exq-book-selection" aria-label="Your selection">
-          <BookingSummary
-            services={chosenServices}
-            staffName={staffName}
-            startAt={selection.startAt}
-          />
-        </section>
-      ) : null}
-      {renderStep()}
     </article>
   );
 }

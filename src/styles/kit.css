@@ -40,6 +40,14 @@
 .exq-btn[data-variant='inverse']:hover {
   color: var(--ink);
 }
+.exq-btn[data-variant='emphasis'] {
+  background: var(--cta-bg);
+  border-color: var(--cta-bg);
+  color: var(--cta-fg);
+}
+.exq-btn[data-variant='emphasis']:hover {
+  color: var(--cta-fg);
+}
 .exq-btn[data-size='sm'] {
   min-height: 36px;
   padding: var(--s1) var(--s4);

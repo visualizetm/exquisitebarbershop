@@ -87,6 +87,7 @@ export const publicRoutes: RouteDefinition[] = [
           maxServicesPerBooking: settings.booking.maxServicesPerBooking,
           allowFirstAvailable: settings.booking.allowFirstAvailable,
           requireEmail: settings.booking.requireEmail,
+          cancelCutoffMinutes: settings.booking.cancelCutoffMinutes,
         },
         heroPhoto: hero,
       });

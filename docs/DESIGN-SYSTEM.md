@@ -38,22 +38,23 @@ Dark values (same list under `[data-theme="dark"]` and under
 `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`;
 values change, names never):
 
-| Token           | Dark    | Notes                                              |
-| --------------- | ------- | -------------------------------------------------- |
-| `--bg`          | #111111 | page                                               |
-| `--card`        | #1A1A1A | cards, sheets, the nav                             |
-| `--card-2`      | #222222 | nested surfaces, hover                             |
-| `--border`      | #2E2E2E | lines, 3:1 against the page                        |
-| `--fg`          | #F4F4F4 | text                                               |
-| `--fg-2`        | #B8B8B8 | secondary text                                     |
-| `--fg-3`        | #8C8C8C | tertiary text, 5.6:1 on #111                       |
-| `--accent`      | #C8102E | red buttons keep white text                        |
-| `--accent-text` | #FF5470 | red text and live dots                             |
-| `--selected-bg` | #FFFFFF | selected chips, days, segments invert to paper     |
-| `--selected-fg` | #111111 |                                                    |
-| `--band-border` | #2E2E2E | top border of ink bands (the CTA band, the footer) |
-| `--ok` etc      | lighter | #5CC98A, #E3B341, #7FB2FF, danger #FF5470          |
-| `--card-shadow` | none    | cards are lighter than the page instead            |
+| Token                  | Dark             | Notes                                                |
+| ---------------------- | ---------------- | ---------------------------------------------------- |
+| `--bg`                 | #111111          | page                                                 |
+| `--card`               | #1A1A1A          | cards, sheets, the nav                               |
+| `--card-2`             | #222222          | nested surfaces, hover                               |
+| `--border`             | #2E2E2E          | lines, 3:1 against the page                          |
+| `--fg`                 | #F4F4F4          | text                                                 |
+| `--fg-2`               | #B8B8B8          | secondary text                                       |
+| `--fg-3`               | #8C8C8C          | tertiary text, 5.6:1 on #111                         |
+| `--accent`             | #C8102E          | red buttons keep white text                          |
+| `--accent-text`        | #FF5470          | red text and live dots                               |
+| `--selected-bg`        | #FFFFFF          | selected chips, days, segments invert to paper       |
+| `--selected-fg`        | #111111          |                                                      |
+| `--cta-bg`, `--cta-fg` | #C8102E, #FFFFFF | the emphasis button; paper on ink inside light bands |
+| `--band-border`        | #2E2E2E          | top border of ink bands (the CTA band, the footer)   |
+| `--ok` etc             | lighter          | #5CC98A, #E3B341, #7FB2FF, danger #FF5470            |
+| `--card-shadow`        | none             | cards are lighter than the page instead              |
 
 Inside `.exq-dark` bands the dark theme uses bg #1A1A1A and border #2E2E2E so
 they still read as bands. Photos and scrims never change. Brand marks swap with

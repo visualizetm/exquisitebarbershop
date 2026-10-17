@@ -1,7 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Link, type LinkProps } from 'react-router';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'inverse';
+/** emphasis: the strongest button for the surface it sits on (red on paper, paper on ink, red in dark). */
+export type ButtonVariant = 'primary' | 'secondary' | 'inverse' | 'emphasis';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface Common {

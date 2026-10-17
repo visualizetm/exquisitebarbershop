@@ -162,3 +162,23 @@ win.
 - D5-10 New dependency: @axe-core/playwright (dev only) for the accessibility
   checks in both themes. It is the standard axe engine behind a Playwright
   builder; nothing else was added.
+- D5-11 Desktop Book layout. The page is one grid at 1024px and up: the steps
+  on the left, a sticky `BookingCard` on the right. The card is `.exq-dark`, so
+  it is ink in light and gets the #1A1A1A surface with the #2E2E2E border in
+  dark from the same tokens as every band. Below 1024px the card is
+  `display: none` and the StickyCTA bar stays, so the phone flow is untouched.
+- D5-12 One Confirm button per screen. On wide screens the inline Confirm on
+  the review step is hidden and the card's button submits; the mobile
+  StickyCTA was already hidden there. Two visible Confirm buttons would be
+  confusing and would break strict role queries in the tests.
+- D5-13 Button variant `emphasis` with `--cta-bg` and `--cta-fg` tokens: red on
+  paper, paper on ink, and red everywhere in dark. The brief wants the card's
+  button white on ink in light and red in dark; a token pair expresses that
+  without a theme check in the component.
+- D5-14 "Book your chair" and "Takes about a minute." show at every width, not
+  only on desktop: one heading per page, and the sub line costs nothing on a
+  phone. "First available" reads "Anyone available" on the chair card as the
+  brief asks; the ticket still says "(first available)" after booking.
+- D5-15 The cancel note is built from `cancelCutoffMinutes`, now part of the
+  public shop response (additive), through `cancelPolicyLabel`: whole hours
+  read as hours, anything else as minutes, zero as "any time before".

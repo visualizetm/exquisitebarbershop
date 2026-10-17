@@ -55,7 +55,7 @@ export function StaffPicker({
                     </span>
                   </span>
                   <span className="exq-chaircard__body">
-                    <span className="exq-chaircard__name exq-h">First available</span>
+                    <span className="exq-chaircard__name exq-h">Anyone available</span>
                     <span className="exq-chaircard__specialty">We pick the least booked chair</span>
                   </span>
                 </button>

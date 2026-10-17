@@ -35,6 +35,7 @@ const shop: PublicShop = {
     maxServicesPerBooking: 3,
     allowFirstAvailable: true,
     requireEmail: false,
+    cancelCutoffMinutes: 120,
   },
   heroPhoto: null,
 };

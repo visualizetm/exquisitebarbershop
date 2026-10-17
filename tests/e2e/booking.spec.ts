@@ -106,6 +106,12 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
   });
   expect(taken.status(), await taken.text()).toBe(201);
 
+  // On a wide screen the summary card carries the only Confirm button.
+  const card = page.getByRole('complementary', { name: 'Your booking' });
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Beard Trim and Lineup');
+  await expect(card).toContainText(/With\s*Dee/);
+  await expect(card).toContainText('Pay in the chair. Free to cancel up to 2 hours before.');
   await page.getByRole('button', { name: 'Confirm booking' }).click();
   const conflict = page.locator('.exq-book-conflict');
   await expect(conflict).toBeVisible();
@@ -118,4 +124,23 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
   await page.getByRole('button', { name: 'Confirm booking' }).click();
   await expect(page.getByRole('heading', { name: 'You are booked' })).toBeFocused();
   await expect(page.locator('.exq-book-done__code')).toHaveText(REFERENCE);
+});
+
+test('the summary card is disabled until the details step and hidden on a phone', async ({
+  page,
+}) => {
+  await page.goto('/book?barber=marcus');
+  const card = page.getByRole('complementary', { name: 'Your booking' });
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Pick a service to start.');
+  await expect(card.getByRole('button', { name: 'Confirm booking' })).toBeDisabled();
+  await page.getByLabel(/Classic Cut/).click();
+  await expect(card).toContainText('Classic Cut');
+  await expect(card).toContainText(/With\s*Marcus/);
+  await expect(card).toContainText('$30');
+  await expect(card.getByRole('button', { name: 'Confirm booking' })).toBeDisabled();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(card).toBeHidden();
+  await expect(page.locator('.exq-sticky')).toContainText('$30');
 });
