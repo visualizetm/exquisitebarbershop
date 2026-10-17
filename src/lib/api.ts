@@ -8,6 +8,8 @@ export class ApiRequestError extends Error {
   readonly details: ApiError['error']['details'];
   readonly requestId: string;
   readonly alternatives: ApiError['error']['alternatives'];
+  /** Bookings a schedule change would strand (SCHEDULE_CONFLICT only). */
+  readonly affected: ApiError['error']['affected'];
 
   constructor(status: number, body: ApiError) {
     super(body.error.message);
@@ -17,6 +19,7 @@ export class ApiRequestError extends Error {
     this.details = body.error.details;
     this.requestId = body.error.requestId;
     this.alternatives = body.error.alternatives;
+    this.affected = body.error.affected;
   }
 }
 
