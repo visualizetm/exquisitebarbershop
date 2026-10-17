@@ -90,6 +90,7 @@ export async function bookPublic(
     startAt: string;
     email?: string | null;
     name?: string;
+    phone?: string;
   },
 ): Promise<{ id: string; referenceCode: string; token: string; staffId: string }> {
   const res = await call(baseUrl, 'POST', '/api/bookings', {
@@ -98,7 +99,11 @@ export async function bookPublic(
       serviceIds: input.serviceIds,
       staff: input.staff,
       startAt: input.startAt,
-      customer: { name: input.name ?? 'Test Customer', phone: phone(), email: input.email ?? null },
+      customer: {
+        name: input.name ?? 'Test Customer',
+        phone: input.phone ?? phone(),
+        email: input.email ?? null,
+      },
     },
   });
   if (res.status !== 201)

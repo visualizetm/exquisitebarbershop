@@ -258,6 +258,8 @@ export interface BookingPageFilter {
   source?: BookingDocument['source'];
   referenceCode?: string;
   phoneDigits?: string;
+  /** Digits that also read as a reference code: match either one. */
+  codeOrPhone?: { referenceCode: string; phoneDigits: string };
   name?: string;
 }
 
@@ -282,6 +284,14 @@ export async function listBookingsPage(
   if (filter.referenceCode) and.push({ referenceCode: filter.referenceCode });
   if (filter.phoneDigits)
     and.push({ 'customer.phone': { $regex: escapeRegex(filter.phoneDigits) } });
+  if (filter.codeOrPhone) {
+    and.push({
+      $or: [
+        { referenceCode: filter.codeOrPhone.referenceCode },
+        { 'customer.phone': { $regex: escapeRegex(filter.codeOrPhone.phoneDigits) } },
+      ],
+    });
+  }
   if (filter.name)
     and.push({ 'customer.name': { $regex: escapeRegex(filter.name), $options: 'i' } });
   if (after) {

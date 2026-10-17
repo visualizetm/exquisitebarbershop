@@ -317,9 +317,12 @@ export async function listBookings(
   if (q) {
     const code = normalizeReferenceCode(q);
     const digits = q.replace(/\D/g, '');
-    if (code) filter.referenceCode = code;
-    else if (digits.length >= 4 && digits.length === q.replace(/[\s()+.-]/g, '').length)
-      filter.phoneDigits = digits;
+    const looksLikePhone =
+      digits.length >= 4 && digits.length === q.replace(/[\s()+.-]/g, '').length;
+    // Codes use the digits 2 to 9 too, so seven such digits may be either one.
+    if (code && looksLikePhone) filter.codeOrPhone = { referenceCode: code, phoneDigits: digits };
+    else if (code) filter.referenceCode = code;
+    else if (looksLikePhone) filter.phoneDigits = digits;
     else filter.name = q;
   }
   const after = decodeCursor(query.cursor, isTimeCursor);

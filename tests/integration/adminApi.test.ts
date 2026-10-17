@@ -286,6 +286,17 @@ describe('bookings list and detail', () => {
     );
     expect(byCode.bookings.map((b) => b.id)).toEqual([created[1]?.id]);
     const phone = byCode.bookings[0]?.customer.phone ?? '';
+    // Seven digits from 2 to 9 also read as a reference code; the search tries both.
+    const lookAlike = await bookPublic(server.baseUrl, {
+      staff: 'dee',
+      serviceIds: [cut],
+      startAt: slotAt(FRI, '12:00'),
+      phone: '+12155552345',
+    });
+    const byDigits = bookingListResponseSchema.parse(
+      (await owner('GET', '/api/admin/bookings?q=5552345')).body,
+    );
+    expect(byDigits.bookings.map((b) => b.id)).toContain(lookAlike.id);
     const byPhone = bookingListResponseSchema.parse(
       (await owner('GET', `/api/admin/bookings?q=${encodeURIComponent(phone.slice(-7))}`)).body,
     );
