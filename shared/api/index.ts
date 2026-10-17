@@ -5,3 +5,4 @@ export * from './availability';
 export * from './bookings';
 export * from './auth';
 export * from './admin';
+export * from './photos';

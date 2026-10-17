@@ -27,6 +27,11 @@ export default defineConfig({
         target: `http://127.0.0.1:${process.env.API_PORT ?? '3001'}`,
         changeOrigin: false,
       },
+      // Local photo storage (STORAGE_DRIVER=local) is served by the API process.
+      '/uploads': {
+        target: `http://127.0.0.1:${process.env.API_PORT ?? '3001'}`,
+        changeOrigin: false,
+      },
     },
   },
   build: {

@@ -66,6 +66,8 @@ test('a public booking shows as new for the owner, who marks it completed', asyn
   await page.getByRole('link', { name: 'Bookings', exact: true }).click();
   await page.getByLabel('Search name, phone or reference').fill(code);
   await page.getByRole('button', { name: 'Show bookings' }).click();
+  // The search by reference code narrows the list to this one booking.
+  await expect(page.locator('.exq-adm-bookings__item')).toHaveCount(1);
   const row = page.locator('.exq-adm-bookings__item').filter({ hasText: 'Admin Flow Customer' });
   await expect(row).toHaveAttribute('data-new', 'true');
   await expect(row.locator('.exq-adm-bookings__new')).toHaveText('New');

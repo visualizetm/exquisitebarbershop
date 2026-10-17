@@ -39,3 +39,27 @@ win.
   machine. Rejected a Node image library (another dependency for one job).
 - D4-09 Nav. Solid paper bar, sticky, never transparent over photos, so the
   "readable over photos" rule holds without a scrim or scroll effect.
+- D4-10 Local uploads. The local driver's PUT and GET live in a small handler
+  (`server/storage/localHttp.ts`) mounted ahead of the API router by the dev
+  server and the test server, and Vite proxies `/uploads`. Rejected adding API
+  routes for it: the router is JSON only and the routes would exist only to
+  serve development.
+- D4-11 Upload tickets. The issued upload (key, kind, chair, type, size, expiry)
+  is a signed, expiring token the client hands back to confirm, so nothing is
+  stored for an upload that never completes. Rejected a pending-uploads
+  collection with a cleanup job.
+- D4-12 Presigned PUT on R2. The URL is signed with query parameters and does
+  not bind Content-Type (aws4fetch leaves it unsigned by default); confirm
+  checks the stored object's size and type instead, which is the check that
+  matters. Rejected signing all headers, which makes browser PUTs brittle.
+- D4-13 Deleted photos. A soft delete sets `deletedAt`; the daily cron removes
+  the object and sets `purgedAt`. Rejected deleting the object inline: a failed
+  delete would then leave an orphan with no record of it.
+- D4-14 Next opening. One availability load for 14 days with every active
+  service, then one engine pass per chair with that chair's shortest service.
+  Rejected a per-chair load (seven queries per chair) and a second engine.
+- D4-15 Days count. `availability/days` rows gained `count`; the slots were
+  already computed, so this costs nothing and the day chips can show it.
+- D4-16 Landing on a time from a link. `/book` with date and time checks the
+  slot once against `/api/availability`; if it is gone it steps back to the
+  time step with a notice. Rejected trusting the link and failing at confirm.

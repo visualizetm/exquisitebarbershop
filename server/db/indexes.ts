@@ -17,6 +17,7 @@ export const COLLECTIONS = {
   rateLimits: 'rateLimits',
   loginThrottle: 'loginThrottle',
   scheduleGuards: 'scheduleGuards',
+  photos: 'photos',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -226,6 +227,19 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { expiresAt: 1 },
     options: { name: 'ttl_expiresAt', expireAfterSeconds: 0 },
     reason: 'Failure history is forgotten a day after the last failed sign-in.',
+  },
+  // photos (prompt 4)
+  {
+    collection: 'photos',
+    keys: { kind: 1, deletedAt: 1, sortOrder: 1 },
+    options: { name: 'kind_live_order' },
+    reason: 'Gallery and hero reads in display order, skipping deleted photos.',
+  },
+  {
+    collection: 'photos',
+    keys: { staffId: 1, kind: 1 },
+    options: { name: 'by_staff_kind' },
+    reason: "A chair's portrait and work photos.",
   },
   // bookings (prompt 3)
   {

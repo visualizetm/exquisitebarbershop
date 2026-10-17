@@ -382,6 +382,26 @@ conflict check of a schedule change and its commit. Indexes: `_id` only.
 | uniq_scope_key (unique) | scope, key | atomic claim across concurrent retries |
 | ttl_expiresAt (TTL 0s)  | expiresAt  | automatic cleanup                      |
 
+### photos (prompt 4)
+
+| Field         | Type                 | Notes                                                                                |
+| ------------- | -------------------- | ------------------------------------------------------------------------------------ |
+| kind          | staff, gallery, hero |                                                                                      |
+| staffId       | string or null       | the chair for staff photos and credited gallery photos                               |
+| key           | string               | server generated: staff/<staffId>/<uuid>.webp, gallery/<uuid>.webp, hero/<uuid>.webp |
+| width, height | int                  | from the browser after the resize                                                    |
+| alt           | string               | required                                                                             |
+| sortOrder     | int                  | display order within a kind (and chair)                                              |
+| createdBy     | actor                |                                                                                      |
+| createdAt     | Date                 |                                                                                      |
+| deletedAt     | Date or null         | soft delete                                                                          |
+| purgedAt      | Date or null         | set once the object is removed from storage                                          |
+
+| Index           | Keys                       | Why                                  |
+| --------------- | -------------------------- | ------------------------------------ |
+| kind_live_order | kind, deletedAt, sortOrder | gallery and hero reads in order      |
+| by_staff_kind   | staffId, kind              | one chair's portrait and work photos |
+
 ### rateLimits
 
 | Field       | Type                                | Notes        |
@@ -567,6 +587,22 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 | GET           | /api/admin/outbox                     | owner                    | query `status, cursor`; payloads are never returned                                                              |
 | POST          | /api/admin/outbox/:id/retry           | owner                    | failed messages only, else CONFLICT                                                                              |
 
+### Prompt 4: photos, next opening, gallery
+
+| Method        | Path                         | Auth               | Notes                                                                                 |
+| ------------- | ---------------------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId |
+| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service               |
+| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`; photos with per chair counts        |
+| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                 |
+| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket    |
+| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201           |
+| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal              |
+
+`/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
+`/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`.
+`/api/internal/outbox/deliver` also purges deleted photo objects (`photosPurged`).
+
 Prompt 3 error codes: PASSWORD_CHANGE_REQUIRED 403, SCHEDULE_CONFLICT 409 (with
 `affected`: bookingId, referenceCode, staffId, staffName, startAt, endAt,
 customerName, services, hasEmail) and INVALID_TRANSITION 409.
@@ -733,6 +769,39 @@ Access
 - Operator recovery: `npm run user:reset -- --email owner@... [--password-stdin]`
   sets a new password (or prints a temporary one) and ends every session.
 
+## 8b. Photos and storage (prompt 4)
+
+Storage is a port (`server/storage/types.ts`) with two drivers chosen by
+STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,
+presigned PUT URLs valid for five minutes, public reads through
+R2_PUBLIC_BASE_URL) and `local` (files under `.data/uploads`, a signed PUT URL
+and public reads at `/uploads/<key>` served by `serveLocalUploads` in the dev
+server; Vite proxies `/uploads` to the API).
+
+Upload flow
+
+1. `POST /api/admin/photos/upload-url` with kind, staffId, contentType (jpeg,
+   png or webp) and size (10 MB at most). The server makes the key and returns
+   the presigned URL plus a signed ticket (`u1.<payload>.<sig>`, HMAC with
+   MANAGE_LINK_SECRET) binding key, kind, chair, type, size and expiry. A key
+   sent by the client is ignored.
+2. The browser resizes to a 2000px long edge and re-encodes to WebP at about
+   0.82 quality before the PUT, which also strips EXIF and location data.
+3. `POST /api/admin/photos/confirm` with the ticket, width, height and alt. The
+   server HEADs the object, requires the declared size and type, inserts the
+   document and audits `photo.create`.
+4. PATCH edits alt and sortOrder (`photo.update`); DELETE soft deletes
+   (`photo.delete`) and the cron purges the object (`purgedAt`).
+
+Access: the owner manages every photo. A barber may upload to their own chair
+only while `permissions.barbersCanUploadPhotos` is on (default off); any other
+photo reads as not found for them.
+
+Next opening: `server/services/nextOpening.ts` loads one availability context
+for the next 14 days (bounded by the booking window) with every active service,
+then runs the engine once per chair with that chair's shortest service, or
+`shopSettings.nextOpenServiceId` when set. No second engine.
+
 ## 9. Notifications: outbox and channels
 
 Pattern
@@ -819,20 +888,22 @@ SMS reminders
 
 Environments
 
-| Variable                                      | Needed          | Purpose                                |
-| --------------------------------------------- | --------------- | -------------------------------------- |
-| MONGODB_URI                                   | now             | replica set connection string          |
-| MONGODB_DB_NAME                               | now             | database name per environment          |
-| APP_BASE_URL                                  | now             | manage links, allowed Origin           |
-| MANAGE_LINK_SECRET                            | now             | HMAC key for manage links              |
-| EMAIL_PROVIDER                                | later           | log or resend                          |
-| RESEND_API_KEY, EMAIL_FROM                    | later           | email delivery                         |
-| SEED_OWNER_PASSWORD                           | now, seed only  | initial owner login at seed time       |
-| SEED_OWNER_EMAIL                              | optional, seed  | overrides the placeholder owner email  |
-| CRON_SECRET                                   | later           | bearer token for internal routes       |
-| LOG_LEVEL                                     | optional        |                                        |
-| MONGOMS_SYSTEM_BINARY                         | optional, tests | use an existing mongod                 |
-| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL | set by Vercel   | build sha, environment, preview origin |
+| Variable                                                                             | Needed          | Purpose                                |
+| ------------------------------------------------------------------------------------ | --------------- | -------------------------------------- |
+| MONGODB_URI                                                                          | now             | replica set connection string          |
+| MONGODB_DB_NAME                                                                      | now             | database name per environment          |
+| APP_BASE_URL                                                                         | now             | manage links, allowed Origin           |
+| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links              |
+| EMAIL_PROVIDER                                                                       | later           | log or resend                          |
+| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                         |
+| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time       |
+| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email  |
+| CRON_SECRET                                                                          | later           | bearer token for internal routes       |
+| STORAGE_DRIVER                                                                       | now             | local or r2                            |
+| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage            |
+| LOG_LEVEL                                                                            | optional        |                                        |
+| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                 |
+| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin |
 
 Deployment
 

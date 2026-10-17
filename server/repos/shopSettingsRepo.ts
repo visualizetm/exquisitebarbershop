@@ -12,8 +12,12 @@ import { sessionOf, type RepoOptions } from './types';
 
 /** Fills groups added after the settings document was written. */
 function fill(doc: ShopSettingsDocument): ShopSettingsDocument {
-  const stored = (doc as Partial<ShopSettingsDocument>).permissions;
-  return { ...doc, permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored } };
+  const stored = doc as Partial<ShopSettingsDocument>;
+  return {
+    ...doc,
+    permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
+    nextOpenServiceId: stored.nextOpenServiceId ?? null,
+  };
 }
 
 function withDefaults(doc: ShopSettingsDocument | null): ShopSettingsDocument | null {

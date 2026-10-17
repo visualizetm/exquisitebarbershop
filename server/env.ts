@@ -21,6 +21,13 @@ const envSchema = z.object({
   /** "off" lets tests drive outbox delivery by hand instead of right after the response. */
   OUTBOX_AFTER_RESPONSE: z.enum(['on', 'off']).default('on'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  /** Where photos live: Cloudflare R2 in production, the local disk in dev and tests. */
+  STORAGE_DRIVER: z.enum(['local', 'r2']).default('local'),
+  R2_ACCOUNT_ID: z.string().optional(),
+  R2_ACCESS_KEY_ID: z.string().optional(),
+  R2_SECRET_ACCESS_KEY: z.string().optional(),
+  R2_BUCKET: z.string().optional(),
+  R2_PUBLIC_BASE_URL: z.url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -37,6 +44,21 @@ export function getEnv(): Env {
   if (parsed.data.NODE_ENV === 'production' && parsed.data.EMAIL_PROVIDER !== 'log') {
     if (!parsed.data.RESEND_API_KEY || !parsed.data.EMAIL_FROM) {
       throw new Error('EMAIL_PROVIDER=resend requires RESEND_API_KEY and EMAIL_FROM');
+    }
+  }
+  if (parsed.data.STORAGE_DRIVER === 'r2') {
+    const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL } =
+      parsed.data;
+    if (
+      !R2_ACCOUNT_ID ||
+      !R2_ACCESS_KEY_ID ||
+      !R2_SECRET_ACCESS_KEY ||
+      !R2_BUCKET ||
+      !R2_PUBLIC_BASE_URL
+    ) {
+      throw new Error(
+        'STORAGE_DRIVER=r2 requires R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET and R2_PUBLIC_BASE_URL',
+      );
     }
   }
   cached = parsed.data;

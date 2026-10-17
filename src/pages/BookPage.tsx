@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import type { AvailabilitySlot } from '@shared/api/availability';
+import { availabilityResponseSchema, type AvailabilitySlot } from '@shared/api/availability';
 import {
   createBookingResponseSchema,
   type CreateBookingRequest,
@@ -75,6 +75,10 @@ export function BookPage() {
   const [confirmation, setConfirmation] = useState<CreateBookingResponse | null>(() =>
     loadConfirmation(),
   );
+  // A time that arrived in the URL (a profile opening chip) is checked once; if it has gone,
+  // the flow steps back to the times with a notice instead of failing at confirm.
+  const [staleTime, setStaleTime] = useState<string | null>(null);
+  const checkedTime = useRef<string | null>(null);
 
   const update = (patch: Partial<BookSelection>, nextStep?: BookStep) => {
     const next: BookSelection = { ...selection, ...patch, step: nextStep ?? null };
@@ -92,6 +96,26 @@ export function BookPage() {
   const goTo = (target: BookStep) => {
     setParams(writeSelection({ ...selection, step: target }));
   };
+
+  const latestStartAt = useRef<string | null>(null);
+  latestStartAt.current = selection.startAt;
+  useEffect(() => {
+    const { date, startAt, staff: who, serviceIds } = selection;
+    if (!date || !startAt || !who || serviceIds.length === 0) return;
+    if (step !== 'details' && step !== 'confirm') return;
+    if (checkedTime.current === startAt) return;
+    checkedTime.current = startAt;
+    const query = new URLSearchParams({ date, serviceIds: serviceIds.join(','), staff: who });
+    // Not aborted on cleanup: StrictMode runs effects twice in development and the check must land.
+    apiRequest(`/api/availability?${query.toString()}`, availabilityResponseSchema)
+      .then((result) => {
+        if (latestStartAt.current !== startAt) return;
+        if (result.slots.some((slot) => slot.startAt === startAt)) return;
+        setStaleTime(startAt);
+        setParams(writeSelection({ ...selection, startAt: null, step: 'time' }), { replace: true });
+      })
+      .catch(() => undefined);
+  }, [selection, step, setParams]);
 
   // An alias slug on a printed card resolves to the current slug and the address is corrected.
   useEffect(() => {
@@ -229,16 +253,24 @@ export function BookPage() {
         );
       case 'time':
         return (
-          <TimePicker
-            date={selection.date ?? ''}
-            serviceIds={selection.serviceIds}
-            staff={selection.staff ?? 'any'}
-            selected={selection.startAt}
-            version={refreshVersion}
-            onPick={(slot) => {
-              update({ startAt: slot.startAt }, 'details');
-            }}
-          />
+          <>
+            {staleTime ? (
+              <p className="exq-book-notice" role="alert" data-state="stale-time">
+                That time was just taken. Here are the times still open.
+              </p>
+            ) : null}
+            <TimePicker
+              date={selection.date ?? ''}
+              serviceIds={selection.serviceIds}
+              staff={selection.staff ?? 'any'}
+              selected={selection.startAt}
+              version={refreshVersion}
+              onPick={(slot) => {
+                setStaleTime(null);
+                update({ startAt: slot.startAt }, 'details');
+              }}
+            />
+          </>
         );
       case 'details':
         return (

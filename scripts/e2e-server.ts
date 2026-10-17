@@ -20,6 +20,7 @@ async function main(): Promise<void> {
   process.env.APP_BASE_URL = `http://127.0.0.1:${WEB_PORT}`;
   process.env.EMAIL_PROVIDER = 'log';
   process.env.OUTBOX_AFTER_RESPONSE = 'on';
+  process.env.STORAGE_DRIVER = 'local';
   process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'warn';
   process.env.API_PORT = API_PORT;
 

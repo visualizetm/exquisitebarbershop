@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { DateTime } from 'luxon';
 import { getRouter } from '../../server/http/app';
+import { serveLocalUploads } from '../../server/storage/localHttp';
 import { SHOP_TIMEZONE } from '../../shared/lib/constants';
 import { shopLocalToUtc } from '../../shared/lib/time';
 
@@ -14,7 +15,10 @@ export interface TestServer {
 export async function startTestServer(): Promise<TestServer> {
   const router = getRouter();
   const server: Server = createServer((req, res) => {
-    void router.handle(req, res);
+    void serveLocalUploads(req, res).then((handled) => {
+      if (!handled) return router.handle(req, res);
+      return undefined;
+    });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

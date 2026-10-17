@@ -67,6 +67,8 @@ export const availabilityDaySchema = z.object({
   date: isoDateSchema,
   available: z.boolean(),
   reason: noAvailabilityReasonSchema.nullable(),
+  /** How many start times are open that day. */
+  count: z.int().optional(),
 });
 export type AvailabilityDay = z.infer<typeof availabilityDaySchema>;
 
@@ -78,3 +80,21 @@ export const availabilityDaysResponseSchema = z.object({
   availableDates: z.array(isoDateSchema),
 });
 export type AvailabilityDaysResponse = z.infer<typeof availabilityDaysResponseSchema>;
+
+/** Today's status and next open time for every chair shown on the site. */
+export const chairStatusSchema = z.enum(['in', 'off', 'closed']);
+export const nextOpeningSchema = z.object({
+  staff: z.object({ id: idSchema, slug: z.string(), name: z.string() }),
+  status: chairStatusSchema,
+  nextOpen: z.iso.datetime().nullable(),
+  /** "2:15 PM", "Tomorrow 10:00 AM" or "Thu 10:00 AM". */
+  nextOpenLabel: z.string().nullable(),
+  /** The service the time was computed for. */
+  serviceId: idSchema.nullable(),
+});
+export type NextOpening = z.infer<typeof nextOpeningSchema>;
+export const nextOpeningsResponseSchema = z.object({
+  date: isoDateSchema,
+  chairs: z.array(nextOpeningSchema),
+});
+export type NextOpeningsResponse = z.infer<typeof nextOpeningsResponseSchema>;

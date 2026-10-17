@@ -3,6 +3,7 @@ import { idSchema, slugSchema, weekHoursSchema } from '../schemas/common';
 import { serviceGroupSchema } from '../schemas/service';
 import { addressSchema } from '../schemas/shopSettings';
 import { staffRoleSchema } from '../schemas/staff';
+import { photoViewSchema } from './photos';
 
 /** Public shop information for the Visit page, the footer and SEO. */
 export const publicShopSchema = z.object({
@@ -22,6 +23,8 @@ export const publicShopSchema = z.object({
     allowFirstAvailable: z.boolean(),
     requireEmail: z.boolean(),
   }),
+  /** The home page hero, when the owner has uploaded one. */
+  heroPhoto: photoViewSchema.nullable().optional(),
 });
 export type PublicShop = z.infer<typeof publicShopSchema>;
 
@@ -52,6 +55,8 @@ export const publicStaffSchema = z.object({
   instagramHandle: z.string().nullable(),
   acceptsOnlineBooking: z.boolean(),
   sortOrder: z.int(),
+  /** The chair's portrait, when one has been uploaded. */
+  photo: photoViewSchema.nullable().optional(),
 });
 export type PublicStaff = z.infer<typeof publicStaffSchema>;
 export const publicStaffListResponseSchema = z.object({ staff: z.array(publicStaffSchema) });
@@ -63,3 +68,24 @@ export const publicStaffResponseSchema = z.object({
   canonical: z.boolean(),
 });
 export type PublicStaffResponse = z.infer<typeof publicStaffResponseSchema>;
+
+/** Next starts for one chair, for the profile page. */
+export const staffOpeningsQuerySchema = z.object({
+  count: z.coerce.number().int().min(1).max(10).default(3),
+});
+export const openingSchema = z.object({
+  startAt: z.iso.datetime(),
+  endAt: z.iso.datetime(),
+  /** Shop-local date, for the /book link. */
+  date: z.string(),
+  /** "2:15 PM", "Tomorrow 10:00 AM" or "Thu 10:00 AM". */
+  label: z.string(),
+});
+export type Opening = z.infer<typeof openingSchema>;
+export const staffOpeningsResponseSchema = z.object({
+  staff: z.object({ id: idSchema, slug: slugSchema, name: z.string() }),
+  /** The service the openings are for, or null when the chair offers nothing online. */
+  service: z.object({ id: idSchema, name: z.string(), durationMinutes: z.int() }).nullable(),
+  openings: z.array(openingSchema),
+});
+export type StaffOpeningsResponse = z.infer<typeof staffOpeningsResponseSchema>;

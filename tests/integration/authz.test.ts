@@ -25,6 +25,9 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'GET /api/services': 'public',
   'GET /api/staff': 'public',
   'GET /api/staff/:slug': 'public',
+  'GET /api/staff/:slug/openings': 'public',
+  'GET /api/gallery': 'public',
+  'GET /api/availability/next': 'public',
   'GET /api/availability': 'public',
   'GET /api/availability/days': 'public',
   'POST /api/bookings': 'public',
@@ -83,6 +86,11 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'POST /api/admin/outbox/:id/retry': 'owner',
   'GET /api/internal/outbox/deliver': 'internal',
   'POST /api/internal/outbox/deliver': 'internal',
+  'GET /api/admin/photos': 'barber',
+  'POST /api/admin/photos/upload-url': 'barber',
+  'POST /api/admin/photos/confirm': 'barber',
+  'PATCH /api/admin/photos/:id': 'barber',
+  'DELETE /api/admin/photos/:id': 'barber',
 };
 
 type Role = 'anonymous' | 'barber' | 'owner' | 'tempPassword';

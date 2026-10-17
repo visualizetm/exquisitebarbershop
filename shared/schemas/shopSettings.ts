@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { LOCK_GRANULARITY_MINUTES, SHOP_SETTINGS_ID } from '../lib/constants';
-import { emailSchema, nonEmptyText, phoneSchema, timestampsSchema } from './common';
+import { emailSchema, idSchema, nonEmptyText, phoneSchema, timestampsSchema } from './common';
 
 export const addressSchema = z.object({
   line1: nonEmptyText(120),
@@ -66,9 +66,14 @@ export const notificationSettingsSchema = z.object({
 export const staffPermissionsSchema = z.object({
   /** Barbers may block their own time (lunch, time off). Off by default. */
   barbersCanBlockTime: z.boolean().default(false),
+  /** Barbers may upload photos to their own chair. Off by default. */
+  barbersCanUploadPhotos: z.boolean().default(false),
 });
 export type StaffPermissions = z.infer<typeof staffPermissionsSchema>;
-export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = { barbersCanBlockTime: false };
+export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = {
+  barbersCanBlockTime: false,
+  barbersCanUploadPhotos: false,
+};
 
 /** Feature flags for work that is designed but not built. All default off. */
 export const featureFlagsSchema = z.object({
@@ -92,6 +97,8 @@ export const shopSettingsDocumentSchema = z
     notifications: notificationSettingsSchema,
     features: featureFlagsSchema,
     permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
+    /** The service "next open" times are computed for. Null means each chair's shortest service. */
+    nextOpenServiceId: idSchema.nullable().default(null),
   })
   .extend(timestampsSchema.shape);
 export type ShopSettingsDocument = z.infer<typeof shopSettingsDocumentSchema>;

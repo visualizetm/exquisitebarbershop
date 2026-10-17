@@ -5,6 +5,7 @@ import type { ClosureDocument } from '../../shared/schemas/closure';
 import type { EmailOutboxDocument } from '../../shared/schemas/emailOutbox';
 import type { IdempotencyKeyDocument } from '../../shared/schemas/idempotencyKey';
 import type { LoginThrottleDocument } from '../../shared/schemas/loginThrottle';
+import type { PhotoDocument } from '../../shared/schemas/photo';
 import type { ScheduleGuardDocument } from '../../shared/schemas/scheduleGuard';
 import type { RateLimitDocument } from '../../shared/schemas/rateLimit';
 import type { ServiceDocument } from '../../shared/schemas/service';
@@ -35,6 +36,7 @@ export interface CollectionTypes {
   rateLimits: RateLimitDocument;
   loginThrottle: LoginThrottleDocument;
   scheduleGuards: ScheduleGuardDocument;
+  photos: PhotoDocument;
 }
 
 /** Typed access to a collection. Only repositories call this. */

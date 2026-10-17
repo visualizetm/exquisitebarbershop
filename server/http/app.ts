@@ -7,6 +7,7 @@ import { bookingRoutes } from './routes/bookings';
 import { healthRoutes } from './routes/health';
 import { internalRoutes } from './routes/internal';
 import { meRoutes } from './routes/me';
+import { photosRoutes } from './routes/photos';
 import { publicRoutes } from './routes/public';
 import type { RouteDefinition } from './types';
 
@@ -22,6 +23,7 @@ export const allRoutes: readonly RouteDefinition[] = [
   ...authRoutes,
   ...meRoutes,
   ...adminRoutes,
+  ...photosRoutes,
   ...internalRoutes,
 ];
 

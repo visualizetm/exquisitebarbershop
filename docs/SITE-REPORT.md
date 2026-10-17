@@ -48,16 +48,18 @@ Older components still in use until their page is restyled:
 ## Data sources and APIs
 
 Public: `GET /api/shop`, `/api/services`, `/api/staff`, `/api/staff/:slug`,
-`/api/availability`, `/api/availability/days`, `POST /api/bookings`,
-`/api/bookings/manage` (GET, cancel, reschedule). Staff and owner routes are
-listed in `docs/ARCHITECTURE.md` section 5.
+`/api/availability`, `/api/availability/days` (with per day counts),
+`/api/availability/next`, `/api/staff/:slug/openings`, `/api/gallery`,
+`POST /api/bookings`, `/api/bookings/manage` (GET, cancel, reschedule). Staff
+and owner routes, including photos, are listed in `docs/ARCHITECTURE.md`
+section 5. Photos are stored on Cloudflare R2 (local disk in development) and
+read through public URLs.
 
 Env var names (values never written here): MONGODB_URI, MONGODB_DB_NAME,
 APP_BASE_URL, MANAGE_LINK_SECRET, CRON_SECRET, EMAIL_PROVIDER, RESEND_API_KEY,
 EMAIL_FROM, SEED_OWNER_PASSWORD, SEED_OWNER_EMAIL, LOG_LEVEL,
-OUTBOX_AFTER_RESPONSE, MONGOMS_SYSTEM_BINARY. Milestone 2 adds STORAGE_DRIVER,
-R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET,
-R2_PUBLIC_BASE_URL.
+OUTBOX_AFTER_RESPONSE, MONGOMS_SYSTEM_BINARY, STORAGE_DRIVER, R2_ACCOUNT_ID,
+R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL.
 
 ## Forms
 
@@ -83,4 +85,4 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
 
 ## Last commit
 
-Milestone 1, see `docs/PROGRESS.md` for the hash and date.
+Milestone 2, see `docs/PROGRESS.md` for the hash and date.
