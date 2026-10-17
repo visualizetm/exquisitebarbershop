@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { servicesSeed, staffSeed, staffSeedId } from '../../seed/shop';
-import { servicesRepo, staffRepo, weeklyHoursRepo } from '../../server/repos';
+import { servicesRepo, staffRepo, usersRepo, weeklyHoursRepo } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
 import { NOW, useTestDb } from '../helpers/db';
 
@@ -15,6 +15,7 @@ describe('seed', () => {
       servicesCreated: servicesSeed.length,
       staffCreated: staffSeed.length,
       staffHoursCreated: staffSeed.length,
+      ownerLogin: 'skipped',
     });
     const second = await runSeed(db(), NOW);
     expect(second).toEqual({
@@ -23,6 +24,7 @@ describe('seed', () => {
       servicesCreated: 0,
       staffCreated: 0,
       staffHoursCreated: 0,
+      ownerLogin: 'skipped',
     });
     expect(await servicesRepo.listPublicServices()).toHaveLength(servicesSeed.length);
     expect(await staffRepo.listPublicStaff()).toHaveLength(6);
@@ -46,5 +48,20 @@ describe('seed', () => {
     await staffRepo.updateStaff(marcus, { name: 'Real Name' }, NOW);
     await runSeed(db(), NOW);
     expect((await staffRepo.findStaffById(marcus))?.name).toBe('Real Name');
+  });
+
+  it('creates the owner login once, linked to the owner chair, and refuses weak passwords', async () => {
+    await expect(runSeed(db(), NOW, { ownerPassword: 'password123456' })).rejects.toThrow(
+      /too weak/,
+    );
+    const first = await runSeed(db(), NOW, { ownerPassword: 'long-and-unusual-phrase-42' });
+    expect(first.ownerLogin).toBe('created');
+    const again = await runSeed(db(), NOW, { ownerPassword: 'another-unusual-phrase-77' });
+    expect(again.ownerLogin).toBe('exists');
+    const owner = await usersRepo.findOwnerUser();
+    expect(owner?.email).toBe('owner@exquisitebarberbeauty.com');
+    expect(owner?.staffId).toBe(staffSeedId('dontrise'));
+    expect(owner?.passwordHash.startsWith('$argon2id$')).toBe(true);
+    expect(owner?.mustChangePassword).toBe(false);
   });
 });

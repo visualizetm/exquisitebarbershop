@@ -80,3 +80,37 @@ export function nextDate(weekday: number, minDaysAhead = 3): string {
 export function slotAt(date: string, hhmm: string): string {
   return shopLocalToUtc(date, hhmm).toISOString();
 }
+
+/** Books through the public API and returns the created booking id and manage token. */
+export async function bookPublic(
+  baseUrl: string,
+  input: {
+    staff: string;
+    serviceIds: string[];
+    startAt: string;
+    email?: string | null;
+    name?: string;
+  },
+): Promise<{ id: string; referenceCode: string; token: string; staffId: string }> {
+  const res = await call(baseUrl, 'POST', '/api/bookings', {
+    headers: { 'idempotency-key': idemKey() },
+    body: {
+      serviceIds: input.serviceIds,
+      staff: input.staff,
+      startAt: input.startAt,
+      customer: { name: input.name ?? 'Test Customer', phone: phone(), email: input.email ?? null },
+    },
+  });
+  if (res.status !== 201)
+    throw new Error(`booking failed: ${res.status} ${JSON.stringify(res.body)}`);
+  const body = res.body as {
+    booking: { id: string; referenceCode: string; staff: { id: string } };
+    managePath: string;
+  };
+  return {
+    id: body.booking.id,
+    referenceCode: body.booking.referenceCode,
+    staffId: body.booking.staff.id,
+    token: new URL(body.managePath, 'http://x').searchParams.get('token') ?? '',
+  };
+}
