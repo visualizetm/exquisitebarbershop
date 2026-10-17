@@ -58,10 +58,18 @@ function assertCronSecret(req: IncomingMessage): void {
   }
 }
 
+const KNOWN_LEVELS: ReadonlySet<string> = new Set(['public', 'barber', 'owner', 'internal']);
+
+/** Deny by default: building a router with a route that has no valid auth level fails at startup. */
 export function createRouter(
   definitions: readonly RouteDefinition[],
   authenticate: Authenticator,
 ): Router {
+  for (const d of definitions) {
+    if (!KNOWN_LEVELS.has(d.auth)) {
+      throw new Error(`Route ${d.method} ${d.path} has no valid auth level`);
+    }
+  }
   const compiled: CompiledRoute[] = definitions.map((d) => ({
     ...d,
     segments: d.path.split('/').filter(Boolean),
@@ -112,15 +120,28 @@ export function createRouter(
         now: new Date(),
       };
 
-      if (route.auth === 'internal') {
-        assertCronSecret(req);
-      } else if (route.auth !== 'public') {
-        const principal = await authenticate(ctx);
-        if (!principal) throw new AppError('AUTH_REQUIRED', 'Please sign in');
-        if (route.auth === 'owner' && principal.role !== 'owner') {
-          throw new AppError('FORBIDDEN', 'Owner access is required');
+      switch (route.auth) {
+        case 'public':
+          break;
+        case 'internal':
+          assertCronSecret(req);
+          break;
+        case 'barber':
+        case 'owner': {
+          const principal = await authenticate(ctx);
+          if (!principal) throw new AppError('AUTH_REQUIRED', 'Please sign in');
+          if (principal.mustChangePassword && route.allowDuringPasswordChange !== true) {
+            throw new AppError('PASSWORD_CHANGE_REQUIRED', 'Please choose a new password first');
+          }
+          if (route.auth === 'owner' && principal.role !== 'owner') {
+            throw new AppError('FORBIDDEN', 'Owner access is required');
+          }
+          ctx.principal = principal;
+          break;
         }
-        ctx.principal = principal;
+        default:
+          // Unreachable for typed routes; a route cast past the type check is denied.
+          throw new AppError('FORBIDDEN', 'Not allowed');
       }
 
       const result = await route.handler(ctx);

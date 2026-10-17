@@ -24,10 +24,12 @@
     "db:indexes": "tsx scripts/indexes.ts",
     "db:seed": "tsx scripts/seed.ts",
     "test:e2e": "playwright test",
-    "e2e:server": "tsx scripts/e2e-server.ts"
+    "e2e:server": "tsx scripts/e2e-server.ts",
+    "user:reset": "tsx scripts/user-reset.ts"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.10",
+    "@node-rs/argon2": "^2.2.2",
     "@untitled-ui/icons-react": "^0.1.4",
     "@vercel/functions": "^3.10.1",
     "luxon": "^3.7.2",

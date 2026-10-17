@@ -7,10 +7,8 @@ import {
   rescheduleBookingRequestSchema,
   rescheduleBookingResponseSchema,
 } from '../../../shared/api/bookings';
-import { getEnv } from '../../env';
-import { runAfterResponse } from '../../lib/afterResponse';
 import { AppError } from '../../lib/errors';
-import { deliverOutboxIds } from '../../notifications/deliver';
+import { scheduleDelivery } from '../delivery';
 import {
   cancelViaToken,
   createBooking,
@@ -20,12 +18,6 @@ import {
 } from '../../services/bookingService';
 import { clientIp, headerValue, parseBody, parseQuery } from '../request';
 import type { RouteDefinition } from '../types';
-
-/** Emails go out right after the response unless tests asked to drive delivery by hand. */
-function scheduleDelivery(outboxIds: string[]): void {
-  if (outboxIds.length === 0 || getEnv().OUTBOX_AFTER_RESPONSE === 'off') return;
-  runAfterResponse('outbox.deliver', () => deliverOutboxIds(outboxIds));
-}
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 

@@ -1,0 +1,398 @@
+import type { ServerResponse } from 'node:http';
+import type { Actor } from '../../shared/schemas/timeBlock';
+import type { UserDocument } from '../../shared/schemas/user';
+import type { Principal } from '../http/types';
+import { AppError } from '../lib/errors';
+import { sha256Hex } from '../lib/ids';
+import {
+  auditLogRepo,
+  loginThrottleRepo,
+  rateLimitsRepo,
+  sessionsRepo,
+  staffRepo,
+  usersRepo,
+} from '../repos';
+import {
+  generateTemporaryPassword,
+  getDummyHash,
+  hashPassword,
+  needsRehash,
+  passwordProblems,
+  verifyPassword,
+} from './password';
+import { startSession } from './sessions';
+
+/** Per IP: 20 sign-in attempts per 15 minutes, any email. */
+export const LOGIN_IP_LIMIT = { limit: 20, windowMs: 15 * 60_000 };
+/** Per email, existing or not: 10 attempts per 15 minutes. */
+export const LOGIN_ACCOUNT_LIMIT = { limit: 10, windowMs: 15 * 60_000 };
+/** Five failures in a row lock the email; each lockout in a row lasts longer. */
+export const LOCKOUT_RULE = { threshold: 5, lockMinutes: [5, 15, 60, 240] } as const;
+/** Password changes per login: 10 per 15 minutes. */
+export const PASSWORD_CHANGE_LIMIT = { limit: 10, windowMs: 15 * 60_000 };
+
+const GENERIC_FAILURE = 'Email or password is incorrect';
+
+export interface RequestMeta {
+  ip: string;
+  userAgent: string | null;
+  requestId: string;
+  now: Date;
+}
+
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/** Throttle key for an email. Hashed so the throttle table holds no addresses. */
+export function emailKey(email: string): string {
+  return sha256Hex(`login:${normalizeEmail(email)}`);
+}
+
+function actorOf(principal: Principal): Actor {
+  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
+}
+
+const SYSTEM: Actor = { type: 'system', userId: null, staffId: null };
+
+async function auditLogin(
+  outcome: 'success' | 'failure',
+  input: { email: string; userId: string | null; reason: string | null },
+  meta: RequestMeta,
+): Promise<void> {
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: input.userId ? { type: 'system', userId: input.userId, staffId: null } : SYSTEM,
+      action: outcome === 'success' ? 'auth.login.success' : 'auth.login.failure',
+      entityType: 'user',
+      entityId: input.userId ?? 'unknown',
+      before: null,
+      after: null,
+      meta: { email: normalizeEmail(input.email).slice(0, 254), ip: meta.ip, reason: input.reason },
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+}
+
+/** A login may act only if it is active and, for barbers, linked to a live staff record. */
+async function loginIsUsable(user: UserDocument): Promise<boolean> {
+  if (!user.isActive) return false;
+  if (user.role === 'owner') return true;
+  if (!user.staffId) return false;
+  const staff = await staffRepo.findStaffById(user.staffId);
+  return staff !== null && staff.deletedAt === null;
+}
+
+export interface LoginResult {
+  user: UserDocument;
+  sessionId: string;
+}
+
+/**
+ * Signs in. Wrong passwords, unknown emails, disabled logins and unlinked
+ * barbers all get the same INVALID_CREDENTIALS after the same argon2 work, and
+ * the throttle is keyed by email whether or not an account exists, so neither
+ * the message, the timing nor the lockout reveals which emails have accounts.
+ * The password is never logged.
+ */
+export async function login(
+  res: ServerResponse,
+  input: { email: string; password: string },
+  meta: RequestMeta,
+): Promise<LoginResult> {
+  const email = normalizeEmail(input.email);
+  const ipHit = await rateLimitsRepo.hitRateLimit(`login:ip:${meta.ip}`, LOGIN_IP_LIMIT, meta.now);
+  if (!ipHit.allowed) {
+    await auditLogin('failure', { email, userId: null, reason: 'ipRateLimited' }, meta);
+    throw new AppError('RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.', {
+      retryAfterSeconds: ipHit.retryAfterSeconds,
+    });
+  }
+  const key = emailKey(email);
+  const accountHit = await rateLimitsRepo.hitRateLimit(
+    `login:account:${key}`,
+    LOGIN_ACCOUNT_LIMIT,
+    meta.now,
+  );
+  if (!accountHit.allowed) {
+    await auditLogin('failure', { email, userId: null, reason: 'accountRateLimited' }, meta);
+    throw new AppError('RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.', {
+      retryAfterSeconds: accountHit.retryAfterSeconds,
+    });
+  }
+  const throttle = await loginThrottleRepo.getLoginThrottle(key);
+  if (throttle?.lockedUntil && throttle.lockedUntil.getTime() > meta.now.getTime()) {
+    await auditLogin('failure', { email, userId: null, reason: 'locked' }, meta);
+    throw new AppError(
+      'ACCOUNT_LOCKED',
+      'Too many failed attempts. Please wait before trying again.',
+      {
+        retryAfterSeconds: Math.ceil((throttle.lockedUntil.getTime() - meta.now.getTime()) / 1000),
+      },
+    );
+  }
+
+  const user = await usersRepo.findUserByEmail(email);
+  const passwordOk = await verifyPassword(
+    user?.passwordHash ?? (await getDummyHash()),
+    input.password,
+  );
+  const usable = user !== null && passwordOk && (await loginIsUsable(user));
+  if (!user || !usable) {
+    await loginThrottleRepo.recordLoginFailure(key, LOCKOUT_RULE, meta.now);
+    const reason = !user ? 'unknownEmail' : !passwordOk ? 'badPassword' : 'disabled';
+    await auditLogin('failure', { email, userId: user?._id ?? null, reason }, meta);
+    throw new AppError('INVALID_CREDENTIALS', GENERIC_FAILURE);
+  }
+
+  await loginThrottleRepo.clearLoginThrottle(key);
+  await usersRepo.recordSuccessfulLogin(user._id, meta.now);
+  if (needsRehash(user.passwordHash)) {
+    await usersRepo.setUserPasswordHash(user._id, await hashPassword(input.password), meta.now, {
+      mustChangePassword: user.mustChangePassword,
+    });
+  }
+  const session = await startSession(res, user, {
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+    now: meta.now,
+  });
+  await auditLogin('success', { email, userId: user._id, reason: null }, meta);
+  return { user, sessionId: session._id };
+}
+
+function weakPasswordError(problems: string[], path: string): AppError {
+  return new AppError('VALIDATION_ERROR', 'Please choose a stronger password', {
+    details: problems.map((message) => ({ path, message })),
+  });
+}
+
+/**
+ * Changes the caller's own password. Requires the current one, ends every other
+ * session of this login and clears the temporary-password flag.
+ */
+export async function changeOwnPassword(
+  principal: Principal,
+  input: { currentPassword: string; newPassword: string },
+  meta: RequestMeta,
+): Promise<void> {
+  const hit = await rateLimitsRepo.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta.now,
+  );
+  if (!hit.allowed) {
+    throw new AppError('RATE_LIMITED', 'Too many attempts. Please wait and try again.', {
+      retryAfterSeconds: hit.retryAfterSeconds,
+    });
+  }
+  const user = await usersRepo.findUserById(principal.userId);
+  if (!user) throw new AppError('AUTH_REQUIRED', 'Please sign in');
+  if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    throw new AppError('INVALID_CREDENTIALS', 'Your current password is incorrect');
+  }
+  if (input.newPassword === input.currentPassword) {
+    throw weakPasswordError(['Choose a password different from the current one.'], 'newPassword');
+  }
+  const problems = passwordProblems(input.newPassword, { email: user.email });
+  if (problems.length > 0) throw weakPasswordError(problems, 'newPassword');
+  await usersRepo.setUserPasswordHash(user._id, await hashPassword(input.newPassword), meta.now);
+  const ended = await sessionsRepo.revokeOtherSessions(user._id, principal.sessionId, meta.now);
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: 'user.password.change',
+      entityType: 'user',
+      entityId: user._id,
+      before: null,
+      after: null,
+      meta: { otherSessionsEnded: ended, wasTemporary: user.mustChangePassword },
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+}
+
+export interface IssuedPassword {
+  user: UserDocument;
+  /** Shown once to the owner, never stored. */
+  temporaryPassword: string;
+}
+
+/** Owner creates a barber login for a staff record, with a temporary password. */
+export async function createStaffLogin(
+  principal: Principal,
+  input: { email: string; staffId: string },
+  meta: RequestMeta,
+): Promise<IssuedPassword> {
+  const staff = await staffRepo.findStaffById(input.staffId);
+  if (!staff || staff.deletedAt) throw new AppError('NOT_FOUND', 'Staff member was not found');
+  if (await usersRepo.findUserByStaffId(staff._id)) {
+    throw new AppError('CONFLICT', `${staff.name} already has a login`);
+  }
+  const temporaryPassword = generateTemporaryPassword();
+  const user = await usersRepo.insertUser(
+    {
+      email: normalizeEmail(input.email),
+      passwordHash: await hashPassword(temporaryPassword),
+      role: 'barber',
+      staffId: staff._id,
+      mustChangePassword: true,
+    },
+    meta.now,
+  );
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: 'user.create',
+      entityType: 'user',
+      entityId: user._id,
+      before: null,
+      after: { email: user.email, role: user.role, staffId: user.staffId },
+      meta: null,
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+  return { user, temporaryPassword };
+}
+
+async function requireOtherUser(principal: Principal, userId: string): Promise<UserDocument> {
+  const user = await usersRepo.findUserById(userId);
+  if (!user) throw new AppError('NOT_FOUND', 'Login was not found');
+  if (user._id === principal.userId) {
+    throw new AppError('BAD_REQUEST', 'Use your own account page to change your own login');
+  }
+  return user;
+}
+
+/** Owner resets another login: new temporary password, every session ended, lockout cleared. */
+export async function resetLoginPassword(
+  principal: Principal,
+  userId: string,
+  meta: RequestMeta,
+): Promise<IssuedPassword> {
+  const user = await requireOtherUser(principal, userId);
+  const temporaryPassword = generateTemporaryPassword();
+  await usersRepo.setUserPasswordHash(user._id, await hashPassword(temporaryPassword), meta.now, {
+    mustChangePassword: true,
+  });
+  await sessionsRepo.revokeAllSessionsForUser(user._id, meta.now);
+  await loginThrottleRepo.clearLoginThrottle(emailKey(user.email));
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: 'user.password.reset',
+      entityType: 'user',
+      entityId: user._id,
+      before: null,
+      after: null,
+      meta: null,
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+  const updated = await usersRepo.findUserById(user._id);
+  return { user: updated ?? user, temporaryPassword };
+}
+
+/** Owner disables or re-enables another login. Disabling ends its sessions at once. */
+export async function setLoginActive(
+  principal: Principal,
+  userId: string,
+  isActive: boolean,
+  meta: RequestMeta,
+): Promise<UserDocument> {
+  const user = await requireOtherUser(principal, userId);
+  await usersRepo.setUserActive(user._id, isActive, meta.now);
+  if (!isActive) await sessionsRepo.revokeAllSessionsForUser(user._id, meta.now);
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: isActive ? 'user.enable' : 'user.disable',
+      entityType: 'user',
+      entityId: user._id,
+      before: { isActive: user.isActive },
+      after: { isActive },
+      meta: null,
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+  return (await usersRepo.findUserById(user._id)) ?? user;
+}
+
+/**
+ * Creates the owner login during seeding, once. Refuses a weak password rather
+ * than creating an account that is easy to take over.
+ */
+export async function ensureOwnerLogin(
+  input: { email: string; password: string; staffId: string | null },
+  now: Date,
+): Promise<{ created: boolean }> {
+  if (await usersRepo.findOwnerUser()) return { created: false };
+  const problems = passwordProblems(input.password, { email: input.email });
+  if (problems.length > 0) {
+    throw new Error(`SEED_OWNER_PASSWORD is too weak: ${problems.join(' ')}`);
+  }
+  const user = await usersRepo.insertUser(
+    {
+      email: normalizeEmail(input.email),
+      passwordHash: await hashPassword(input.password),
+      role: 'owner',
+      staffId: input.staffId,
+    },
+    now,
+  );
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: SYSTEM,
+      action: 'user.create',
+      entityType: 'user',
+      entityId: user._id,
+      before: null,
+      after: { email: user.email, role: user.role },
+      meta: { source: 'seed' },
+      requestId: null,
+    },
+    now,
+  );
+  return { created: true };
+}
+
+/**
+ * Operator reset from the server shell (npm run user:reset). Sets a new password,
+ * temporary unless one is supplied, ends every session and clears the lockout.
+ */
+export async function operatorResetPassword(
+  input: { email: string; password: string | null },
+  now: Date,
+): Promise<{ user: UserDocument; password: string; temporary: boolean }> {
+  const user = await usersRepo.findUserByEmail(input.email);
+  if (!user) throw new Error(`No login exists for ${normalizeEmail(input.email)}`);
+  const temporary = input.password === null;
+  const password = input.password ?? generateTemporaryPassword();
+  const problems = passwordProblems(password, { email: user.email });
+  if (problems.length > 0) throw new Error(`Password is too weak: ${problems.join(' ')}`);
+  await usersRepo.setUserPasswordHash(user._id, await hashPassword(password), now, {
+    mustChangePassword: temporary,
+  });
+  await usersRepo.setUserActive(user._id, true, now);
+  await sessionsRepo.revokeAllSessionsForUser(user._id, now);
+  await loginThrottleRepo.clearLoginThrottle(emailKey(user.email));
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: SYSTEM,
+      action: 'user.password.reset',
+      entityType: 'user',
+      entityId: user._id,
+      before: null,
+      after: null,
+      meta: { source: 'cli', temporary },
+      requestId: null,
+    },
+    now,
+  );
+  return { user, password, temporary };
+}
