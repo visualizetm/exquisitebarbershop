@@ -12,3 +12,5 @@ export * as auditLogRepo from './auditLogRepo';
 export * as emailOutboxRepo from './emailOutboxRepo';
 export * as idempotencyKeysRepo from './idempotencyKeysRepo';
 export * as rateLimitsRepo from './rateLimitsRepo';
+export * as loginThrottleRepo from './loginThrottleRepo';
+export * as scheduleGuardsRepo from './scheduleGuardsRepo';

@@ -14,6 +14,8 @@ export const userDocumentSchema = z
     /** Barber logins point at their staff record so they only see their own schedule. */
     staffId: idSchema.nullable(),
     isActive: z.boolean(),
+    /** Set for temporary passwords; every route except password change is refused until cleared. */
+    mustChangePassword: z.boolean(),
     failedLoginCount: z.int().min(0),
     lockedUntil: z.date().nullable(),
     lastLoginAt: z.date().nullable(),
@@ -29,6 +31,7 @@ export const publicUserSchema = userDocumentSchema.pick({
   role: true,
   staffId: true,
   isActive: true,
+  mustChangePassword: true,
   lastLoginAt: true,
 });
 export type PublicUser = z.infer<typeof publicUserSchema>;

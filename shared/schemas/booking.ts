@@ -15,7 +15,7 @@ import { actorTypeSchema } from './timeBlock';
 export const bookingStatusSchema = z.enum(['confirmed', 'cancelled', 'completed', 'noShow']);
 export type BookingStatus = z.infer<typeof bookingStatusSchema>;
 
-export const bookingSourceSchema = z.enum(['online', 'walkIn', 'owner', 'barber']);
+export const bookingSourceSchema = z.enum(['online', 'walkIn', 'owner', 'barber', 'phone']);
 export type BookingSource = z.infer<typeof bookingSourceSchema>;
 
 /** Snapshot of a service at booking time, so later price edits never rewrite history. */
@@ -64,6 +64,8 @@ export const bookingDocumentSchema = z
     rescheduledFromId: idSchema.nullable(),
     /** Bumped on reschedule or cancel; manage links embed it so old links stop working. */
     manageTokenVersion: z.int().min(1),
+    /** When the owner first opened it. Online bookings without it show as new. */
+    ownerSeenAt: z.date().nullable().optional(),
   })
   .extend(timestampsSchema.shape)
   .refine((v) => v.endAt.getTime() > v.startAt.getTime(), {

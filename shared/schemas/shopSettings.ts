@@ -62,6 +62,14 @@ export const notificationSettingsSchema = z.object({
   customerSms: z.boolean().default(false),
 });
 
+/** What barber logins may do on their own. */
+export const staffPermissionsSchema = z.object({
+  /** Barbers may block their own time (lunch, time off). Off by default. */
+  barbersCanBlockTime: z.boolean().default(false),
+});
+export type StaffPermissions = z.infer<typeof staffPermissionsSchema>;
+export const DEFAULT_STAFF_PERMISSIONS: StaffPermissions = { barbersCanBlockTime: false };
+
 /** Feature flags for work that is designed but not built. All default off. */
 export const featureFlagsSchema = z.object({
   giftCards: z.boolean().default(false),
@@ -83,6 +91,7 @@ export const shopSettingsDocumentSchema = z
     booking: bookingSettingsSchema,
     notifications: notificationSettingsSchema,
     features: featureFlagsSchema,
+    permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
   })
   .extend(timestampsSchema.shape);
 export type ShopSettingsDocument = z.infer<typeof shopSettingsDocumentSchema>;

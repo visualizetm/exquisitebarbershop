@@ -15,6 +15,8 @@ export const COLLECTIONS = {
   emailOutbox: 'emailOutbox',
   idempotencyKeys: 'idempotencyKeys',
   rateLimits: 'rateLimits',
+  loginThrottle: 'loginThrottle',
+  scheduleGuards: 'scheduleGuards',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -217,6 +219,20 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { expiresAt: 1 },
     options: { name: 'ttl_expiresAt', expireAfterSeconds: 0 },
     reason: 'Old windows disappear on their own.',
+  },
+  // loginThrottle
+  {
+    collection: 'loginThrottle',
+    keys: { expiresAt: 1 },
+    options: { name: 'ttl_expiresAt', expireAfterSeconds: 0 },
+    reason: 'Failure history is forgotten a day after the last failed sign-in.',
+  },
+  // bookings (prompt 3)
+  {
+    collection: 'bookings',
+    keys: { status: 1, source: 1, ownerSeenAt: 1, startAt: 1 },
+    options: { name: 'unseen_new' },
+    reason: 'Dashboard count of online bookings the owner has not opened yet.',
   },
 ];
 

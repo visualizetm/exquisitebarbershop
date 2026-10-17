@@ -76,3 +76,23 @@ export async function deleteClosure(id: string, options?: RepoOptions): Promise<
   const result = await col.deleteOne({ _id: id }, sessionOf(options));
   return result.deletedCount === 1;
 }
+
+export async function findClosureById(
+  id: string,
+  options?: RepoOptions,
+): Promise<ClosureDocument | null> {
+  const col = await collection('closures');
+  return col.findOne({ _id: id }, sessionOf(options));
+}
+
+/** Every exception from a date onward. */
+export async function listClosuresFrom(
+  fromDate: string,
+  options?: RepoOptions,
+): Promise<ClosureDocument[]> {
+  const col = await collection('closures');
+  return col
+    .find({ date: { $gte: fromDate } }, sessionOf(options))
+    .sort({ date: 1 })
+    .toArray();
+}

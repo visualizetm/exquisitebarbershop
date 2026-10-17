@@ -9,6 +9,18 @@ export interface UserInput {
   passwordHash: string;
   role: UserDocument['role'];
   staffId: string | null;
+  /** True for temporary passwords handed out by the owner. */
+  mustChangePassword?: boolean;
+}
+
+/** Fills fields added after a document was written, so older records read safely. */
+function fill(doc: UserDocument): UserDocument {
+  const stored = (doc as Partial<UserDocument>).mustChangePassword;
+  return { ...doc, mustChangePassword: stored ?? false };
+}
+
+function withDefaults(doc: UserDocument | null): UserDocument | null {
+  return doc ? fill(doc) : null;
 }
 
 export async function insertUser(
@@ -18,8 +30,12 @@ export async function insertUser(
 ): Promise<UserDocument> {
   const doc = userDocumentSchema.parse({
     _id: options?.id ?? newId(),
-    ...input,
+    email: input.email,
+    passwordHash: input.passwordHash,
+    role: input.role,
+    staffId: input.staffId,
     isActive: true,
+    mustChangePassword: input.mustChangePassword ?? false,
     failedLoginCount: 0,
     lockedUntil: null,
     lastLoginAt: null,
@@ -46,7 +62,7 @@ export async function findUserByEmail(
   options?: RepoOptions,
 ): Promise<UserDocument | null> {
   const col = await collection('users');
-  return col.findOne({ email: email.trim().toLowerCase() }, sessionOf(options));
+  return withDefaults(await col.findOne({ email: email.trim().toLowerCase() }, sessionOf(options)));
 }
 
 export async function findUserById(
@@ -54,38 +70,26 @@ export async function findUserById(
   options?: RepoOptions,
 ): Promise<UserDocument | null> {
   const col = await collection('users');
-  return col.findOne({ _id: id }, sessionOf(options));
+  return withDefaults(await col.findOne({ _id: id }, sessionOf(options)));
+}
+
+export async function findUserByStaffId(
+  staffId: string,
+  options?: RepoOptions,
+): Promise<UserDocument | null> {
+  const col = await collection('users');
+  return withDefaults(await col.findOne({ staffId }, sessionOf(options)));
+}
+
+export async function findOwnerUser(options?: RepoOptions): Promise<UserDocument | null> {
+  const col = await collection('users');
+  return withDefaults(await col.findOne({ role: 'owner' }, sessionOf(options)));
 }
 
 export async function listUsers(options?: RepoOptions): Promise<UserDocument[]> {
   const col = await collection('users');
-  return col.find({}, sessionOf(options)).sort({ role: 1, email: 1 }).toArray();
-}
-
-/** Increments the failure counter and locks the account when the threshold is hit. */
-export async function recordFailedLogin(
-  id: string,
-  rule: { maxFailures: number; lockMinutes: number },
-  now: Date,
-  options?: RepoOptions,
-): Promise<UserDocument> {
-  const col = await collection('users');
-  const user = await col.findOneAndUpdate(
-    { _id: id },
-    { $inc: { failedLoginCount: 1 }, $set: { updatedAt: now } },
-    { returnDocument: 'after', ...sessionOf(options) },
-  );
-  if (!user) throw new AppError('NOT_FOUND', 'User was not found');
-  if (user.failedLoginCount >= rule.maxFailures) {
-    const lockedUntil = new Date(now.getTime() + rule.lockMinutes * 60_000);
-    const locked = await col.findOneAndUpdate(
-      { _id: id },
-      { $set: { lockedUntil, failedLoginCount: 0, updatedAt: now } },
-      { returnDocument: 'after', ...sessionOf(options) },
-    );
-    return locked ?? user;
-  }
-  return user;
+  const docs = await col.find({}, sessionOf(options)).sort({ role: 1, email: 1 }).toArray();
+  return docs.map(fill);
 }
 
 export async function recordSuccessfulLogin(
@@ -101,11 +105,12 @@ export async function recordSuccessfulLogin(
   );
 }
 
+/** Replaces the password hash. `mustChangePassword` marks a temporary password. */
 export async function setUserPasswordHash(
   id: string,
   passwordHash: string,
   now: Date,
-  options?: RepoOptions,
+  options?: RepoOptions & { mustChangePassword?: boolean },
 ): Promise<void> {
   const col = await collection('users');
   const result = await col.updateOne(
@@ -114,6 +119,7 @@ export async function setUserPasswordHash(
       $set: {
         passwordHash,
         passwordChangedAt: now,
+        mustChangePassword: options?.mustChangePassword ?? false,
         failedLoginCount: 0,
         lockedUntil: null,
         updatedAt: now,

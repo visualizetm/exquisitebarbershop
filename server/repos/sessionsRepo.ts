@@ -67,6 +67,22 @@ export async function revokeSession(
   return result.modifiedCount === 1;
 }
 
+/** Ends every live session of a user except one (the one changing the password). */
+export async function revokeOtherSessions(
+  userId: string,
+  keepSessionId: string,
+  now: Date,
+  options?: RepoOptions,
+): Promise<number> {
+  const col = await collection('sessions');
+  const result = await col.updateMany(
+    { userId, revokedAt: null, _id: { $ne: keepSessionId } },
+    { $set: { revokedAt: now } },
+    sessionOf(options),
+  );
+  return result.modifiedCount;
+}
+
 export async function revokeAllSessionsForUser(
   userId: string,
   now: Date,

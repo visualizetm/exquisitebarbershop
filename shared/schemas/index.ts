@@ -13,3 +13,5 @@ export * from './auditLog';
 export * from './emailOutbox';
 export * from './idempotencyKey';
 export * from './rateLimit';
+export * from './loginThrottle';
+export * from './scheduleGuard';

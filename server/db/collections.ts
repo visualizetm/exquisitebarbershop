@@ -4,6 +4,8 @@ import type { BookingDocument } from '../../shared/schemas/booking';
 import type { ClosureDocument } from '../../shared/schemas/closure';
 import type { EmailOutboxDocument } from '../../shared/schemas/emailOutbox';
 import type { IdempotencyKeyDocument } from '../../shared/schemas/idempotencyKey';
+import type { LoginThrottleDocument } from '../../shared/schemas/loginThrottle';
+import type { ScheduleGuardDocument } from '../../shared/schemas/scheduleGuard';
 import type { RateLimitDocument } from '../../shared/schemas/rateLimit';
 import type { ServiceDocument } from '../../shared/schemas/service';
 import type { SessionDocument } from '../../shared/schemas/session';
@@ -31,6 +33,8 @@ export interface CollectionTypes {
   emailOutbox: EmailOutboxDocument;
   idempotencyKeys: IdempotencyKeyDocument;
   rateLimits: RateLimitDocument;
+  loginThrottle: LoginThrottleDocument;
+  scheduleGuards: ScheduleGuardDocument;
 }
 
 /** Typed access to a collection. Only repositories call this. */
