@@ -8,6 +8,11 @@ How to run the site day to day. Companion to `docs/DEPLOY.md`.
   the photo bucket under `_backups/YYYY-MM-DD/` as gzipped NDJSON files plus a
   `manifest.json`. Sessions, rate limit windows and idempotency keys are not
   included. Thirty days are kept.
+- While STORAGE_DRIVER is `none` (the launch without R2, DEPLOY.md section 2)
+  there is no bucket, so the daily job sends the outbox and logs that the photo
+  purge, the upload sweep and the backup were skipped. Atlas keeps its own
+  snapshots on paid tiers; on the free tier there is no backup until R2 is on
+  (DEPLOY.md section 10). The doctor shows Backups as Check until then.
 - To check: Cloudflare R2, the bucket, open `_backups/`; there should be a folder
   for yesterday with one file per collection.
 - To restore into a scratch database from a computer with the repo:
@@ -34,6 +39,9 @@ Change the value in Vercel, redeploy, then:
 - R2 API token: create a new token in Cloudflare, set both R2 values, redeploy,
   delete the old token. Photos keep working (they are read through the public
   address, not the token).
+- STORAGE_DRIVER back to `none` (with STORAGE_DISABLED_ACK=true): photos
+  disappear from the pages and the Photos screen until it is `r2` again; the
+  objects and records stay.
 - MONGODB_URI (database user password): change the password in Atlas Database
   Access, set the new string, redeploy. Requests fail for the seconds between.
 

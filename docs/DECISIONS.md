@@ -281,3 +281,72 @@ win.
   server are recorded as a dev artifact (lazy chunk CSS injected after the
   first paint there) and not fixed: the production build loads the chunk's
   stylesheet first and the sign-in page measures 0 there.
+
+## Prompt 7: live without R2
+
+- D7-01 The branch is `claude/p7-live-without-r2`, started from `main` after
+  PR 1 merged, as the brief asks for a new branch and a new pull request.
+- D7-02 `STORAGE_DRIVER=none` is a third driver value, not a missing R2
+  variable treated leniently: the gate stays strict (`local` is still refused
+  on Vercel), and production needs STORAGE_DISABLED_ACK=true, the same shape
+  as EMAIL_DISABLED_ACK. Previews take `none` without an acknowledgement, as
+  they take `log` email. Nothing else the gate blocks is optional: the
+  database name, the https address and CRON_SECRET stay required.
+- D7-03 Without storage every photo read returns nothing (hero null, no
+  portraits, empty gallery, empty admin list) rather than records with no
+  usable URL, because there is no public address to serve a file from. The
+  records and objects stay, so switching R2 back on shows them again.
+- D7-04 Upload routes answer 503 STORAGE_DISABLED from the service
+  (`assertStorageEnabled` before any database write), not from the router, so
+  the authorization matrix is unchanged: the routes still exist and still
+  need a login.
+- D7-05 The Photos screen learns about storage from `features.photos` on
+  `/api/auth/me` rather than a new route or a public flag, because it is a
+  deployment capability the signed-in dashboard already asks about itself.
+- D7-06 The daily job skips the purge, the sweep, the backup and the prune as
+  one block and reports `skipped: [...]` plus a warn log line, instead of
+  letting each step fail with STORAGE_DISABLED: Vercel Cron only sees the
+  status code, and the log line is what a person reads.
+- D7-07 The doctor gets a Backups row (pass with storage, warn without) so the
+  three things R2 turns on are named side by side with the one fix sentence.
+- D7-08 `/api/health` answers 503 with `{ ok: false, status: "config",
+missing: [names] }` while the gate refuses; `db` is left out because nothing
+  is tried. To make that work with a missing MONGODB_URI, `describeEnv` and
+  `getPartialEnv` read the environment without throwing, and the secret check,
+  the setup status, the doctor and `currentEnvironment` use them. `getEnv`
+  keeps throwing for everything else.
+- D7-09 `/setup` no longer asks for `/api/shop` at all (the layout passes a null
+  path on that route), which is simpler than special-casing the down state,
+  and a missing shop settings document now answers 503 CONFIG_ERROR instead of
+  500, since it is the same "not set up yet" condition.
+- D7-10 Nav logo: two marks in the DOM with a width-based wrapper (wordmark at
+  40px tall from 1024px, stacked at 48px below), instead of one wordmark sized
+  for phones. The wrappers carry the display rule so the theme swap inside
+  `Mark` keeps working; a class on the images themselves lost to the theme
+  rule's specificity (seen in the first dark capture). The admin side nav uses
+  the stacked mark. The active nav underline was fixed on the way: the rule
+  targeted the anchor while the state lives on the span.
+- D7-11 Route-change focus: a hook in both layouts focuses the page H1 one tick
+  after the path changes, skips the first load (nothing is focused, so no
+  ring), and steps aside when the page already placed focus inside main (the
+  Book step headings). Headings with tabindex -1 never draw an outline; every
+  control keeps `:focus-visible`. The Book step heading showed a ring on first
+  paint before this, as the only programmatic focus before any interaction.
+- D7-12 The sign-in page no longer probes `/api/auth/me` on a browser that
+  never signed in: a localStorage hint set after a sign-in gates the probe,
+  and a 401 or sign-out clears it. The known "two 401s in the console" gap is
+  gone and the production-like run can assert zero console errors.
+- D7-13 The production-like run is its own Playwright config and server script
+  (`npm run test:e2e:prod`): it builds with vite, serves `dist` over https on
+  127.0.0.1 with a self-signed certificate from openssl, applies the headers
+  from vercel.json, sets exactly the DEPLOY.md variable list with NODE_ENV and
+  VERCEL_ENV production, and spawns a twin on the next port without
+  MONGODB_URI. https is needed because APP_BASE_URL must be https in production
+  and the Origin check compares against it. `npm run test:e2e` runs the dev
+  suite and then this one; CI keeps running Vitest only.
+- D7-14 Short admin pages on phones sat below the fold: the admin grid gave its
+  one `1fr` row to the empty header. Rows are now `auto 1fr` below 1024px.
+  Found in the p7 captures, fixed as a small safe change.
+- D7-15 The combined `docs/screens/p7/montage.png` is the four per-width
+  montages stacked at half size, so it stays under the size of the rest of the
+  folder.

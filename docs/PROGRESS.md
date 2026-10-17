@@ -213,3 +213,27 @@ commit, and what is still open.
 - `docs/OWNER-GUIDE.md` and `.pdf`, `docs/BARBER-GUIDE.md` with phone
   screenshots in `docs/guide/`; the living docs; the pull request;
   `docs/reports/06-final.md`.
+
+## Prompt 7
+
+### Live without R2, visible failures, three UI fixes, a production-like run
+
+- Shipped: STORAGE_DRIVER=none with STORAGE_DISABLED_ACK in production (upload
+  routes answer 503 STORAGE_DISABLED, every photo read is empty so the pages
+  show their placeholders, the Photos screen shows one empty state, the daily
+  job skips the storage steps and says so, the doctor warns with the R2 fix);
+  `/api/health` answers `{ ok: false, missing: [...] }` while the gate refuses
+  to serve, and does so even when MONGODB_URI itself is missing; `/setup` loads
+  in that state; the nav shows the wordmark from 1024px and the stacked mark
+  below, the admin side nav the stacked mark; the API-down body reads "Call the
+  shop and we'll get you in."; route changes focus the page H1 without a ring;
+  `npm run test:e2e:prod` builds and serves the production bundle over https
+  with the Vercel headers and the launch variable set, plus a twin without
+  MONGODB_URI; `docs/screens/p7/` with one combined montage; DEPLOY.md with the
+  no-R2 table, the order of clicks and the R2-later section.
+- Also fixed on the way: a missing shop settings document answered 500 (now the
+  same 503 CONFIG_ERROR as the gate); short admin pages on phones sat below the
+  fold; the active nav underline never showed; the sign-in page probed the
+  session without a cookie and logged a 401.
+- Open: Rob sets the variables, redeploys, runs /setup, removes the setup
+  variables and redeploys; R2 and Resend later.

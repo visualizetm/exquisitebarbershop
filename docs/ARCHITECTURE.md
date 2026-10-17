@@ -529,7 +529,7 @@ INTERNAL_ERROR 500, NOT_IMPLEMENTED 501, DATABASE_UNAVAILABLE 503.
 
 | Method    | Path                            | Auth                                                                     | Request                                                                                                               | Response and errors                                                                                                                                                                                                                                                                                       |
 | --------- | ------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET       | /api/health                     | public                                                                   | none                                                                                                                  | `healthResponseSchema` (200 ok, 503 degraded)                                                                                                                                                                                                                                                             |
+| GET       | /api/health                     | public                                                                   | none                                                                                                                  | `healthResponseSchema` (200 ok; 503 degraded; 503 config with `missing` variable names)                                                                                                                                                                                                                   |
 | GET       | /api/shop                       | public                                                                   | none                                                                                                                  | `publicShopSchema`, cached 60s                                                                                                                                                                                                                                                                            |
 | GET       | /api/services                   | public                                                                   | none                                                                                                                  | `{ services: PublicService[] }`, cached 60s                                                                                                                                                                                                                                                               |
 | GET       | /api/staff                      | public                                                                   | none                                                                                                                  | `{ staff: PublicStaff[] }`, cached 60s                                                                                                                                                                                                                                                                    |
@@ -808,7 +808,14 @@ STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,
 presigned PUT URLs valid for five minutes, public reads through
 R2_PUBLIC_BASE_URL) and `local` (files under `.data/uploads`, a signed PUT URL
 and public reads at `/uploads/<key>` served by `serveLocalUploads` in the dev
-server; Vite proxies `/uploads` to the API).
+server; Vite proxies `/uploads` to the API). A third value, `none`, runs the
+site without storage (prompt 7): `storageEnabled()` is false, upload-url and
+confirm answer 503 STORAGE_DISABLED, every photo read returns nothing (the
+pages show their placeholders), `/api/auth/me` carries
+`features.photos: false` so the Photos screen shows one empty state, the daily
+job skips the purge, the sweep and the backup, and the doctor warns for Photo
+storage, Public photo URL and Backups. Production accepts `none` only with
+STORAGE_DISABLED_ACK=true, the same shape as EMAIL_DISABLED_ACK.
 
 Upload flow
 
@@ -956,7 +963,8 @@ Environments
 | SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time                                         |
 | SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email                                    |
 | CRON_SECRET                                                                          | later           | bearer token for internal routes                                         |
-| STORAGE_DRIVER                                                                       | now             | local or r2                                                              |
+| STORAGE_DRIVER                                                                       | now             | local, r2 or none (no photos and no backups until R2 exists)             |
+| STORAGE_DISABLED_ACK                                                                 | production      | "true" allows STORAGE_DRIVER=none in production, on purpose              |
 | R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                                              |
 | R2_KEY_PREFIX                                                                        | preview         | folder for every object key, e.g. preview/                               |
 | BOOTSTRAP_SECRET                                                                     | until setup ran | enables POST /api/internal/bootstrap and /setup; remove afterwards       |
