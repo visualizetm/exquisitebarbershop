@@ -178,7 +178,9 @@ describe('maintenance mode', () => {
     const services = await call(server.baseUrl, 'GET', '/api/services');
     expect(services.status).toBe(503);
     expect(apiErrorSchema.parse(services.body).error.code).toBe('MAINTENANCE');
-    expect((await call(server.baseUrl, 'GET', '/api/shop')).status).toBe(200);
+    const shop = await call(server.baseUrl, 'GET', '/api/shop');
+    expect(shop.status).toBe(200);
+    expect(shop.body.maintenance).toBe(true);
     expect((await call(server.baseUrl, 'GET', '/api/health')).status).toBe(200);
     expect((await call(server.baseUrl, 'GET', '/api/admin/today')).status).toBe(401);
     expect((await call(server.baseUrl, 'POST', '/api/auth/login', { body: {} })).status).toBe(400);

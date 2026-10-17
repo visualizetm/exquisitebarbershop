@@ -90,6 +90,7 @@ export const publicRoutes: RouteDefinition[] = [
           cancelCutoffMinutes: settings.booking.cancelCutoffMinutes,
         },
         heroPhoto: hero,
+        maintenance: getEnv().MAINTENANCE_MODE === 'true',
       });
       return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
     },

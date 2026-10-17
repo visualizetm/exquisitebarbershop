@@ -160,3 +160,16 @@ commit, and what is still open.
   production deployment with missing settings, bootstrap once and forced, 404
   while off, maintenance mode on the API, the setup page end to end; the
   authorization matrix is 75 routes by 4 roles.
+
+### Milestone 5: backups, the daily cron, logs, maintenance
+
+- Shipped: `runBackup` and `pruneBackups` (gzipped canonical EJSON per business
+  collection under `_backups/YYYY-MM-DD/`, 30 days kept), `npm run restore`
+  into another database (live name refused without `--force`), the combined
+  `/api/internal/cron/daily` route wired in vercel.json with a 60 second
+  function limit, PII scrubbing in the logger, the `SiteDown` state for an
+  unreachable API and for MAINTENANCE_MODE with the shop phone and a tel button.
+- Tests: backup and restore round trip on the in-memory replica set (exact
+  documents, Dates intact), pruning, the daily route, PII masking, the
+  maintenance flag on `/api/shop`.
+- Screens: `docs/screens/p5-m5/` (the API-down and maintenance states at 390).

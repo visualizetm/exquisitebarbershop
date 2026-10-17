@@ -27,6 +27,8 @@ export const publicShopSchema = z.object({
   }),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
+  /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
+  maintenance: z.boolean().optional(),
 });
 export type PublicShop = z.infer<typeof publicShopSchema>;
 

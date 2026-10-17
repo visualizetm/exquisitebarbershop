@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router';
 import { publicShopSchema } from '@shared/api/public';
+import { SiteDown } from '@/components/site/SiteDown';
 import { Footer, Nav, ToastProvider } from '@/components/ui';
 import { shopJsonLd } from '@/lib/seo';
 import { useApi } from '@/lib/useApi';
@@ -9,6 +10,14 @@ import { ShopContext } from './shopContext';
 export function PublicLayout() {
   const shop = useApi('/api/shop', publicShopSchema);
   useJsonLd(shop.status === 'ready' ? shopJsonLd(shop.data, window.location.origin) : null);
+  // The API is down, or the owner switched maintenance on: one message instead of the pages.
+  const down =
+    shop.status === 'error'
+      ? ('down' as const)
+      : shop.status === 'ready' && shop.data.maintenance
+        ? ('maintenance' as const)
+        : null;
+  const phone = shop.status === 'ready' ? shop.data.phone : __SHOP_PHONE__;
   return (
     <ShopContext.Provider value={shop}>
       <ToastProvider>
@@ -18,7 +27,7 @@ export function PublicLayout() {
           </a>
           <Nav />
           <main id="exq-main" className="exq-main" tabIndex={-1}>
-            <Outlet />
+            {down ? <SiteDown reason={down} phone={phone} /> : <Outlet />}
           </main>
           <Footer shop={shop.status === 'ready' ? shop.data : null} />
         </div>

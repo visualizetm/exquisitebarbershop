@@ -14,6 +14,10 @@ Last commit: see the bottom of this file.
 - Hosting: Vercel (Vite preset). `vercel.json` rewrites every non-API path to
   `index.html`, sets CSP and the security headers, and runs the outbox cron.
 - Tests: Vitest with mongodb-memory-server, Playwright for end to end.
+- Operations: a daily cron at `/api/internal/cron/daily` (email backstop, photo
+  cleanup, backup to R2 with 30 days kept), `npm run doctor`, `npm run smoke`,
+  `npm run restore`; `/setup` for the first run; MAINTENANCE_MODE and an
+  API-down state in the public layout (`SiteDown`).
 - SEO: per-route meta from `usePageMeta`, JSON-LD BarberShop from `/api/shop`,
   `/sitemap.xml` from the API, `public/robots.txt`, `public/og.png` (1200x630),
   favicons, apple touch icon and `site.webmanifest`. Brand assets are rendered

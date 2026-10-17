@@ -5,7 +5,8 @@
     { "source": "/sitemap.xml", "destination": "/api/sitemap.xml" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
-  "crons": [{ "path": "/api/internal/outbox/deliver", "schedule": "0 13 * * *" }],
+  "crons": [{ "path": "/api/internal/cron/daily", "schedule": "0 13 * * *" }],
+  "functions": { "api/[...path].ts": { "maxDuration": 60 } },
   "headers": [
     {
       "source": "/(.*)",

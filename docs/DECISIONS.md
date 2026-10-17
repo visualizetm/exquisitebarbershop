@@ -207,3 +207,21 @@ win.
 - D5-21 Resend's domain status comes from GET /domains with the API key; no
   email is sent. A missing domain, an unverified domain and a bad key each get
   their own fix line.
+- D5-22 Backups go to the photo bucket as canonical EJSON NDJSON, gzipped, one
+  file per collection plus a manifest. Rejected mongodump: no binary on Vercel.
+  Canonical EJSON keeps Dates and ids exact, which the restore test proves.
+- D5-23 Pruning by date arithmetic instead of listing the bucket: the keys are
+  deterministic (date plus collection name), so each run deletes the ten days
+  just past the window and never needs ListObjects.
+- D5-24 One daily cron route. Vercel Hobby allows one run a day; the route runs
+  the outbox backstop, the photo purge, the upload sweep, the backup and the
+  prune in order and reports each count. The old outbox route stays for a
+  manual call. `maxDuration` is 60 seconds for the one function.
+- D5-25 PII is masked in the logger itself, not at each call site, so a new
+  log line cannot leak an address by accident. The log email channel moved the
+  message body to debug level.
+- D5-26 The API-down and maintenance states live in the public layout: it
+  already fetches `/api/shop`, so a failed fetch or `maintenance: true` swaps
+  the page for one ErrorState with a tel button. The phone falls back to the
+  seed placeholder compiled in by Vite (`__SHOP_PHONE__`); the placeholder
+  itself stays in seed/shop.ts.

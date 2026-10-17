@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [tsconfigPaths({ projects: ['./tsconfig.node.json', './tsconfig.app.json'] })],
   define: {
     __BUILD_SHA__: JSON.stringify('test'),
+    __SHOP_PHONE__: JSON.stringify('(610) 555-0100'),
   },
   test: {
     environment: 'node',

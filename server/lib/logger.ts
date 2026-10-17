@@ -1,6 +1,9 @@
+import { scrub } from './pii';
+
 /**
  * Minimal structured logger. One JSON object per line so Vercel log search works.
  * Level comes from LOG_LEVEL and is read lazily to keep imports side effect free.
+ * Every field is scrubbed: emails and phone numbers never reach a log line whole.
  */
 type Level = 'debug' | 'info' | 'warn' | 'error';
 const ORDER: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 };
@@ -12,7 +15,12 @@ function threshold(): number {
 
 function emit(level: Level, message: string, fields: Record<string, unknown>): void {
   if (ORDER[level] < threshold()) return;
-  const line = JSON.stringify({ level, time: new Date().toISOString(), message, ...fields });
+  const line = JSON.stringify({
+    level,
+    time: new Date().toISOString(),
+    message,
+    ...(scrub(fields) as Record<string, unknown>),
+  });
   if (level === 'error' || level === 'warn') console.error(line);
   else process.stdout.write(`${line}\n`);
 }

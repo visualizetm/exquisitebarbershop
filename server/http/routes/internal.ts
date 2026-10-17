@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { getEnv } from '../../env';
 import { deliverPendingOutbox } from '../../notifications/deliver';
+import { pruneBackups, runBackup } from '../../services/backup';
 import { bootstrap } from '../../services/bootstrap';
 import { runDoctor } from '../../services/doctor';
 import { parseBody } from '../request';
@@ -18,11 +19,36 @@ const deliver: RouteHandler = async (ctx) => {
   };
 };
 
+/** The one daily job (Vercel Hobby allows one run a day): email backstop, photo cleanup, backup. */
+const daily: RouteHandler = async (ctx) => {
+  const outbox = await deliverPendingOutbox({ now: ctx.now });
+  const photosPurged = await purgeDeletedPhotos(ctx.now);
+  const uploadsSwept = await sweepAbandonedUploads(ctx.now);
+  const backup = await runBackup(ctx.now);
+  const backupsPruned = await pruneBackups(ctx.now);
+  return {
+    body: {
+      outbox,
+      photosPurged,
+      uploadsSwept,
+      backup: {
+        date: backup.date,
+        documents: backup.collections.reduce((n, c) => n + c.count, 0),
+        bytes: backup.collections.reduce((n, c) => n + c.bytes, 0),
+      },
+      backupsPruned,
+    },
+    headers: { 'Cache-Control': 'no-store' },
+  };
+};
+
 const bootstrapBodySchema = z.object({ force: z.boolean().default(false) });
 
 export const internalRoutes: RouteDefinition[] = [
   { method: 'GET', path: '/api/internal/outbox/deliver', auth: 'internal', handler: deliver },
   { method: 'POST', path: '/api/internal/outbox/deliver', auth: 'internal', handler: deliver },
+  { method: 'GET', path: '/api/internal/cron/daily', auth: 'internal', handler: daily },
+  { method: 'POST', path: '/api/internal/cron/daily', auth: 'internal', handler: daily },
   {
     // The checklist for a deployment. Takes CRON_SECRET or BOOTSTRAP_SECRET; answers while settings are missing.
     method: 'GET',

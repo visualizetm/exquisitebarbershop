@@ -24,6 +24,8 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'GET /api/shop': 'public',
   'GET /api/sitemap.xml': 'public',
   'GET /api/setup': 'public',
+  'GET /api/internal/cron/daily': 'internal',
+  'POST /api/internal/cron/daily': 'internal',
   'GET /api/internal/doctor': 'internal',
   'POST /api/internal/bootstrap': 'internal',
   'GET /api/services': 'public',

@@ -27,7 +27,8 @@
     "e2e:server": "tsx scripts/e2e-server.ts",
     "user:reset": "tsx scripts/user-reset.ts",
     "doctor": "tsx scripts/doctor.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "restore": "tsx scripts/restore.ts"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.10",

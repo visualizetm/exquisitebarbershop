@@ -602,11 +602,12 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 
 ### Prompt 5: setup, doctor and operations
 
-| Method | Path                    | Auth                         | Notes                                                                                                                |
-| ------ | ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| GET    | /api/setup              | public                       | `{ enabled }`: whether BOOTSTRAP_SECRET is set, so the /setup page knows to exist                                    |
-| GET    | /api/internal/doctor    | internal (cron or bootstrap) | the checklist: settings, database, replica set, transactions, indexes, seed, storage, public URL, email, cron        |
-| POST   | /api/internal/bootstrap | internal (cron or bootstrap) | indexes, seed, owner from SEED_OWNER_*; once, then 409 unless `{ force: true }`; 404 while BOOTSTRAP_SECRET is unset |
+| Method    | Path                     | Auth                         | Notes                                                                                                                |
+| --------- | ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| GET       | /api/setup               | public                       | `{ enabled }`: whether BOOTSTRAP_SECRET is set, so the /setup page knows to exist                                    |
+| GET       | /api/internal/doctor     | internal (cron or bootstrap) | the checklist: settings, database, replica set, transactions, indexes, seed, storage, public URL, email, cron        |
+| GET, POST | /api/internal/cron/daily | internal                     | the one daily job: outbox backstop, photo purge, upload sweep, backup, prune; `vercel.json` cron at 13:00 UTC        |
+| POST      | /api/internal/bootstrap  | internal (cron or bootstrap) | indexes, seed, owner from SEED_OWNER_*; once, then 409 unless `{ force: true }`; 404 while BOOTSTRAP_SECRET is unset |
 
 Routes flagged `alwaysOn` (health, doctor, bootstrap, setup) answer while the
 environment is incomplete; every other route answers 503 CONFIG_ERROR until the
@@ -914,6 +915,31 @@ SMS reminders
   dedupeKey `booking:<id>:reminder24h`.
 - Consent: a `customer.smsOptIn` boolean on bookings and a STOP handler webhook.
   `features.smsReminders` gates it all.
+
+## 10b. Backups, logs and maintenance (prompt 5)
+
+- Backups: the daily cron (`/api/internal/cron/daily`) exports every business
+  collection (everything except sessions, rateLimits and idempotencyKeys) as
+  canonical EJSON, one gzipped NDJSON file per collection plus a manifest, to
+  `_backups/YYYY-MM-DD/` in the photo bucket (under R2_KEY_PREFIX when set).
+  Thirty days are kept; the ten days past the window are deleted on each run
+  (keys are deterministic, so nothing is listed). `npm run restore --
+--date=YYYY-MM-DD --to=<db name>` restores into another database; the live
+  name is refused without `--force`.
+- Cron: Vercel Hobby allows one run a day, so every scheduled job is in one
+  route. Vercel Pro allows more frequent schedules; split the route or add a
+  second cron entry then. `/api/internal/outbox/deliver` still exists for a
+  manual backstop.
+- Logs: one JSON object per line with `requestId`, `code` and `status`; every
+  error is logged once by the response helper. The logger scrubs every field
+  (`server/lib/pii.ts`): emails keep one letter and the domain, phone numbers
+  keep the last two digits. The log email channel never logs the body above
+  debug level.
+- API down and maintenance: the public layout shows one kit ErrorState with
+  the shop phone (from `/api/shop`, or the seed placeholder compiled in as
+  `__SHOP_PHONE__`) when `/api/shop` fails or reports `maintenance: true`.
+  MAINTENANCE_MODE=true makes public routes answer 503 MAINTENANCE except
+  `/api/shop` and `/api/auth/*`; the staff area and `/api/health` keep working.
 
 ## 11. Operations
 
