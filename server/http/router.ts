@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import { currentEnvProblems, getEnv } from '../env';
+import { currentEnvProblems, getEnv, getPartialEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { randomRequestId } from '../lib/ids';
 import { logger } from '../lib/logger';
@@ -61,7 +61,8 @@ function sameSecret(provided: string, secret: string | undefined): boolean {
  * Bootstrap routes also take BOOTSTRAP_SECRET, and do not exist while it is unset.
  */
 function assertInternalSecret(req: IncomingMessage, route: RouteDefinition): void {
-  const env = getEnv();
+  // The partial environment, so the doctor can be called while a variable is missing.
+  const env = getPartialEnv();
   const provided = bearerOf(req);
   if (sameSecret(provided, env.CRON_SECRET)) return;
   if (route.bootstrap === true && provided !== '') {

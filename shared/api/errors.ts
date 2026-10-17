@@ -45,6 +45,8 @@ export const ERROR_CODES = {
   CONFIG_ERROR: 503,
   /** MAINTENANCE_MODE is on; the admin and the health check still answer. */
   MAINTENANCE: 503,
+  /** STORAGE_DRIVER is none: photos cannot be uploaded until R2 is connected. */
+  STORAGE_DISABLED: 503,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

@@ -13,13 +13,23 @@ import { chromium, type Browser } from '@playwright/test';
  * under /admin sign in as the seeded owner first.
  */
 const WEB_PORT = process.env.WEB_PORT ?? '5174';
-const BASE = `http://127.0.0.1:${WEB_PORT}`;
 const args = process.argv.slice(2);
+/** --base=https://127.0.0.1:4174 captures another server, such as the production-like one. */
+const BASE =
+  args.find((a) => a.startsWith('--base='))?.slice('--base='.length) ??
+  `http://127.0.0.1:${WEB_PORT}`;
 /** --photos uploads sample hero, chair and gallery photos first, so the pages show them. */
 const withPhotos = args.includes('--photos');
+/** --combine also stacks every montage in the folder into one montage.png. */
+const combine = args.includes('--combine');
 /** --theme=light|dark stores that choice before each page loads and suffixes the file names. */
 const theme = args.find((a) => a.startsWith('--theme='))?.slice('--theme='.length) ?? null;
-const [milestoneArg, ...routes] = args.filter((a) => a !== '--photos' && !a.startsWith('--theme='));
+/** --owner=email:password signs in with another owner than the e2e seed. */
+const ownerArg = args.find((a) => a.startsWith('--owner='))?.slice('--owner='.length);
+const FLAGS = ['--photos', '--combine'];
+const [milestoneArg, ...routes] = args.filter(
+  (a) => !FLAGS.includes(a) && !/^--(theme|base|owner)=/.test(a),
+);
 if (!milestoneArg || routes.length === 0) {
   console.error('Usage: tsx scripts/screens.ts <milestone> <route> [route...]');
   process.exit(1);
@@ -51,6 +61,7 @@ async function main(): Promise<void> {
       viewport: { width: size.width, height: size.height },
       deviceScaleFactor: 1,
       reducedMotion: 'reduce',
+      ignoreHTTPSErrors: true,
     });
     const page = await context.newPage();
     if (theme) {
@@ -60,9 +71,10 @@ async function main(): Promise<void> {
     }
     if (routes.some((r) => r.startsWith('/admin'))) {
       const { E2E_OWNER } = await import('../../scripts/e2e-accounts');
+      const [email, password] = ownerArg?.split(':') ?? [E2E_OWNER.email, E2E_OWNER.password];
       await page.goto(`${BASE}/admin/login`);
-      await page.getByLabel('Email').fill(E2E_OWNER.email);
-      await page.getByLabel('Password').fill(E2E_OWNER.password);
+      await page.getByLabel('Email').fill(email ?? '');
+      await page.getByLabel('Password').fill(password ?? '');
       await page.getByRole('button', { name: 'Sign in' }).click();
       await page.waitForURL(/\/admin(?!\/login)/);
     }
@@ -106,6 +118,25 @@ async function main(): Promise<void> {
       'North',
       '-background',
       '#D9D9D9',
+      out,
+    ]);
+    process.stdout.write(`${out}\n`);
+  }
+  if (combine) {
+    const parts = readdirSync(dir)
+      .filter((f) => /^montage-.*\.png$/.test(f))
+      .sort()
+      .map((f) => join(dir, f));
+    const out = join(dir, 'montage.png');
+    // Half size: four full montages stacked would otherwise weigh more than the rest of the folder.
+    execFileSync('montage', [
+      ...parts,
+      '-tile',
+      '1x',
+      '-geometry',
+      '50%x50%+0+24',
+      '-background',
+      '#BFBFBF',
       out,
     ]);
     process.stdout.write(`${out}\n`);

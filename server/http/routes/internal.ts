@@ -1,12 +1,16 @@
 import { z } from 'zod';
-import { getEnv } from '../../env';
+import { getPartialEnv } from '../../env';
+import { logger } from '../../lib/logger';
 import { deliverPendingOutbox } from '../../notifications/deliver';
 import { pruneBackups, runBackup } from '../../services/backup';
 import { bootstrap } from '../../services/bootstrap';
 import { runDoctor } from '../../services/doctor';
 import { parseBody } from '../request';
 import { purgeDeletedPhotos, sweepAbandonedUploads } from '../../services/photosService';
+import { storageEnabled } from '../../storage';
 import type { RouteDefinition, RouteHandler } from '../types';
+
+const STORAGE_STEPS = ['photosPurged', 'uploadsSwept', 'backup', 'backupsPruned'] as const;
 
 /** Vercel Cron calls with GET; operators may POST. Both need the CRON_SECRET bearer token. */
 const deliver: RouteHandler = async (ctx) => {
@@ -19,9 +23,29 @@ const deliver: RouteHandler = async (ctx) => {
   };
 };
 
-/** The one daily job (Vercel Hobby allows one run a day): email backstop, photo cleanup, backup. */
+/**
+ * The one daily job (Vercel Hobby allows one run a day): email backstop, photo
+ * cleanup, backup. Without photo storage only the outbox runs; the rest is
+ * reported as skipped so the log says why there is no backup.
+ */
 const daily: RouteHandler = async (ctx) => {
   const outbox = await deliverPendingOutbox({ now: ctx.now });
+  if (!storageEnabled()) {
+    logger.warn('daily job: photo purge, upload sweep and backup skipped', {
+      reason: 'STORAGE_DRIVER is none',
+    });
+    return {
+      body: {
+        outbox,
+        photosPurged: 0,
+        uploadsSwept: 0,
+        backup: null,
+        backupsPruned: 0,
+        skipped: [...STORAGE_STEPS],
+      },
+      headers: { 'Cache-Control': 'no-store' },
+    };
+  }
   const photosPurged = await purgeDeletedPhotos(ctx.now);
   const uploadsSwept = await sweepAbandonedUploads(ctx.now);
   const backup = await runBackup(ctx.now);
@@ -37,6 +61,7 @@ const daily: RouteHandler = async (ctx) => {
         bytes: backup.collections.reduce((n, c) => n + c.bytes, 0),
       },
       backupsPruned,
+      skipped: [],
     },
     headers: { 'Cache-Control': 'no-store' },
   };
@@ -76,13 +101,14 @@ export const internalRoutes: RouteDefinition[] = [
   },
   {
     // Lets the /setup page know whether setup exists at all. No secrets, no values.
+    // Reads the partial environment so the page still works while a variable is missing.
     method: 'GET',
     path: '/api/setup',
     auth: 'public',
     alwaysOn: true,
     handler: () =>
       Promise.resolve({
-        body: { enabled: Boolean(getEnv().BOOTSTRAP_SECRET) },
+        body: { enabled: Boolean(getPartialEnv().BOOTSTRAP_SECRET) },
         headers: { 'Cache-Control': 'no-store' },
       }),
   },

@@ -68,18 +68,18 @@ test('System follows the device scheme, and a saved Light choice overrides it', 
   await expectBackground(page, INK);
   expect(await themeColor(page)).toBe('#111111');
   // The black mark is hidden in dark and the white one shows.
-  await expect(page.locator('.exq-nav__logo.exq-mark--dark')).toBeVisible();
-  await expect(page.locator('.exq-nav__logo.exq-mark--light')).toBeHidden();
+  await expect(page.locator('.exq-nav__logo-wide .exq-mark--dark')).toBeVisible();
+  await expect(page.locator('.exq-nav__logo-wide .exq-mark--light')).toBeHidden();
 
   await page.emulateMedia({ colorScheme: 'light' });
   await expectBackground(page, PAPER);
-  await expect(page.locator('.exq-nav__logo.exq-mark--light')).toBeVisible();
+  await expect(page.locator('.exq-nav__logo-wide .exq-mark--light')).toBeVisible();
 
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.getByRole('button', { name: 'Theme: System' }).click();
   await page.getByRole('menuitemradio', { name: 'Light' }).click();
   await expectBackground(page, PAPER);
-  await expect(page.locator('.exq-nav__logo.exq-mark--light')).toBeVisible();
+  await expect(page.locator('.exq-nav__logo-wide .exq-mark--light')).toBeVisible();
 });
 
 test('the first paint already carries the stored theme', async ({ page }) => {

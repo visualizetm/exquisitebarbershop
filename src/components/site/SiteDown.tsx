@@ -20,7 +20,7 @@ export function SiteDown({ reason, phone }: { reason: 'down' | 'maintenance'; ph
       >
         {reason === 'maintenance'
           ? `We are doing some work on the site. Call the shop at ${formatUsPhone(phone)} to book.`
-          : `Online booking is having a moment. Call the shop at ${formatUsPhone(phone)}.`}
+          : "Call the shop and we'll get you in."}
       </ErrorState>
     </section>
   );

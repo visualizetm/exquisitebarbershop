@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { environmentOf, envProblems, type Env } from '../../server/env';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  describeEnv,
+  environmentOf,
+  envProblems,
+  getPartialEnv,
+  resetEnvCache,
+  type Env,
+} from '../../server/env';
 
 const base: Env = {
   NODE_ENV: 'development',
@@ -13,6 +20,7 @@ const base: Env = {
   OUTBOX_AFTER_RESPONSE: 'on',
   LOG_LEVEL: 'info',
   STORAGE_DRIVER: 'local',
+  STORAGE_DISABLED_ACK: 'false',
 };
 const r2 = {
   STORAGE_DRIVER: 'r2' as const,
@@ -80,6 +88,34 @@ describe('envProblems', () => {
     expect(names({ ...noEmail, EMAIL_DISABLED_ACK: 'true' })).toEqual([]);
   });
 
+  it('allows no photo storage in production only with STORAGE_DISABLED_ACK=true', () => {
+    const noStorage: Env = {
+      ...base,
+      NODE_ENV: 'production',
+      MONGODB_DB_NAME: 'exquisite_production',
+      APP_BASE_URL: 'https://example.com',
+      CRON_SECRET: 'c'.repeat(40),
+      STORAGE_DRIVER: 'none',
+      EMAIL_DISABLED_ACK: 'true',
+    };
+    expect(names(noStorage)).toEqual(['STORAGE_DISABLED_ACK']);
+    expect(names({ ...noStorage, STORAGE_DISABLED_ACK: 'true' })).toEqual([]);
+    // The local disk is never an option on Vercel; the message names both real choices.
+    const local = envProblems({ ...noStorage, STORAGE_DRIVER: 'local' });
+    expect(local.map((p) => p.name)).toEqual(['STORAGE_DRIVER']);
+    expect(local[0]?.fix).toContain('none');
+    // A preview without storage needs no acknowledgement and no key prefix.
+    expect(
+      names({
+        ...noStorage,
+        NODE_ENV: 'development',
+        VERCEL_ENV: 'preview',
+        MONGODB_DB_NAME: 'exquisite_preview',
+        EMAIL_DISABLED_ACK: 'false',
+      }),
+    ).toEqual([]);
+  });
+
   it('asks previews for R2 and a key prefix, and never for the email acknowledgement', () => {
     const preview: Env = {
       ...base,
@@ -99,5 +135,54 @@ describe('envProblems', () => {
       expect(p.fix.length).toBeGreaterThan(20);
       expect(p.message).not.toContain('mongodb://');
     }
+  });
+});
+
+describe('describeEnv and getPartialEnv', () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+    resetEnvCache();
+  });
+
+  it('names a missing or short variable instead of throwing, and still reads the rest', () => {
+    process.env = {
+      PATH: saved.PATH ?? '',
+      NODE_ENV: 'test',
+      MANAGE_LINK_SECRET: 'short',
+      BOOTSTRAP_SECRET: 'b'.repeat(40),
+    };
+    resetEnvCache();
+    const { env, problems } = describeEnv();
+    expect(env).toBeNull();
+    expect(problems.map((p) => p.name)).toEqual(['MONGODB_URI', 'MANAGE_LINK_SECRET']);
+    for (const p of problems) {
+      expect(p.fix).toContain(p.name);
+      expect(p.fix).not.toContain('short');
+    }
+    const partial = getPartialEnv();
+    expect(partial.MONGODB_URI).toBeUndefined();
+    expect(partial.MANAGE_LINK_SECRET).toBeUndefined();
+    expect(partial.BOOTSTRAP_SECRET).toBe('b'.repeat(40));
+    expect(partial.STORAGE_DRIVER).toBe('local');
+  });
+
+  it('agrees with envProblems once every variable parses', () => {
+    process.env = {
+      PATH: saved.PATH ?? '',
+      NODE_ENV: 'production',
+      MONGODB_URI: 'mongodb://127.0.0.1:27017',
+      MANAGE_LINK_SECRET: 'm'.repeat(40),
+    };
+    resetEnvCache();
+    const { env, problems } = describeEnv();
+    expect(env?.MONGODB_DB_NAME).toBe('exquisite');
+    expect(problems.map((p) => p.name)).toEqual([
+      'MONGODB_DB_NAME',
+      'APP_BASE_URL',
+      'CRON_SECRET',
+      'STORAGE_DRIVER',
+      'EMAIL_DISABLED_ACK',
+    ]);
   });
 });

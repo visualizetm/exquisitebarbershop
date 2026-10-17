@@ -424,8 +424,16 @@ select.exq-field__control {
   text-decoration: none;
 }
 .exq-nav__logo {
-  height: 32px;
+  height: 48px;
   width: auto;
+}
+.exq-nav__logo-wide,
+.exq-nav__logo-narrow {
+  display: inline-flex;
+  align-items: center;
+}
+.exq-nav__logo-wide {
+  display: none;
 }
 .exq-nav__links {
   display: none;
@@ -441,7 +449,11 @@ select.exq-field__control {
   text-decoration: none;
   border-bottom: 2px solid transparent;
 }
-.exq-nav__link[data-state='active'] {
+.exq-nav__link > span {
+  padding: var(--s1) 0;
+  border-bottom: 2px solid transparent;
+}
+.exq-nav__link > span[data-state='active'] {
   border-bottom-color: var(--accent);
 }
 .exq-nav__actions {
@@ -489,6 +501,15 @@ select.exq-field__control {
   }
   .exq-nav__toggle {
     display: none;
+  }
+  .exq-nav__logo {
+    height: 40px;
+  }
+  .exq-nav__logo-narrow {
+    display: none;
+  }
+  .exq-nav__logo-wide {
+    display: inline-flex;
   }
 }
 

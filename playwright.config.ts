@@ -5,6 +5,8 @@ const baseURL = `http://127.0.0.1:${WEB_PORT}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // The production-like run has its own config and server (playwright.prod.config.ts).
+  testIgnore: '**/prod/**',
   globalSetup: './tests/e2e/global-setup.ts',
   timeout: 60_000,
   expect: { timeout: 10_000 },

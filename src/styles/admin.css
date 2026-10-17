@@ -6,10 +6,11 @@
 .exq-main--admin {
   display: block;
 }
+/* Phones: the header row is empty (the tab bar is fixed), so the content row takes the space. */
 .exq-adm {
   display: grid;
   min-height: 100vh;
-  grid-template-rows: 1fr;
+  grid-template-rows: auto 1fr;
 }
 .exq-adm__content {
   padding: var(--s4) var(--s4) calc(96px + env(safe-area-inset-bottom));
@@ -117,7 +118,7 @@
   color: var(--accent-text);
 }
 .exq-adm-nav__logo {
-  width: 160px;
+  width: 180px;
   height: auto;
   margin-bottom: var(--s5);
 }
@@ -128,6 +129,7 @@
 @media (min-width: 1024px) {
   .exq-adm {
     grid-template-columns: 260px 1fr;
+    grid-template-rows: 1fr;
   }
   .exq-adm-nav__side {
     display: flex;

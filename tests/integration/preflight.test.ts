@@ -65,6 +65,7 @@ describe('the doctor', () => {
       'owner:pass',
       'storage:pass',
       'storage-public:pass',
+      'backups:pass',
       'email:pass',
       'cron:pass',
     ]);
@@ -93,11 +94,14 @@ describe('the doctor', () => {
       'env:EMAIL_DISABLED_ACK',
     ]);
     expect(failing.every((c) => c.status === 'fail' && (c.fix ?? '').length > 20)).toBe(true);
-    // Everything else answers 503 with a pointer to the doctor; the health check still works.
+    // Everything else answers 503 with a pointer to the doctor; the health check names the gaps.
     const shop = await call(server.baseUrl, 'GET', '/api/shop');
     expect(shop.status).toBe(503);
     expect(apiErrorSchema.parse(shop.body).error.code).toBe('CONFIG_ERROR');
-    expect((await call(server.baseUrl, 'GET', '/api/health')).status).toBe(200);
+    const health = await call(server.baseUrl, 'GET', '/api/health');
+    expect(health.status).toBe(503);
+    expect(health.body.ok).toBe(false);
+    expect(health.body.missing).toEqual(['APP_BASE_URL', 'STORAGE_DRIVER', 'EMAIL_DISABLED_ACK']);
   });
 
   it('refuses a wrong secret and does not exist for a setup secret while BOOTSTRAP_SECRET is unset', async () => {

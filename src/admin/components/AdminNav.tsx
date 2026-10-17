@@ -86,11 +86,11 @@ export function AdminNav() {
       {/* Side nav, 1024px and up */}
       <nav className="exq-adm-nav__side" aria-label="Staff">
         <Mark
-          name="wordmark"
+          name="stacked"
           className="exq-adm-nav__logo"
           alt="Exquisite"
           width={200}
-          height={51}
+          height={84}
         />
         {who}
         <ul className="exq-adm-nav__list">

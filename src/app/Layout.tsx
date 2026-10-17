@@ -1,14 +1,18 @@
-import { Outlet } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
 import { publicShopSchema } from '@shared/api/public';
 import { SiteDown } from '@/components/site/SiteDown';
 import { Footer, Nav, ToastProvider } from '@/components/ui';
 import { shopJsonLd } from '@/lib/seo';
 import { useApi } from '@/lib/useApi';
 import { useJsonLd } from '@/lib/useJsonLd';
+import { useRouteFocus } from '@/lib/useRouteFocus';
 import { ShopContext } from './shopContext';
 
 export function PublicLayout() {
-  const shop = useApi('/api/shop', publicShopSchema);
+  const { pathname } = useLocation();
+  // The setup page runs before the shop exists, so it never asks for it.
+  const shop = useApi(pathname === '/setup' ? null : '/api/shop', publicShopSchema);
+  useRouteFocus();
   useJsonLd(shop.status === 'ready' ? shopJsonLd(shop.data, window.location.origin) : null);
   // The API is down, or the owner switched maintenance on: one message instead of the pages.
   const down =
@@ -37,6 +41,7 @@ export function PublicLayout() {
 }
 
 export function AdminLayout() {
+  useRouteFocus();
   return (
     <ToastProvider>
       <div className="exq-app" data-state="admin">

@@ -10,6 +10,7 @@ import { changeOwnPassword, login } from '../../auth/authService';
 import { endAllSessions, endSession } from '../../auth/sessions';
 import { shopSettingsRepo, staffRepo, usersRepo } from '../../repos';
 import { AppError } from '../../lib/errors';
+import { storageEnabled } from '../../storage';
 import { toPublicStaff } from './public';
 import { metaOf, NO_STORE, principalOf } from '../context';
 import { parseBody } from '../request';
@@ -34,6 +35,7 @@ async function meFor(userId: string): Promise<MeResponse> {
     },
     staff: staff && !staff.deletedAt ? toPublicStaff(staff) : null,
     permissions: { barbersCanBlockTime: settings.permissions.barbersCanBlockTime },
+    features: { photos: storageEnabled() },
   });
 }
 

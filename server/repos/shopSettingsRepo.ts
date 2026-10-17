@@ -33,7 +33,8 @@ export async function getShopSettings(options?: RepoOptions): Promise<ShopSettin
 export async function requireShopSettings(options?: RepoOptions): Promise<ShopSettingsDocument> {
   const settings = await getShopSettings(options);
   if (!settings) {
-    throw new AppError('INTERNAL_ERROR', 'Shop settings are missing. Run the seed script.');
+    // A deployment that has not run setup yet: the same 503 the environment gate uses.
+    throw new AppError('CONFIG_ERROR', 'The site is not set up yet. Run setup at /setup.');
   }
   return settings;
 }

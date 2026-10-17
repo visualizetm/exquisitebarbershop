@@ -28,11 +28,19 @@ async function main(): Promise<void> {
   // Health and the build.
   try {
     const res = await get('/api/health');
-    const body = (await res.json()) as { status?: string; buildSha?: string; db?: { ok: boolean } };
+    const body = (await res.json()) as {
+      ok?: boolean;
+      status?: string;
+      buildSha?: string;
+      db?: { ok: boolean };
+      missing?: string[];
+    };
     record(
       'Health',
-      res.status === 200 && body.status === 'ok',
-      `${res.status}, status ${body.status ?? '?'}, build ${body.buildSha ?? '?'}, db ${body.db?.ok ? 'ok' : 'down'}`,
+      res.status === 200 && body.ok === true,
+      `${res.status}, status ${body.status ?? '?'}, build ${body.buildSha ?? '?'}, db ${body.db?.ok ? 'ok' : 'down'}${
+        body.missing?.length ? `, missing ${body.missing.join(', ')}` : ''
+      }`,
     );
     record(
       'Build sha',
