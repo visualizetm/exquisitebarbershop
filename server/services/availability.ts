@@ -323,7 +323,8 @@ function computeStaffDay(input: StaffDayInput): StaffDay {
       .filter(
         (b) =>
           b.staffId === staff._id &&
-          b.status === 'confirmed' &&
+          // Completed and no-show bookings keep their slot locks, so their time stays taken.
+          b.status !== 'cancelled' &&
           b._id !== input.excludeBookingId &&
           overlaps({ start: b.startAt, end: addMinutes(b.endAt, b.bufferMinutes) }, dayBounds),
       )
@@ -360,7 +361,7 @@ function computeStaffDay(input: StaffDayInput): StaffDay {
   return { staffId: staff._id, starts, reason: null };
 }
 
-/** Minutes of confirmed work each chair already has on a day, for the fairness pick. */
+/** Minutes of booked work (anything not cancelled) each chair has on a day, for the fairness pick. */
 function bookedMinutesByStaff(
   ctx: AvailabilityContext,
   dayBounds: Range,
@@ -368,7 +369,7 @@ function bookedMinutesByStaff(
 ): Map<string, number> {
   const out = new Map<string, number>();
   for (const b of ctx.bookings) {
-    if (b.status !== 'confirmed' || b._id === exclude) continue;
+    if (b.status === 'cancelled' || b._id === exclude) continue;
     if (!overlaps({ start: b.startAt, end: b.endAt }, dayBounds)) continue;
     out.set(b.staffId, (out.get(b.staffId) ?? 0) + b.durationMinutes);
   }

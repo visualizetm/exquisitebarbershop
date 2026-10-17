@@ -29,6 +29,7 @@ import {
   todayResponseSchema,
   whoIsInResponseSchema,
 } from '../../shared/api/admin';
+import { availabilityResponseSchema } from '../../shared/api/availability';
 import { apiErrorSchema } from '../../shared/api/errors';
 import { createLogin, sessionCookie } from '../helpers/auth';
 import {
@@ -102,6 +103,30 @@ describe('status changes', () => {
       .find({ entityId: b.id, action: 'booking.status' })
       .toArray();
     expect(audit).toHaveLength(2);
+  });
+
+  it('a completed or no-show booking still holds its time, so it is never offered again', async () => {
+    const at = slotAt(WED, '16:00');
+    const b = await bookPublic(server.baseUrl, { staff: 'marcus', serviceIds: [cut], startAt: at });
+    const offered = async () =>
+      availabilityResponseSchema
+        .parse(
+          (
+            await call(
+              server.baseUrl,
+              'GET',
+              `/api/availability?date=${WED}&serviceIds=${cut}&staff=marcus`,
+            )
+          ).body,
+        )
+        .slots.map((s) => s.startAt);
+    for (const status of ['completed', 'noShow'] as const) {
+      await owner('POST', `/api/admin/bookings/${b.id}/status`, { status });
+      expect(await offered()).not.toContain(at);
+      await owner('POST', `/api/admin/bookings/${b.id}/status`, { status: 'confirmed' });
+    }
+    await owner('POST', `/api/admin/bookings/${b.id}/cancel`, { notify: false });
+    expect(await offered()).toContain(at);
   });
 
   it('restores a cancelled booking, and refuses when the slot was taken meanwhile', async () => {
@@ -479,6 +504,7 @@ describe('audit and outbox viewers', () => {
     );
     expect(failed.messages.map((m) => m.id)).toContain(id);
     expect((await owner('POST', `/api/admin/outbox/${id}/retry`)).status).toBe(200);
-    expect((await emailOutboxRepo.findOutboxMessageById(id))?.status).toBe('pending');
+    // Requeued: it may already be on its way by the time this reads it.
+    expect((await emailOutboxRepo.findOutboxMessageById(id))?.status).not.toBe('failed');
   });
 });

@@ -26,6 +26,9 @@ export interface LoadAvailabilityInput {
  * collection (seven in total), never one per day. Throws SERVICE_UNAVAILABLE when
  * any requested service is missing, inactive or deleted.
  */
+/** Every status whose slot locks are still held. Only a cancellation frees the time. */
+const HELD_STATUSES = ['confirmed', 'completed', 'noShow'] as const;
+
 export async function loadAvailabilityContext(
   input: LoadAvailabilityInput,
   session?: ClientSession,
@@ -48,7 +51,8 @@ export async function loadAvailabilityContext(
     weeklyHoursRepo.listAllHours(opts),
     closuresRepo.listClosuresBetween(input.fromDate, input.toDate, opts),
     timeBlocksRepo.listTimeBlocksBetween(range, opts),
-    bookingsRepo.listBookingsBetween(range, { statuses: ['confirmed'] }, opts),
+    // Completed and no-show bookings keep their slot locks, so they stay busy here too.
+    bookingsRepo.listBookingsBetween(range, { statuses: HELD_STATUSES }, opts),
   ]);
 
   const usable: ServiceDocument[] = services.filter((s) => s.deletedAt === null && s.isActive);
