@@ -12,7 +12,8 @@ import {
   publicStaffResponseSchema,
 } from '@shared/api/public';
 import { Status } from '@/components/Status';
-import { Button, StepBar, StickyCTA, Ticket, TimeChip, useToast } from '@/components/ui';
+import { Button, StepBar, Ticket, TimeChip, useBar, useToast } from '@/components/ui';
+import type { BarConfig } from '@/components/ui/barStore';
 import { formatCents } from '@shared/lib/money';
 import { formatShopDateTime } from '@shared/lib/time';
 import { BookingCard } from '@/components/booking/BookingCard';
@@ -62,6 +63,14 @@ const STEP_TITLES: Record<BookStep, string> = {
   confirm: 'Review and confirm',
   done: 'You are booked',
 };
+
+/** Tells the phone bottom bar what to say. A component so it can sit in the ready branch. */
+function BookBar({ config }: { config: BarConfig | null }) {
+  useBar(config);
+  return null;
+}
+
+const STEP_ORDER: BookStep[] = ['services', 'barber', 'day', 'time', 'details', 'confirm'];
 
 interface ConflictState {
   message: string;
@@ -226,6 +235,69 @@ export function BookPage() {
     }
   };
 
+  const bar = ((): BarConfig | null => {
+    if (step === 'done') return null;
+    const totalCents = chosenServices.reduce((sum, x) => sum + x.priceCents, 0);
+    const minutes = chosenServices.reduce((sum, x) => sum + x.durationMinutes, 0);
+    const summary =
+      chosenServices.length === 0 ? undefined : (
+        <>
+          <span>
+            {chosenServices.some((x) => x.priceFrom) ? 'From ' : ''}
+            {formatCents(totalCents)}
+          </span>
+          <span>
+            {minutes} min{chosenStaff ? ` with ${chosenStaff}` : ''}
+          </span>
+        </>
+      );
+    const before = STEP_ORDER[STEP_ORDER.indexOf(step) - 1];
+    const left: BarConfig['left'] = before
+      ? {
+          label: 'Back',
+          onClick: () => {
+            goTo(before);
+          },
+          tone: 'ink',
+        }
+      : { label: 'Back', to: '/', tone: 'ink' };
+    const next = (disabled: boolean, to: BookStep): BarConfig['right'] => ({
+      label: 'Continue',
+      disabled,
+      onClick: () => {
+        goTo(to);
+      },
+      tone: 'paper',
+    });
+    let right: BarConfig['right'];
+    switch (step) {
+      case 'services':
+        right = next(selection.serviceIds.length === 0, selection.staff ? 'day' : 'barber');
+        break;
+      case 'barber':
+        right = next(!selection.staff, 'day');
+        break;
+      case 'day':
+        right = next(!selection.date, 'time');
+        break;
+      case 'time':
+        right = next(!selection.startAt, 'details');
+        break;
+      case 'details':
+        right = { label: 'Continue', form: 'exq-details-form', tone: 'paper' };
+        break;
+      case 'confirm':
+        right = {
+          label: 'Confirm booking',
+          disabled: submitting,
+          onClick: () => void submit(),
+          tone: 'red',
+        };
+        break;
+    }
+    return { mode: 'booking', summary, left, right };
+  })();
+
   const renderStep = () => {
     switch (step) {
       case 'services':
@@ -370,16 +442,6 @@ export function BookPage() {
                 {submitError}
               </p>
             ) : null}
-            <StickyCTA
-              primary={`${chosenServices.some((s) => s.priceFrom) ? 'From ' : ''}${formatCents(
-                chosenServices.reduce((sum, s) => sum + s.priceCents, 0),
-              )}`}
-              secondary={`${String(chosenServices.reduce((sum, s) => sum + s.durationMinutes, 0))} min with ${staffName}`}
-            >
-              <Button loading={submitting} onClick={() => void submit()}>
-                {submitting ? 'Booking' : 'Confirm booking'}
-              </Button>
-            </StickyCTA>
             <p className="exq-book-confirm__actions">
               <Button
                 variant="outline"
@@ -479,6 +541,7 @@ export function BookPage() {
 
   return (
     <article className="exq-book exq-wrap exq-section" data-state={step}>
+      <BookBar config={bar} />
       <div className="exq-book__main">
         <h1 className="exq-book__title">Book your chair</h1>
         <p className="exq-book__sub">Takes about a minute.</p>

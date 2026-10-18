@@ -289,3 +289,17 @@ commit, and what is still open.
   (removed in M4); the old Nav, Footer and StickyCTA still run until M2.
 - Tests: `tests/unit/motionCss.test.ts` (durations from tokens, allowed animated properties, no
   loops but the spinner, no literal colors or font sizes in the kit stylesheets).
+
+### M2: the frame
+
+- Shipped: TopStrip (announcement from shop settings, default "Walk ins welcome" plus a red
+  "Book online" link; an empty ink bar while settings load), the Header (stacked logo below 1024px,
+  wordmark above, hamburger that becomes an X, a Book a chair button always visible on desktop), the
+  full-screen ink MobileMenu (big caps links, theme switch, Call and Book, page behind inert), the
+  phone BottomBar (CALL and BOOK NOW; BOOK MARCUS on a profile; BACK and CONTINUE, then CONFIRM
+  BOOKING, with a total row in booking; hides for the keyboard; publishes `--bar-h`), a Footer with
+  no build stamp and no staff link, `viewport-fit=cover`, and a no-JavaScript fallback in
+  `index.html`. The old Nav and StickyCTA are gone; the build sha is only in `/api/health`.
+- Tests: `tests/e2e/frame.spec.ts` (bar visible at 390 and 60px tall, hidden at 1280 and in /admin,
+  /setup and /kit, labels per page and per booking step, hidden while a field has focus, never
+  covers the page end, no build text or staff link on any public page, the menu).

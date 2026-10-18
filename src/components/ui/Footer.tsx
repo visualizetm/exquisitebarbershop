@@ -1,4 +1,3 @@
-import { Link } from 'react-router';
 import type { PublicShop } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
 import { DAY_KEYS, type DayKey } from '@shared/lib/time';
@@ -14,13 +13,20 @@ const DAY_SHORT: Record<DayKey, string> = {
   sun: 'Sun',
 };
 
-/** The public footer: seal, hours, address, Instagram, the year and the build stamp. */
+/**
+ * The public footer: the seal, hours, address and phone, Instagram and the year. It carries no
+ * build stamp (the build is in /api/health only) and no staff link: /admin is reached by address.
+ */
 export function Footer({ shop }: { shop: PublicShop | null }) {
-  const sha = __BUILD_SHA__;
   const year = new Date().getFullYear();
+  const instagram = shop?.instagramHandle ?? 'exquisitebarberbeauty';
   return (
-    <footer className="exq-site-footer exq-footer exq-dark" data-state={shop ? 'ready' : 'loading'}>
-      <div className="exq-wrap exq-site-footer__inner">
+    <footer
+      className="exq-site-footer exq-footer exq-dark"
+      data-state={shop ? 'ready' : 'loading'}
+      data-menu-inert
+    >
+      <div className="exq-wrap exq-footer__inner">
         <div className="exq-footer__grid">
           <img
             className="exq-footer__seal"
@@ -45,7 +51,7 @@ export function Footer({ shop }: { shop: PublicShop | null }) {
           <div>
             <p className="exq-footer__title">Visit</p>
             {shop ? (
-              <address className="exq-site-footer__address" style={{ fontStyle: 'normal' }}>
+              <address>
                 {shop.address.line1}
                 <br />
                 {shop.address.city}, {shop.address.state} {shop.address.postalCode}
@@ -56,29 +62,18 @@ export function Footer({ shop }: { shop: PublicShop | null }) {
           </div>
           <div>
             <p className="exq-footer__title">Follow</p>
-            <p className="exq-site-footer__social">
+            <p>
               <a
-                href={`https://instagram.com/${shop?.instagramHandle ?? 'exquisitebarberbeauty'}`}
+                href={`https://instagram.com/${instagram}`}
                 rel="noopener noreferrer"
                 target="_blank"
               >
-                @{shop?.instagramHandle ?? 'exquisitebarberbeauty'}
+                @{instagram}
               </a>
             </p>
           </div>
         </div>
-        <p className="exq-footer__meta">
-          <span>&copy; {year} Exquisite Barber &amp; Beauty Lounge</span>
-          <Link to="/admin" className="exq-site-footer__links">
-            Staff sign in
-          </Link>
-          <span
-            className="exq-site-footer__build"
-            data-state={sha === 'unknown' ? 'unknown' : 'known'}
-          >
-            Build {sha.slice(0, 7)}
-          </span>
-        </p>
+        <p className="exq-footer__meta">&copy; {year} Exquisite Barber &amp; Beauty Lounge</p>
       </div>
     </footer>
   );

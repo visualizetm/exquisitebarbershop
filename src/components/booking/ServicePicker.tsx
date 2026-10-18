@@ -1,6 +1,6 @@
 import type { PublicService } from '@shared/api/public';
 import { formatCents, priceLabel } from '@shared/lib/money';
-import { Button, StickyCTA } from '@/components/ui';
+import { Button } from '@/components/ui';
 
 export interface ServicePickerProps {
   services: PublicService[];
@@ -10,7 +10,7 @@ export interface ServicePickerProps {
   onContinue: () => void;
 }
 
-/** Services as selectable rows with price and duration. The total rides in a sticky bar on phones. */
+/** Services as selectable rows with price and duration. On phones the bottom bar carries the total and Continue. */
 export function ServicePicker({
   services,
   selected,
@@ -97,16 +97,6 @@ export function ServicePicker({
           Continue
         </Button>
       </p>
-      <StickyCTA
-        primary={chosen.length === 0 ? 'Pick a service' : totalLabel}
-        secondary={
-          chosen.length === 0 ? undefined : `${totalMinutes} min, ${chosen.length} selected`
-        }
-      >
-        <Button disabled={chosen.length === 0} onClick={onContinue}>
-          Continue
-        </Button>
-      </StickyCTA>
     </div>
   );
 }

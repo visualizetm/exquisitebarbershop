@@ -8,14 +8,8 @@ import {
 } from '@shared/api/public';
 import { priceLabel } from '@shared/lib/money';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
-import {
-  ButtonLink,
-  Chips,
-  ErrorState,
-  PhotoFrame,
-  StickyCTA,
-  TimeChipLink,
-} from '@/components/ui';
+import { ButtonLink, Chips, ErrorState, PhotoFrame, TimeChipLink, useBar } from '@/components/ui';
+import { useShop } from '@/app/useShop';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
@@ -33,6 +27,21 @@ export function ChairPage() {
   const services = useApi('/api/services', publicServicesResponseSchema);
   const work = useApi(slug ? `/api/gallery?staff=${encoded}&limit=6` : null, galleryResponseSchema);
   const profile = result.status === 'ready' ? result.data.staff : null;
+  const shop = useShop();
+  const phone = (shop.status === 'ready' ? shop.data.phone : __SHOP_PHONE__).replace(/[^\d+]/g, '');
+  // On a profile the phone bar books this barber, and the booking opens with them chosen.
+  useBar(
+    profile?.acceptsOnlineBooking
+      ? {
+          left: { label: 'Call', href: `tel:${phone}`, tone: 'ink' },
+          right: {
+            label: `Book ${profile.name}`,
+            to: `/book?barber=${encodeURIComponent(profile.slug)}`,
+            tone: 'paper',
+          },
+        }
+      : null,
+  );
   usePageMeta({
     title: profile?.name ?? 'The chairs',
     description: profile
@@ -189,14 +198,6 @@ export function ChairPage() {
             </Link>
           </p>
         </section>
-      ) : null}
-
-      {staff.acceptsOnlineBooking ? (
-        <StickyCTA>
-          <ButtonLink to={bookPath} block>
-            Book {staff.name}
-          </ButtonLink>
-        </StickyCTA>
       ) : null}
     </article>
   );

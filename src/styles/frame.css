@@ -398,3 +398,8 @@ html[data-menu='open'] {
     gap: var(--s6);
   }
 }
+
+/* The open phone menu has its own Call and Book; the bar steps aside. */
+html[data-menu='open'] .exq-bar {
+  visibility: hidden;
+}

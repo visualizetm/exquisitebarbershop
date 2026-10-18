@@ -123,8 +123,9 @@
 .exq-book__inline-action {
   margin-top: var(--s4);
 }
+/* On phones the bottom bar carries Continue; the inline button is for desktop. */
 @media (max-width: 1023px) {
-  .exq-service-picker .exq-book__inline-action {
+  .exq-book__inline-action {
     display: none;
   }
 }

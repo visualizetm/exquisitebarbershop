@@ -541,3 +541,20 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   (default "Walk ins welcome" with a "Book online" link to `/book`). Older settings documents get
   the default on read, so nothing needs a migration. The strip is an empty ink bar while shop data
   loads so the page does not shift.
+- D10-12 The bar hides when a text field has focus or the visual viewport has shrunk by more than
+  150px. Focus alone is what a desktop browser at phone width can show (the tests), and the viewport
+  check is what iOS and Android report; together they cover both. The cost: with the keyboard up
+  the bar is out of reach, so the last field is finished with the keyboard's own Go key (the form
+  submits) or by closing the keyboard.
+- D10-13 On the first booking step BACK links to the home page; on later steps it goes one step back
+  with the choices kept. On the details step CONTINUE submits the form (the `form` attribute), so
+  validation messages appear as before.
+- D10-14 The bar's routes: hidden under `/admin`, `/setup`, `/kit` and `/portal`. Prompt 11's barber
+  portal is not built yet; it should live under `/portal`, or add its prefix to `NO_BAR_PREFIXES`.
+- D10-15 With JavaScript off nothing in a single page app can render, so `index.html` carries a
+  `<noscript>` block: the name, the phone (from the seed, the same value the down screen uses) and
+  the address. Every reveal is already visible by default, so a page that loses its script mid way is
+  never left hidden.
+- D10-16 Header is sticky on every width (the strip scrolls away), because the phone bar carries only
+  Call and Book and the menu must stay reachable. The announcement strip is 40px, not thinner, so its
+  link is a real tap target.

@@ -41,6 +41,7 @@ export function CustomerForm({ initial, requireEmail, onSubmit }: CustomerFormPr
   const errorCount = Object.keys(errors).length;
   return (
     <form
+      id="exq-details-form"
       className="exq-customer-form"
       data-state={errorCount > 0 ? 'invalid' : 'idle'}
       onSubmit={handleSubmit}
@@ -145,7 +146,9 @@ export function CustomerForm({ initial, requireEmail, onSubmit }: CustomerFormPr
           }}
         />
       </div>
-      <Button type="submit">Review booking</Button>
+      <p className="exq-book__inline-action">
+        <Button type="submit">Review booking</Button>
+      </p>
     </form>
   );
 }
