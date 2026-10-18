@@ -15,6 +15,7 @@ import type { StaffDocument } from '../../../shared/schemas/staff';
 import { getEnv } from '../../env';
 import { AppError } from '../../lib/errors';
 import { servicesRepo, shopSettingsRepo, staffRepo, weeklyHoursRepo } from '../../repos';
+import { demoEnabled } from '../../services/demo';
 import { staffOpenings } from '../../services/nextOpening';
 import { galleryPage, heroPhoto, staffPhotoMap } from '../../services/photosService';
 import { parseParams, parseQuery } from '../request';
@@ -91,6 +92,7 @@ export const publicRoutes: RouteDefinition[] = [
         },
         heroPhoto: hero,
         maintenance: getEnv().MAINTENANCE_MODE === 'true',
+        demo: demoEnabled(),
       });
       return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
     },

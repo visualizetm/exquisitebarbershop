@@ -3,6 +3,7 @@ import { publicShopSchema } from '@shared/api/public';
 import { SiteDown } from '@/components/site/SiteDown';
 import { Footer, Nav, ToastProvider } from '@/components/ui';
 import { shopJsonLd } from '@/lib/seo';
+import { errorCodeOf } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useJsonLd } from '@/lib/useJsonLd';
 import { useRouteFocus } from '@/lib/useRouteFocus';
@@ -31,7 +32,15 @@ export function PublicLayout() {
           </a>
           <Nav />
           <main id="exq-main" className="exq-main" tabIndex={-1}>
-            {down ? <SiteDown reason={down} phone={phone} /> : <Outlet />}
+            {down ? (
+              <SiteDown
+                reason={down}
+                phone={phone}
+                code={shop.status === 'error' ? errorCodeOf(shop.error) : undefined}
+              />
+            ) : (
+              <Outlet />
+            )}
           </main>
           <Footer shop={shop.status === 'ready' ? shop.data : null} />
         </div>

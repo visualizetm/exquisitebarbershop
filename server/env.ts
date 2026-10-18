@@ -39,9 +39,15 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   /**
    * Where photos live: Cloudflare R2 in production, the local disk in dev and tests,
-   * or "none" to run without photos and daily backups until R2 exists.
+   * "none" to run without photos until R2 exists, or "mongo" (MongoDB GridFS, demo mode only).
    */
-  STORAGE_DRIVER: z.enum(['local', 'r2', 'none']).default('local'),
+  STORAGE_DRIVER: z.enum(['local', 'r2', 'none', 'mongo']).default('local'),
+  /**
+   * Showcase mode: the first request sets the shop up with sample data, the admin login
+   * offers a one-click demo sign-in, photos can live in MongoDB (STORAGE_DRIVER=mongo),
+   * and the site tells search engines not to index it. Never for a real launch.
+   */
+  DEMO_MODE: z.enum(['true', 'false']).default('false'),
   /** Lets production launch with STORAGE_DRIVER=none on purpose, before R2 is set up. */
   STORAGE_DISABLED_ACK: z.enum(['true', 'false']).default('false'),
   R2_ACCOUNT_ID: z.string().optional(),
@@ -111,11 +117,21 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
     need(
       'STORAGE_DRIVER',
       env.STORAGE_DRIVER !== 'local',
-      'STORAGE_DRIVER must be r2 or none on Vercel',
-      'Set STORAGE_DRIVER to r2 with the R2 variables, or to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now. Vercel functions have no disk to keep photos on.',
+      'STORAGE_DRIVER must be r2, none or mongo on Vercel',
+      'Set STORAGE_DRIVER to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on.',
     );
   }
-  if (env.STORAGE_DRIVER === 'none' && environment === 'production') {
+  const demo = env.DEMO_MODE === 'true';
+  if (env.STORAGE_DRIVER === 'mongo' && environment === 'production') {
+    need(
+      'STORAGE_DRIVER',
+      demo,
+      'STORAGE_DRIVER is mongo without DEMO_MODE',
+      'Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md) for a real launch.',
+    );
+  }
+  // Demo mode says "no photos or email on purpose" by itself; the acknowledgements are for real launches.
+  if (env.STORAGE_DRIVER === 'none' && environment === 'production' && !demo) {
     need(
       'STORAGE_DISABLED_ACK',
       env.STORAGE_DISABLED_ACK === 'true',
@@ -160,7 +176,7 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
       'EMAIL_FROM is not set',
       'Set EMAIL_FROM to the sender, for example "Exquisite Barber & Beauty Lounge <bookings@yourdomain.com>", on a domain verified in Resend.',
     );
-  } else if (environment === 'production') {
+  } else if (environment === 'production' && !demo) {
     need(
       'EMAIL_DISABLED_ACK',
       env.EMAIL_DISABLED_ACK === 'true',

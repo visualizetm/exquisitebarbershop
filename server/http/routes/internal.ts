@@ -4,10 +4,11 @@ import { logger } from '../../lib/logger';
 import { deliverPendingOutbox } from '../../notifications/deliver';
 import { pruneBackups, runBackup } from '../../services/backup';
 import { bootstrap } from '../../services/bootstrap';
+import { clearDemoData } from '../../services/demo';
 import { runDoctor } from '../../services/doctor';
 import { parseBody } from '../request';
 import { purgeDeletedPhotos, sweepAbandonedUploads } from '../../services/photosService';
-import { storageEnabled } from '../../storage';
+import { backupsEnabled, storageEnabled } from '../../storage';
 import type { RouteDefinition, RouteHandler } from '../types';
 
 const STORAGE_STEPS = ['photosPurged', 'uploadsSwept', 'backup', 'backupsPruned'] as const;
@@ -48,6 +49,21 @@ const daily: RouteHandler = async (ctx) => {
   }
   const photosPurged = await purgeDeletedPhotos(ctx.now);
   const uploadsSwept = await sweepAbandonedUploads(ctx.now);
+  if (!backupsEnabled()) {
+    // GridFS photos live in the database itself, so a backup written there would back up nothing.
+    logger.warn('daily job: backup skipped', { reason: 'STORAGE_DRIVER is mongo (GridFS)' });
+    return {
+      body: {
+        outbox,
+        photosPurged,
+        uploadsSwept,
+        backup: null,
+        backupsPruned: 0,
+        skipped: ['backup', 'backupsPruned'],
+      },
+      headers: { 'Cache-Control': 'no-store' },
+    };
+  }
   const backup = await runBackup(ctx.now);
   const backupsPruned = await pruneBackups(ctx.now);
   return {
@@ -98,6 +114,17 @@ export const internalRoutes: RouteDefinition[] = [
       const result = await bootstrap({ force, requestId: ctx.requestId }, ctx.now);
       return { status: 201, body: result, headers: { 'Cache-Control': 'no-store' } };
     },
+  },
+  {
+    // Leaving the showcase: empties a database the demo seeded (and only one), so /setup can start clean.
+    method: 'POST',
+    path: '/api/internal/demo/clear',
+    auth: 'internal',
+    bootstrap: true,
+    handler: async () => ({
+      body: await clearDemoData(),
+      headers: { 'Cache-Control': 'no-store' },
+    }),
   },
   {
     // Lets the /setup page know whether setup exists at all. No secrets, no values.

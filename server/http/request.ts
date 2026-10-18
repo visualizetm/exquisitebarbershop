@@ -30,6 +30,35 @@ export async function readJsonBody(req: IncomingMessage & { body?: unknown }): P
   return parseJsonText(Buffer.concat(chunks).toString('utf8'));
 }
 
+/**
+ * Reads a raw binary body up to `maxBytes`. Vercel hands an octet-stream body over as a
+ * Buffer on req.body; a plain Node server leaves the stream untouched. Both work.
+ */
+export async function readRawBody(
+  req: IncomingMessage & { body?: unknown },
+  maxBytes: number,
+): Promise<Buffer> {
+  const declared = Number(req.headers['content-length'] ?? '0');
+  if (declared > maxBytes) throw new AppError('PAYLOAD_TOO_LARGE', 'The file is too large');
+  const pre = req.body;
+  if (pre !== undefined) {
+    if (!Buffer.isBuffer(pre)) {
+      throw new AppError('UNSUPPORTED_MEDIA_TYPE', 'Send the file as application/octet-stream');
+    }
+    if (pre.length > maxBytes) throw new AppError('PAYLOAD_TOO_LARGE', 'The file is too large');
+    return pre;
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const buffer = typeof chunk === 'string' ? Buffer.from(chunk) : (chunk as Buffer);
+    size += buffer.length;
+    if (size > maxBytes) throw new AppError('PAYLOAD_TOO_LARGE', 'The file is too large');
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
 function parseJsonText(text: string): unknown {
   if (text.trim() === '') return undefined;
   try {

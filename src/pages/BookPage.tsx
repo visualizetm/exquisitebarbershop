@@ -443,6 +443,14 @@ export function BookPage() {
                 A confirmation is on its way to {booked.customer.email}.
               </p>
             ) : null}
+            {shop.data.demo === true ? (
+              <p className="exq-book-done__demo" data-state="demo">
+                Demo mode: no emails are sent, so here is the manage link a customer would get:{' '}
+                <a className="exq-book-done__demo-link" href={manageUrl}>
+                  {manageUrl}
+                </a>
+              </p>
+            ) : null}
             <p className="exq-book-done__manage-url">
               Keep the confirmation email: its link lets you move or cancel this booking.
               {booked.customer.email ? null : (

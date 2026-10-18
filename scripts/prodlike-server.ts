@@ -15,10 +15,14 @@ import { PRODLIKE_OWNER } from './e2e-accounts';
  * MONGODB_URI missing, so the tests can see what a broken deployment shows.
  *
  *   npm run e2e:prod-server            builds, then serves on 4174 (and 4175 broken)
+ *   npm run e2e:prod-server -- --port=4176 --profile=demo
+ *                                      the showcase: DEMO_MODE=true, STORAGE_DRIVER=mongo and
+ *                                      nothing else, on an empty database
  *   PRODLIKE_SKIP_BUILD=1 ...          reuses the last build
  */
 const PORT = Number(process.argv.find((a) => a.startsWith('--port='))?.slice(7) ?? '4174');
 const MISSING = process.argv.find((a) => a.startsWith('--missing='))?.slice(10) ?? null;
+const PROFILE = process.argv.find((a) => a.startsWith('--profile='))?.slice(10) ?? 'launch';
 const DIST = resolve('dist');
 const SECRETS = {
   MANAGE_LINK_SECRET: 'prodlike-manage-link-secret-0123456789abcdef',
@@ -26,14 +30,24 @@ const SECRETS = {
   BOOTSTRAP_SECRET: 'prodlike-bootstrap-secret-0123456789abcdef',
 };
 
-/** The Production variable list from DEPLOY.md, nothing more. */
+/** The Production variable list from DEPLOY.md for the chosen profile, nothing more. */
 function productionEnv(mongoUri: string | null): Record<string, string> {
-  return {
+  const shared = {
     ...(mongoUri === null ? {} : { MONGODB_URI: mongoUri }),
     MONGODB_DB_NAME: 'exquisite_production',
     APP_BASE_URL: `https://127.0.0.1:${PORT}`,
     MANAGE_LINK_SECRET: SECRETS.MANAGE_LINK_SECRET,
     CRON_SECRET: SECRETS.CRON_SECRET,
+    // Vercel sets these itself.
+    NODE_ENV: 'production',
+    VERCEL_ENV: 'production',
+  };
+  if (PROFILE === 'demo') {
+    // The showcase, exactly: six variables and the two switches. No setup, no seed, no R2.
+    return { ...shared, DEMO_MODE: 'true', STORAGE_DRIVER: 'mongo' };
+  }
+  return {
+    ...shared,
     EMAIL_PROVIDER: 'log',
     EMAIL_DISABLED_ACK: 'true',
     BOOTSTRAP_SECRET: SECRETS.BOOTSTRAP_SECRET,
@@ -41,9 +55,6 @@ function productionEnv(mongoUri: string | null): Record<string, string> {
     SEED_OWNER_PASSWORD: PRODLIKE_OWNER.password,
     STORAGE_DRIVER: 'none',
     STORAGE_DISABLED_ACK: 'true',
-    // Vercel sets these itself.
-    NODE_ENV: 'production',
-    VERCEL_ENV: 'production',
   };
 }
 
@@ -70,6 +81,7 @@ const KNOWN = [
   'LOG_LEVEL',
   'STORAGE_DRIVER',
   'STORAGE_DISABLED_ACK',
+  'DEMO_MODE',
   'R2_ACCOUNT_ID',
   'R2_ACCESS_KEY_ID',
   'R2_SECRET_ACCESS_KEY',
@@ -217,36 +229,44 @@ async function main(): Promise<void> {
     console.log('building the production bundle');
     execFileSync('npx', ['vite', 'build'], {
       stdio: 'inherit',
-      env: { ...process.env, APP_BASE_URL: values.APP_BASE_URL ?? '' },
+      env: {
+        ...process.env,
+        APP_BASE_URL: values.APP_BASE_URL ?? '',
+        // The showcase build carries noindex in its HTML and a closed robots.txt.
+        ...(values.DEMO_MODE ? { DEMO_MODE: values.DEMO_MODE } : {}),
+      },
     });
   }
   applyEnv(values);
   // Made once here, then shared with the broken twin through PRODLIKE_CERT_DIR.
   certificate();
 
-  // The broken twin comes up first so the tests can rely on both.
+  // The broken twin comes up first so the tests can rely on both (launch profile only).
   const brokenPort = PORT + 1;
-  const child: ChildProcess = spawn(
-    'npx',
-    ['tsx', 'scripts/prodlike-server.ts', `--port=${brokenPort}`, '--missing=MONGODB_URI'],
-    {
-      stdio: 'inherit',
-      env: {
-        PATH: process.env.PATH ?? '',
-        HOME: process.env.HOME ?? '',
-        PRODLIKE_CERT_DIR: process.env.PRODLIKE_CERT_DIR ?? '',
+  let child: ChildProcess | null = null;
+  if (PROFILE !== 'demo') {
+    child = spawn(
+      'npx',
+      ['tsx', 'scripts/prodlike-server.ts', `--port=${brokenPort}`, '--missing=MONGODB_URI'],
+      {
+        stdio: 'inherit',
+        env: {
+          PATH: process.env.PATH ?? '',
+          HOME: process.env.HOME ?? '',
+          PRODLIKE_CERT_DIR: process.env.PRODLIKE_CERT_DIR ?? '',
+        },
       },
-    },
-  );
-  await waitFor(`https://127.0.0.1:${brokenPort}/api/health`);
+    );
+    await waitFor(`https://127.0.0.1:${brokenPort}/api/health`);
+  }
 
   const site = await createSite();
   await listen(site, PORT);
-  console.log(`prod-like site on https://127.0.0.1:${PORT} (broken twin on ${brokenPort})`);
+  console.log(`prod-like ${PROFILE} site on https://127.0.0.1:${PORT}`);
 
   const { closeMongoClient } = await import('../server/db/client');
   const shutdown = async () => {
-    child.kill('SIGTERM');
+    child?.kill('SIGTERM');
     await new Promise<void>((r) =>
       site.close(() => {
         r();
@@ -258,7 +278,7 @@ async function main(): Promise<void> {
   };
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
-  child.on('exit', () => void shutdown());
+  child?.on('exit', () => void shutdown());
 }
 
 main().catch((error: unknown) => {

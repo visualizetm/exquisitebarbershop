@@ -16,7 +16,7 @@ export interface StoredObject {
 }
 
 export interface StorageDriver {
-  readonly name: 'r2' | 'local';
+  readonly name: 'r2' | 'local' | 'mongo';
   /** A URL the browser may PUT one object to, for a short time. The key is always server made. */
   presignUpload(input: {
     key: string;

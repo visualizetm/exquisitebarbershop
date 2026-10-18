@@ -12,7 +12,6 @@ import type {
 import { idSchema } from '../../shared/schemas/common';
 import {
   PHOTO_CONTENT_TYPES,
-  PHOTO_MAX_BYTES,
   photoKindSchema,
   type PhotoDocument,
   type PhotoKind,
@@ -29,7 +28,13 @@ import {
   shopSettingsRepo,
   staffRepo,
 } from '../repos';
-import { assertStorageEnabled, getStorage, keyPrefix, storageEnabled } from '../storage';
+import {
+  assertStorageEnabled,
+  getStorage,
+  keyPrefix,
+  maxUploadBytes,
+  storageEnabled,
+} from '../storage';
 import { actorOf } from './access';
 import type { ServiceMeta } from './adminBookings';
 import { cursors } from './adminBookings';
@@ -128,6 +133,12 @@ export async function issueUploadUrl(
   meta: ServiceMeta,
 ): Promise<UploadUrlResponse> {
   assertStorageEnabled();
+  if (input.size > maxUploadBytes()) {
+    throw new AppError(
+      'PAYLOAD_TOO_LARGE',
+      `Photos can be up to ${String(Math.floor(maxUploadBytes() / (1024 * 1024)))} MB after the resize`,
+    );
+  }
   const staffId = input.kind === 'hero' ? null : (input.staffId ?? null);
   if (input.kind === 'staff' && !staffId) {
     throw new AppError('VALIDATION_ERROR', 'A staff photo needs a staffId', {
@@ -191,7 +202,7 @@ export async function confirmUpload(
   if (
     stored.size !== issued.n ||
     stored.contentType !== issued.ct ||
-    stored.size > PHOTO_MAX_BYTES
+    stored.size > maxUploadBytes()
   ) {
     // The object stays nowhere: a mismatch is removed before the caller hears about it.
     await getStorage().delete(issued.k);

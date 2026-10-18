@@ -6,7 +6,8 @@ import {
   okResponseSchema,
   type MeResponse,
 } from '../../../shared/api/auth';
-import { changeOwnPassword, login } from '../../auth/authService';
+import { changeOwnPassword, login, loginAsDemoOwner } from '../../auth/authService';
+import { assertDemoEnabled, demoEnabled } from '../../services/demo';
 import { endAllSessions, endSession } from '../../auth/sessions';
 import { shopSettingsRepo, staffRepo, usersRepo } from '../../repos';
 import { AppError } from '../../lib/errors';
@@ -35,7 +36,7 @@ async function meFor(userId: string): Promise<MeResponse> {
     },
     staff: staff && !staff.deletedAt ? toPublicStaff(staff) : null,
     permissions: { barbersCanBlockTime: settings.permissions.barbersCanBlockTime },
-    features: { photos: storageEnabled() },
+    features: { photos: storageEnabled(), demo: demoEnabled() },
   });
 }
 
@@ -47,6 +48,18 @@ export const authRoutes: RouteDefinition[] = [
     handler: async (ctx) => {
       const input = await parseBody(ctx, loginRequestSchema);
       const result = await login(ctx.res, input, metaOf(ctx));
+      return { body: await meFor(result.user._id), headers: NO_STORE };
+    },
+  },
+  {
+    // Demo mode only (the router never matches it otherwise): one click into the owner dashboard.
+    method: 'POST',
+    path: '/api/auth/demo-login',
+    auth: 'public',
+    demoOnly: true,
+    handler: async (ctx) => {
+      assertDemoEnabled();
+      const result = await loginAsDemoOwner(ctx.res, metaOf(ctx));
       return { body: await meFor(result.user._id), headers: NO_STORE };
     },
   },

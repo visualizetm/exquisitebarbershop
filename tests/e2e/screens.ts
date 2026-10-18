@@ -20,13 +20,17 @@ const BASE =
   `http://127.0.0.1:${WEB_PORT}`;
 /** --photos uploads sample hero, chair and gallery photos first, so the pages show them. */
 const withPhotos = args.includes('--photos');
+/** --demo signs in with the "Enter demo dashboard" button instead of an email and password. */
+const demoLogin = args.includes('--demo');
+/** --signed-out never signs in, so /admin/login can be captured. */
+const signedOut = args.includes('--signed-out');
 /** --combine also stacks every montage in the folder into one montage.png. */
 const combine = args.includes('--combine');
 /** --theme=light|dark stores that choice before each page loads and suffixes the file names. */
 const theme = args.find((a) => a.startsWith('--theme='))?.slice('--theme='.length) ?? null;
 /** --owner=email:password signs in with another owner than the e2e seed. */
 const ownerArg = args.find((a) => a.startsWith('--owner='))?.slice('--owner='.length);
-const FLAGS = ['--photos', '--combine'];
+const FLAGS = ['--photos', '--combine', '--demo', '--signed-out'];
 const [milestoneArg, ...routes] = args.filter(
   (a) => !FLAGS.includes(a) && !/^--(theme|base|owner)=/.test(a),
 );
@@ -69,13 +73,17 @@ async function main(): Promise<void> {
         localStorage.setItem('exq-theme', t);
       }, theme);
     }
-    if (routes.some((r) => r.startsWith('/admin'))) {
+    if (!signedOut && routes.some((r) => r.startsWith('/admin'))) {
       const { E2E_OWNER } = await import('../../scripts/e2e-accounts');
       const [email, password] = ownerArg?.split(':') ?? [E2E_OWNER.email, E2E_OWNER.password];
       await page.goto(`${BASE}/admin/login`);
-      await page.getByLabel('Email').fill(email ?? '');
-      await page.getByLabel('Password').fill(password ?? '');
-      await page.getByRole('button', { name: 'Sign in' }).click();
+      if (demoLogin) {
+        await page.getByRole('button', { name: 'Enter demo dashboard' }).click();
+      } else {
+        await page.getByLabel('Email').fill(email ?? '');
+        await page.getByLabel('Password').fill(password ?? '');
+        await page.getByRole('button', { name: 'Sign in' }).click();
+      }
       await page.waitForURL(/\/admin(?!\/login)/);
     }
     for (const route of routes) {

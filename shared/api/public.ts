@@ -29,6 +29,8 @@ export const publicShopSchema = z.object({
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
   maintenance: z.boolean().optional(),
+  /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
+  demo: z.boolean().optional(),
 });
 export type PublicShop = z.infer<typeof publicShopSchema>;
 

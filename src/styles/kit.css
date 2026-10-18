@@ -1076,3 +1076,32 @@ a.exq-chaircard:hover {
   align-items: center;
   min-height: 44px;
 }
+
+/* Demo mode ----------------------------------------------------------------- */
+.exq-demo-banner {
+  margin: 0 0 var(--s4);
+  padding: var(--s2) var(--s3);
+  border: 1px dashed var(--red-200);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: var(--fs-1);
+  font-weight: 500;
+  text-align: center;
+}
+.exq-site-down__details {
+  margin-top: var(--s4);
+  color: var(--fg-2);
+  font-size: var(--fs-1);
+  text-align: center;
+}
+.exq-site-down__details summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+.exq-site-down__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--fg);
+}

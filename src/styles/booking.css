@@ -478,3 +478,13 @@ button.exq-chaircard:hover {
 .exq-manage-view__cutoff {
   color: var(--fg-2);
 }
+
+.exq-book-done__demo {
+  margin-top: var(--s4);
+  padding: var(--s3);
+  border: 1px dashed var(--red-200);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  font-size: var(--fs-1);
+  overflow-wrap: anywhere;
+}

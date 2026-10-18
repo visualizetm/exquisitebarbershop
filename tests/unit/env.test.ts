@@ -21,6 +21,7 @@ const base: Env = {
   LOG_LEVEL: 'info',
   STORAGE_DRIVER: 'local',
   STORAGE_DISABLED_ACK: 'false',
+  DEMO_MODE: 'false',
 };
 const r2 = {
   STORAGE_DRIVER: 'r2' as const,
@@ -108,6 +109,49 @@ describe('envProblems', () => {
     expect(
       names({
         ...noStorage,
+        NODE_ENV: 'development',
+        VERCEL_ENV: 'preview',
+        MONGODB_DB_NAME: 'exquisite_preview',
+        EMAIL_DISABLED_ACK: 'false',
+      }),
+    ).toEqual([]);
+  });
+
+  it('allows photos in MongoDB in production only in demo mode, which also waives the acknowledgements', () => {
+    const showcase: Env = {
+      ...base,
+      NODE_ENV: 'production',
+      MONGODB_DB_NAME: 'exquisite_production',
+      APP_BASE_URL: 'https://example.com',
+      CRON_SECRET: 'c'.repeat(40),
+      STORAGE_DRIVER: 'mongo',
+      EMAIL_DISABLED_ACK: 'true',
+    };
+    const problems = envProblems(showcase);
+    expect(problems.map((p) => p.name)).toEqual(['STORAGE_DRIVER']);
+    expect(problems[0]?.fix).toContain('DEMO_MODE=true');
+    expect(names({ ...showcase, DEMO_MODE: 'true' })).toEqual([]);
+    // The showcase needs only the six variables: no email or storage acknowledgement.
+    expect(names({ ...showcase, DEMO_MODE: 'true', EMAIL_DISABLED_ACK: 'false' })).toEqual([]);
+    expect(
+      names({
+        ...showcase,
+        DEMO_MODE: 'true',
+        STORAGE_DRIVER: 'none',
+        EMAIL_DISABLED_ACK: 'false',
+      }),
+    ).toEqual([]);
+    // Demo does not excuse the required settings or the local disk.
+    expect(names({ ...showcase, DEMO_MODE: 'true', CRON_SECRET: undefined })).toEqual([
+      'CRON_SECRET',
+    ]);
+    expect(names({ ...showcase, DEMO_MODE: 'true', STORAGE_DRIVER: 'local' })).toEqual([
+      'STORAGE_DRIVER',
+    ]);
+    // A preview may use it freely.
+    expect(
+      names({
+        ...showcase,
         NODE_ENV: 'development',
         VERCEL_ENV: 'preview',
         MONGODB_DB_NAME: 'exquisite_preview',

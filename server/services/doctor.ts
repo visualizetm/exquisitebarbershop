@@ -257,6 +257,26 @@ async function checkStorage(): Promise<DoctorCheck[]> {
     });
     return checks;
   }
+  if (storage.name === 'mongo') {
+    // Photos are served by the site itself, so there is no separate public address to test.
+    await storage.delete(key).catch(() => undefined);
+    checks.push(
+      {
+        id: 'storage-public',
+        label: 'Public photo URL',
+        status: 'pass',
+        detail: 'Photos are served by the site itself at /api/media (showcase storage in MongoDB).',
+      },
+      {
+        id: 'backups',
+        label: 'Backups',
+        status: 'warn',
+        detail: 'Showcase storage keeps photos in the database, so the daily backup is skipped.',
+        fix: STORAGE_OFF_FIX,
+      },
+    );
+    return checks;
+  }
   try {
     const res = await fetch(storage.publicUrl(key));
     const text = res.ok ? await res.text() : '';

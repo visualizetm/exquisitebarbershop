@@ -24,6 +24,11 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'GET /api/shop': 'public',
   'GET /api/sitemap.xml': 'public',
   'GET /api/setup': 'public',
+  'GET /api/media/:id': 'public',
+  'PUT /api/media/:id': 'public',
+  'POST /api/auth/demo-login': 'public',
+  'POST /api/admin/demo/reset': 'owner',
+  'POST /api/internal/demo/clear': 'internal',
   'GET /api/internal/cron/daily': 'internal',
   'POST /api/internal/cron/daily': 'internal',
   'GET /api/internal/doctor': 'internal',
@@ -163,7 +168,9 @@ describe('authorization matrix', () => {
         const label = `${role} ${route.method} ${route.path} -> ${res.status} ${code ?? ''}`;
         const signedIn = role !== 'anonymous';
         let ok: boolean;
-        if (level === 'internal') ok = res.status === 403;
+        // Showcase-only routes do not exist while DEMO_MODE is off: a plain 404 for every role.
+        if (route.demoOnly === true) ok = res.status === 404 && code === 'NOT_FOUND';
+        else if (level === 'internal') ok = res.status === 403;
         else if (level === 'public')
           ok = code !== 'AUTH_REQUIRED' && code !== 'PASSWORD_CHANGE_REQUIRED' && !ownerOnly;
         else if (!signedIn) ok = res.status === 401 && code === 'AUTH_REQUIRED';
@@ -176,6 +183,45 @@ describe('authorization matrix', () => {
     }
     expect(failures).toEqual([]);
     expect(checked).toBe(Object.keys(EXPECTED).length * ROLES.length);
+  });
+
+  it('answers the showcase-only routes as declared once DEMO_MODE is on', async () => {
+    const { resetEnvCache } = await import('../../server/env');
+    process.env.DEMO_MODE = 'true';
+    resetEnvCache();
+    try {
+      const demoRoutes = allRoutes.filter((r) => r.demoOnly === true);
+      expect(demoRoutes.map((r) => `${r.method} ${r.path}`).sort()).toEqual([
+        'POST /api/admin/demo/reset',
+        'POST /api/auth/demo-login',
+      ]);
+      const failures: string[] = [];
+      // The owner goes last: a reset deletes the other logins.
+      const order: Role[] = ['anonymous', 'tempPassword', 'barber', 'owner'];
+      for (const route of demoRoutes) {
+        for (const role of order) {
+          const res = await call(server.baseUrl, route.method, route.path, {
+            headers: await cookieFor(role),
+            body: {},
+          });
+          const parsed = apiErrorSchema.safeParse(res.body);
+          const code = parsed.success ? parsed.data.error.code : null;
+          const label = `${role} ${route.method} ${route.path} -> ${res.status} ${code ?? ''}`;
+          let ok: boolean;
+          if (route.auth === 'public') ok = res.status === 200;
+          else if (role === 'anonymous') ok = res.status === 401 && code === 'AUTH_REQUIRED';
+          else if (role === 'tempPassword')
+            ok = res.status === 403 && code === 'PASSWORD_CHANGE_REQUIRED';
+          else if (role === 'barber') ok = res.status === 403 && code === 'FORBIDDEN';
+          else ok = res.status === 200;
+          if (!ok) failures.push(label);
+        }
+      }
+      expect(failures).toEqual([]);
+    } finally {
+      process.env.DEMO_MODE = 'false';
+      resetEnvCache();
+    }
   });
 
   it('a route registered without a valid auth level stops the router from starting', async () => {

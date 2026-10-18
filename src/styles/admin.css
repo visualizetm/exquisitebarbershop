@@ -549,6 +549,37 @@
 .exq-adm-login__submit {
   width: 100%;
 }
+.exq-adm-login__mark {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--s4);
+}
+.exq-adm-login__mark img {
+  width: 180px;
+  height: auto;
+}
+.exq-adm-login__demo {
+  margin-top: var(--s5);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.exq-adm-login__demo p {
+  margin-bottom: var(--s3);
+  color: var(--fg-2);
+}
+.exq-adm-login__demo-button {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border-strong, var(--fg));
+}
+.exq-adm-settings__demo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s3);
+  max-width: 560px;
+}
 
 /* Toasts sit above the bottom tab bar on phones, so Undo is never under a tab. */
 @media (max-width: 1023px) {

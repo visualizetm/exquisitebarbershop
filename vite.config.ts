@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { shopSettingsSeed } from './seed/shop';
 
@@ -25,6 +25,11 @@ function configuredSiteUrl(): string | null {
   return (fromEnv.startsWith('http') ? fromEnv : `https://${fromEnv}`).replace(/\/$/, '');
 }
 
+/** The showcase build: DEMO_MODE=true in the build environment. */
+function demoBuild(): boolean {
+  return process.env.DEMO_MODE === 'true';
+}
+
 function resolveSiteUrl(): string {
   return configuredSiteUrl() ?? 'http://localhost:5173';
 }
@@ -42,9 +47,15 @@ function headPlugin(): Plugin {
       outDir = config.build.outDir;
     },
     closeBundle() {
-      const site = configuredSiteUrl();
       const robots = resolve(outDir, 'robots.txt');
-      if (!site || !existsSync(robots)) return;
+      if (!existsSync(robots)) return;
+      // The showcase asks crawlers to stay out entirely.
+      if (demoBuild()) {
+        writeFileSync(robots, 'User-agent: *\nDisallow: /\n');
+        return;
+      }
+      const site = configuredSiteUrl();
+      if (!site) return;
       const text = readFileSync(robots, 'utf8').trimEnd();
       writeFileSync(robots, `${text}\nSitemap: ${site}/sitemap.xml\n`);
     },
@@ -54,20 +65,26 @@ function headPlugin(): Plugin {
         const fonts = Object.keys(ctx.bundle ?? {}).filter((file) =>
           /jost-latin-(400|500|700)-normal.*\.woff2$/.test(file),
         );
-        return {
-          html: html.replaceAll('%SITE_URL%', resolveSiteUrl()),
-          tags: fonts.map((href) => ({
-            tag: 'link',
+        const tags: HtmlTagDescriptor[] = fonts.map((href) => ({
+          tag: 'link',
+          injectTo: 'head',
+          attrs: {
+            rel: 'preload',
+            as: 'font',
+            type: 'font/woff2',
+            crossorigin: '',
+            href: `/${href}`,
+          },
+        }));
+        // DEMO_MODE at build time puts noindex in the static HTML, for crawlers that never run scripts.
+        if (demoBuild()) {
+          tags.push({
+            tag: 'meta',
             injectTo: 'head',
-            attrs: {
-              rel: 'preload',
-              as: 'font',
-              type: 'font/woff2',
-              crossorigin: '',
-              href: `/${href}`,
-            },
-          })),
-        };
+            attrs: { name: 'robots', content: 'noindex, nofollow' },
+          });
+        }
+        return { html: html.replaceAll('%SITE_URL%', resolveSiteUrl()), tags };
       },
     },
   };

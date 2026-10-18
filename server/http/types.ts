@@ -56,5 +56,10 @@ export interface RouteDefinition {
   bootstrap?: boolean;
   /** Keeps answering in maintenance mode and while the environment is incomplete. */
   alwaysOn?: boolean;
+  /**
+   * Exists only while DEMO_MODE=true. With the mode off the router never matches the
+   * route, so it answers 404 exactly like an address that was never built.
+   */
+  demoOnly?: boolean;
   handler: RouteHandler;
 }

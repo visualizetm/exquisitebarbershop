@@ -76,7 +76,7 @@ describe('without photo storage', () => {
     expect(list.status).toBe(200);
     expect(adminPhotoListResponseSchema.parse(list.body).photos).toEqual([]);
     const me = await owner('GET', '/api/auth/me');
-    expect(meResponseSchema.parse(me.body).features).toEqual({ photos: false });
+    expect(meResponseSchema.parse(me.body).features).toEqual({ photos: false, demo: false });
   });
 
   it('renders the public pages with placeholders: no hero, no portraits, an empty gallery', async () => {

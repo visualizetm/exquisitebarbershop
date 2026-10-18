@@ -28,6 +28,35 @@ async function expectUp(page: Page) {
   await expect(page.locator('.exq-main')).toBeVisible();
 }
 
+test('with DEMO_MODE off nothing of the showcase exists and nothing seeds itself', async ({
+  page,
+}) => {
+  // An empty database and no setup yet: the shop answers "not set up" instead of seeding itself.
+  const shop = await page.request.get('/api/shop');
+  expect(shop.status()).toBe(503);
+  expect(((await shop.json()) as { error: { code: string } }).error.code).toBe('CONFIG_ERROR');
+  expect(shop.headers()['x-robots-tag']).toBeUndefined();
+  const login = await page.request.post('/api/auth/demo-login', { data: {} });
+  expect(login.status()).toBe(404);
+  const reset = await page.request.post('/api/admin/demo/reset', { data: {} });
+  expect(reset.status()).toBe(404);
+  // GridFS photos are not available either: the media address does not exist for this driver.
+  expect(
+    (await page.request.get('/api/media/0f8fad5b-d9cb-469f-a165-70867728950e.webp')).status(),
+  ).toBe(404);
+  const html = await (await page.request.get('/')).text();
+  expect(html).not.toContain('name="robots"');
+  expect(await (await page.request.get('/robots.txt')).text()).not.toMatch(/^Disallow: \/$/m);
+
+  // The down screen names the error code, and nothing else, in a Details disclosure.
+  await page.goto('/');
+  const down = page.locator('.exq-site-down[data-state="down"]');
+  await expect(down).toBeVisible();
+  await down.locator('summary').click();
+  await expect(down.locator('.exq-site-down__code')).toHaveText('CONFIG_ERROR');
+  expect(await down.innerText()).not.toMatch(/mongodb|secret|password/i);
+});
+
 test('a missing MONGODB_URI shows the down message and the health check names it', async ({
   page,
 }) => {
@@ -43,6 +72,8 @@ test('a missing MONGODB_URI shows the down message and the health check names it
   await expect(down).toBeVisible();
   await expect(down.locator('.exq-state__title')).toHaveText('Online booking is having a moment');
   await expect(down.getByText("Call the shop and we'll get you in.")).toBeVisible();
+  await down.locator('summary').click();
+  await expect(down.locator('.exq-site-down__code')).toHaveText('CONFIG_ERROR');
   await expect(down.getByRole('link', { name: /^Call/ })).toHaveAttribute('href', /^tel:/);
 
   // The setup page still works there, so the doctor can say what is missing.
@@ -189,6 +220,9 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await expect(page).toHaveURL(/\/admin\/login/);
   await expect(page.getByRole('heading', { name: 'Staff sign in' })).toBeVisible();
   await expect(page.locator('.exq-site-down')).toHaveCount(0);
+  // A real shop has no demo button and no demo banner.
+  await expect(page.getByRole('button', { name: 'Enter demo dashboard' })).toHaveCount(0);
+  await expect(page.getByText('Demo mode.')).toHaveCount(0);
   await page.getByLabel('Email').fill(PRODLIKE_OWNER.email);
   await page.getByLabel('Password').fill(PRODLIKE_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();

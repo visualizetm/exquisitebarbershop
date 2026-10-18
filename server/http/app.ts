@@ -4,8 +4,10 @@ import { adminRoutes } from './routes/admin';
 import { authRoutes } from './routes/auth';
 import { availabilityRoutes } from './routes/availability';
 import { bookingRoutes } from './routes/bookings';
+import { demoRoutes } from './routes/demo';
 import { healthRoutes } from './routes/health';
 import { internalRoutes } from './routes/internal';
+import { mediaRoutes } from './routes/media';
 import { meRoutes } from './routes/me';
 import { photosRoutes } from './routes/photos';
 import { publicRoutes } from './routes/public';
@@ -24,6 +26,8 @@ export const allRoutes: readonly RouteDefinition[] = [
   ...meRoutes,
   ...adminRoutes,
   ...photosRoutes,
+  ...mediaRoutes,
+  ...demoRoutes,
   ...internalRoutes,
 ];
 

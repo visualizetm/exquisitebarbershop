@@ -19,6 +19,11 @@ function signature(secret: string, key: string, exp: number): string {
   return createHmac('sha256', secret).update(`${key}:${exp}`).digest('base64url');
 }
 
+/** The signature of a short-lived PUT URL. The mongo driver signs its upload URLs the same way. */
+export function signLocalUpload(secret: string, key: string, exp: number): string {
+  return signature(secret, key, exp);
+}
+
 /** True when the PUT URL for `key` was issued by this server and has not expired. */
 export function verifyLocalUploadSignature(
   secret: string,
