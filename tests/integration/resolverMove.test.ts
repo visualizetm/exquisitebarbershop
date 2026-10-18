@@ -7,6 +7,8 @@ import {
   staffRepo,
   weeklyHoursRepo,
 } from '../../server/repos';
+import { newId } from '../../server/lib/ids';
+import { createTimeBlock } from '../../server/services/adminSchedule';
 import { runSeed } from '../../server/services/seedService';
 import { serviceSeedId, shopHoursSeed, staffSeed, staffSeedId } from '../../seed/shop';
 import { apiErrorSchema } from '../../shared/api/errors';
@@ -27,7 +29,6 @@ process.env.OUTBOX_AFTER_RESPONSE = 'off';
 const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
-let barberCookie: string;
 const THU = nextDate(4, 3);
 const marcus = staffSeedId('marcus');
 const dee = staffSeedId('dee');
@@ -104,8 +105,6 @@ beforeAll(async () => {
   ownerCookie = await sessionCookie(
     (await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') }))._id,
   );
-  const barber = await createLogin({ role: 'barber', staffId: marcus });
-  barberCookie = await sessionCookie(barber._id);
 });
 afterAll(async () => {
   await server.close();
@@ -219,28 +218,33 @@ describe('the resolver: Move', () => {
     expect(new Set(held.map((l) => l.holderId)).size).toBe(1);
   });
 
-  it('a barber may keep but not move', async () => {
+  it('a barber may keep but not move (the rule holds even below the barber routes)', async () => {
     const booking = await seedBooking(marcus, '12:00');
-    // The owner allows barbers to block their own time, so the refusal below is about the move.
-    const current = (await asOwner('GET', '/api/admin/settings')).body as {
-      settings: Record<string, unknown>;
+    const barber = {
+      userId: marcus,
+      role: 'barber' as const,
+      staffId: marcus,
+      sessionId: newId(),
+      email: '',
+      mustChangePassword: false,
     };
-    const allowed = await asOwner('PUT', '/api/admin/settings', {
-      ...current.settings,
-      permissions: { barbersCanBlockTime: true, barbersCanUploadPhotos: false },
+    await expect(
+      createTimeBlock(
+        barber,
+        { kind: 'chair', staffId: marcus },
+        {
+          staffId: marcus,
+          kind: 'timeOff',
+          startAt: slotAt(THU, '08:00'),
+          endAt: slotAt(THU, '21:00'),
+          resolutions: [{ bookingId: booking._id, action: 'move', toStaffId: tre }],
+        },
+        { requestId: 'test', now: new Date() },
+      ),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: expect.stringContaining('cancel or move'),
     });
-    expect(allowed.status).toBe(200);
-    const res = await call(server.baseUrl, 'POST', '/api/me/time-blocks', {
-      headers: { cookie: barberCookie },
-      body: {
-        kind: 'timeOff',
-        startAt: slotAt(THU, '08:00'),
-        endAt: slotAt(THU, '21:00'),
-        resolutions: [{ bookingId: booking._id, action: 'move', toStaffId: tre }],
-      },
-    });
-    expect(res.status).toBe(403);
-    expect(apiErrorSchema.parse(res.body).error.message).toContain('cancel or move');
     expect((await bookingsRepo.findBookingById(booking._id))?.staffId).toBe(marcus);
   });
 });

@@ -10,6 +10,7 @@ import { Status } from '@/components/Status';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { useQuick } from '../shell/quick';
+import { AccessTab } from './AccessTab';
 import { HoursTab } from './HoursTab';
 import { ProfileTab } from './ProfileTab';
 import { ServicesTab } from './ServicesTab';
@@ -20,9 +21,10 @@ const TABS = [
   { id: 'services', label: 'Services' },
   { id: 'hours', label: 'Working hours' },
   { id: 'timeoff', label: 'Time off' },
+  { id: 'access', label: 'Access' },
 ];
 
-/** One barber: profile, the services they do, weekly hours and time off. */
+/** One barber: profile, the services they do, weekly hours, time off and how they sign in. */
 export function TeamDetailPage() {
   const { id = '' } = useParams();
   const quick = useQuick();
@@ -97,6 +99,7 @@ export function TeamDetailPage() {
             <HoursTab member={member} hours={days} onChanged={quick.changed} />
           ) : null}
           {tab === 'timeoff' ? <TimeOffTab member={member} /> : null}
+          {tab === 'access' ? <AccessTab member={member} /> : null}
         </Tabs>
       </section>
     </div>

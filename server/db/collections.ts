@@ -9,6 +9,11 @@ import type { IdempotencyKeyDocument } from '../../shared/schemas/idempotencyKey
 import type { LoginThrottleDocument } from '../../shared/schemas/loginThrottle';
 import type { PendingUploadDocument } from '../../shared/schemas/pendingUpload';
 import type { PhotoDocument } from '../../shared/schemas/photo';
+import type {
+  SetupTokenDocument,
+  StaffPinDocument,
+  TeamSessionDocument,
+} from '../../shared/schemas/staffPin';
 import type { ScheduleGuardDocument } from '../../shared/schemas/scheduleGuard';
 import type { RateLimitDocument } from '../../shared/schemas/rateLimit';
 import type { ServiceDocument } from '../../shared/schemas/service';
@@ -45,6 +50,9 @@ export interface CollectionTypes {
   systemState: SystemStateDocument;
   alerts: AlertDocument;
   customerNotes: CustomerNoteDocument;
+  staffPins: StaffPinDocument;
+  setupTokens: SetupTokenDocument;
+  teamSessions: TeamSessionDocument;
 }
 
 /** Typed access to a collection. Only repositories call this. */

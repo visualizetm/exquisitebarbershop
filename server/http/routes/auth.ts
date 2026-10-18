@@ -72,7 +72,7 @@ export const authRoutes: RouteDefinition[] = [
   {
     method: 'POST',
     path: '/api/auth/logout',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       await endSession(ctx.res, principalOf(ctx), ctx.now);
@@ -82,7 +82,7 @@ export const authRoutes: RouteDefinition[] = [
   {
     method: 'POST',
     path: '/api/auth/logout-all',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const sessionsEnded = await endAllSessions(ctx.res, principalOf(ctx), ctx.now);
@@ -95,14 +95,14 @@ export const authRoutes: RouteDefinition[] = [
   {
     method: 'GET',
     path: '/api/auth/me',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => ({ body: await meFor(principalOf(ctx).userId), headers: NO_STORE }),
   },
   {
     method: 'POST',
     path: '/api/me/email',
-    auth: 'barber',
+    auth: 'owner',
     handler: async (ctx) => {
       const input = await parseBody(ctx, changeEmailRequestSchema);
       await changeOwnEmail(principalOf(ctx), input, metaOf(ctx));
@@ -112,7 +112,7 @@ export const authRoutes: RouteDefinition[] = [
   {
     method: 'POST',
     path: '/api/me/password',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const input = await parseBody(ctx, changePasswordRequestSchema);

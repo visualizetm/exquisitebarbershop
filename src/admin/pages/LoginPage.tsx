@@ -66,6 +66,8 @@ export function LoginPage() {
         setError('Too many attempts. Please wait a few minutes and try again.');
       } else if (err instanceof ApiRequestError && err.status === 401) {
         setError('Email or password is incorrect.');
+      } else if (err instanceof ApiRequestError && err.status === 403) {
+        setError('Barbers sign in with a PIN at /team, not here.');
       } else {
         setError('Could not sign in. Please try again.');
       }
@@ -117,6 +119,9 @@ export function LoginPage() {
           {working ? 'Signing in' : 'Sign in'}
         </button>
       </form>
+      <p className="exq-adm-login__team">
+        Barber? <a href="/team">Sign in with your PIN</a>.
+      </p>
       {demo ? (
         <div className="exq-adm-login__demo">
           <p>Looking around? Skip the password.</p>

@@ -1,12 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resetEnvCache } from '../../server/env';
-import { shopSettingsRepo } from '../../server/repos';
 import { purgeDeletedPhotos, sweepStorageOrphans } from '../../server/services/photosService';
 import { runDoctor } from '../../server/services/doctor';
 import { runSeed } from '../../server/services/seedService';
 import { resetStorageCache } from '../../server/storage';
 import { ORPHAN_AGE_MS, signParams } from '../../server/storage/cloudinary';
-import { shopSettingsSeed, staffSeedId } from '../../seed/shop';
+import { staffSeedId } from '../../seed/shop';
 import { apiErrorSchema } from '../../shared/api/errors';
 import {
   adminPhotoResponseSchema,
@@ -16,7 +15,7 @@ import {
 } from '../../shared/api/photos';
 import { publicShopSchema } from '../../shared/api/public';
 import { photoKeySchema } from '../../shared/schemas/photo';
-import { createLogin, sessionCookie } from '../helpers/auth';
+import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
 import { call, startTestServer, type TestServer } from '../helpers/bookingApi';
 import { NOW, useTestDb } from '../helpers/db';
 import { installFakeCloudinary, type FakeCloudinary } from '../helpers/fakeCloudinary';
@@ -30,7 +29,6 @@ const { db } = useTestDb();
 let server: TestServer;
 let fake: FakeCloudinary;
 let ownerCookie: string;
-let marcusCookie: string;
 const marcus = staffSeedId('marcus');
 const dee = staffSeedId('dee');
 const BYTES = Buffer.from('RIFF....WEBPVP8 ' + 'x'.repeat(300));
@@ -90,7 +88,6 @@ beforeAll(async () => {
   ownerCookie = await sessionCookie(
     (await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') }))._id,
   );
-  marcusCookie = await sessionCookie((await createLogin({ role: 'barber', staffId: marcus }))._id);
 });
 afterAll(async () => {
   await server.close();
@@ -145,43 +142,15 @@ describe('the signature', () => {
 });
 
 describe('who can get a signature', () => {
-  it('a barber cannot, until the owner allows it, and then only for their own portrait', async () => {
-    expect((await issue(marcusCookie, { kind: 'staff', staffId: marcus })).res.status).toBe(403);
-    await shopSettingsRepo.updateShopSettings(
-      {
-        ...shopSettingsSeed,
-        permissions: { barbersCanBlockTime: false, barbersCanUploadPhotos: true },
-      },
-      new Date(),
-    );
-    const mine = await issue(marcusCookie, { kind: 'staff', staffId: marcus });
-    expect(mine.res.status).toBe(200);
-    expect(mine.issued?.method).toBe('POST');
-    // Not another chair's portrait, not the gallery, not the home hero.
-    expect((await issue(marcusCookie, { kind: 'staff', staffId: dee })).res.status).toBe(403);
-    expect((await issue(marcusCookie, { kind: 'gallery', staffId: marcus })).res.status).toBe(403);
-    expect((await issue(marcusCookie, { kind: 'gallery' })).res.status).toBe(403);
-    expect((await issue(marcusCookie, { kind: 'hero' })).res.status).toBe(403);
-    // And a ticket issued to the owner for the gallery cannot be confirmed by the barber.
-    const { issued } = await issue(ownerCookie, { kind: 'gallery' });
-    if (!issued) throw new Error('no upload');
-    const uploaded = (await (await fake.browserUpload(issued, BYTES)).json()) as {
-      public_id: string;
-      version: number;
-      bytes: number;
-    };
-    const stolen = await as(marcusCookie)('POST', '/api/admin/photos/confirm', {
-      ticket: issued.ticket,
-      width: 10,
-      height: 10,
-      alt: 'x',
-      cloudinary: {
-        publicId: uploaded.public_id,
-        version: uploaded.version,
-        bytes: uploaded.bytes,
-      },
-    });
-    expect(stolen.status).toBe(403);
+  it('a barber signed in with a PIN cannot get a signature for anything', async () => {
+    const barberCookie = await teamCookie(marcus);
+    for (const body of [
+      { kind: 'staff' as const, staffId: marcus },
+      { kind: 'gallery' as const },
+      { kind: 'hero' as const },
+    ]) {
+      expect((await issue(barberCookie, body)).res.status).toBe(401);
+    }
   });
 });
 

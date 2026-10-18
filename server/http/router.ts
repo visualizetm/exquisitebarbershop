@@ -17,7 +17,11 @@ interface CompiledRoute extends RouteDefinition {
   segments: string[];
 }
 
-export type Authenticator = (ctx: RequestContext) => Promise<Principal | null>;
+/** Finds the caller for a protected route: the owner's session cookie or a barber's PIN session. */
+export type Authenticator = (
+  ctx: RequestContext,
+  level: 'owner' | 'team',
+) => Promise<Principal | null>;
 
 /** Until the auth prompt lands, every non-public route is denied. Deny by default is the safe choice. */
 export const denyAllAuthenticator: Authenticator = () => Promise.resolve(null);
@@ -99,7 +103,7 @@ async function assertServing(route: RouteDefinition, pathname: string, now: Date
   }
 }
 
-const KNOWN_LEVELS: ReadonlySet<string> = new Set(['public', 'barber', 'owner', 'internal']);
+const KNOWN_LEVELS: ReadonlySet<string> = new Set(['public', 'team', 'owner', 'internal']);
 
 /** Deny by default: building a router with a route that has no valid auth level fails at startup. */
 export function createRouter(
@@ -172,14 +176,19 @@ export function createRouter(
         case 'internal':
           assertInternalSecret(req, route);
           break;
-        case 'barber':
+        case 'team': {
+          const principal = await authenticate(ctx, 'team');
+          if (principal?.role !== 'barber') throw new AppError('AUTH_REQUIRED', 'Please sign in');
+          ctx.principal = principal;
+          break;
+        }
         case 'owner': {
-          const principal = await authenticate(ctx);
+          const principal = await authenticate(ctx, 'owner');
           if (!principal) throw new AppError('AUTH_REQUIRED', 'Please sign in');
           if (principal.mustChangePassword && route.allowDuringPasswordChange !== true) {
             throw new AppError('PASSWORD_CHANGE_REQUIRED', 'Please choose a new password first');
           }
-          if (route.auth === 'owner' && principal.role !== 'owner') {
+          if (principal.role !== 'owner') {
             throw new AppError('FORBIDDEN', 'Owner access is required');
           }
           ctx.principal = principal;

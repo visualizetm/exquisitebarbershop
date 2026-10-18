@@ -65,7 +65,8 @@ export async function authenticateFromCookie(ctx: RequestContext): Promise<Princ
     return null;
   }
   const user = await usersRepo.findUserById(session.userId);
-  if (!user?.isActive) {
+  // Barbers sign in at /team with a PIN; a barber login record can no longer open the dashboard.
+  if (!user?.isActive || user.role !== 'owner') {
     clearSessionCookie(ctx.res);
     return null;
   }

@@ -694,3 +694,45 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   before its clock started, which set the time left to zero). The pause now only acts on a running clock.
   The e2e booking helper clears the test server's rate-limit windows before each booking, because a full
   run books more than ten times from one address, which the real limit refuses by design.
+- D11-27 A barber has no login record. Identity is the staff record plus a PIN, in three new collections:
+  `staffPins` (one per barber, unique on `staffId`), `setupTokens` (hash only, TTL on `expiresAt`) and
+  `teamSessions` (hash only, TTL on `expiresAt`, 12 hours absolute). The barber cookie is `__Host-exq_team`,
+  separate from the owner's, and the router has a new auth level `team` next to `owner`. The two never stand
+  in for each other: an owner route reads only the owner cookie and answers 401 to a barber session, and
+  the other way round. The old barber email login is refused at `/admin` with a pointer to `/team` (only
+  after the right password, so it reveals nothing), a barber login record can no longer authenticate, and
+  the barber routes under `/api/me/*`, the `/api/admin/users*` routes and their screens are gone.
+- D11-28 The PIN is stored as argon2id of an HMAC-SHA256 of the PIN keyed with `MANAGE_LINK_SECRET` and the
+  staff id. Six digits are only a million guesses, so the hash alone would fall to an offline attack in
+  minutes if the database leaked; the keyed digest means the database alone is not enough. Security wins
+  over convenience here (decision rule), and it needs no new variable.
+- D11-29 The five-tries lock reuses `loginThrottle` under a hashed `pin:<staffId>` key with one 15 minute
+  level, and the thirty-per-address limit reuses `rateLimits`. Only failures count and a success clears the
+  barber's count. Wrong PIN, no PIN yet, hidden barber and unknown id all answer the same `INVALID_CREDENTIALS`
+  after the same hashing work; an unknown id only counts against the address, never against a barber. The
+  one place the answer differs is the lock itself (`ACCOUNT_LOCKED`), because a real barber has to know to
+  wait; that costs nothing the roster does not already show.
+- D11-30 A setup link and "Reset PIN" are one operation: issuing a link deletes the PIN, ends every session
+  of that barber, retires earlier links and clears a lock, so "a new link or reset invalidates the old PIN"
+  holds by construction. "Copy setup link" is the same call without a confirmation; "Reset PIN" asks first.
+  Using a link also signs the barber in, since holding the link is proof enough and typing the PIN twice is
+  the only step left.
+- D11-31 `barbersCanBlockTime` and `barbersCanUploadPhotos` no longer gate anything. Every barber can block
+  their own time and ask for days off, which the portal needs to work out of the box, and photos stay with the
+  owner (the Me tab says to ask). The flags remain in the stored settings document, unused, with no control.
+- D11-32 "I'm out today" sets the day off, keeps every booked client exactly where they are and raises one
+  `barberOut` alert when anyone was booked; pressing it twice changes nothing and raises nothing more. Days off
+  ahead apply at once when those days are empty and otherwise become a `timeOffRequest` alert. A short block
+  over a booked client is refused with the usual conflict answer, and the screen tells the barber to call the
+  shop, because a barber may keep but never cancel or move a client.
+- D11-33 What a barber sees of a booking is the first and last name as booked, the services, the time, the
+  status and notes. Never a phone number or an email (a test asserts neither appears in any portal payload);
+  "Call shop" replaces them. The walk-in form takes a phone number as input only, because a booking needs
+  one for the owner's customer list.
+- D11-34 In demo mode every seeded barber gets PIN 246810 when the shop is first set up, and a demo seeded
+  before PINs existed gets them once, only while no PIN and no setup link exist at all. The sign-in screen
+  prints "Demo PIN: 246810" only when the public shop says it is a demo, and e2e proves it is absent in the
+  normal build.
+- D11-35 Admin type stays 13 to 22px: PIN keys and stat values are now `--t-h3`. The portal page uses
+  `--card-2` rather than `--surface-2`, because `--surface-2` is a light-only value and white text on it
+  failed contrast in dark.

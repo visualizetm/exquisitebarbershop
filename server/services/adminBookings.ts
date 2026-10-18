@@ -5,7 +5,6 @@ import type {
   CustomerListQuery,
   CustomerListResponse,
   CustomerResponse,
-  MyScheduleResponse,
   ScheduleResponse,
   ScheduleWeekResponse,
   TodayResponse,
@@ -103,7 +102,7 @@ function rangeViews(ranges: { start: Date; end: Date }[]) {
   return ranges.map((r) => ({ startAt: r.start.toISOString(), endAt: r.end.toISOString() }));
 }
 
-function workingView(staffId: string, date: string, source: ScheduleSource) {
+export function workingView(staffId: string, date: string, source: ScheduleSource) {
   const day = workingRangesFor(staffId, date, source);
   return { ranges: rangeViews(day.ranges), reason: day.reason };
 }
@@ -285,44 +284,6 @@ export async function whoIsInForStaff(staffId: string, date: string): Promise<Wh
   const staff = data.staff.find((s) => s._id === staffId);
   if (!staff) throw new AppError('NOT_FOUND', 'Staff member was not found');
   return whoIsInFor(staff, date, data.source);
-}
-
-/** The barber's own schedule for one to seven days. */
-export async function mySchedule(
-  scope: Scope & { kind: 'chair' },
-  input: { date?: string | undefined; days: number },
-  now: Date,
-): Promise<MyScheduleResponse> {
-  const from = input.date ?? shopDateOf(now);
-  const to =
-    shopDayStart(from)
-      .plus({ days: input.days - 1 })
-      .toISODate() ?? from;
-  const range = { start: shopDayBounds(from).start, end: shopDayBounds(to).end };
-  const [data, bookings, settings] = await Promise.all([
-    loadScheduleData(from, to),
-    bookingsRepo.listBookingsBetween(range, { staffId: scope.staffId }),
-    shopSettingsRepo.requireShopSettings(),
-  ]);
-  const staff = data.staff.find((s) => s._id === scope.staffId);
-  if (!staff || staff.deletedAt)
-    throw new AppError('FORBIDDEN', 'This login is not linked to a chair');
-  const days: MyScheduleResponse['days'] = [];
-  for (let d = shopDayStart(from); (d.toISODate() ?? '') <= to; d = d.plus({ days: 1 })) {
-    const date = d.toISODate() ?? from;
-    const bounds = shopDayBounds(date);
-    days.push({
-      date,
-      working: workingView(staff._id, date, data.source),
-      bookings: bookings
-        .filter((b) => b.startAt >= bounds.start && b.startAt < bounds.end)
-        .map((b) => toAdminBookingView(b, staff)),
-      blocks: data.source.timeBlocks
-        .filter((b) => b.staffId === staff._id && b.startAt < bounds.end && b.endAt > bounds.start)
-        .map(toTimeBlockView),
-    });
-  }
-  return { staff: toStaffRef(staff), days, canBlockTime: settings.permissions.barbersCanBlockTime };
 }
 
 // ---------------------------------------------------------------------------

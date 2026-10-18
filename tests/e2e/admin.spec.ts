@@ -1,18 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DateTime } from 'luxon';
-import { E2E_BARBER, E2E_OWNER } from '../../scripts/e2e-accounts';
-import { myScheduleResponseSchema } from '../../shared/api/admin';
+import { E2E_OWNER } from '../../scripts/e2e-accounts';
 import { bookPublicly } from './owner';
 
 const SHOP_ZONE = 'America/New_York';
-
-/**
- * Status of a same-origin request made by the page itself. The session cookie is
- * Secure, so it only travels with requests the browser makes.
- */
-async function statusFromPage(page: Page, path: string): Promise<number> {
-  return page.evaluate(async (url) => (await fetch(url)).status, path);
-}
 
 async function signIn(page: Page, account: { email: string; password: string }) {
   await page.goto('/admin/login');
@@ -103,29 +94,11 @@ test('the owner blocks an hour and that time disappears from /book', async ({ pa
   await customer.context().close();
 });
 
-test('a barber signs in and sees only their own schedule', async ({ page }) => {
-  await signIn(page, E2E_BARBER);
-  await expect(page).toHaveURL(/\/admin\/me/);
-  await expect(page.getByRole('heading', { name: 'My schedule, Marcus' })).toBeVisible();
-  const nav = page.locator('.exq-adm-nav__list a');
-  await expect(nav).toHaveText(['My schedule', 'Account']);
-
-  // Owner screens are not reachable, in the app or through the API.
-  await page.goto('/admin/schedule');
-  await expect(page).toHaveURL(/\/admin\/me$/);
-  expect(await statusFromPage(page, '/api/admin/today')).toBe(403);
-  expect(await statusFromPage(page, '/api/admin/bookings')).toBe(403);
-
-  // A week view lists only Marcus's bookings.
-  await page.getByRole('button', { name: 'Week' }).click();
-  await expect(page.locator('.exq-adm-mine')).toHaveAttribute('data-view', 'week');
-  await expect(page.locator('.exq-adm-mine__day')).toHaveCount(7);
-  const body = myScheduleResponseSchema.parse(
-    await page.evaluate(async () => {
-      const res = await fetch('/api/me/schedule?days=7');
-      return res.json() as Promise<unknown>;
-    }),
-  );
-  expect(body.staff.slug).toBe('marcus');
-  expect(body.days.flatMap((d) => d.bookings).every((b) => b.staff.slug === 'marcus')).toBe(true);
+test('the staff sign in page points barbers to their PIN sign in', async ({ page }) => {
+  await page.goto('/admin/login');
+  const link = page.getByRole('link', { name: 'Sign in with your PIN' });
+  await expect(link).toHaveAttribute('href', '/team');
+  await link.click();
+  await expect(page).toHaveURL(/\/team$/);
+  await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
 });

@@ -2822,12 +2822,12 @@ function $constructor(name, initializer3, proto, params) {
     inst._zod.traits.add(name);
     initializer3(inst, def);
     if (initialized) {
-      const own3 = Object.getPrototypeOf(inst);
+      const own2 = Object.getPrototypeOf(inst);
       const ctorProto = inst._zod.constr.prototype;
-      let up = own3;
+      let up = own2;
       while (up && up !== ctorProto)
         up = Object.getPrototypeOf(up);
-      const target = up ?? own3;
+      const target = up ?? own2;
       if (!initialized.has(target)) {
         initialized.add(target);
         members(target, protoMembers);
@@ -6185,20 +6185,20 @@ function leafPattern(schema) {
     return "(?!)";
   if (minimum !== void 0 || maximum !== void 0)
     return string({ minimum, maximum }).source;
-  const own3 = schema._zod.pattern;
-  return (isInt && own3 === number ? integer : own3)?.source;
+  const own2 = schema._zod.pattern;
+  return (isInt && own2 === number ? integer : own2)?.source;
 }
 function partPattern(schema) {
   const def = schema._zod.def;
-  const own3 = schema._zod.pattern?.source;
+  const own2 = schema._zod.pattern?.source;
   const inner = def.innerType ?? schema._zod.innerType;
   if (inner) {
     const before = inner._zod.pattern?.source;
     const after = partPattern(inner);
-    if (own3 && before && after && after !== before) {
-      return own3.replace(cleanRegex(before), () => cleanRegex(after));
+    if (own2 && before && after && after !== before) {
+      return own2.replace(cleanRegex(before), () => cleanRegex(after));
     }
-    return own3;
+    return own2;
   }
   if (def.options) {
     const sources = def.options.map(partPattern);
@@ -24138,17 +24138,17 @@ var Duration = class _Duration {
     for (const k of orderedUnits$1) {
       if (units.indexOf(k) >= 0) {
         lastUnit = k;
-        let own3 = 0;
+        let own2 = 0;
         for (const ak in accumulated) {
-          own3 += this.matrix[ak][k] * accumulated[ak];
+          own2 += this.matrix[ak][k] * accumulated[ak];
           accumulated[ak] = 0;
         }
         if (isNumber(vals[k])) {
-          own3 += vals[k];
+          own2 += vals[k];
         }
-        const i = Math.trunc(own3);
+        const i = Math.trunc(own2);
         built[k] = i;
-        accumulated[k] = (own3 * 1e3 - i * 1e3) / 1e3;
+        accumulated[k] = (own2 * 1e3 - i * 1e3) / 1e3;
       } else if (isNumber(vals[k])) {
         accumulated[k] = vals[k];
       }
@@ -28305,7 +28305,10 @@ var COLLECTIONS = {
   pendingUploads: "pendingUploads",
   systemState: "systemState",
   alerts: "alerts",
-  customerNotes: "customerNotes"
+  customerNotes: "customerNotes",
+  staffPins: "staffPins",
+  setupTokens: "setupTokens",
+  teamSessions: "teamSessions"
 };
 var DAY_SECONDS = 24 * 60 * 60;
 var INDEXES = [
@@ -28400,6 +28403,51 @@ var INDEXES = [
     keys: { phone: 1 },
     options: { name: "uniq_phone", unique: true },
     reason: "One private note per customer phone number."
+  },
+  // staffPins
+  {
+    collection: "staffPins",
+    keys: { staffId: 1 },
+    options: { name: "uniq_staff", unique: true },
+    reason: "At most one PIN per barber; sign-in looks it up by staff id."
+  },
+  // setupTokens
+  {
+    collection: "setupTokens",
+    keys: { tokenHash: 1 },
+    options: { name: "uniq_tokenHash", unique: true },
+    reason: "A setup link is found by the hash of its token."
+  },
+  {
+    collection: "setupTokens",
+    keys: { expiresAt: 1 },
+    options: { name: "ttl_expiresAt", expireAfterSeconds: 0 },
+    reason: "MongoDB removes expired setup links on its own."
+  },
+  {
+    collection: "setupTokens",
+    keys: { staffId: 1 },
+    options: { name: "by_staff" },
+    reason: "A new link retires the barber's earlier ones."
+  },
+  // teamSessions
+  {
+    collection: "teamSessions",
+    keys: { tokenHash: 1 },
+    options: { name: "uniq_tokenHash", unique: true },
+    reason: "Barber session lookup on every portal request."
+  },
+  {
+    collection: "teamSessions",
+    keys: { expiresAt: 1 },
+    options: { name: "ttl_expiresAt", expireAfterSeconds: 0 },
+    reason: "MongoDB removes expired barber sessions on its own."
+  },
+  {
+    collection: "teamSessions",
+    keys: { staffId: 1 },
+    options: { name: "by_staff" },
+    reason: "A new PIN or a reset ends every session of one barber."
   },
   // slotLocks
   {
@@ -28678,6 +28726,9 @@ var AppError = class _AppError extends Error {
     return new _AppError("VALIDATION_ERROR", message, { details });
   }
 };
+function isAppError(value) {
+  return value instanceof AppError;
+}
 function isDuplicateKeyError(error62) {
   return typeof error62 === "object" && error62 !== null && "code" in error62 && error62.code === 11e3;
 }
@@ -30722,21 +30773,207 @@ async function saveNote(phone, notes, now2, options) {
   return await col.findOne({ phone }, sessionOf(options)) ?? doc;
 }
 
+// server/repos/staffPinsRepo.ts
+var staffPinsRepo_exports = {};
+__export(staffPinsRepo_exports, {
+  countPins: () => countPins,
+  deletePin: () => deletePin,
+  findPinByStaff: () => findPinByStaff,
+  recordSignIn: () => recordSignIn,
+  upsertPin: () => upsertPin
+});
+
+// shared/schemas/staffPin.ts
+var staffPinDocumentSchema = external_exports.object({
+  _id: idSchema,
+  staffId: idSchema,
+  /** argon2id PHC string of a keyed digest of the PIN. Never returned by the API. */
+  pinHash: external_exports.string().min(1),
+  pinSetAt: external_exports.date(),
+  lastSignInAt: external_exports.date().nullable()
+}).extend(timestampsSchema.shape);
+var setupTokenDocumentSchema = external_exports.object({
+  _id: idSchema,
+  staffId: idSchema,
+  tokenHash: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  /** The owner who made the link. */
+  createdByUserId: idSchema,
+  createdAt: external_exports.date(),
+  /** TTL index removes the document after this instant. */
+  expiresAt: external_exports.date(),
+  usedAt: external_exports.date().nullable()
+});
+var teamSessionDocumentSchema = external_exports.object({
+  _id: idSchema,
+  tokenHash: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  staffId: idSchema,
+  createdAt: external_exports.date(),
+  expiresAt: external_exports.date(),
+  ip: external_exports.string().max(64).nullable(),
+  userAgent: external_exports.string().max(512).nullable(),
+  revokedAt: external_exports.date().nullable()
+});
+
+// server/repos/staffPinsRepo.ts
+async function findPinByStaff(staffId, options) {
+  const col = await collection("staffPins");
+  return col.findOne({ staffId }, sessionOf(options));
+}
+async function countPins(options) {
+  const col = await collection("staffPins");
+  return col.countDocuments({}, sessionOf(options));
+}
+async function upsertPin(staffId, pinHash, now2, options) {
+  const col = await collection("staffPins");
+  const after = await col.findOneAndUpdate(
+    { staffId },
+    {
+      $set: { pinHash, pinSetAt: now2, lastSignInAt: null, updatedAt: now2 },
+      $setOnInsert: { _id: newId(), staffId, createdAt: now2 }
+    },
+    { upsert: true, returnDocument: "after", ...sessionOf(options) }
+  );
+  if (!after) throw new Error("upsert returned no document");
+  return staffPinDocumentSchema.parse(after);
+}
+async function deletePin(staffId, options) {
+  const col = await collection("staffPins");
+  const result = await col.deleteOne({ staffId }, sessionOf(options));
+  return result.deletedCount === 1;
+}
+async function recordSignIn(staffId, now2, options) {
+  const col = await collection("staffPins");
+  await col.updateOne({ staffId }, { $set: { lastSignInAt: now2 } }, sessionOf(options));
+}
+
+// server/repos/setupTokensRepo.ts
+var setupTokensRepo_exports = {};
+__export(setupTokensRepo_exports, {
+  consumeToken: () => consumeToken,
+  countTokens: () => countTokens,
+  findUsableToken: () => findUsableToken,
+  hasUsableTokenForStaff: () => hasUsableTokenForStaff,
+  insertSetupToken: () => insertSetupToken,
+  retireTokensForStaff: () => retireTokensForStaff
+});
+async function insertSetupToken(input2, now2, options) {
+  const doc = setupTokenDocumentSchema.parse({
+    _id: newId(),
+    ...input2,
+    createdAt: now2,
+    usedAt: null
+  });
+  const col = await collection("setupTokens");
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findUsableToken(tokenHash, now2, options) {
+  const col = await collection("setupTokens");
+  return col.findOne({ tokenHash, usedAt: null, expiresAt: { $gt: now2 } }, sessionOf(options));
+}
+async function consumeToken(id, now2, options) {
+  const col = await collection("setupTokens");
+  const result = await col.updateOne(
+    { _id: id, usedAt: null },
+    { $set: { usedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+async function retireTokensForStaff(staffId, now2, options) {
+  const col = await collection("setupTokens");
+  const result = await col.updateMany(
+    { staffId, usedAt: null },
+    { $set: { usedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount;
+}
+async function hasUsableTokenForStaff(staffId, now2, options) {
+  const col = await collection("setupTokens");
+  return await col.countDocuments(
+    { staffId, usedAt: null, expiresAt: { $gt: now2 } },
+    { limit: 1, ...sessionOf(options) }
+  ) > 0;
+}
+async function countTokens(options) {
+  const col = await collection("setupTokens");
+  return col.countDocuments({}, sessionOf(options));
+}
+
+// server/repos/teamSessionsRepo.ts
+var teamSessionsRepo_exports = {};
+__export(teamSessionsRepo_exports, {
+  findActiveTeamSession: () => findActiveTeamSession,
+  findTeamSessionById: () => findTeamSessionById,
+  insertTeamSession: () => insertTeamSession,
+  revokeTeamSession: () => revokeTeamSession,
+  revokeTeamSessionsForStaff: () => revokeTeamSessionsForStaff
+});
+async function insertTeamSession(input2, now2, options) {
+  const doc = teamSessionDocumentSchema.parse({
+    _id: newId(),
+    ...input2,
+    createdAt: now2,
+    revokedAt: null
+  });
+  const col = await collection("teamSessions");
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findActiveTeamSession(tokenHash, now2, options) {
+  const col = await collection("teamSessions");
+  return col.findOne({ tokenHash, revokedAt: null, expiresAt: { $gt: now2 } }, sessionOf(options));
+}
+async function findTeamSessionById(id, options) {
+  const col = await collection("teamSessions");
+  return col.findOne({ _id: id }, sessionOf(options));
+}
+async function revokeTeamSession(id, now2, options) {
+  const col = await collection("teamSessions");
+  const result = await col.updateOne(
+    { _id: id, revokedAt: null },
+    { $set: { revokedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+async function revokeTeamSessionsForStaff(staffId, now2, options) {
+  const col = await collection("teamSessions");
+  const result = await col.updateMany(
+    {
+      staffId,
+      revokedAt: null,
+      ...options?.exceptId ? { _id: { $ne: options.exceptId } } : {}
+    },
+    { $set: { revokedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount;
+}
+
 // server/auth/cookies.ts
 var SESSION_COOKIE = "__Host-exq_session";
+var TEAM_COOKIE = "__Host-exq_team";
 var TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-function readSessionCookie(req) {
+function readCookie(req, wanted) {
   const header = req.headers.cookie;
   if (!header) return null;
   for (const part of header.split(";")) {
     const index = part.indexOf("=");
     if (index === -1) continue;
     const name = part.slice(0, index).trim();
-    if (name !== SESSION_COOKIE) continue;
+    if (name !== wanted) continue;
     const value = part.slice(index + 1).trim();
     return TOKEN_PATTERN.test(value) ? value : null;
   }
   return null;
+}
+function readSessionCookie(req) {
+  return readCookie(req, SESSION_COOKIE);
+}
+function readTeamCookie(req) {
+  return readCookie(req, TEAM_COOKIE);
 }
 function appendSetCookie(res, cookie) {
   const existing = res.getHeader("Set-Cookie");
@@ -30751,6 +30988,15 @@ function setSessionCookie(res, token, maxAgeSeconds2) {
 }
 function clearSessionCookie(res) {
   appendSetCookie(res, `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
+}
+function setTeamCookie(res, token, maxAgeSeconds2) {
+  appendSetCookie(
+    res,
+    `${TEAM_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${Math.max(0, Math.floor(maxAgeSeconds2))}`
+  );
+}
+function clearTeamCookie(res) {
+  appendSetCookie(res, `${TEAM_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
 }
 
 // server/auth/sessions.ts
@@ -30794,7 +31040,7 @@ async function authenticateFromCookie(ctx) {
     return null;
   }
   const user = await usersRepo_exports.findUserById(session.userId);
-  if (!user?.isActive) {
+  if (!user?.isActive || user.role !== "owner") {
     clearSessionCookie(ctx.res);
     return null;
   }
@@ -30822,8 +31068,26 @@ async function endAllSessions(res, principal, now2) {
   return count;
 }
 
-// server/http/router.ts
-import { timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+// shared/lib/pin.ts
+var PIN_LENGTH = 6;
+var PIN_PATTERN = /^\d{6}$/;
+var DEMO_PIN = "246810";
+var REJECTED = "Pick a PIN that is harder to guess. Avoid repeats and runs like 123456.";
+function pinProblem(pin) {
+  if (!PIN_PATTERN.test(pin)) return `Use exactly ${String(PIN_LENGTH)} digits.`;
+  const digits = [...pin].map(Number);
+  const step = (a, b) => (b - a + 10) % 10;
+  const steps = digits.slice(1).map((d, i) => step(digits[i] ?? 0, d));
+  if (steps.every((s2) => s2 === 0)) return REJECTED;
+  if (steps.every((s2) => s2 === 1) || steps.every((s2) => s2 === 9)) return REJECTED;
+  for (const size of [2, 3]) {
+    if (pin === pin.slice(0, size).repeat(PIN_LENGTH / size)) return REJECTED;
+  }
+  return null;
+}
+
+// server/auth/pin.ts
+import { createHmac } from "node:crypto";
 
 // server/auth/password.ts
 import { hash as hash2, parseOptions, verify } from "@node-rs/argon2";
@@ -30904,6 +31168,561 @@ function generateTemporaryPassword() {
     if (passwordProblems(candidate).length === 0) return candidate;
   }
 }
+
+// server/auth/pin.ts
+function keyed(staffId, pin) {
+  return createHmac("sha256", getEnv2().MANAGE_LINK_SECRET).update(`pin:${staffId}:${pin}`).digest("hex");
+}
+function hashPin(staffId, pin) {
+  return hashPassword(keyed(staffId, pin));
+}
+function verifyPin(storedHash, staffId, pin) {
+  return verifyPassword(storedHash, keyed(staffId, pin));
+}
+function dummyPinHash() {
+  return getDummyHash();
+}
+
+// server/db/transaction.ts
+var DEFAULT_TX_OPTIONS = {
+  readConcern: { level: "snapshot" },
+  writeConcern: { w: "majority" },
+  readPreference: "primary"
+};
+function hasErrorLabel(error62, label) {
+  if (typeof error62 !== "object" || error62 === null || !("hasErrorLabel" in error62)) return false;
+  const candidate = error62.hasErrorLabel;
+  return typeof candidate === "function" && candidate.call(error62, label);
+}
+function isTransientTransactionError(error62) {
+  return hasErrorLabel(error62, "TransientTransactionError") || hasErrorLabel(error62, "UnknownTransactionCommitResult");
+}
+async function withTransaction(fn, options = {}) {
+  const client = await getMongoClient();
+  const maxRetries = options.maxRetries ?? 3;
+  const txOptions = { ...DEFAULT_TX_OPTIONS, ...options.transaction };
+  let attempt = 0;
+  for (; ; ) {
+    attempt += 1;
+    const session = client.startSession();
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        result = await fn(session);
+      }, txOptions);
+      return result;
+    } catch (error62) {
+      if (isTransientTransactionError(error62) && attempt < maxRetries) {
+        logger.warn("transient transaction error, retrying", { attempt });
+        await new Promise((r) => setTimeout(r, 25 * attempt));
+        continue;
+      }
+      throw error62;
+    } finally {
+      await session.endSession();
+    }
+  }
+}
+
+// server/auth/authService.ts
+var LOGIN_IP_LIMIT = { limit: 20, windowMs: 15 * 6e4 };
+var LOGIN_ACCOUNT_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
+var LOCKOUT_RULE = { threshold: 5, lockMinutes: [5, 15, 60, 240] };
+var PASSWORD_CHANGE_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
+var GENERIC_FAILURE = "Email or password is incorrect";
+function normalizeEmail(email3) {
+  return email3.trim().toLowerCase();
+}
+function emailKey(email3) {
+  return sha256Hex(`login:${normalizeEmail(email3)}`);
+}
+function retryAfter(windowMs, now2) {
+  const windowEnd = (Math.floor(now2.getTime() / windowMs) + 1) * windowMs;
+  return Math.max(1, Math.ceil((windowEnd - now2.getTime()) / 1e3));
+}
+function ipHashOf(ip) {
+  return sha256Hex(`ip:${ip}:${getEnv2().MANAGE_LINK_SECRET}`);
+}
+function actorOf(principal) {
+  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
+}
+var SYSTEM = { type: "system", userId: null, staffId: null };
+async function auditLogin(outcome2, input2, meta3) {
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: input2.userId ? { type: "system", userId: input2.userId, staffId: null } : SYSTEM,
+      action: outcome2 === "success" ? "auth.login.success" : "auth.login.failure",
+      entityType: "user",
+      entityId: input2.userId ?? "unknown",
+      before: null,
+      after: null,
+      meta: { email: normalizeEmail(input2.email).slice(0, 254), ip: meta3.ip, reason: input2.reason },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function loginIsUsable(user) {
+  if (!user.isActive) return false;
+  if (user.role === "owner") return true;
+  if (!user.staffId) return false;
+  const staff = await staffRepo_exports.findStaffById(user.staffId);
+  return staff !== null && staff.deletedAt === null;
+}
+async function login(res, input2, meta3) {
+  const email3 = normalizeEmail(input2.email);
+  const ipKey = `login:ip:${meta3.ip}`;
+  const ipCount = await rateLimitsRepo_exports.peekRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
+  if (ipCount >= LOGIN_IP_LIMIT.limit) {
+    await auditLogin("failure", { email: email3, userId: null, reason: "ipRateLimited" }, meta3);
+    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
+      retryAfterSeconds: retryAfter(LOGIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const key = emailKey(email3);
+  const accountKey = `login:account:${key}`;
+  const accountCount = await rateLimitsRepo_exports.peekRateLimit(
+    accountKey,
+    LOGIN_ACCOUNT_LIMIT,
+    meta3.now
+  );
+  if (accountCount >= LOGIN_ACCOUNT_LIMIT.limit) {
+    await auditLogin("failure", { email: email3, userId: null, reason: "accountRateLimited" }, meta3);
+    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
+      retryAfterSeconds: retryAfter(LOGIN_ACCOUNT_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const ipHash = ipHashOf(meta3.ip);
+  const throttle = await loginThrottleRepo_exports.getLoginThrottle(key);
+  const lockedUntil = throttle?.lockedUntil ?? null;
+  const locked = lockedUntil !== null && lockedUntil.getTime() > meta3.now.getTime();
+  const known = locked ? await usersRepo_exports.findUserByEmail(email3) : null;
+  const bypass = locked && known !== null && usersRepo_exports.hasRecentLoginIp(known, ipHash, meta3.now);
+  if (locked && !bypass) {
+    await auditLogin("failure", { email: email3, userId: null, reason: "locked" }, meta3);
+    throw new AppError(
+      "ACCOUNT_LOCKED",
+      "Too many failed attempts. Please wait before trying again.",
+      {
+        retryAfterSeconds: Math.ceil((lockedUntil.getTime() - meta3.now.getTime()) / 1e3)
+      }
+    );
+  }
+  const user = await usersRepo_exports.findUserByEmail(email3);
+  const passwordOk = await verifyPassword(
+    user?.passwordHash ?? await getDummyHash(),
+    input2.password
+  );
+  if (user && passwordOk && user.role === "barber") {
+    await auditLogin("failure", { email: email3, userId: user._id, reason: "barberUsesTeam" }, meta3);
+    throw new AppError("FORBIDDEN", "Barbers sign in with a PIN at /team", {
+      extra: { signInAt: "/team" }
+    });
+  }
+  const usable = user !== null && passwordOk && await loginIsUsable(user);
+  if (!user || !usable) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
+    await rateLimitsRepo_exports.hitRateLimit(accountKey, LOGIN_ACCOUNT_LIMIT, meta3.now);
+    await loginThrottleRepo_exports.recordLoginFailure(key, LOCKOUT_RULE, meta3.now);
+    const reason = !user ? "unknownEmail" : !passwordOk ? "badPassword" : "disabled";
+    await auditLogin("failure", { email: email3, userId: user?._id ?? null, reason }, meta3);
+    throw new AppError("INVALID_CREDENTIALS", GENERIC_FAILURE);
+  }
+  if (!bypass) await loginThrottleRepo_exports.clearLoginThrottle(key);
+  await usersRepo_exports.recordSuccessfulLogin(user._id, meta3.now, ipHash);
+  if (needsRehash(user.passwordHash)) {
+    await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.password), meta3.now, {
+      mustChangePassword: user.mustChangePassword
+    });
+  }
+  const session = await startSession(res, user, {
+    ip: meta3.ip,
+    userAgent: meta3.userAgent,
+    now: meta3.now
+  });
+  await auditLogin("success", { email: email3, userId: user._id, reason: null }, meta3);
+  return { user, sessionId: session._id };
+}
+var DEMO_LOGIN_LIMIT = { limit: 30, windowMs: 15 * 6e4 };
+async function loginAsDemoOwner(res, meta3) {
+  const hit = await rateLimitsRepo_exports.hitRateLimit(
+    `demo-login:ip:${meta3.ip}`,
+    DEMO_LOGIN_LIMIT,
+    meta3.now
+  );
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+  const owner2 = await usersRepo_exports.findOwnerUser();
+  if (!owner2?.isActive) throw new AppError("NOT_FOUND", "No such endpoint");
+  await usersRepo_exports.recordSuccessfulLogin(owner2._id, meta3.now, ipHashOf(meta3.ip));
+  const session = await startSession(res, owner2, {
+    ip: meta3.ip,
+    userAgent: meta3.userAgent,
+    now: meta3.now
+  });
+  await auditLogin("success", { email: owner2.email, userId: owner2._id, reason: "demo" }, meta3);
+  return { user: owner2, sessionId: session._id };
+}
+function weakPasswordError(problems, path) {
+  return new AppError("VALIDATION_ERROR", "Please choose a stronger password", {
+    details: problems.map((message) => ({ path, message }))
+  });
+}
+async function changeOwnPassword(principal, input2, meta3) {
+  const hit = await rateLimitsRepo_exports.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta3.now
+  );
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+  const user = await usersRepo_exports.findUserById(principal.userId);
+  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
+  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
+    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
+  }
+  if (input2.newPassword === input2.currentPassword) {
+    throw weakPasswordError(["Choose a password different from the current one."], "newPassword");
+  }
+  const problems = passwordProblems(input2.newPassword, { email: user.email });
+  if (problems.length > 0) throw weakPasswordError(problems, "newPassword");
+  await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.newPassword), meta3.now);
+  const ended = await sessionsRepo_exports.revokeOtherSessions(user._id, principal.sessionId, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: "user.password.change",
+      entityType: "user",
+      entityId: user._id,
+      before: null,
+      after: null,
+      meta: { otherSessionsEnded: ended, wasTemporary: user.mustChangePassword },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function changeOwnEmail(principal, input2, meta3) {
+  const hit = await rateLimitsRepo_exports.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta3.now
+  );
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+  const user = await usersRepo_exports.findUserById(principal.userId);
+  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
+  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
+    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
+  }
+  if (input2.newEmail === user.email)
+    throw new AppError("BAD_REQUEST", "That is already your email");
+  await usersRepo_exports.setUserEmail(user._id, input2.newEmail, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: "user.email.change",
+      entityType: "user",
+      entityId: user._id,
+      before: { email: user.email },
+      after: { email: input2.newEmail },
+      meta: null,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function ensureOwnerLogin(input2, now2) {
+  if (await usersRepo_exports.findOwnerUser()) return { created: false };
+  const problems = passwordProblems(input2.password, { email: input2.email });
+  if (problems.length > 0) {
+    throw new Error(`SEED_OWNER_PASSWORD is too weak: ${problems.join(" ")}`);
+  }
+  const user = await usersRepo_exports.insertUser(
+    {
+      email: normalizeEmail(input2.email),
+      passwordHash: await hashPassword(input2.password),
+      role: "owner",
+      staffId: input2.staffId
+    },
+    now2
+  );
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: SYSTEM,
+      action: "user.create",
+      entityType: "user",
+      entityId: user._id,
+      before: null,
+      after: { email: user.email, role: user.role },
+      meta: { source: "seed" },
+      requestId: null
+    },
+    now2
+  );
+  return { created: true };
+}
+
+// server/auth/teamAuth.ts
+var TEAM_SESSION_MS = 12 * 60 * 6e4;
+var SETUP_LINK_MS = 72 * 60 * 6e4;
+var PIN_LOCKOUT = { threshold: 5, lockMinutes: [15] };
+var PIN_IP_LIMIT = { limit: 30, windowMs: 15 * 6e4 };
+var GENERIC_FAILURE2 = "That PIN did not work";
+var SYSTEM2 = { type: "system", userId: null, staffId: null };
+function pinThrottleKey(staffId) {
+  return sha256Hex(`pin:${staffId}`);
+}
+function retryAfter2(windowMs, now2) {
+  const windowEnd = (Math.floor(now2.getTime() / windowMs) + 1) * windowMs;
+  return Math.max(1, Math.ceil((windowEnd - now2.getTime()) / 1e3));
+}
+async function audit(action, staffId, actor, meta3, extra = null) {
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor,
+      action,
+      entityType: "staff",
+      entityId: staffId,
+      before: null,
+      after: null,
+      meta: extra,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function usableStaff(staffId) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  return staff && staff.deletedAt === null && staff.showOnWebsite ? staff : null;
+}
+function principalFor(staff, sessionId) {
+  return {
+    userId: staff._id,
+    role: "barber",
+    staffId: staff._id,
+    sessionId,
+    email: "",
+    mustChangePassword: false
+  };
+}
+async function startTeamSession(res, staffId, meta3) {
+  const token = randomToken(32);
+  const session = await teamSessionsRepo_exports.insertTeamSession(
+    {
+      tokenHash: sha256Hex(token),
+      staffId,
+      expiresAt: new Date(meta3.now.getTime() + TEAM_SESSION_MS),
+      ip: meta3.ip.slice(0, 64),
+      userAgent: meta3.userAgent?.slice(0, 512) ?? null
+    },
+    meta3.now
+  );
+  setTeamCookie(res, token, TEAM_SESSION_MS / 1e3);
+  return session._id;
+}
+async function teamLogin(res, input2, meta3) {
+  const ipKey = `pin:ip:${meta3.ip}`;
+  const ipCount = await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+  if (ipCount >= PIN_IP_LIMIT.limit) {
+    throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
+      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const staff = await usableStaff(input2.staffId);
+  const throttleKey = staff ? pinThrottleKey(staff._id) : null;
+  if (throttleKey) {
+    const throttle = await loginThrottleRepo_exports.getLoginThrottle(throttleKey);
+    if (throttle?.lockedUntil && throttle.lockedUntil.getTime() > meta3.now.getTime()) {
+      throw new AppError(
+        "ACCOUNT_LOCKED",
+        "Too many wrong tries. Please wait before trying again.",
+        {
+          retryAfterSeconds: Math.ceil(
+            (throttle.lockedUntil.getTime() - meta3.now.getTime()) / 1e3
+          )
+        }
+      );
+    }
+  }
+  const pinDoc = staff ? await staffPinsRepo_exports.findPinByStaff(staff._id) : null;
+  const ok = await verifyPin(pinDoc?.pinHash ?? await dummyPinHash(), input2.staffId, input2.pin);
+  if (!staff || !pinDoc || !ok) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+    if (throttleKey) await loginThrottleRepo_exports.recordLoginFailure(throttleKey, PIN_LOCKOUT, meta3.now);
+    if (staff)
+      await audit("auth.pin.failure", staff._id, SYSTEM2, meta3, { ipHash: ipHashOf(meta3.ip) });
+    throw new AppError("INVALID_CREDENTIALS", GENERIC_FAILURE2);
+  }
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staff._id));
+  await staffPinsRepo_exports.recordSignIn(staff._id, meta3.now);
+  const sessionId = await startTeamSession(res, staff._id, meta3);
+  await audit(
+    "auth.pin.success",
+    staff._id,
+    { type: "barber", userId: null, staffId: staff._id },
+    meta3
+  );
+  return { sessionId, expiresAt: new Date(meta3.now.getTime() + TEAM_SESSION_MS) };
+}
+async function authenticateTeam(ctx) {
+  const token = readTeamCookie(ctx.req);
+  if (!token) return null;
+  const session = await teamSessionsRepo_exports.findActiveTeamSession(sha256Hex(token), ctx.now);
+  if (!session) {
+    clearTeamCookie(ctx.res);
+    return null;
+  }
+  const staff = await usableStaff(session.staffId);
+  if (!staff) {
+    clearTeamCookie(ctx.res);
+    return null;
+  }
+  return principalFor(staff, session._id);
+}
+async function endTeamSession(res, principal, now2) {
+  await teamSessionsRepo_exports.revokeTeamSession(principal.sessionId, now2);
+  clearTeamCookie(res);
+}
+function teamActor(principal) {
+  return { type: "barber", userId: null, staffId: principal.staffId };
+}
+function pinError(pin) {
+  const problem = pinProblem(pin);
+  return problem ? new AppError("VALIDATION_ERROR", "Please choose a different PIN", {
+    details: [{ path: "pin", message: problem }]
+  }) : null;
+}
+async function changePin(principal, input2, meta3) {
+  const staffId = principal.staffId ?? "";
+  const ipKey = `pin:ip:${meta3.ip}`;
+  if (await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now) >= PIN_IP_LIMIT.limit) {
+    throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
+      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const key = pinThrottleKey(staffId);
+  const throttle = await loginThrottleRepo_exports.getLoginThrottle(key);
+  if (throttle?.lockedUntil && throttle.lockedUntil.getTime() > meta3.now.getTime()) {
+    throw new AppError("ACCOUNT_LOCKED", "Too many wrong tries. Please wait before trying again.", {
+      retryAfterSeconds: Math.ceil((throttle.lockedUntil.getTime() - meta3.now.getTime()) / 1e3)
+    });
+  }
+  const doc = await staffPinsRepo_exports.findPinByStaff(staffId);
+  if (!doc || !await verifyPin(doc.pinHash, staffId, input2.currentPin)) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+    await loginThrottleRepo_exports.recordLoginFailure(key, PIN_LOCKOUT, meta3.now);
+    throw new AppError("INVALID_CREDENTIALS", "Your current PIN is not right");
+  }
+  const bad = pinError(input2.newPin);
+  if (bad) throw bad;
+  if (input2.newPin === input2.currentPin) {
+    throw new AppError("VALIDATION_ERROR", "Please choose a different PIN", {
+      details: [{ path: "newPin", message: "Choose a PIN different from the current one." }]
+    });
+  }
+  await loginThrottleRepo_exports.clearLoginThrottle(key);
+  await staffPinsRepo_exports.upsertPin(staffId, await hashPin(staffId, input2.newPin), meta3.now);
+  const ended = await teamSessionsRepo_exports.revokeTeamSessionsForStaff(staffId, meta3.now, {
+    exceptId: principal.sessionId
+  });
+  await audit("auth.pin.change", staffId, teamActor(principal), meta3, {
+    otherSessionsEnded: ended
+  });
+}
+async function issueSetupLink(ownerActor, ownerUserId, staffId, meta3) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
+  const token = randomToken(32);
+  const expiresAt = new Date(meta3.now.getTime() + SETUP_LINK_MS);
+  await withTransaction(async (session) => {
+    await staffPinsRepo_exports.deletePin(staffId, { session });
+    await teamSessionsRepo_exports.revokeTeamSessionsForStaff(staffId, meta3.now, { session });
+    await setupTokensRepo_exports.retireTokensForStaff(staffId, meta3.now, { session });
+    await setupTokensRepo_exports.insertSetupToken(
+      { staffId, tokenHash: sha256Hex(token), createdByUserId: ownerUserId, expiresAt },
+      meta3.now,
+      { session }
+    );
+  });
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staffId));
+  await audit("auth.pin.setupLink", staffId, ownerActor, meta3);
+  return { token, expiresAt };
+}
+async function setupLinkInfo(token, now2) {
+  const found = await setupTokensRepo_exports.findUsableToken(sha256Hex(token), now2);
+  const staff = found ? await usableStaff(found.staffId) : null;
+  if (!found || !staff)
+    throw new AppError("NOT_FOUND", "This link has expired or was already used");
+  return { staffName: staff.name };
+}
+async function completeSetup(res, token, pin, meta3) {
+  const ipKey = `pin:ip:${meta3.ip}`;
+  if (await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now) >= PIN_IP_LIMIT.limit) {
+    throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
+      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const found = await setupTokensRepo_exports.findUsableToken(sha256Hex(token), meta3.now);
+  const staff = found ? await usableStaff(found.staffId) : null;
+  if (!found || !staff) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+    throw new AppError("NOT_FOUND", "This link has expired or was already used");
+  }
+  const bad = pinError(pin);
+  if (bad) throw bad;
+  const pinHash = await hashPin(staff._id, pin);
+  await withTransaction(async (session) => {
+    if (!await setupTokensRepo_exports.consumeToken(found._id, meta3.now, { session })) {
+      throw new AppError("NOT_FOUND", "This link has expired or was already used");
+    }
+    await staffPinsRepo_exports.upsertPin(staff._id, pinHash, meta3.now, { session });
+  });
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staff._id));
+  await staffPinsRepo_exports.recordSignIn(staff._id, meta3.now);
+  const sessionId = await startTeamSession(res, staff._id, meta3);
+  await audit(
+    "auth.pin.setup",
+    staff._id,
+    { type: "barber", userId: null, staffId: staff._id },
+    meta3
+  );
+  return { sessionId, expiresAt: new Date(meta3.now.getTime() + TEAM_SESSION_MS) };
+}
+async function staffAccess(staffId, now2) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff) throw new AppError("NOT_FOUND", "Staff member was not found");
+  const [pin, throttle, setupLinkActive] = await Promise.all([
+    staffPinsRepo_exports.findPinByStaff(staffId),
+    loginThrottleRepo_exports.getLoginThrottle(pinThrottleKey(staffId)),
+    setupTokensRepo_exports.hasUsableTokenForStaff(staffId, now2)
+  ]);
+  const lockedUntil = throttle?.lockedUntil && throttle.lockedUntil.getTime() > now2.getTime() ? throttle.lockedUntil : null;
+  return {
+    hasPin: pin !== null,
+    lastSignInAt: pin?.lastSignInAt ?? null,
+    lockedUntil,
+    setupLinkActive
+  };
+}
+async function unlockStaff(ownerActor, staffId, meta3) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff) throw new AppError("NOT_FOUND", "Staff member was not found");
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staffId));
+  await audit("auth.pin.unlock", staffId, ownerActor, meta3);
+}
+
+// server/http/router.ts
+import { timingSafeEqual as timingSafeEqual3 } from "node:crypto";
 
 // server/services/demo.ts
 import { randomUUID } from "node:crypto";
@@ -31350,7 +32169,7 @@ var staffSeed = [
 import { GridFSBucket } from "mongodb";
 
 // server/storage/local.ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac as createHmac2, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
@@ -31368,7 +32187,7 @@ var LOCAL_DATA_DIR = [".data", "uploads"].join("/");
 var LOCAL_UPLOADS_DIR = resolve(process.env.EXQ_LOCAL_UPLOADS_DIR ?? LOCAL_DATA_DIR);
 var LOCAL_UPLOAD_PATH = "/uploads";
 function signature(secret2, key, exp) {
-  return createHmac("sha256", secret2).update(`${key}:${exp}`).digest("base64url");
+  return createHmac2("sha256", secret2).update(`${key}:${exp}`).digest("base64url");
 }
 function signLocalUpload(secret2, key, exp) {
   return signature(secret2, key, exp);
@@ -32398,49 +33217,8 @@ async function loadAvailabilityContext(input2, session) {
   };
 }
 
-// server/db/transaction.ts
-var DEFAULT_TX_OPTIONS = {
-  readConcern: { level: "snapshot" },
-  writeConcern: { w: "majority" },
-  readPreference: "primary"
-};
-function hasErrorLabel(error62, label) {
-  if (typeof error62 !== "object" || error62 === null || !("hasErrorLabel" in error62)) return false;
-  const candidate = error62.hasErrorLabel;
-  return typeof candidate === "function" && candidate.call(error62, label);
-}
-function isTransientTransactionError(error62) {
-  return hasErrorLabel(error62, "TransientTransactionError") || hasErrorLabel(error62, "UnknownTransactionCommitResult");
-}
-async function withTransaction(fn, options = {}) {
-  const client = await getMongoClient();
-  const maxRetries = options.maxRetries ?? 3;
-  const txOptions = { ...DEFAULT_TX_OPTIONS, ...options.transaction };
-  let attempt = 0;
-  for (; ; ) {
-    attempt += 1;
-    const session = client.startSession();
-    try {
-      let result;
-      await session.withTransaction(async () => {
-        result = await fn(session);
-      }, txOptions);
-      return result;
-    } catch (error62) {
-      if (isTransientTransactionError(error62) && attempt < maxRetries) {
-        logger.warn("transient transaction error, retrying", { attempt });
-        await new Promise((r) => setTimeout(r, 25 * attempt));
-        continue;
-      }
-      throw error62;
-    } finally {
-      await session.endSession();
-    }
-  }
-}
-
 // server/lib/manageToken.ts
-import { createHmac as createHmac2, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+import { createHmac as createHmac3, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
 var VERSION = "v1";
 var payloadSchema = external_exports.object({
   b: idSchema,
@@ -32448,7 +33226,7 @@ var payloadSchema = external_exports.object({
   exp: external_exports.int().min(0)
 });
 function sign(secret2, signedPart) {
-  return createHmac2("sha256", secret2).update(signedPart).digest();
+  return createHmac3("sha256", secret2).update(signedPart).digest();
 }
 function createManageToken(secret2, input2) {
   const payload = {
@@ -32760,112 +33538,6 @@ var adminPhotoListQuerySchema = external_exports.object({
 var adminPhotoListResponseSchema = external_exports.object({ photos: external_exports.array(adminPhotoViewSchema) });
 var adminPhotoResponseSchema = external_exports.object({ photo: adminPhotoViewSchema });
 
-// shared/api/public.ts
-var publicShopSchema = external_exports.object({
-  name: external_exports.string(),
-  tagline: external_exports.string(),
-  address: addressSchema,
-  phone: external_exports.string(),
-  email: external_exports.string(),
-  instagramHandle: external_exports.string(),
-  timezone: external_exports.string(),
-  hours: weekHoursSchema,
-  booking: external_exports.object({
-    slotStepMinutes: external_exports.int(),
-    leadTimeMinutes: external_exports.int(),
-    bookingWindowDays: external_exports.int(),
-    maxServicesPerBooking: external_exports.int(),
-    allowFirstAvailable: external_exports.boolean(),
-    requireEmail: external_exports.boolean(),
-    /** Customers may cancel or move online until this many minutes before the start. */
-    cancelCutoffMinutes: external_exports.int()
-  }),
-  /** The line in the strip above the header. Absent from older responses; the client then shows none. */
-  announcement: announcementSchema.optional(),
-  social: socialLinksSchema.optional(),
-  /** The home page hero, when the owner has uploaded one. */
-  heroPhoto: photoViewSchema.nullable().optional(),
-  /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
-  maintenance: external_exports.boolean().optional(),
-  /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
-  demo: external_exports.boolean().optional()
-});
-var publicServiceSchema = external_exports.object({
-  id: idSchema,
-  name: external_exports.string(),
-  group: serviceGroupSchema,
-  description: external_exports.string(),
-  priceCents: external_exports.int(),
-  priceFrom: external_exports.boolean(),
-  durationMinutes: external_exports.int(),
-  sortOrder: external_exports.int()
-});
-var publicServicesResponseSchema = external_exports.object({ services: external_exports.array(publicServiceSchema) });
-var publicStaffSchema = external_exports.object({
-  id: idSchema,
-  slug: slugSchema,
-  name: external_exports.string(),
-  role: staffRoleSchema,
-  title: external_exports.string(),
-  specialty: external_exports.string(),
-  bio: external_exports.string(),
-  chairNumber: external_exports.int().nullable(),
-  serviceIds: external_exports.array(idSchema),
-  photoUrl: external_exports.string().nullable(),
-  instagramHandle: external_exports.string().nullable(),
-  acceptsOnlineBooking: external_exports.boolean(),
-  sortOrder: external_exports.int(),
-  /** The chair's portrait, when one has been uploaded. */
-  photo: photoViewSchema.nullable().optional()
-});
-var publicStaffListResponseSchema = external_exports.object({ staff: external_exports.array(publicStaffSchema) });
-var publicStaffResponseSchema = external_exports.object({
-  staff: publicStaffSchema,
-  requestedSlug: external_exports.string(),
-  canonical: external_exports.boolean()
-});
-var staffOpeningsQuerySchema = external_exports.object({
-  count: external_exports.coerce.number().int().min(1).max(10).default(3)
-});
-var openingSchema = external_exports.object({
-  startAt: external_exports.iso.datetime(),
-  endAt: external_exports.iso.datetime(),
-  /** Shop-local date, for the /book link. */
-  date: external_exports.string(),
-  /** "2:15 PM", "Tomorrow 10:00 AM" or "Thu 10:00 AM". */
-  label: external_exports.string()
-});
-var staffOpeningsResponseSchema = external_exports.object({
-  staff: external_exports.object({ id: idSchema, slug: slugSchema, name: external_exports.string() }),
-  /** The service the openings are for, or null when the chair offers nothing online. */
-  service: external_exports.object({ id: idSchema, name: external_exports.string(), durationMinutes: external_exports.int() }).nullable(),
-  openings: external_exports.array(openingSchema)
-});
-
-// shared/api/auth.ts
-var loginRequestSchema = external_exports.object({
-  email: external_exports.string().trim().min(3).max(254),
-  password: external_exports.string().min(1).max(256)
-});
-var meUserSchema = publicUserSchema.omit({ lastLoginAt: true }).extend({ lastLoginAt: external_exports.iso.datetime().nullable() });
-var meResponseSchema = external_exports.object({
-  user: meUserSchema,
-  staff: publicStaffSchema.nullable(),
-  permissions: external_exports.object({ barbersCanBlockTime: external_exports.boolean() }),
-  /** What this deployment can do at all, whatever the role: photos need storage, demo is the showcase mode. */
-  features: external_exports.object({ photos: external_exports.boolean(), demo: external_exports.boolean(), email: external_exports.boolean() })
-});
-var changePasswordRequestSchema = external_exports.object({
-  currentPassword: external_exports.string().min(1).max(256),
-  newPassword: external_exports.string().min(1).max(256)
-});
-var changeEmailRequestSchema = external_exports.object({
-  currentPassword: external_exports.string().min(1).max(256),
-  newEmail: emailSchema
-});
-var okResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
-var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
-
 // shared/api/admin.ts
 var conflictActionSchema = external_exports.enum(["keep", "move", "cancel", "cancelAndNotify"]);
 var conflictResolutionSchema = external_exports.object({
@@ -33144,22 +33816,6 @@ var timeBlockCreateRequestSchema = external_exports.object({
     path: ["endAt"]
   }
 );
-var ownTimeBlockRequestSchema = external_exports.object({
-  kind: external_exports.enum(["block", "timeOff"]),
-  startAt: external_exports.iso.datetime({ offset: true }),
-  endAt: external_exports.iso.datetime({ offset: true }),
-  reason: external_exports.string().trim().max(200).optional(),
-  resolutions: resolutionsSchema
-}).refine((v) => new Date(v.endAt).getTime() > new Date(v.startAt).getTime(), {
-  message: "The end must be after the start",
-  path: ["endAt"]
-}).refine(
-  (v) => new Date(v.endAt).getTime() - new Date(v.startAt).getTime() <= 30 * 24 * 36e5,
-  {
-    message: "Blocks are limited to 30 days",
-    path: ["endAt"]
-  }
-);
 var timeBlockResponseSchema = external_exports.object({ timeBlock: timeBlockViewSchema }).extend(conflictOutcomeSchema.shape);
 var timeBlockListQuerySchema = external_exports.object({
   from: isoDateSchema,
@@ -33220,8 +33876,7 @@ var adminStaffViewSchema = external_exports.object({
   sortOrder: external_exports.int(),
   acceptsOnlineBooking: external_exports.boolean(),
   showOnWebsite: external_exports.boolean(),
-  deletedAt: external_exports.iso.datetime().nullable(),
-  hasLogin: external_exports.boolean()
+  deletedAt: external_exports.iso.datetime().nullable()
 });
 var staffListResponseSchema = external_exports.object({ staff: external_exports.array(adminStaffViewSchema) });
 var staffResponseSchema = external_exports.object({ staff: adminStaffViewSchema });
@@ -33256,14 +33911,6 @@ var closureUpsertRequestSchema = external_exports.intersection(
 var closureResponseSchema = external_exports.object({ closure: closureViewSchema }).extend(conflictOutcomeSchema.shape);
 var settingsResponseSchema = external_exports.object({ settings: shopSettingsInputSchema });
 var settingsRequestSchema = shopSettingsInputSchema;
-var loginViewSchema = meUserSchema.extend({ staffName: external_exports.string().nullable() });
-var loginListResponseSchema = external_exports.object({ users: external_exports.array(loginViewSchema) });
-var loginCreateRequestSchema = external_exports.object({ email: emailSchema, staffId: idSchema });
-var issuedPasswordResponseSchema = external_exports.object({
-  user: loginViewSchema,
-  temporaryPassword: external_exports.string()
-});
-var loginResponseSchema = external_exports.object({ user: loginViewSchema });
 var overviewStatSchema = external_exports.object({ value: external_exports.int(), compare: external_exports.int().nullable() });
 var activityKindSchema = external_exports.enum(["booked", "canceled", "rescheduled", "noShow", "walkIn"]);
 var activityEntrySchema = external_exports.object({
@@ -33389,22 +34036,6 @@ var outboxListQuerySchema = external_exports.object({
 var outboxListResponseSchema = external_exports.object({
   messages: external_exports.array(outboxMessageViewSchema),
   nextCursor: external_exports.string().nullable()
-});
-var myScheduleQuerySchema = external_exports.object({
-  date: isoDateSchema.optional(),
-  days: external_exports.coerce.number().int().min(1).max(7).default(1)
-});
-var myScheduleResponseSchema = external_exports.object({
-  staff: staffRefSchema,
-  days: external_exports.array(
-    external_exports.object({
-      date: isoDateSchema,
-      working: workingDaySchema,
-      bookings: external_exports.array(adminBookingViewSchema),
-      blocks: external_exports.array(timeBlockViewSchema)
-    })
-  ),
-  canBlockTime: external_exports.boolean()
 });
 
 // server/services/bookingView.ts
@@ -34265,7 +34896,7 @@ async function enforceManageRateLimit(ip, now2, limits) {
 }
 
 // server/services/demo.ts
-var SYSTEM = { type: "system", userId: null, staffId: null };
+var SYSTEM3 = { type: "system", userId: null, staffId: null };
 var DEMO_LOCK_STALE_MS = 6e4;
 var WAIT_FOR_SEED_MS = 25e3;
 var POLL_MS = 250;
@@ -34348,7 +34979,7 @@ async function seedSampleBookings(now2) {
       };
       if (plan.source === "walkIn") {
         if (!await workingNow(plan.chair, now2)) continue;
-        await createManualBooking({ ...base, source: "walkIn", override: false }, SYSTEM, meta3);
+        await createManualBooking({ ...base, source: "walkIn", override: false }, SYSTEM3, meta3);
       } else {
         const startAt = await openStart(plan, now2);
         if (!startAt) continue;
@@ -34363,7 +34994,7 @@ async function seedSampleBookings(now2) {
               override: false,
               notifyCustomer: false
             },
-            SYSTEM,
+            SYSTEM3,
             meta3
           );
         }
@@ -34377,6 +35008,19 @@ async function seedSampleBookings(now2) {
     }
   }
   return placed;
+}
+async function seedDemoPins(now2) {
+  let seeded = 0;
+  for (const staff of await staffRepo_exports.listStaff({})) {
+    if (await staffPinsRepo_exports.findPinByStaff(staff._id)) continue;
+    await staffPinsRepo_exports.upsertPin(staff._id, await hashPin(staff._id, DEMO_PIN), now2);
+    seeded += 1;
+  }
+  return seeded;
+}
+async function ensureDemoPins(now2) {
+  if (await staffPinsRepo_exports.countPins() > 0 || await setupTokensRepo_exports.countTokens() > 0) return;
+  await seedDemoPins(now2);
 }
 async function purgePhotoObjects() {
   if (getPartialEnv().STORAGE_DRIVER === "mongo") {
@@ -34429,6 +35073,7 @@ async function ensureDemoReady(setup, now2 = /* @__PURE__ */ new Date()) {
   if (!demoEnabled()) return;
   if (Date.now() < readyUntil) return;
   if (!await shopSettingsRepo_exports.getShopSettings()) await seedWithLock(setup, now2);
+  await ensureDemoPins(now2);
   readyUntil = Date.now() + READY_TTL_MS;
 }
 async function resetDemoData(setup, now2 = /* @__PURE__ */ new Date()) {
@@ -34451,331 +35096,6 @@ async function clearDemoData() {
   await db.collection(COLLECTIONS.systemState).deleteMany({});
   resetDemoReadyCache();
   return { cleared: true };
-}
-
-// server/auth/authService.ts
-var LOGIN_IP_LIMIT = { limit: 20, windowMs: 15 * 6e4 };
-var LOGIN_ACCOUNT_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
-var LOCKOUT_RULE = { threshold: 5, lockMinutes: [5, 15, 60, 240] };
-var PASSWORD_CHANGE_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
-var GENERIC_FAILURE = "Email or password is incorrect";
-function normalizeEmail(email3) {
-  return email3.trim().toLowerCase();
-}
-function emailKey(email3) {
-  return sha256Hex(`login:${normalizeEmail(email3)}`);
-}
-function retryAfter(windowMs, now2) {
-  const windowEnd = (Math.floor(now2.getTime() / windowMs) + 1) * windowMs;
-  return Math.max(1, Math.ceil((windowEnd - now2.getTime()) / 1e3));
-}
-function ipHashOf(ip) {
-  return sha256Hex(`ip:${ip}:${getEnv2().MANAGE_LINK_SECRET}`);
-}
-function actorOf(principal) {
-  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
-}
-var SYSTEM2 = { type: "system", userId: null, staffId: null };
-async function auditLogin(outcome2, input2, meta3) {
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: input2.userId ? { type: "system", userId: input2.userId, staffId: null } : SYSTEM2,
-      action: outcome2 === "success" ? "auth.login.success" : "auth.login.failure",
-      entityType: "user",
-      entityId: input2.userId ?? "unknown",
-      before: null,
-      after: null,
-      meta: { email: normalizeEmail(input2.email).slice(0, 254), ip: meta3.ip, reason: input2.reason },
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-}
-async function loginIsUsable(user) {
-  if (!user.isActive) return false;
-  if (user.role === "owner") return true;
-  if (!user.staffId) return false;
-  const staff = await staffRepo_exports.findStaffById(user.staffId);
-  return staff !== null && staff.deletedAt === null;
-}
-async function login(res, input2, meta3) {
-  const email3 = normalizeEmail(input2.email);
-  const ipKey = `login:ip:${meta3.ip}`;
-  const ipCount = await rateLimitsRepo_exports.peekRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
-  if (ipCount >= LOGIN_IP_LIMIT.limit) {
-    await auditLogin("failure", { email: email3, userId: null, reason: "ipRateLimited" }, meta3);
-    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
-      retryAfterSeconds: retryAfter(LOGIN_IP_LIMIT.windowMs, meta3.now)
-    });
-  }
-  const key = emailKey(email3);
-  const accountKey = `login:account:${key}`;
-  const accountCount = await rateLimitsRepo_exports.peekRateLimit(
-    accountKey,
-    LOGIN_ACCOUNT_LIMIT,
-    meta3.now
-  );
-  if (accountCount >= LOGIN_ACCOUNT_LIMIT.limit) {
-    await auditLogin("failure", { email: email3, userId: null, reason: "accountRateLimited" }, meta3);
-    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
-      retryAfterSeconds: retryAfter(LOGIN_ACCOUNT_LIMIT.windowMs, meta3.now)
-    });
-  }
-  const ipHash = ipHashOf(meta3.ip);
-  const throttle = await loginThrottleRepo_exports.getLoginThrottle(key);
-  const lockedUntil = throttle?.lockedUntil ?? null;
-  const locked = lockedUntil !== null && lockedUntil.getTime() > meta3.now.getTime();
-  const known = locked ? await usersRepo_exports.findUserByEmail(email3) : null;
-  const bypass = locked && known !== null && usersRepo_exports.hasRecentLoginIp(known, ipHash, meta3.now);
-  if (locked && !bypass) {
-    await auditLogin("failure", { email: email3, userId: null, reason: "locked" }, meta3);
-    throw new AppError(
-      "ACCOUNT_LOCKED",
-      "Too many failed attempts. Please wait before trying again.",
-      {
-        retryAfterSeconds: Math.ceil((lockedUntil.getTime() - meta3.now.getTime()) / 1e3)
-      }
-    );
-  }
-  const user = await usersRepo_exports.findUserByEmail(email3);
-  const passwordOk = await verifyPassword(
-    user?.passwordHash ?? await getDummyHash(),
-    input2.password
-  );
-  const usable = user !== null && passwordOk && await loginIsUsable(user);
-  if (!user || !usable) {
-    await rateLimitsRepo_exports.hitRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
-    await rateLimitsRepo_exports.hitRateLimit(accountKey, LOGIN_ACCOUNT_LIMIT, meta3.now);
-    await loginThrottleRepo_exports.recordLoginFailure(key, LOCKOUT_RULE, meta3.now);
-    const reason = !user ? "unknownEmail" : !passwordOk ? "badPassword" : "disabled";
-    await auditLogin("failure", { email: email3, userId: user?._id ?? null, reason }, meta3);
-    throw new AppError("INVALID_CREDENTIALS", GENERIC_FAILURE);
-  }
-  if (!bypass) await loginThrottleRepo_exports.clearLoginThrottle(key);
-  await usersRepo_exports.recordSuccessfulLogin(user._id, meta3.now, ipHash);
-  if (needsRehash(user.passwordHash)) {
-    await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.password), meta3.now, {
-      mustChangePassword: user.mustChangePassword
-    });
-  }
-  const session = await startSession(res, user, {
-    ip: meta3.ip,
-    userAgent: meta3.userAgent,
-    now: meta3.now
-  });
-  await auditLogin("success", { email: email3, userId: user._id, reason: null }, meta3);
-  return { user, sessionId: session._id };
-}
-var DEMO_LOGIN_LIMIT = { limit: 30, windowMs: 15 * 6e4 };
-async function loginAsDemoOwner(res, meta3) {
-  const hit = await rateLimitsRepo_exports.hitRateLimit(
-    `demo-login:ip:${meta3.ip}`,
-    DEMO_LOGIN_LIMIT,
-    meta3.now
-  );
-  if (!hit.allowed) {
-    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
-      retryAfterSeconds: hit.retryAfterSeconds
-    });
-  }
-  const owner2 = await usersRepo_exports.findOwnerUser();
-  if (!owner2?.isActive) throw new AppError("NOT_FOUND", "No such endpoint");
-  await usersRepo_exports.recordSuccessfulLogin(owner2._id, meta3.now, ipHashOf(meta3.ip));
-  const session = await startSession(res, owner2, {
-    ip: meta3.ip,
-    userAgent: meta3.userAgent,
-    now: meta3.now
-  });
-  await auditLogin("success", { email: owner2.email, userId: owner2._id, reason: "demo" }, meta3);
-  return { user: owner2, sessionId: session._id };
-}
-function weakPasswordError(problems, path) {
-  return new AppError("VALIDATION_ERROR", "Please choose a stronger password", {
-    details: problems.map((message) => ({ path, message }))
-  });
-}
-async function changeOwnPassword(principal, input2, meta3) {
-  const hit = await rateLimitsRepo_exports.hitRateLimit(
-    `password:user:${principal.userId}`,
-    PASSWORD_CHANGE_LIMIT,
-    meta3.now
-  );
-  if (!hit.allowed) {
-    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
-      retryAfterSeconds: hit.retryAfterSeconds
-    });
-  }
-  const user = await usersRepo_exports.findUserById(principal.userId);
-  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
-  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
-    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
-  }
-  if (input2.newPassword === input2.currentPassword) {
-    throw weakPasswordError(["Choose a password different from the current one."], "newPassword");
-  }
-  const problems = passwordProblems(input2.newPassword, { email: user.email });
-  if (problems.length > 0) throw weakPasswordError(problems, "newPassword");
-  await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.newPassword), meta3.now);
-  const ended = await sessionsRepo_exports.revokeOtherSessions(user._id, principal.sessionId, meta3.now);
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: "user.password.change",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: null,
-      meta: { otherSessionsEnded: ended, wasTemporary: user.mustChangePassword },
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-}
-async function changeOwnEmail(principal, input2, meta3) {
-  const hit = await rateLimitsRepo_exports.hitRateLimit(
-    `password:user:${principal.userId}`,
-    PASSWORD_CHANGE_LIMIT,
-    meta3.now
-  );
-  if (!hit.allowed) {
-    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
-      retryAfterSeconds: hit.retryAfterSeconds
-    });
-  }
-  const user = await usersRepo_exports.findUserById(principal.userId);
-  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
-  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
-    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
-  }
-  if (input2.newEmail === user.email)
-    throw new AppError("BAD_REQUEST", "That is already your email");
-  await usersRepo_exports.setUserEmail(user._id, input2.newEmail, meta3.now);
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: "user.email.change",
-      entityType: "user",
-      entityId: user._id,
-      before: { email: user.email },
-      after: { email: input2.newEmail },
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-}
-async function createStaffLogin(principal, input2, meta3) {
-  const staff = await staffRepo_exports.findStaffById(input2.staffId);
-  if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
-  if (await usersRepo_exports.findUserByStaffId(staff._id)) {
-    throw new AppError("CONFLICT", `${staff.name} already has a login`);
-  }
-  const temporaryPassword = generateTemporaryPassword();
-  const user = await usersRepo_exports.insertUser(
-    {
-      email: normalizeEmail(input2.email),
-      passwordHash: await hashPassword(temporaryPassword),
-      role: "barber",
-      staffId: staff._id,
-      mustChangePassword: true
-    },
-    meta3.now
-  );
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: "user.create",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: { email: user.email, role: user.role, staffId: user.staffId },
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  return { user, temporaryPassword };
-}
-async function requireOtherUser(principal, userId) {
-  const user = await usersRepo_exports.findUserById(userId);
-  if (!user) throw new AppError("NOT_FOUND", "Login was not found");
-  if (user._id === principal.userId) {
-    throw new AppError("BAD_REQUEST", "Use your own account page to change your own login");
-  }
-  return user;
-}
-async function resetLoginPassword(principal, userId, meta3) {
-  const user = await requireOtherUser(principal, userId);
-  const temporaryPassword = generateTemporaryPassword();
-  await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(temporaryPassword), meta3.now, {
-    mustChangePassword: true
-  });
-  await sessionsRepo_exports.revokeAllSessionsForUser(user._id, meta3.now);
-  await loginThrottleRepo_exports.clearLoginThrottle(emailKey(user.email));
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: "user.password.reset",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: null,
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  const updated = await usersRepo_exports.findUserById(user._id);
-  return { user: updated ?? user, temporaryPassword };
-}
-async function setLoginActive(principal, userId, isActive, meta3) {
-  const user = await requireOtherUser(principal, userId);
-  await usersRepo_exports.setUserActive(user._id, isActive, meta3.now);
-  if (!isActive) await sessionsRepo_exports.revokeAllSessionsForUser(user._id, meta3.now);
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: isActive ? "user.enable" : "user.disable",
-      entityType: "user",
-      entityId: user._id,
-      before: { isActive: user.isActive },
-      after: { isActive },
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  return await usersRepo_exports.findUserById(user._id) ?? user;
-}
-async function ensureOwnerLogin(input2, now2) {
-  if (await usersRepo_exports.findOwnerUser()) return { created: false };
-  const problems = passwordProblems(input2.password, { email: input2.email });
-  if (problems.length > 0) {
-    throw new Error(`SEED_OWNER_PASSWORD is too weak: ${problems.join(" ")}`);
-  }
-  const user = await usersRepo_exports.insertUser(
-    {
-      email: normalizeEmail(input2.email),
-      passwordHash: await hashPassword(input2.password),
-      role: "owner",
-      staffId: input2.staffId
-    },
-    now2
-  );
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: SYSTEM2,
-      action: "user.create",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: { email: user.email, role: user.role },
-      meta: { source: "seed" },
-      requestId: null
-    },
-    now2
-  );
-  return { created: true };
 }
 
 // server/services/seedService.ts
@@ -34826,7 +35146,7 @@ async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
 }
 
 // server/services/bootstrap.ts
-var SYSTEM3 = { type: "system", userId: null, staffId: null };
+var SYSTEM4 = { type: "system", userId: null, staffId: null };
 async function bootstrap(input2, now2) {
   const env = getEnv2();
   const demo = env.DEMO_MODE === "true";
@@ -34858,13 +35178,14 @@ async function bootstrap(input2, now2) {
   const created = { ...summary, indexes: true };
   if (demo && !demoRecord) {
     created.sampleBookings = await seedSampleBookings(now2);
+    created.demoPins = await seedDemoPins(now2);
     await systemStateRepo_exports.recordDemoSeed(now2);
     created.demo = true;
   }
   const record2 = await systemStateRepo_exports.recordBootstrap(created, now2);
   await auditLogRepo_exports.appendAuditEntry(
     {
-      actor: SYSTEM3,
+      actor: SYSTEM4,
       action: "system.bootstrap",
       entityType: "system",
       entityId: "bootstrap",
@@ -35105,7 +35426,7 @@ async function assertServing(route, pathname, now2) {
     throw new AppError("MAINTENANCE", "Online booking is having a moment. Please call the shop.");
   }
 }
-var KNOWN_LEVELS = /* @__PURE__ */ new Set(["public", "barber", "owner", "internal"]);
+var KNOWN_LEVELS = /* @__PURE__ */ new Set(["public", "team", "owner", "internal"]);
 function createRouter(definitions, authenticate) {
   for (const d of definitions) {
     if (!KNOWN_LEVELS.has(d.auth)) {
@@ -35166,14 +35487,19 @@ function createRouter(definitions, authenticate) {
         case "internal":
           assertInternalSecret(req, route);
           break;
-        case "barber":
+        case "team": {
+          const principal = await authenticate(ctx, "team");
+          if (principal?.role !== "barber") throw new AppError("AUTH_REQUIRED", "Please sign in");
+          ctx.principal = principal;
+          break;
+        }
         case "owner": {
-          const principal = await authenticate(ctx);
+          const principal = await authenticate(ctx, "owner");
           if (!principal) throw new AppError("AUTH_REQUIRED", "Please sign in");
           if (principal.mustChangePassword && route.allowDuringPasswordChange !== true) {
             throw new AppError("PASSWORD_CHANGE_REQUIRED", "Please choose a new password first");
           }
-          if (route.auth === "owner" && principal.role !== "owner") {
+          if (principal.role !== "owner") {
             throw new AppError("FORBIDDEN", "Owner access is required");
           }
           ctx.principal = principal;
@@ -35197,6 +35523,128 @@ function createRouter(definitions, authenticate) {
   }
   return { handle, routes: definitions };
 }
+
+// shared/api/team.ts
+var pinSchema = external_exports.string().regex(PIN_PATTERN, "Use exactly 6 digits");
+var teamLoginRequestSchema = external_exports.object({ staffId: idSchema, pin: pinSchema });
+var teamSetupInfoResponseSchema = external_exports.object({ staffName: external_exports.string() });
+var teamSetupRequestSchema = external_exports.object({ pin: pinSchema, confirmPin: pinSchema }).refine((v) => v.pin === v.confirmPin, {
+  message: "The two PINs do not match",
+  path: ["confirmPin"]
+});
+var teamChangePinRequestSchema = external_exports.object({ currentPin: pinSchema, newPin: pinSchema, confirmPin: pinSchema }).refine((v) => v.newPin === v.confirmPin, {
+  message: "The two PINs do not match",
+  path: ["confirmPin"]
+});
+var teamMeResponseSchema = external_exports.object({
+  staff: external_exports.object({
+    id: idSchema,
+    name: external_exports.string(),
+    title: external_exports.string(),
+    photo: photoViewSchema.nullable()
+  }),
+  /** When this sign-in ends, whatever the barber does. */
+  expiresAt: external_exports.iso.datetime()
+});
+var teamBookingViewSchema = external_exports.object({
+  id: idSchema,
+  referenceCode: external_exports.string(),
+  status: bookingStatusSchema,
+  source: bookingSourceSchema,
+  startAt: external_exports.iso.datetime(),
+  endAt: external_exports.iso.datetime(),
+  customerName: external_exports.string(),
+  services: external_exports.array(external_exports.string()),
+  notes: external_exports.string().nullable()
+});
+var teamDayResponseSchema = external_exports.object({
+  date: isoDateSchema,
+  now: external_exports.iso.datetime(),
+  working: workingDaySchema,
+  /** The first confirmed booking that has not ended yet today. */
+  nextUp: teamBookingViewSchema.nullable(),
+  bookings: external_exports.array(teamBookingViewSchema),
+  blocks: external_exports.array(timeBlockViewSchema),
+  /** The barber marked themselves out for today. */
+  isOut: external_exports.boolean(),
+  counts: external_exports.object({ total: external_exports.int(), done: external_exports.int(), noShow: external_exports.int(), left: external_exports.int() })
+});
+var teamWeekResponseSchema = external_exports.object({
+  days: external_exports.array(
+    external_exports.object({
+      date: isoDateSchema,
+      working: workingDaySchema,
+      count: external_exports.int(),
+      bookings: external_exports.array(teamBookingViewSchema),
+      blocks: external_exports.array(timeBlockViewSchema)
+    })
+  )
+});
+var teamStatusRequestSchema = external_exports.object({
+  status: external_exports.enum(["completed", "noShow", "confirmed"])
+});
+var teamStatusResponseSchema = external_exports.object({ booking: teamBookingViewSchema });
+var teamNoteRequestSchema = external_exports.object({
+  notes: external_exports.string().trim().max(MAX_NOTE_LENGTH).nullable()
+});
+var teamWalkInRequestSchema = external_exports.object({
+  name: external_exports.string().trim().min(1).max(80),
+  phone: phoneSchema,
+  serviceIds: external_exports.array(idSchema).min(1).max(6)
+});
+var teamWalkInResponseSchema = external_exports.object({
+  booking: teamBookingViewSchema,
+  outsideWorkingTime: external_exports.boolean()
+});
+var teamTimeOffResponseSchema = external_exports.object({
+  isOutToday: external_exports.boolean(),
+  blocks: external_exports.array(timeBlockViewSchema),
+  requests: external_exports.array(
+    external_exports.object({
+      id: idSchema,
+      fromDate: isoDateSchema,
+      toDate: isoDateSchema,
+      reason: external_exports.string().nullable()
+    })
+  )
+});
+var teamBlockTimeRequestSchema = external_exports.object({
+  date: isoDateSchema,
+  start: hhmmSchema,
+  end: hhmmSchema,
+  reason: external_exports.string().trim().max(200).optional()
+}).refine((v) => v.end > v.start, { message: "The end must be after the start", path: ["end"] });
+var teamOutTodayResponseSchema = external_exports.object({
+  /** Confirmed clients today whose bookings stay in place until the owner decides. */
+  clients: external_exports.int()
+});
+var teamDaysOffRequestSchema = external_exports.object({
+  fromDate: isoDateSchema,
+  toDate: isoDateSchema,
+  reason: external_exports.string().trim().max(200).optional()
+}).refine((v) => v.toDate >= v.fromDate, {
+  message: "The last day cannot be before the first",
+  path: ["toDate"]
+});
+var teamDaysOffResponseSchema = external_exports.object({
+  /** True when the days were empty and the time off is already in place. */
+  applied: external_exports.boolean(),
+  /** Clients on those days when it became a request for the owner. */
+  clients: external_exports.int()
+});
+var staffAccessResponseSchema = external_exports.object({
+  hasPin: external_exports.boolean(),
+  lastSignInAt: external_exports.iso.datetime().nullable(),
+  /** Set while five wrong tries have locked the barber out. */
+  lockedUntil: external_exports.iso.datetime().nullable(),
+  /** A setup link was made and has neither been used nor expired. */
+  setupLinkActive: external_exports.boolean()
+});
+var setupLinkResponseSchema = external_exports.object({
+  /** The full address to send the barber. Shown once; only its hash is kept. */
+  url: external_exports.string(),
+  expiresAt: external_exports.iso.datetime()
+});
 
 // server/lib/afterResponse.ts
 var import_functions = __toESM(require_functions(), 1);
@@ -35653,7 +36101,11 @@ function assertInScope(scope, staffId, what = "Booking") {
   }
 }
 function actorOf2(principal) {
-  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
+  return {
+    type: principal.role,
+    userId: principal.role === "owner" ? principal.userId : null,
+    staffId: principal.staffId
+  };
 }
 
 // server/services/scheduleData.ts
@@ -35866,31 +36318,6 @@ async function whoIsInForStaff(staffId, date5) {
   if (!staff) throw new AppError("NOT_FOUND", "Staff member was not found");
   return whoIsInFor(staff, date5, data.source);
 }
-async function mySchedule(scope, input2, now2) {
-  const from = input2.date ?? shopDateOf(now2);
-  const to = shopDayStart(from).plus({ days: input2.days - 1 }).toISODate() ?? from;
-  const range = { start: shopDayBounds(from).start, end: shopDayBounds(to).end };
-  const [data, bookings, settings] = await Promise.all([
-    loadScheduleData(from, to),
-    bookingsRepo_exports.listBookingsBetween(range, { staffId: scope.staffId }),
-    shopSettingsRepo_exports.requireShopSettings()
-  ]);
-  const staff = data.staff.find((s2) => s2._id === scope.staffId);
-  if (!staff || staff.deletedAt)
-    throw new AppError("FORBIDDEN", "This login is not linked to a chair");
-  const days = [];
-  for (let d = shopDayStart(from); (d.toISODate() ?? "") <= to; d = d.plus({ days: 1 })) {
-    const date5 = d.toISODate() ?? from;
-    const bounds = shopDayBounds(date5);
-    days.push({
-      date: date5,
-      working: workingView(staff._id, date5, data.source),
-      bookings: bookings.filter((b) => b.startAt >= bounds.start && b.startAt < bounds.end).map((b) => toAdminBookingView(b, staff)),
-      blocks: data.source.timeBlocks.filter((b) => b.staffId === staff._id && b.startAt < bounds.end && b.endAt > bounds.start).map(toTimeBlockView)
-    });
-  }
-  return { staff: toStaffRef(staff), days, canBlockTime: settings.permissions.barbersCanBlockTime };
-}
 function encodeCursor(value) {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
 }
@@ -35947,13 +36374,13 @@ async function bookingDetail(principal, scope, id, now2) {
   const booking = await loadBookingInScope(scope, id);
   if (scope.kind === "all") await bookingsRepo_exports.markOwnerSeen(booking._id, now2);
   const fresh = await bookingsRepo_exports.findBookingById(booking._id) ?? booking;
-  const [audit2, outbox] = scope.kind === "all" ? await Promise.all([
+  const [audit3, outbox] = scope.kind === "all" ? await Promise.all([
     auditLogRepo_exports.listAuditForEntity("booking", booking._id, 50),
     emailOutboxRepo_exports.listOutboxForBooking(booking._id)
   ]) : [[], []];
   return {
     booking: await viewOf(fresh),
-    audit: audit2.map(toAuditView),
+    audit: audit3.map(toAuditView),
     outbox: outbox.map(toOutboxView),
     transitions: allowedTransitions(principal, scope, fresh.status),
     managePath: scope.kind === "all" ? manageLinkFor(fresh) : null
@@ -36469,7 +36896,7 @@ async function applyScheduleChange(change) {
 }
 
 // server/services/adminCatalog.ts
-async function audit(principal, entry, meta3) {
+async function audit2(principal, entry, meta3) {
   await auditLogRepo_exports.appendAuditEntry(
     {
       actor: actorOf2(principal),
@@ -36504,7 +36931,7 @@ async function listServices2() {
 }
 async function createService(principal, input2, meta3) {
   const service = await servicesRepo_exports.insertService(input2, meta3.now);
-  await audit(
+  await audit2(
     principal,
     { action: "service.create", entityType: "service", entityId: service._id, after: input2 },
     meta3
@@ -36515,7 +36942,7 @@ async function updateService2(principal, id, patch, meta3) {
   const before = await servicesRepo_exports.findServiceById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
   const service = await servicesRepo_exports.updateService(id, patch, meta3.now);
-  await audit(
+  await audit2(
     principal,
     {
       action: "service.update",
@@ -36549,7 +36976,7 @@ async function deleteService(principal, id, resolutions, meta3) {
     outboxIds: change.outboxIds
   };
 }
-function toStaffView(s2, logins) {
+function toStaffView(s2) {
   return {
     id: s2._id,
     slug: s2.slug,
@@ -36566,25 +36993,20 @@ function toStaffView(s2, logins) {
     sortOrder: s2.sortOrder,
     acceptsOnlineBooking: s2.acceptsOnlineBooking,
     showOnWebsite: s2.showOnWebsite,
-    deletedAt: s2.deletedAt?.toISOString() ?? null,
-    hasLogin: logins.has(s2._id)
+    deletedAt: s2.deletedAt?.toISOString() ?? null
   };
 }
-async function loginStaffIds() {
-  return new Set((await usersRepo_exports.listUsers()).flatMap((u) => u.staffId ? [u.staffId] : []));
-}
 async function listStaff2() {
-  const [staff, logins] = await Promise.all([staffRepo_exports.listStaff(), loginStaffIds()]);
-  return { staff: staff.map((s2) => toStaffView(s2, logins)) };
+  return { staff: (await staffRepo_exports.listStaff()).map(toStaffView) };
 }
 async function createStaff(principal, input2, meta3) {
   const staff = await staffRepo_exports.insertStaff(input2, meta3.now);
-  await audit(
+  await audit2(
     principal,
     { action: "staff.create", entityType: "staff", entityId: staff._id, after: input2 },
     meta3
   );
-  return { staff: toStaffView(staff, /* @__PURE__ */ new Set()) };
+  return { staff: toStaffView(staff) };
 }
 async function updateStaff2(principal, id, input2, meta3) {
   const { resolutions, ...patch } = input2;
@@ -36611,7 +37033,7 @@ async function updateStaff2(principal, id, input2, meta3) {
   });
   return {
     body: {
-      staff: toStaffView(change.result, await loginStaffIds()),
+      staff: toStaffView(change.result),
       kept: change.kept,
       moved: change.moved,
       cancelled: change.cancelled
@@ -36623,7 +37045,7 @@ async function renameStaffSlug2(principal, id, slug, meta3) {
   const before = await staffRepo_exports.findStaffById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
   const staff = await staffRepo_exports.renameStaffSlug(id, slug, meta3.now);
-  await audit(
+  await audit2(
     principal,
     {
       action: "staff.slug.rename",
@@ -36634,7 +37056,7 @@ async function renameStaffSlug2(principal, id, slug, meta3) {
     },
     meta3
   );
-  return { staff: toStaffView(staff, await loginStaffIds()) };
+  return { staff: toStaffView(staff) };
 }
 async function deleteStaff(principal, id, resolutions, meta3) {
   const staff = await staffRepo_exports.findStaffById(id);
@@ -36677,7 +37099,7 @@ async function putSettings(principal, input2, meta3) {
   await withTransaction(async (session) => {
     await shopSettingsRepo_exports.updateShopSettings(input2, meta3.now, { session });
   });
-  await audit(
+  await audit2(
     principal,
     {
       action: "settings.update",
@@ -36689,25 +37111,6 @@ async function putSettings(principal, input2, meta3) {
     meta3
   );
   return getSettings();
-}
-function toLoginView(user, staffById) {
-  return {
-    _id: user._id,
-    email: user.email,
-    role: user.role,
-    staffId: user.staffId,
-    isActive: user.isActive,
-    mustChangePassword: user.mustChangePassword,
-    lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
-    staffName: user.staffId ? staffById.get(user.staffId)?.name ?? null : null
-  };
-}
-async function staffMap() {
-  return new Map((await staffRepo_exports.listStaff({ includeDeleted: true })).map((s2) => [s2._id, s2]));
-}
-async function listLogins() {
-  const [users, staffById] = await Promise.all([usersRepo_exports.listUsers(), staffMap()]);
-  return { users: users.map((u) => toLoginView(u, staffById)) };
 }
 async function listAudit(query) {
   const before = cursors.decode(query.cursor, cursors.isTimeCursor);
@@ -36750,7 +37153,7 @@ async function retryOutboxMessage(principal, id, meta3) {
   if (!await emailOutboxRepo_exports.requeueOutboxMessage(id, meta3.now)) {
     throw new AppError("CONFLICT", "Only failed messages can be retried");
   }
-  await audit(principal, { action: "outbox.retry", entityType: "emailOutbox", entityId: id }, meta3);
+  await audit2(principal, { action: "outbox.retry", entityType: "emailOutbox", entityId: id }, meta3);
   return id;
 }
 
@@ -36762,17 +37165,9 @@ async function requireLiveStaff(staffId) {
   const staff = await staffRepo_exports.findStaffById(staffId);
   if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
 }
-async function assertBarberMayBlock(principal, scope) {
-  if (principal.role === "owner" && scope.kind === "all") return;
-  const settings = await shopSettingsRepo_exports.requireShopSettings();
-  if (principal.role !== "owner" && !settings.permissions.barbersCanBlockTime) {
-    throw new AppError("FORBIDDEN", "The owner has not allowed barbers to block their own time");
-  }
-}
 async function createTimeBlock(principal, scope, input2, meta3) {
   const staffId = scope.kind === "chair" ? scope.staffId : input2.staffId;
   assertInScope(scope, staffId, "Staff member");
-  await assertBarberMayBlock(principal, scope);
   await requireLiveStaff(staffId);
   if (scope.kind === "chair" && input2.kind !== "block" && input2.kind !== "timeOff") {
     throw new AppError("FORBIDDEN", "Only the owner can set days off and extra hours");
@@ -36824,7 +37219,6 @@ async function deleteTimeBlock2(principal, scope, id, resolutions, meta3) {
   const block = await timeBlocksRepo_exports.findTimeBlockById(id);
   if (!block) throw new AppError("NOT_FOUND", "Time block was not found");
   assertInScope(scope, block.staffId, "Time block");
-  await assertBarberMayBlock(principal, scope);
   if (scope.kind === "chair" && block.kind !== "block" && block.kind !== "timeOff") {
     throw new AppError("FORBIDDEN", "Only the owner can change days off and extra hours");
   }
@@ -37032,9 +37426,9 @@ async function deleteClosure2(principal, id, resolutions, meta3) {
 import { randomUUID as randomUUID2 } from "node:crypto";
 
 // server/lib/signedPayload.ts
-import { createHmac as createHmac3, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
+import { createHmac as createHmac4, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
 function sign2(secret2, prefix, encoded) {
-  return createHmac3("sha256", secret2).update(`${prefix}.${encoded}`).digest("base64url");
+  return createHmac4("sha256", secret2).update(`${prefix}.${encoded}`).digest("base64url");
 }
 function signPayload(secret2, prefix, payload) {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -37460,7 +37854,7 @@ async function overview(now2) {
   const nextMonday = monday.plus({ weeks: 1 });
   const todayStart = shopDayStart(today);
   const sameDayLastWeek = todayStart.minus({ weeks: 1 }).toISODate() ?? today;
-  const [data, weekBookings, photos, alerts, audit2] = await Promise.all([
+  const [data, weekBookings, photos, alerts, audit3] = await Promise.all([
     loadScheduleData(today, today),
     bookingsRepo_exports.listBookingsStartingBetween({
       start: lastMonday.toJSDate(),
@@ -37519,13 +37913,13 @@ async function overview(now2) {
     },
     week,
     chairs,
-    activity: await activityFrom(audit2),
+    activity: await activityFrom(audit3),
     alerts
   };
 }
-async function activityFrom(audit2) {
+async function activityFrom(audit3) {
   const picked = [];
-  for (const entry of audit2) {
+  for (const entry of audit3) {
     const after = entry.after ?? {};
     const meta3 = entry.meta ?? {};
     if (entry.action === "booking.create")
@@ -38022,47 +38416,40 @@ var adminRoutes = [
     const input2 = await parseBody(ctx, settingsRequestSchema);
     return { body: settingsResponseSchema.parse(await putSettings(principal, input2, metaOf(ctx))) };
   }),
-  // Logins ----------------------------------------------------------------
-  owner("GET", "/api/admin/users", async (ctx) => {
+  // A barber's PIN access ---------------------------------------------------
+  owner("GET", "/api/admin/staff/:id/access", async (ctx) => {
     ctxScope(ctx);
-    return { body: loginListResponseSchema.parse(await listLogins()), headers: NO_STORE };
+    const { id } = parseParams(ctx, idParams);
+    const access = await staffAccess(id, ctx.now);
+    return {
+      body: staffAccessResponseSchema.parse({
+        hasPin: access.hasPin,
+        lastSignInAt: access.lastSignInAt?.toISOString() ?? null,
+        lockedUntil: access.lockedUntil?.toISOString() ?? null,
+        setupLinkActive: access.setupLinkActive
+      }),
+      headers: NO_STORE
+    };
   }),
-  owner("POST", "/api/admin/users", async (ctx) => {
+  // Also how a PIN is reset: the old PIN stops working and the barber's sessions end.
+  owner("POST", "/api/admin/staff/:id/setup-link", async (ctx) => {
     const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, loginCreateRequestSchema);
-    const issued = await createStaffLogin(principal, input2, metaOf(ctx));
+    const { id } = parseParams(ctx, idParams);
+    const issued = await issueSetupLink(actorOf2(principal), principal.userId, id, metaOf(ctx));
     return {
       status: 201,
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword
+      body: setupLinkResponseSchema.parse({
+        url: `${getEnv2().APP_BASE_URL}/team/setup/${issued.token}`,
+        expiresAt: issued.expiresAt.toISOString()
       }),
       headers: NO_STORE
     };
   }),
-  owner("POST", "/api/admin/users/:id/reset-password", async (ctx) => {
+  owner("POST", "/api/admin/staff/:id/unlock", async (ctx) => {
     const { principal } = ctxScope(ctx);
     const { id } = parseParams(ctx, idParams);
-    const issued = await resetLoginPassword(principal, id, metaOf(ctx));
-    return {
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword
-      }),
-      headers: NO_STORE
-    };
-  }),
-  owner("POST", "/api/admin/users/:id/disable", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, false, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
-  }),
-  owner("POST", "/api/admin/users/:id/enable", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, true, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
+    await unlockStaff(actorOf2(principal), id, metaOf(ctx));
+    return { body: { ok: true }, headers: NO_STORE };
   }),
   // Audit and outbox ------------------------------------------------------
   owner("GET", "/api/admin/audit", async (ctx) => {
@@ -38083,6 +38470,112 @@ var adminRoutes = [
     return { body: { ok: true } };
   })
 ];
+
+// shared/api/public.ts
+var publicShopSchema = external_exports.object({
+  name: external_exports.string(),
+  tagline: external_exports.string(),
+  address: addressSchema,
+  phone: external_exports.string(),
+  email: external_exports.string(),
+  instagramHandle: external_exports.string(),
+  timezone: external_exports.string(),
+  hours: weekHoursSchema,
+  booking: external_exports.object({
+    slotStepMinutes: external_exports.int(),
+    leadTimeMinutes: external_exports.int(),
+    bookingWindowDays: external_exports.int(),
+    maxServicesPerBooking: external_exports.int(),
+    allowFirstAvailable: external_exports.boolean(),
+    requireEmail: external_exports.boolean(),
+    /** Customers may cancel or move online until this many minutes before the start. */
+    cancelCutoffMinutes: external_exports.int()
+  }),
+  /** The line in the strip above the header. Absent from older responses; the client then shows none. */
+  announcement: announcementSchema.optional(),
+  social: socialLinksSchema.optional(),
+  /** The home page hero, when the owner has uploaded one. */
+  heroPhoto: photoViewSchema.nullable().optional(),
+  /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
+  maintenance: external_exports.boolean().optional(),
+  /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
+  demo: external_exports.boolean().optional()
+});
+var publicServiceSchema = external_exports.object({
+  id: idSchema,
+  name: external_exports.string(),
+  group: serviceGroupSchema,
+  description: external_exports.string(),
+  priceCents: external_exports.int(),
+  priceFrom: external_exports.boolean(),
+  durationMinutes: external_exports.int(),
+  sortOrder: external_exports.int()
+});
+var publicServicesResponseSchema = external_exports.object({ services: external_exports.array(publicServiceSchema) });
+var publicStaffSchema = external_exports.object({
+  id: idSchema,
+  slug: slugSchema,
+  name: external_exports.string(),
+  role: staffRoleSchema,
+  title: external_exports.string(),
+  specialty: external_exports.string(),
+  bio: external_exports.string(),
+  chairNumber: external_exports.int().nullable(),
+  serviceIds: external_exports.array(idSchema),
+  photoUrl: external_exports.string().nullable(),
+  instagramHandle: external_exports.string().nullable(),
+  acceptsOnlineBooking: external_exports.boolean(),
+  sortOrder: external_exports.int(),
+  /** The chair's portrait, when one has been uploaded. */
+  photo: photoViewSchema.nullable().optional()
+});
+var publicStaffListResponseSchema = external_exports.object({ staff: external_exports.array(publicStaffSchema) });
+var publicStaffResponseSchema = external_exports.object({
+  staff: publicStaffSchema,
+  requestedSlug: external_exports.string(),
+  canonical: external_exports.boolean()
+});
+var staffOpeningsQuerySchema = external_exports.object({
+  count: external_exports.coerce.number().int().min(1).max(10).default(3)
+});
+var openingSchema = external_exports.object({
+  startAt: external_exports.iso.datetime(),
+  endAt: external_exports.iso.datetime(),
+  /** Shop-local date, for the /book link. */
+  date: external_exports.string(),
+  /** "2:15 PM", "Tomorrow 10:00 AM" or "Thu 10:00 AM". */
+  label: external_exports.string()
+});
+var staffOpeningsResponseSchema = external_exports.object({
+  staff: external_exports.object({ id: idSchema, slug: slugSchema, name: external_exports.string() }),
+  /** The service the openings are for, or null when the chair offers nothing online. */
+  service: external_exports.object({ id: idSchema, name: external_exports.string(), durationMinutes: external_exports.int() }).nullable(),
+  openings: external_exports.array(openingSchema)
+});
+
+// shared/api/auth.ts
+var loginRequestSchema = external_exports.object({
+  email: external_exports.string().trim().min(3).max(254),
+  password: external_exports.string().min(1).max(256)
+});
+var meUserSchema = publicUserSchema.omit({ lastLoginAt: true }).extend({ lastLoginAt: external_exports.iso.datetime().nullable() });
+var meResponseSchema = external_exports.object({
+  user: meUserSchema,
+  staff: publicStaffSchema.nullable(),
+  permissions: external_exports.object({ barbersCanBlockTime: external_exports.boolean() }),
+  /** What this deployment can do at all, whatever the role: photos need storage, demo is the showcase mode. */
+  features: external_exports.object({ photos: external_exports.boolean(), demo: external_exports.boolean(), email: external_exports.boolean() })
+});
+var changePasswordRequestSchema = external_exports.object({
+  currentPassword: external_exports.string().min(1).max(256),
+  newPassword: external_exports.string().min(1).max(256)
+});
+var changeEmailRequestSchema = external_exports.object({
+  currentPassword: external_exports.string().min(1).max(256),
+  newEmail: emailSchema
+});
+var okResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
+var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
 
 // server/services/nextOpening.ts
 var LOOKAHEAD_DAYS2 = 14;
@@ -38385,7 +38878,7 @@ var authRoutes = [
   {
     method: "POST",
     path: "/api/auth/logout",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       await endSession(ctx.res, principalOf(ctx), ctx.now);
@@ -38395,7 +38888,7 @@ var authRoutes = [
   {
     method: "POST",
     path: "/api/auth/logout-all",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const sessionsEnded = await endAllSessions(ctx.res, principalOf(ctx), ctx.now);
@@ -38408,14 +38901,14 @@ var authRoutes = [
   {
     method: "GET",
     path: "/api/auth/me",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => ({ body: await meFor(principalOf(ctx).userId), headers: NO_STORE })
   },
   {
     method: "POST",
     path: "/api/me/email",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
       const input2 = await parseBody(ctx, changeEmailRequestSchema);
       await changeOwnEmail(principalOf(ctx), input2, metaOf(ctx));
@@ -38425,7 +38918,7 @@ var authRoutes = [
   {
     method: "POST",
     path: "/api/me/password",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const input2 = await parseBody(ctx, changePasswordRequestSchema);
@@ -39313,89 +39806,13 @@ var mediaRoutes = [
   }
 ];
 
-// server/http/routes/me.ts
-var idParams2 = external_exports.object({ id: idSchema });
-function own2(ctx) {
-  const principal = principalOf(ctx);
-  return { principal, scope: chairScope(principal) };
-}
-var meRoutes = [
-  {
-    method: "GET",
-    path: "/api/me/schedule",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { scope } = own2(ctx);
-      const query = parseQuery(ctx, myScheduleQuerySchema);
-      return {
-        body: myScheduleResponseSchema.parse(await mySchedule(scope, query, ctx.now)),
-        headers: NO_STORE
-      };
-    }
-  },
-  {
-    method: "GET",
-    path: "/api/me/bookings/:id",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const { id } = parseParams(ctx, idParams2);
-      return {
-        body: bookingDetailResponseSchema.parse(await bookingDetail(principal, scope, id, ctx.now)),
-        headers: NO_STORE
-      };
-    }
-  },
-  {
-    method: "POST",
-    path: "/api/me/bookings/:id/status",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const { id } = parseParams(ctx, idParams2);
-      const input2 = await parseBody(ctx, statusChangeRequestSchema);
-      const done = await changeBookingStatus(principal, scope, id, input2, metaOf(ctx));
-      scheduleDelivery(done.outboxIds);
-      return { body: bookingResponseSchema.parse(done.body) };
-    }
-  },
-  {
-    method: "POST",
-    path: "/api/me/time-blocks",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const input2 = await parseBody(ctx, ownTimeBlockRequestSchema);
-      const done = await createTimeBlock(
-        principal,
-        scope,
-        { ...input2, staffId: scope.staffId },
-        metaOf(ctx)
-      );
-      return { status: 201, body: timeBlockResponseSchema.parse(done.body) };
-    }
-  },
-  {
-    method: "DELETE",
-    path: "/api/me/time-blocks/:id",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const { id } = parseParams(ctx, idParams2);
-      const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
-      const done = await deleteTimeBlock2(principal, scope, id, resolutions, metaOf(ctx));
-      return { body: conflictOnlyResponseSchema.parse(done.body) };
-    }
-  }
-];
-
 // server/http/routes/photos.ts
-var idParams3 = external_exports.object({ id: idSchema });
+var idParams2 = external_exports.object({ id: idSchema });
 var photosRoutes = [
   {
     method: "GET",
     path: "/api/admin/photos",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
       const query = parseQuery(ctx, adminPhotoListQuerySchema);
       return {
@@ -39409,7 +39826,7 @@ var photosRoutes = [
   {
     method: "POST",
     path: "/api/admin/photos/upload-url",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
       const input2 = await parseBody(ctx, uploadUrlRequestSchema);
       return {
@@ -39423,7 +39840,7 @@ var photosRoutes = [
   {
     method: "POST",
     path: "/api/admin/photos/confirm",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
       const input2 = await parseBody(ctx, confirmUploadRequestSchema);
       return {
@@ -39437,9 +39854,9 @@ var photosRoutes = [
   {
     method: "PATCH",
     path: "/api/admin/photos/:id",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams2);
       const patch = await parseBody(ctx, photoPatchRequestSchema);
       return {
         body: adminPhotoResponseSchema.parse({
@@ -39451,11 +39868,427 @@ var photosRoutes = [
   {
     method: "DELETE",
     path: "/api/admin/photos/:id",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams2);
       await deletePhoto(principalOf(ctx), id, metaOf(ctx));
       return { body: { ok: true } };
+    }
+  }
+];
+
+// server/services/teamPortal.ts
+function toTeamBookingView(b) {
+  return {
+    id: b._id,
+    referenceCode: b.referenceCode,
+    status: b.status,
+    source: b.source,
+    startAt: b.startAt.toISOString(),
+    endAt: b.endAt.toISOString(),
+    customerName: b.customer.name,
+    services: b.services.map((s2) => s2.name),
+    notes: b.notes
+  };
+}
+async function ownStaff(principal) {
+  const { staffId } = chairScope(principal);
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff || staff.deletedAt)
+    throw new AppError("FORBIDDEN", "This sign-in is no longer active");
+  return staff;
+}
+async function teamMe(principal) {
+  const staff = await ownStaff(principal);
+  const [session, photos] = await Promise.all([
+    teamSessionsRepo_exports.findTeamSessionById(principal.sessionId),
+    staffPhotoMap()
+  ]);
+  return {
+    staff: {
+      id: staff._id,
+      name: staff.name,
+      title: staff.title,
+      photo: photos.get(staff._id) ?? null
+    },
+    expiresAt: (session?.expiresAt ?? /* @__PURE__ */ new Date()).toISOString()
+  };
+}
+var LIVE = ["confirmed", "completed", "noShow"];
+async function teamDay(principal, now2) {
+  const staff = await ownStaff(principal);
+  const date5 = shopDateOf(now2);
+  const bounds = shopDayBounds(date5);
+  const [data, bookings] = await Promise.all([
+    loadScheduleData(date5, date5),
+    bookingsRepo_exports.listBookingsBetween(bounds, { staffId: staff._id, statuses: LIVE })
+  ]);
+  const blocks = data.source.timeBlocks.filter(
+    (b) => b.staffId === staff._id && b.startAt < bounds.end && b.endAt > bounds.start
+  );
+  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  return {
+    date: date5,
+    now: now2.toISOString(),
+    working: workingView(staff._id, date5, data.source),
+    nextUp: toNext(confirmed, now2),
+    bookings: bookings.map(toTeamBookingView),
+    blocks: blocks.map(toTimeBlockView),
+    isOut: blocks.some(
+      (b) => b.kind === "dayOff" && b.startAt <= bounds.start && b.endAt >= bounds.end
+    ),
+    counts: {
+      total: bookings.length,
+      done: bookings.filter((b) => b.status === "completed").length,
+      noShow: bookings.filter((b) => b.status === "noShow").length,
+      left: confirmed.length
+    }
+  };
+}
+function toNext(confirmed, now2) {
+  const next2 = confirmed.find((b) => b.endAt > now2);
+  return next2 ? toTeamBookingView(next2) : null;
+}
+async function teamWeek(principal, now2) {
+  const staff = await ownStaff(principal);
+  const from = shopDateOf(now2);
+  const to = shopDayStart(from).plus({ days: 6 }).toISODate() ?? from;
+  const [data, bookings] = await Promise.all([
+    loadScheduleData(from, to),
+    bookingsRepo_exports.listBookingsBetween(
+      { start: shopDayBounds(from).start, end: shopDayBounds(to).end },
+      { staffId: staff._id, statuses: LIVE }
+    )
+  ]);
+  const days = [];
+  for (let d = shopDayStart(from); (d.toISODate() ?? "") <= to; d = d.plus({ days: 1 })) {
+    const date5 = d.toISODate() ?? from;
+    const bounds = shopDayBounds(date5);
+    const mine = bookings.filter((b) => b.startAt >= bounds.start && b.startAt < bounds.end);
+    days.push({
+      date: date5,
+      working: workingView(staff._id, date5, data.source),
+      count: mine.filter((b) => b.status !== "noShow").length,
+      bookings: mine.map(toTeamBookingView),
+      blocks: data.source.timeBlocks.filter((b) => b.staffId === staff._id && b.startAt < bounds.end && b.endAt > bounds.start).map(toTimeBlockView)
+    });
+  }
+  return { days };
+}
+async function setBookingStatus2(principal, id, status, meta3) {
+  const done = await changeBookingStatus(
+    principal,
+    chairScope(principal),
+    id,
+    { status, notify: false },
+    meta3
+  );
+  return viewById(done.body.booking.id);
+}
+async function setBookingNote(principal, id, notes, meta3) {
+  const done = await updateBookingNotes2(principal, chairScope(principal), id, notes, meta3);
+  return viewById(done.booking.id);
+}
+async function viewById(id) {
+  const booking = await bookingsRepo_exports.findBookingById(id);
+  if (!booking) throw new AppError("NOT_FOUND", "Booking was not found");
+  return toTeamBookingView(booking);
+}
+async function addWalkIn(principal, input2, meta3) {
+  const staff = await ownStaff(principal);
+  const request = manualBookingRequestSchema.parse({
+    source: "walkIn",
+    serviceIds: input2.serviceIds,
+    staff: staff._id,
+    customer: { name: input2.name, phone: input2.phone, email: null },
+    notifyCustomer: false
+  });
+  const outcome2 = await createManualBooking(request, actorOf2(principal), meta3);
+  const body = outcome2.body;
+  return {
+    booking: await viewById(body.booking.id),
+    outsideWorkingTime: body.outsideWorkingTime
+  };
+}
+var AHEAD_DAYS = 90;
+async function teamTimeOff(principal, now2) {
+  const staff = await ownStaff(principal);
+  const today = shopDateOf(now2);
+  const range = {
+    start: shopDayBounds(today).start,
+    end: shopDayBounds(shopDayStart(today).plus({ days: AHEAD_DAYS }).toISODate() ?? today).end
+  };
+  const [blocks, alerts] = await Promise.all([
+    timeBlocksRepo_exports.listTimeBlocksForStaff(staff._id, range),
+    alertsRepo_exports.listOpenAlerts()
+  ]);
+  const todayBounds = shopDayBounds(today);
+  return {
+    isOutToday: blocks.some(
+      (b) => b.kind === "dayOff" && b.startAt <= todayBounds.start && b.endAt >= todayBounds.end
+    ),
+    blocks: blocks.filter((b) => b.kind !== "extraHours").map(toTimeBlockView),
+    requests: alerts.filter((a) => a.staffId === staff._id && a.kind === "timeOffRequest").map((a) => ({ id: a._id, fromDate: a.fromDate, toDate: a.toDate, reason: a.reason }))
+  };
+}
+async function blockTime(principal, input2, meta3) {
+  const staff = await ownStaff(principal);
+  return createTimeBlock(
+    principal,
+    chairScope(principal),
+    {
+      staffId: staff._id,
+      kind: "block",
+      startAt: shopLocalToUtc(input2.date, input2.start).toISOString(),
+      endAt: shopLocalToUtc(input2.date, input2.end).toISOString(),
+      reason: input2.reason
+    },
+    meta3
+  );
+}
+async function removeBlock(principal, id, meta3) {
+  return deleteTimeBlock2(principal, chairScope(principal), id, void 0, meta3);
+}
+function affectedIds(error62) {
+  if (!isAppError(error62) || error62.code !== "SCHEDULE_CONFLICT") return [];
+  const list = error62.extra?.affected;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap(
+    (a) => typeof a === "object" && a !== null && "bookingId" in a && typeof a.bookingId === "string" ? [a.bookingId] : []
+  );
+}
+var keepAll = (ids) => ids.map((bookingId) => ({ bookingId, action: "keep" }));
+async function outToday(principal, meta3) {
+  const staff = await ownStaff(principal);
+  const date5 = shopDateOf(meta3.now);
+  const input2 = { date: date5, status: "out" };
+  let clients = 0;
+  try {
+    await setDayStatus(principal, staff._id, input2, meta3);
+  } catch (error62) {
+    const ids = affectedIds(error62);
+    if (ids.length === 0) throw error62;
+    clients = ids.length;
+    await setDayStatus(principal, staff._id, { ...input2, resolutions: keepAll(ids) }, meta3);
+  }
+  if (clients > 0) await raiseAlert("barberOut", staff._id, date5, date5, null, meta3.now);
+  return { clients };
+}
+async function requestDaysOff(principal, input2, meta3) {
+  const staff = await ownStaff(principal);
+  const range = {
+    start: shopDayBounds(input2.fromDate).start,
+    end: shopDayBounds(input2.toDate).end
+  };
+  const booked = await bookingsRepo_exports.listBookingsBetween(range, {
+    staffId: staff._id,
+    statuses: ["confirmed"]
+  });
+  if (booked.length === 0) {
+    await createTimeBlock(
+      principal,
+      chairScope(principal),
+      {
+        staffId: staff._id,
+        kind: "timeOff",
+        startAt: range.start.toISOString(),
+        endAt: range.end.toISOString(),
+        reason: input2.reason
+      },
+      meta3
+    );
+    return { applied: true, clients: 0 };
+  }
+  await raiseAlert(
+    "timeOffRequest",
+    staff._id,
+    input2.fromDate,
+    input2.toDate,
+    input2.reason ?? null,
+    meta3.now
+  );
+  return { applied: false, clients: booked.length };
+}
+async function raiseAlert(kind, staffId, fromDate, toDate, reason, now2) {
+  await alertsRepo_exports.insertAlert(
+    {
+      kind,
+      staffId,
+      fromDate,
+      toDate,
+      startAt: shopDayBounds(fromDate).start,
+      endAt: shopDayBounds(toDate).end,
+      reason
+    },
+    now2
+  );
+}
+
+// server/http/routes/team.ts
+var idParams3 = external_exports.object({ id: idSchema });
+var tokenParams = external_exports.object({ token: external_exports.string().regex(/^[A-Za-z0-9_-]{43}$/) });
+var teamRoutes = [
+  {
+    method: "POST",
+    path: "/api/team/login",
+    auth: "public",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamLoginRequestSchema);
+      await teamLogin(ctx.res, input2, metaOf(ctx));
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/setup/:token",
+    auth: "public",
+    handler: async (ctx) => {
+      const { token } = parseParams(ctx, tokenParams);
+      return {
+        body: teamSetupInfoResponseSchema.parse(await setupLinkInfo(token, ctx.now)),
+        headers: NO_STORE
+      };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/setup/:token",
+    auth: "public",
+    handler: async (ctx) => {
+      const { token } = parseParams(ctx, tokenParams);
+      const input2 = await parseBody(ctx, teamSetupRequestSchema);
+      await completeSetup(ctx.res, token, input2.pin, metaOf(ctx));
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/logout",
+    auth: "team",
+    handler: async (ctx) => {
+      await endTeamSession(ctx.res, principalOf(ctx), ctx.now);
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/me",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamMeResponseSchema.parse(await teamMe(principalOf(ctx))),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/pin",
+    auth: "team",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamChangePinRequestSchema);
+      await changePin(principalOf(ctx), input2, metaOf(ctx));
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/today",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamDayResponseSchema.parse(await teamDay(principalOf(ctx), ctx.now)),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "GET",
+    path: "/api/team/week",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamWeekResponseSchema.parse(await teamWeek(principalOf(ctx), ctx.now)),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/bookings/:id/status",
+    auth: "team",
+    handler: async (ctx) => {
+      const { id } = parseParams(ctx, idParams3);
+      const input2 = await parseBody(ctx, teamStatusRequestSchema);
+      const booking = await setBookingStatus2(principalOf(ctx), id, input2.status, metaOf(ctx));
+      return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/bookings/:id/note",
+    auth: "team",
+    handler: async (ctx) => {
+      const { id } = parseParams(ctx, idParams3);
+      const input2 = await parseBody(ctx, teamNoteRequestSchema);
+      const booking = await setBookingNote(principalOf(ctx), id, input2.notes, metaOf(ctx));
+      return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/walk-ins",
+    auth: "team",
+    handler: async (ctx) => {
+      const key = idempotencyKeyOf(ctx);
+      const input2 = await parseBody(ctx, teamWalkInRequestSchema);
+      const done = await addWalkIn(principalOf(ctx), input2, {
+        ...metaOf(ctx),
+        idempotencyKey: key
+      });
+      return { status: 201, body: teamWalkInResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/time-off",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamTimeOffResponseSchema.parse(await teamTimeOff(principalOf(ctx), ctx.now)),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/time-blocks",
+    auth: "team",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamBlockTimeRequestSchema);
+      const done = await blockTime(principalOf(ctx), input2, metaOf(ctx));
+      return { status: 201, body: timeBlockResponseSchema.parse(done.body), headers: NO_STORE };
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/api/team/time-blocks/:id",
+    auth: "team",
+    handler: async (ctx) => {
+      const { id } = parseParams(ctx, idParams3);
+      const done = await removeBlock(principalOf(ctx), id, metaOf(ctx));
+      return { body: conflictOnlyResponseSchema.parse(done.body), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/out-today",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamOutTodayResponseSchema.parse(await outToday(principalOf(ctx), metaOf(ctx))),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/days-off",
+    auth: "team",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamDaysOffRequestSchema);
+      const done = await requestDaysOff(principalOf(ctx), input2, metaOf(ctx));
+      return { status: 201, body: teamDaysOffResponseSchema.parse(done), headers: NO_STORE };
     }
   }
 ];
@@ -39467,7 +40300,7 @@ var allRoutes = [
   ...availabilityRoutes,
   ...bookingRoutes,
   ...authRoutes,
-  ...meRoutes,
+  ...teamRoutes,
   ...adminRoutes,
   ...photosRoutes,
   ...mediaRoutes,
@@ -39476,7 +40309,10 @@ var allRoutes = [
 ];
 var router = null;
 function getRouter() {
-  router ??= createRouter(allRoutes, authenticateFromCookie);
+  router ??= createRouter(
+    allRoutes,
+    (ctx, level) => level === "team" ? authenticateTeam(ctx) : authenticateFromCookie(ctx)
+  );
   return router;
 }
 

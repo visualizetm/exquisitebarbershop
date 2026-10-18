@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Db } from 'mongodb';
+import { DEMO_PIN } from '../../shared/lib/pin';
 import { shopDateOf, shopDayStart, toShopTime } from '../../shared/lib/time';
 import type { Actor } from '../../shared/schemas/timeBlock';
 import { serviceSeedId, staffSeedId, type staffSeed } from '../../seed/shop';
@@ -8,7 +9,16 @@ import { COLLECTIONS } from '../db/indexes';
 import { getPartialEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { logger } from '../lib/logger';
-import { photosRepo, shopSettingsRepo, systemStateRepo, usersRepo } from '../repos';
+import { hashPin } from '../auth/pin';
+import {
+  photosRepo,
+  setupTokensRepo,
+  shopSettingsRepo,
+  staffPinsRepo,
+  staffRepo,
+  systemStateRepo,
+  usersRepo,
+} from '../repos';
 import { dropMedia } from '../storage/mongo';
 import { getStorage, storageEnabled } from '../storage';
 import { computeAvailability, workingRangesFor } from './availability';
@@ -173,6 +183,29 @@ export async function seedSampleBookings(now: Date): Promise<number> {
   return placed;
 }
 
+/**
+ * Gives every barber the demo PIN, so the showcase's /team screen opens with one known number.
+ * Only barbers without a PIN get one. Real shops never run this: it is reached in demo mode only.
+ */
+export async function seedDemoPins(now: Date): Promise<number> {
+  let seeded = 0;
+  for (const staff of await staffRepo.listStaff({})) {
+    if (await staffPinsRepo.findPinByStaff(staff._id)) continue;
+    await staffPinsRepo.upsertPin(staff._id, await hashPin(staff._id, DEMO_PIN), now);
+    seeded += 1;
+  }
+  return seeded;
+}
+
+/**
+ * A demo seeded before barber PINs existed has none. Give them out once: when no PIN and no setup
+ * link exists at all. After the owner starts handing out real links, this never runs again.
+ */
+async function ensureDemoPins(now: Date): Promise<void> {
+  if ((await staffPinsRepo.countPins()) > 0 || (await setupTokensRepo.countTokens()) > 0) return;
+  await seedDemoPins(now);
+}
+
 // ---------------------------------------------------------------------------
 // Wiping
 // ---------------------------------------------------------------------------
@@ -252,6 +285,7 @@ export async function ensureDemoReady(
   if (!demoEnabled()) return;
   if (Date.now() < readyUntil) return;
   if (!(await shopSettingsRepo.getShopSettings())) await seedWithLock(setup, now);
+  await ensureDemoPins(now);
   readyUntil = Date.now() + READY_TTL_MS;
 }
 

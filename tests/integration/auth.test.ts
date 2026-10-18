@@ -74,7 +74,11 @@ describe('login', () => {
   });
 
   it('a wrong password and an unknown email look the same: status, body and time', async () => {
-    const barber = await createLogin({ role: 'barber', staffId: staffSeedId('marcus') });
+    const barber = await createLogin({
+      role: 'owner',
+      staffId: staffSeedId('marcus'),
+      password: BARBER_PASSWORD,
+    });
     const wrong = await login(barber.email, 'definitely-not-it-123');
     const unknown = await login('nobody-here@example.com', 'definitely-not-it-123');
     expect(wrong.status).toBe(401);
@@ -105,15 +109,31 @@ describe('login', () => {
     expect(ratio).toBeLessThan(3);
   });
 
-  it('disabled logins and barbers whose chair was removed get the same generic answer', async () => {
-    const disabled = await createLogin({ role: 'barber', staffId: staffSeedId('tre') });
+  it('disabled logins get the same generic answer', async () => {
+    const disabled = await createLogin({
+      role: 'owner',
+      staffId: staffSeedId('tre'),
+      password: BARBER_PASSWORD,
+    });
     await usersRepo.setUserActive(disabled._id, false, new Date());
     const res = await login(disabled.email, BARBER_PASSWORD);
     expect(apiErrorSchema.parse(res.body).error.code).toBe('INVALID_CREDENTIALS');
-    const unlinked = await createLogin({ role: 'barber', staffId: null });
+  });
+
+  it('a barber login is pointed to /team, but only after the right password', async () => {
+    const barber = await createLogin({ role: 'barber', staffId: staffSeedId('dee') });
+    const wrong = await login(barber.email, 'definitely-not-it-123');
+    expect(wrong.status).toBe(401);
+    expect(apiErrorSchema.parse(wrong.body).error.code).toBe('INVALID_CREDENTIALS');
+    const right = await login(barber.email, BARBER_PASSWORD);
+    expect(right.status).toBe(403);
+    expect(apiErrorSchema.parse(right.body).error.message).toContain('/team');
+    // No session starts, and a session made some other way is refused too.
+    expect(right.headers.getSetCookie()).toEqual([]);
+    const cookie = await sessionCookie(barber._id);
     expect(
-      apiErrorSchema.parse((await login(unlinked.email, BARBER_PASSWORD)).body).error.code,
-    ).toBe('INVALID_CREDENTIALS');
+      (await call(server.baseUrl, 'GET', '/api/auth/me', { headers: { cookie } })).status,
+    ).toBe(401);
   });
 
   it('writes every attempt to the audit log, never the password', async () => {
@@ -145,7 +165,11 @@ describe('login', () => {
   });
 
   it('locks an email after five failures, longer each time, identically for unknown emails', async () => {
-    const barber = await createLogin({ role: 'barber', staffId: staffSeedId('jay') });
+    const barber = await createLogin({
+      role: 'owner',
+      staffId: staffSeedId('jay'),
+      password: BARBER_PASSWORD,
+    });
     for (let i = 0; i < 5; i += 1)
       expect((await login(barber.email, `bad-guess-number-${i}`)).status).toBe(401);
     const locked = await login(barber.email, BARBER_PASSWORD);
@@ -203,14 +227,15 @@ describe('login', () => {
 
   it('a temporary password must be changed before anything else works', async () => {
     const barber = await createLogin({
-      role: 'barber',
+      role: 'owner',
       staffId: staffSeedId('kris'),
+      password: BARBER_PASSWORD,
       mustChangePassword: true,
     });
     const res = await login(barber.email, BARBER_PASSWORD);
     expect(meResponseSchema.parse(res.body).user.mustChangePassword).toBe(true);
     const cookie = cookieFrom(res.headers) ?? '';
-    const blocked = await call(server.baseUrl, 'GET', '/api/me/schedule', { headers: { cookie } });
+    const blocked = await call(server.baseUrl, 'GET', '/api/admin/today', { headers: { cookie } });
     expect(blocked.status).toBe(403);
     expect(apiErrorSchema.parse(blocked.body).error.code).toBe('PASSWORD_CHANGE_REQUIRED');
     const weak = await call(server.baseUrl, 'POST', '/api/me/password', {
@@ -235,7 +260,7 @@ describe('login', () => {
     expect(changed.status).toBe(200);
     expect(meResponseSchema.parse(changed.body).user.mustChangePassword).toBe(false);
     expect(
-      (await call(server.baseUrl, 'GET', '/api/me/schedule', { headers: { cookie } })).status,
+      (await call(server.baseUrl, 'GET', '/api/admin/today', { headers: { cookie } })).status,
     ).toBe(200);
     expect((await login(barber.email, 'a-brand-new-phrase-55')).status).toBe(200);
   });

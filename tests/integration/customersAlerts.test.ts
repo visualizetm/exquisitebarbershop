@@ -20,7 +20,7 @@ import {
 import { apiErrorSchema } from '../../shared/api/errors';
 import { generateReferenceCode } from '../../shared/lib/referenceCode';
 import { addMinutes } from '../../shared/lib/time';
-import { createLogin, sessionCookie } from '../helpers/auth';
+import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
 import { call, nextDate, slotAt, startTestServer, type TestServer } from '../helpers/bookingApi';
 import { NOW, useTestDb } from '../helpers/db';
 
@@ -105,7 +105,7 @@ beforeAll(async () => {
   ownerCookie = await sessionCookie(
     (await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') }))._id,
   );
-  barberCookie = await sessionCookie((await createLogin({ role: 'barber', staffId: marcus }))._id);
+  barberCookie = await teamCookie(marcus);
 });
 afterAll(async () => {
   await server.close();
@@ -202,7 +202,7 @@ describe('the customer list', () => {
       (await asOwner('GET', '/api/admin/customer-list')).body,
     );
     expect(list.rows[0]?.hasNotes).toBe(true);
-    // A barber can neither read nor write it.
+    // A barber's PIN session can neither read nor write it.
     for (const [method, path] of [
       ['GET', '/api/admin/customers?phone=2155550155'],
       ['GET', '/api/admin/customer-list'],
@@ -212,7 +212,7 @@ describe('the customer list', () => {
         headers: { cookie: barberCookie },
         ...(method === 'PUT' ? { body: { phone: '2155550155', notes: 'x' } } : {}),
       });
-      expect(res.status, path).toBe(403);
+      expect(res.status, path).toBe(401);
     }
     await asOwner('PUT', '/api/admin/customers/notes', { phone: '2155550155', notes: '   ' });
     expect(await db().collection('customerNotes').countDocuments({})).toBe(0);

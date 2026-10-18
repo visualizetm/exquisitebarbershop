@@ -24,7 +24,7 @@ beforeAll(async () => {
   });
   ownerId = owner._id;
   cookie = await sessionCookie(owner._id);
-  await createLogin({ role: 'barber', staffId: staffSeedId('marcus'), email: 'taken@example.com' });
+  await createLogin({ role: 'owner', staffId: null, email: 'taken@example.com' });
 });
 afterAll(async () => {
   await server.close();

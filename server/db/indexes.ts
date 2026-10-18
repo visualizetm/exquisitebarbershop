@@ -22,6 +22,9 @@ export const COLLECTIONS = {
   systemState: 'systemState',
   alerts: 'alerts',
   customerNotes: 'customerNotes',
+  staffPins: 'staffPins',
+  setupTokens: 'setupTokens',
+  teamSessions: 'teamSessions',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -132,6 +135,51 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { phone: 1 },
     options: { name: 'uniq_phone', unique: true },
     reason: 'One private note per customer phone number.',
+  },
+  // staffPins
+  {
+    collection: 'staffPins',
+    keys: { staffId: 1 },
+    options: { name: 'uniq_staff', unique: true },
+    reason: 'At most one PIN per barber; sign-in looks it up by staff id.',
+  },
+  // setupTokens
+  {
+    collection: 'setupTokens',
+    keys: { tokenHash: 1 },
+    options: { name: 'uniq_tokenHash', unique: true },
+    reason: 'A setup link is found by the hash of its token.',
+  },
+  {
+    collection: 'setupTokens',
+    keys: { expiresAt: 1 },
+    options: { name: 'ttl_expiresAt', expireAfterSeconds: 0 },
+    reason: 'MongoDB removes expired setup links on its own.',
+  },
+  {
+    collection: 'setupTokens',
+    keys: { staffId: 1 },
+    options: { name: 'by_staff' },
+    reason: "A new link retires the barber's earlier ones.",
+  },
+  // teamSessions
+  {
+    collection: 'teamSessions',
+    keys: { tokenHash: 1 },
+    options: { name: 'uniq_tokenHash', unique: true },
+    reason: 'Barber session lookup on every portal request.',
+  },
+  {
+    collection: 'teamSessions',
+    keys: { expiresAt: 1 },
+    options: { name: 'ttl_expiresAt', expireAfterSeconds: 0 },
+    reason: 'MongoDB removes expired barber sessions on its own.',
+  },
+  {
+    collection: 'teamSessions',
+    keys: { staffId: 1 },
+    options: { name: 'by_staff' },
+    reason: 'A new PIN or a reset ends every session of one barber.',
   },
   // slotLocks
   {

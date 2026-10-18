@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
-import { AdminLayout, PublicLayout } from './Layout';
+import { AdminLayout, PublicLayout, TeamLayout } from './Layout';
 import { BookPage } from '@/pages/BookPage';
 import { ChairPage } from '@/pages/ChairPage';
 import { ChairsPage } from '@/pages/ChairsPage';
@@ -15,6 +15,8 @@ import { Status } from '@/components/Status';
 
 // The staff area is its own chunk: public visitors never download it.
 const AdminApp = lazy(() => import('@/admin/AdminApp'));
+// The barber portal is another chunk of its own, for the same reason.
+const TeamApp = lazy(() => import('@/team/TeamApp'));
 // The kit showcase exists only in development builds, for visual checks and screenshots.
 const KitPage = import.meta.env.DEV ? lazy(() => import('@/pages/KitPage')) : null;
 
@@ -43,6 +45,16 @@ export function App() {
             />
           ) : null}
           <Route path="*" element={<NotFoundPage />} />
+        </Route>
+        <Route element={<TeamLayout />}>
+          <Route
+            path="team/*"
+            element={
+              <Suspense fallback={<Status state="loading" />}>
+                <TeamApp />
+              </Suspense>
+            }
+          />
         </Route>
         <Route element={<AdminLayout />}>
           <Route

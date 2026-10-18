@@ -33,5 +33,10 @@ export function assertInScope(scope: Scope, staffId: string, what = 'Booking'): 
 }
 
 export function actorOf(principal: Principal): Actor {
-  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
+  // A barber signs in with a PIN and has no login record: the audit names the chair, not a user.
+  return {
+    type: principal.role,
+    userId: principal.role === 'owner' ? principal.userId : null,
+    staffId: principal.staffId,
+  };
 }

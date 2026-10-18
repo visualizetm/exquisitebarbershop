@@ -69,3 +69,15 @@ export function AdminLayout() {
     </ToastProvider>
   );
 }
+
+/** The barber portal: no site header or footer, just the portal's own screens and toasts. */
+export function TeamLayout() {
+  useRouteFocus();
+  return (
+    <ToastProvider>
+      <div className="exq-app" data-state="team">
+        <Outlet />
+      </div>
+    </ToastProvider>
+  );
+}

@@ -24,10 +24,6 @@ import {
   dayStatusResponseSchema,
   hoursRequestSchema,
   hoursResponseSchema,
-  issuedPasswordResponseSchema,
-  loginCreateRequestSchema,
-  loginListResponseSchema,
-  loginResponseSchema,
   manualBookingRequestSchema,
   manualBookingResponseSchema,
   outboxListQuerySchema,
@@ -64,7 +60,9 @@ import {
 import { createBookingResponseSchema } from '../../../shared/api/bookings';
 import { idSchema } from '../../../shared/schemas/common';
 import { shopDateOf } from '../../../shared/lib/time';
-import { createStaffLogin, resetLoginPassword, setLoginActive } from '../../auth/authService';
+import { setupLinkResponseSchema, staffAccessResponseSchema } from '../../../shared/api/team';
+import { issueSetupLink, staffAccess, unlockStaff } from '../../auth/teamAuth';
+import { getEnv } from '../../env';
 import { runAfterResponse } from '../../lib/afterResponse';
 import { deliverOutboxIds } from '../../notifications/deliver';
 import { ownerScope, actorOf } from '../../services/access';
@@ -90,15 +88,12 @@ import {
   deleteStaff,
   getSettings,
   listAudit,
-  listLogins,
   listOutbox,
   listServices,
   listStaff,
   putSettings,
   renameStaffSlug,
   retryOutboxMessage,
-  staffMap,
-  toLoginView,
   updateService,
   updateStaff,
 } from '../../services/adminCatalog';
@@ -473,47 +468,40 @@ export const adminRoutes: RouteDefinition[] = [
     return { body: settingsResponseSchema.parse(await putSettings(principal, input, metaOf(ctx))) };
   }),
 
-  // Logins ----------------------------------------------------------------
-  owner('GET', '/api/admin/users', async (ctx) => {
+  // A barber's PIN access ---------------------------------------------------
+  owner('GET', '/api/admin/staff/:id/access', async (ctx) => {
     ctxScope(ctx);
-    return { body: loginListResponseSchema.parse(await listLogins()), headers: NO_STORE };
+    const { id } = parseParams(ctx, idParams);
+    const access = await staffAccess(id, ctx.now);
+    return {
+      body: staffAccessResponseSchema.parse({
+        hasPin: access.hasPin,
+        lastSignInAt: access.lastSignInAt?.toISOString() ?? null,
+        lockedUntil: access.lockedUntil?.toISOString() ?? null,
+        setupLinkActive: access.setupLinkActive,
+      }),
+      headers: NO_STORE,
+    };
   }),
-  owner('POST', '/api/admin/users', async (ctx) => {
+  // Also how a PIN is reset: the old PIN stops working and the barber's sessions end.
+  owner('POST', '/api/admin/staff/:id/setup-link', async (ctx) => {
     const { principal } = ctxScope(ctx);
-    const input = await parseBody(ctx, loginCreateRequestSchema);
-    const issued = await createStaffLogin(principal, input, metaOf(ctx));
+    const { id } = parseParams(ctx, idParams);
+    const issued = await issueSetupLink(actorOf(principal), principal.userId, id, metaOf(ctx));
     return {
       status: 201,
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword,
+      body: setupLinkResponseSchema.parse({
+        url: `${getEnv().APP_BASE_URL}/team/setup/${issued.token}`,
+        expiresAt: issued.expiresAt.toISOString(),
       }),
       headers: NO_STORE,
     };
   }),
-  owner('POST', '/api/admin/users/:id/reset-password', async (ctx) => {
+  owner('POST', '/api/admin/staff/:id/unlock', async (ctx) => {
     const { principal } = ctxScope(ctx);
     const { id } = parseParams(ctx, idParams);
-    const issued = await resetLoginPassword(principal, id, metaOf(ctx));
-    return {
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword,
-      }),
-      headers: NO_STORE,
-    };
-  }),
-  owner('POST', '/api/admin/users/:id/disable', async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, false, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
-  }),
-  owner('POST', '/api/admin/users/:id/enable', async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, true, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
+    await unlockStaff(actorOf(principal), id, metaOf(ctx));
+    return { body: { ok: true }, headers: NO_STORE };
   }),
 
   // Audit and outbox ------------------------------------------------------

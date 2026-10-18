@@ -416,3 +416,20 @@ commit, and what is still open.
 - Tests: `tests/integration/ownEmail.test.ts`, the photo tag tests, the authz row, and
   `tests/e2e/website.spec.ts` (every tab, the closed day resolver, services, home photo, gallery, settings
   saves and errors, email change and back, axe in both themes at 1280 and 390).
+
+### M5: the barber portal
+
+- Shipped: `/team`, one shared link. Tap a name, then a 6 dot PIN pad that submits on the sixth digit.
+  Four tabs: Today (Next up with Done and No show, the day, Add note, Undo, Walk-in), Week (seven days
+  with counts), Time off ("I am out today" with a confirm, Block time, Days off ahead, requests waiting)
+  and Me (change PIN, theme, sign out). `/team/setup/:token` is the one-time link where a barber chooses and
+  confirms a PIN. The owner's Team page has a new Access tab: Copy setup link, Reset PIN, Unlock, last sign
+  in. Barbers can no longer sign in at `/admin`.
+- Server: `staffPins`, `setupTokens`, `teamSessions`; the `team` auth level; `/api/team/*` (16 routes) and
+  `/api/admin/staff/:id/access|setup-link|unlock`; demo PIN seeding.
+- Tests: `tests/unit/pin.test.ts`, `teamAuth.test.ts` (links, hashing, 12 hours, identical failures, lockout,
+  address limit, change PIN, audit), `teamPortal.test.ts` (day, status, notes, out today and the owner's
+  decision, days off, blocks, walk-in), `idor.test.ts` rewritten for the barber API, the demo PIN tests in
+  `demo.test.ts`, the authz matrix across anonymous, barber, owner and temporary password, and
+  `tests/e2e/portal.spec.ts` (sign in, the whole barber day at 390, setup link, lockout and unlock, axe on
+  every screen in both themes).

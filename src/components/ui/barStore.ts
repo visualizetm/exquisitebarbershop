@@ -44,7 +44,7 @@ export function subscribeBar(listener: () => void): () => void {
 }
 
 /** Pages that never show the bar. Prompt 11's barber portal lives under /portal. */
-export const NO_BAR_PREFIXES = ['/admin', '/setup', '/kit', '/portal'] as const;
+export const NO_BAR_PREFIXES = ['/admin', '/setup', '/team', '/kit', '/portal'] as const;
 
 /** CALL and BOOK NOW, the bar on every public page unless the page says otherwise. */
 export function defaultBar(phone: string): BarConfig {

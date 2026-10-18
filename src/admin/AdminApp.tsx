@@ -3,15 +3,10 @@ import { Status } from '@/components/Status';
 import { DemoBanner } from '@/components/site/DemoBanner';
 import '@/styles/admin.css';
 import '@/styles/dashboard.css';
-import { AdminNav } from './components/AdminNav';
-import { AccountPage } from './pages/AccountPage';
 import { AuditPage } from './pages/AuditPage';
-import { BookingDetailPage } from './pages/BookingDetailPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { CustomersPage } from './customers/CustomersPage';
 import { LoginPage } from './pages/LoginPage';
-import { LoginsSettings } from './pages/settings/LoginsSettings';
-import { MySchedulePage } from './pages/MySchedulePage';
 import { OutboxPage } from './pages/OutboxPage';
 import { SchedulePage } from './schedule/SchedulePage';
 import { SettingsPage } from './settings/SettingsPage';
@@ -78,13 +73,13 @@ function Gate() {
       </AdminShell>
     );
   }
+  // Barbers sign in with a PIN at /team. A barber login cannot open a session here at all, so this
+  // is only reached by a session that predates the PIN portal.
   return (
     <div className="exq-adm" data-state="barber">
-      <AdminNav />
-      <div className="exq-adm__content">
-        {state.me.features.demo ? <DemoBanner /> : null}
-        <BarberRoutes />
-      </div>
+      <p>
+        Barbers sign in at <a href="/team">/team</a> with a PIN.
+      </p>
     </div>
   );
 }
@@ -103,24 +98,11 @@ function OwnerRoutes() {
       <Route path="customers/:phone" element={<CustomersPage />} />
       <Route path="photos" element={<Navigate to="/admin/website?tab=gallery" replace />} />
       <Route path="settings" element={<SettingsPage />} />
-      <Route path="settings/logins" element={<LoginsSettings />} />
       <Route path="settings/*" element={<Navigate to="/admin/settings" replace />} />
       <Route path="audit" element={<AuditPage />} />
       <Route path="outbox" element={<OutboxPage />} />
       <Route path="account" element={<Navigate to="/admin/settings?tab=account" replace />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />
-    </Routes>
-  );
-}
-
-function BarberRoutes() {
-  return (
-    <Routes>
-      <Route index element={<Navigate to="/admin/me" replace />} />
-      <Route path="me" element={<MySchedulePage />} />
-      <Route path="me/bookings/:id" element={<BookingDetailPage mine />} />
-      <Route path="account" element={<AccountPage />} />
-      <Route path="*" element={<Navigate to="/admin/me" replace />} />
     </Routes>
   );
 }

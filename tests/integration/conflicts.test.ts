@@ -8,7 +8,6 @@ import {
   slotLocksRepo,
   staffRepo,
   timeBlocksRepo,
-  usersRepo,
   weeklyHoursRepo,
 } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
@@ -17,7 +16,7 @@ import { generateReferenceCode } from '../../shared/lib/referenceCode';
 import { addMinutes } from '../../shared/lib/time';
 import type { WeekHours } from '../../shared/schemas/common';
 import { apiErrorSchema } from '../../shared/api/errors';
-import { createLogin, sessionCookie } from '../helpers/auth';
+import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
 import {
   call,
   nextDate,
@@ -369,7 +368,7 @@ describe('conflict rule: time blocks and days', () => {
 });
 
 describe('conflict rule: removing chairs and services', () => {
-  it('removing a chair lists its bookings; cancelling them also disables its login', async () => {
+  it('removing a chair lists its bookings; cancelling them also ends its barber sign-in', async () => {
     const created = await asOwner('POST', '/api/admin/staff', {
       slug: 'temp-chair',
       name: 'Temp',
@@ -388,8 +387,10 @@ describe('conflict rule: removing chairs and services', () => {
     expect(created.status).toBe(201);
     const id = (created.body as { staff: { id: string } }).staff.id;
     await asOwner('PUT', `/api/admin/staff/${id}/hours`, { days: shopHoursSeed });
-    const login = await createLogin({ role: 'barber', staffId: id });
-    const cookie = await sessionCookie(login._id);
+    const cookie = await teamCookie(id);
+    expect(
+      (await call(server.baseUrl, 'GET', '/api/team/today', { headers: { cookie } })).status,
+    ).toBe(200);
     const booking = await seedBooking(id, '10:00');
     const res = await asOwner('DELETE', `/api/admin/staff/${id}`, {});
     expect(res.status).toBe(409);
@@ -400,9 +401,8 @@ describe('conflict rule: removing chairs and services', () => {
     });
     expect(ok.body).toEqual({ ok: true, kept: [], moved: [], cancelled: [booking._id] });
     expect((await staffRepo.findStaffById(id))?.deletedAt).not.toBeNull();
-    expect((await usersRepo.findUserById(login._id))?.isActive).toBe(false);
     expect(
-      (await call(server.baseUrl, 'GET', '/api/me/schedule', { headers: { cookie } })).status,
+      (await call(server.baseUrl, 'GET', '/api/team/today', { headers: { cookie } })).status,
     ).toBe(401);
   });
 

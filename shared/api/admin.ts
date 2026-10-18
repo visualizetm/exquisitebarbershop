@@ -11,7 +11,6 @@ import {
   idSchema,
   isoDateSchema,
   weekHoursSchema,
-  emailSchema,
   slugSchema,
 } from '../schemas/common';
 import { outboxStatusSchema } from '../schemas/emailOutbox';
@@ -23,7 +22,6 @@ import { staffSelectorSchema } from './availability';
 import { bookingViewSchema } from './bookings';
 import { photoViewSchema } from './photos';
 import { alertKindSchema } from '../schemas/alert';
-import { meUserSchema } from './auth';
 
 // ---------------------------------------------------------------------------
 // Shared pieces
@@ -386,26 +384,6 @@ export const timeBlockCreateRequestSchema = z
 export type TimeBlockCreateRequest = z.input<typeof timeBlockCreateRequestSchema>;
 
 /** Barbers block their own chair, so staffId is implied; only short blocks and time off. */
-export const ownTimeBlockRequestSchema = z
-  .object({
-    kind: z.enum(['block', 'timeOff']),
-    startAt: z.iso.datetime({ offset: true }),
-    endAt: z.iso.datetime({ offset: true }),
-    reason: z.string().trim().max(200).optional(),
-    resolutions: resolutionsSchema,
-  })
-  .refine((v) => new Date(v.endAt).getTime() > new Date(v.startAt).getTime(), {
-    message: 'The end must be after the start',
-    path: ['endAt'],
-  })
-  .refine(
-    (v) => new Date(v.endAt).getTime() - new Date(v.startAt).getTime() <= 30 * 24 * 3600_000,
-    {
-      message: 'Blocks are limited to 30 days',
-      path: ['endAt'],
-    },
-  );
-
 export const timeBlockResponseSchema = z
   .object({ timeBlock: timeBlockViewSchema })
   .extend(conflictOutcomeSchema.shape);
@@ -482,7 +460,6 @@ export const adminStaffViewSchema = z.object({
   acceptsOnlineBooking: z.boolean(),
   showOnWebsite: z.boolean(),
   deletedAt: z.iso.datetime().nullable(),
-  hasLogin: z.boolean(),
 });
 export type AdminStaffView = z.infer<typeof adminStaffViewSchema>;
 export const staffListResponseSchema = z.object({ staff: z.array(adminStaffViewSchema) });
@@ -527,16 +504,6 @@ export const closureResponseSchema = z
 
 export const settingsResponseSchema = z.object({ settings: shopSettingsInputSchema });
 export const settingsRequestSchema = shopSettingsInputSchema;
-
-export const loginViewSchema = meUserSchema.extend({ staffName: z.string().nullable() });
-export type LoginView = z.infer<typeof loginViewSchema>;
-export const loginListResponseSchema = z.object({ users: z.array(loginViewSchema) });
-export const loginCreateRequestSchema = z.object({ email: emailSchema, staffId: idSchema });
-export const issuedPasswordResponseSchema = z.object({
-  user: loginViewSchema,
-  temporaryPassword: z.string(),
-});
-export const loginResponseSchema = z.object({ user: loginViewSchema });
 
 // ---------------------------------------------------------------------------
 // Overview
@@ -700,25 +667,3 @@ export const outboxListResponseSchema = z.object({
   messages: z.array(outboxMessageViewSchema),
   nextCursor: z.string().nullable(),
 });
-
-// ---------------------------------------------------------------------------
-// Barber API
-// ---------------------------------------------------------------------------
-
-export const myScheduleQuerySchema = z.object({
-  date: isoDateSchema.optional(),
-  days: z.coerce.number().int().min(1).max(7).default(1),
-});
-export const myScheduleResponseSchema = z.object({
-  staff: staffRefSchema,
-  days: z.array(
-    z.object({
-      date: isoDateSchema,
-      working: workingDaySchema,
-      bookings: z.array(adminBookingViewSchema),
-      blocks: z.array(timeBlockViewSchema),
-    }),
-  ),
-  canBlockTime: z.boolean(),
-});
-export type MyScheduleResponse = z.infer<typeof myScheduleResponseSchema>;

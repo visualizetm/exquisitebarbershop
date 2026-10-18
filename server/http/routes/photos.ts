@@ -31,7 +31,7 @@ export const photosRoutes: RouteDefinition[] = [
   {
     method: 'GET',
     path: '/api/admin/photos',
-    auth: 'barber',
+    auth: 'owner',
     handler: async (ctx) => {
       const query = parseQuery(ctx, adminPhotoListQuerySchema);
       return {
@@ -45,7 +45,7 @@ export const photosRoutes: RouteDefinition[] = [
   {
     method: 'POST',
     path: '/api/admin/photos/upload-url',
-    auth: 'barber',
+    auth: 'owner',
     handler: async (ctx) => {
       const input = await parseBody(ctx, uploadUrlRequestSchema);
       return {
@@ -59,7 +59,7 @@ export const photosRoutes: RouteDefinition[] = [
   {
     method: 'POST',
     path: '/api/admin/photos/confirm',
-    auth: 'barber',
+    auth: 'owner',
     handler: async (ctx) => {
       const input = await parseBody(ctx, confirmUploadRequestSchema);
       return {
@@ -73,7 +73,7 @@ export const photosRoutes: RouteDefinition[] = [
   {
     method: 'PATCH',
     path: '/api/admin/photos/:id',
-    auth: 'barber',
+    auth: 'owner',
     handler: async (ctx) => {
       const { id } = parseParams(ctx, idParams);
       const patch = await parseBody(ctx, photoPatchRequestSchema);
@@ -87,7 +87,7 @@ export const photosRoutes: RouteDefinition[] = [
   {
     method: 'DELETE',
     path: '/api/admin/photos/:id',
-    auth: 'barber',
+    auth: 'owner',
     handler: async (ctx) => {
       const { id } = parseParams(ctx, idParams);
       await deletePhoto(principalOf(ctx), id, metaOf(ctx));

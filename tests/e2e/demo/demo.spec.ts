@@ -62,11 +62,14 @@ test('the first visit sets the shop up by itself and Home loads fully', async ({
   const response = await page.goto('/');
   expect(response?.status()).toBe(200);
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible({
+    timeout: 40_000,
+  });
   const cards = page.locator(
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );
-  await expect(cards.first()).toBeVisible();
+  // The first request seeds the whole shop, so the very first paint of data can take a while.
+  await expect(cards.first()).toBeVisible({ timeout: 40_000 });
   // Cards swap from loading to loaded one by one, so the count is polled rather than read once.
   await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(6);
 
@@ -251,6 +254,26 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
   expect(media.headers()['cache-control']).toContain('immutable');
   expect(media.headers()['content-type']).toBe('image/webp');
   expect(errors).toEqual([]);
+});
+
+test('the barber portal shows the demo PIN, and it opens the portal', async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/team');
+  await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
+  await expect(page.getByText('Demo PIN: 246810')).toBeVisible();
+  await page.getByRole('button', { name: /^Marcus/ }).click();
+  await expect(page.getByText('Demo PIN: 246810')).toBeVisible();
+  const pad = page.getByRole('group', { name: 'PIN for Marcus' });
+  // A wrong PIN is refused, the demo PIN opens Today.
+  for (const digit of '135790') await pad.getByRole('button', { name: digit, exact: true }).click();
+  await expect(page.getByText('That PIN did not work. Try again.')).toBeVisible();
+  for (const digit of '246810') await pad.getByRole('button', { name: digit, exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Week', exact: true }).click();
+  await expect(page.locator('.exq-team-day')).toHaveCount(7);
+  // The one wrong PIN is a 401 the browser logs; nothing else may be.
+  expect(errors.filter((e) => !e.includes('401'))).toEqual([]);
 });
 
 test('Reset demo data wipes the changes and loads the sample shop again', async ({ page }) => {

@@ -10,14 +10,7 @@ import type { WeekHours } from '../../shared/schemas/common';
 import type { TimeBlockDocument, TimeBlockKind } from '../../shared/schemas/timeBlock';
 import type { Principal } from '../http/types';
 import { AppError } from '../lib/errors';
-import {
-  closuresRepo,
-  shopSettingsRepo,
-  slotLocksRepo,
-  staffRepo,
-  timeBlocksRepo,
-  weeklyHoursRepo,
-} from '../repos';
+import { closuresRepo, slotLocksRepo, staffRepo, timeBlocksRepo, weeklyHoursRepo } from '../repos';
 import { actorOf, assertInScope, type Scope } from './access';
 import { whoIsInForStaff, type Changed, type ServiceMeta } from './adminBookings';
 import { toTimeBlockView } from './bookingView';
@@ -32,15 +25,6 @@ function outcome(r: { kept: string[]; moved: string[]; cancelled: string[] }): C
 async function requireLiveStaff(staffId: string): Promise<void> {
   const staff = await staffRepo.findStaffById(staffId);
   if (!staff || staff.deletedAt) throw new AppError('NOT_FOUND', 'Staff member was not found');
-}
-
-/** Barbers act on their own chair only, and only when the owner allows it. */
-async function assertBarberMayBlock(principal: Principal, scope: Scope): Promise<void> {
-  if (principal.role === 'owner' && scope.kind === 'all') return;
-  const settings = await shopSettingsRepo.requireShopSettings();
-  if (principal.role !== 'owner' && !settings.permissions.barbersCanBlockTime) {
-    throw new AppError('FORBIDDEN', 'The owner has not allowed barbers to block their own time');
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +53,6 @@ export async function createTimeBlock(
 ): Promise<Changed<{ timeBlock: TimeBlockView } & ConflictOutcome>> {
   const staffId = scope.kind === 'chair' ? scope.staffId : input.staffId;
   assertInScope(scope, staffId, 'Staff member');
-  await assertBarberMayBlock(principal, scope);
   await requireLiveStaff(staffId);
   if (scope.kind === 'chair' && input.kind !== 'block' && input.kind !== 'timeOff') {
     throw new AppError('FORBIDDEN', 'Only the owner can set days off and extra hours');
@@ -133,7 +116,6 @@ export async function deleteTimeBlock(
   const block = await timeBlocksRepo.findTimeBlockById(id);
   if (!block) throw new AppError('NOT_FOUND', 'Time block was not found');
   assertInScope(scope, block.staffId, 'Time block');
-  await assertBarberMayBlock(principal, scope);
   if (scope.kind === 'chair' && block.kind !== 'block' && block.kind !== 'timeOff') {
     throw new AppError('FORBIDDEN', 'Only the owner can change days off and extra hours');
   }

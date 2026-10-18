@@ -3,14 +3,18 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 /**
  * Who may call a route. Every route must declare one; there is no default.
  * - public: anyone
- * - barber: any signed-in login (barber or owner); services scope barbers to their chair
- * - owner: owner logins only
+ * - team: a barber signed in with their PIN; services scope them to their own chair
+ * - owner: the owner's login (email and password)
  * - internal: the cron bearer token only
  */
-export type AuthLevel = 'public' | 'barber' | 'owner' | 'internal';
+export type AuthLevel = 'public' | 'team' | 'owner' | 'internal';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-/** Who is calling. Filled by the cookie authenticator; public routes see null. */
+/**
+ * Who is calling. Filled by the cookie authenticator; public routes see null. For a barber
+ * signed in with a PIN, `userId` is their staff id (there is no login record) and `sessionId`
+ * is a team session.
+ */
 export interface Principal {
   userId: string;
   role: 'owner' | 'barber';
