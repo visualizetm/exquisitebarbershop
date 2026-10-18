@@ -36,7 +36,8 @@ export function useReveal<T extends HTMLElement>() {
     // Hide without a transition: the element was already measured, so a plain change would fade it out.
     el.style.transition = 'none';
     el.dataset.reveal = 'hidden';
-    void el.offsetHeight;
+    // Reading the layout makes the browser apply the hidden state before the transition returns.
+    el.getBoundingClientRect();
     el.style.transition = '';
     const io = shared();
     io.observe(el);

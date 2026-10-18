@@ -70,7 +70,7 @@ test.describe('motion', () => {
       );
       return {
         animations: document.getAnimations().length,
-        transformed: transformed.map((el) => el.className.toString()),
+        transformed: transformed.map((el) => `${el.tagName}.${el.getAttribute('class') ?? ''}`),
         hidden: [...document.querySelectorAll('.exq-service')].filter(
           (el) => getComputedStyle(el).opacity !== '1',
         ).length,
@@ -146,12 +146,13 @@ test.describe('motion', () => {
     await page.addInitScript(() => {
       const w = window as unknown as { __vt: number };
       w.__vt = 0;
-      const original = document.startViewTransition?.bind(document);
+      const doc = document as unknown as { startViewTransition?: (cb?: () => void) => unknown };
+      const original = doc.startViewTransition?.bind(document);
       if (original) {
-        document.startViewTransition = ((cb?: () => void) => {
+        doc.startViewTransition = (cb) => {
           w.__vt += 1;
           return original(cb);
-        }) as typeof document.startViewTransition;
+        };
       }
     });
     await page.goto('/');
