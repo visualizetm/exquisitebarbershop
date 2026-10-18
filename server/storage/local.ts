@@ -5,7 +5,10 @@ import { isObjectKey } from './keys';
 import type { PresignedUpload, StorageDriver, StoredObject } from './types';
 
 /** Local uploads live here, relative to the working directory. Git ignores it. */
-export const LOCAL_UPLOADS_DIR = resolve('.data', 'uploads');
+// Built from parts at run time, not as a literal, so Vercel's file tracer does not mistake it for
+// an asset to ship and pack a developer's local uploads into the function.
+const LOCAL_DATA_DIR = ['.data', 'uploads'].join('/');
+export const LOCAL_UPLOADS_DIR = resolve(process.env.EXQ_LOCAL_UPLOADS_DIR ?? LOCAL_DATA_DIR);
 export const LOCAL_UPLOAD_PATH = '/uploads';
 
 export interface LocalConfig {

@@ -4,6 +4,7 @@ import { createServer as createHttpsServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { PRODLIKE_OWNER } from './e2e-accounts';
 
@@ -158,8 +159,13 @@ function certificate(): { key: Buffer; cert: Buffer } {
 }
 
 async function createSite(): Promise<Server> {
-  const { getRouter } = await import('../server/http/app');
-  const router = getRouter();
+  // The function exactly as Vercel runs it: api/index.js loading the committed bundle, not the
+  // TypeScript source through tsx. The bundle is rebuilt first (scripts/build-api.mjs).
+  const entry = pathToFileURL(resolve('api/index.js')).href;
+  const { default: handler } = (await import(entry)) as {
+    default: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+  };
+  const router = { handle: handler };
   const rules = headerRules();
   const index = readFileSync(join(DIST, 'index.html'));
 
@@ -225,6 +231,7 @@ async function main(): Promise<void> {
     replSet: { count: 1, storageEngine: 'wiredTiger' },
   });
   const values = productionEnv(replSet.getUri());
+  execFileSync('node', ['scripts/build-api.mjs'], { stdio: 'inherit' });
   if (process.env.PRODLIKE_SKIP_BUILD !== '1') {
     console.log('building the production bundle');
     execFileSync('npx', ['vite', 'build'], {
