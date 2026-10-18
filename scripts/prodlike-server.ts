@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { createServer as createHttpsServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
+import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { extname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -169,6 +170,32 @@ async function createSite(): Promise<Server> {
   const rules = headerRules();
   const index = readFileSync(join(DIST, 'index.html'));
 
+  // Vercel's edge compresses text with brotli or gzip; so does this, or the numbers are worse than live.
+  const compressed = new Map<string, Buffer>();
+  const send = (req: IncomingMessage, res: ServerResponse, key: string, body: Buffer): void => {
+    const header = req.headers['accept-encoding'];
+    const accept = typeof header === 'string' ? header : '';
+    const type = String(res.getHeader('Content-Type') ?? '');
+    if (!/text|javascript|json|svg/.test(type)) {
+      res.end(body);
+      return;
+    }
+    const encoding = /\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : null;
+    if (!encoding) {
+      res.end(body);
+      return;
+    }
+    const id = `${encoding}:${key}`;
+    let out = compressed.get(id);
+    if (!out) {
+      out = encoding === 'br' ? brotliCompressSync(body) : gzipSync(body);
+      compressed.set(id, out);
+    }
+    res.setHeader('Content-Encoding', encoding);
+    res.setHeader('Vary', 'Accept-Encoding');
+    res.end(out);
+  };
+
   const serve = (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'https://localhost');
     for (const h of rules.all) res.setHeader(h.key, h.value);
@@ -182,12 +209,12 @@ async function createSite(): Promise<Server> {
       if (url.pathname.startsWith('/assets/'))
         for (const h of rules.assets) res.setHeader(h.key, h.value);
       res.setHeader('Content-Type', TYPES[extname(file)] ?? 'application/octet-stream');
-      res.end(readFileSync(file));
+      send(req, res, file, readFileSync(file));
       return Promise.resolve();
     }
     // Every other path is the app shell, as the vercel.json rewrite does.
     res.setHeader('Content-Type', TYPES['.html'] ?? 'text/html');
-    res.end(index);
+    send(req, res, 'index', index);
     return Promise.resolve();
   };
 

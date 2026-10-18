@@ -160,7 +160,10 @@ h2[tabindex='-1']:focus,
   left: var(--s4);
   top: calc(var(--s9) * -2);
   z-index: 100;
-  padding: var(--s2) var(--s4);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit);
+  padding: 0 var(--s4);
   background: var(--solid-bg);
   color: var(--solid-fg);
   border-radius: var(--r-pill);

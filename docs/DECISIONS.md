@@ -596,3 +596,12 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   delivery as OK without a network call. The 10 MB limit is enforced on issue and again on confirm.
 - D10-29 The fake Cloudinary in the tests wraps `fetch` and checks the same signature and credentials
   the real service does, so a wrong signing rule fails the test instead of passing quietly.
+- D10-30 Performance is measured on a build served with brotli, because Vercel compresses text and a
+  plain Node server does not (73 to 76 uncompressed, 95 to 97 compressed). `scripts/prodlike-server.ts` now
+  compresses so the local run matches what visitors get.
+- D10-31 Screenshots and recordings were captured once, in the last milestone, from the dev e2e server
+  with sample photos; earlier milestones were checked by eye with throwaway captures. Full page
+  captures show the fixed phone bar mid page; that is the capture, not the layout.
+- D10-32 `milestone 1` through `5` commits each passed typecheck, lint, format, unit tests, the three
+  end to end suites, `test:vercel-function` and the build, except milestone 3, whose first commit
+  carried two lint errors in the reveal hook and a test that were fixed in the next commit.

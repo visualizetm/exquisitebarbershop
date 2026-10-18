@@ -99,7 +99,7 @@
   --fg-2: var(--line);
   --fg-3: var(--mute-on-dark);
   --accent-text: var(--red-on-dark);
-  --accent-soft: var(--ink-3);
+  --accent-soft: var(--ink-2);
   --solid-bg: var(--paper);
   --solid-fg: var(--ink);
   --solid-fg-2: var(--text-2);
@@ -117,7 +117,7 @@
   --fg-2: var(--line);
   --fg-3: var(--mute-on-dark);
   --accent-text: var(--red-on-dark);
-  --accent-soft: var(--ink-3);
+  --accent-soft: var(--ink-2);
   --solid-bg: var(--paper);
   --solid-fg: var(--ink);
   --solid-fg-2: var(--text-2);
@@ -138,7 +138,7 @@
     --fg-2: var(--line);
     --fg-3: var(--mute-on-dark);
     --accent-text: var(--red-on-dark);
-    --accent-soft: var(--ink-3);
+    --accent-soft: var(--ink-2);
     --solid-bg: var(--paper);
     --solid-fg: var(--ink);
     --solid-fg-2: var(--text-2);

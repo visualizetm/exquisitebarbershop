@@ -13,7 +13,7 @@ export function StepHeading({
   step: string;
   /** Change it to pull focus back to the heading while staying on the same step. */
   focusKey?: string;
-  number?: number;
+  number?: number | undefined;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLHeadingElement>(null);

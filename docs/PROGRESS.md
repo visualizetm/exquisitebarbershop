@@ -346,3 +346,18 @@ commit, and what is still open.
   doctor and who can sign (`tests/integration/cloudinary.test.ts`), the migration
   (`tests/integration/photosMigrate.test.ts`), and the browser picking the right sizes
   (`tests/e2e/cloudinary-images.spec.ts`).
+
+### M6: QA
+
+- Lighthouse mobile on the production-like build (served with brotli like Vercel): Home 95 / 100 / 96 / 69,
+  Services 96 / 100 / 96 / 69, Book 97 / 100 / 96 / 69 (performance, accessibility, best practices, SEO;
+  the SEO score is the showcase build's noindex), CLS 0 on all three, LCP 2.2 to 2.5s. Without
+  compression the same build scored 73 to 76: the local https server now compresses like Vercel's edge.
+- Axe (WCAG 2 A and AA): nothing on any public page or booking step, light or dark, at 390 and 1280
+  (`tests/e2e/rules.spec.ts`), plus the earlier admin runs. Also tested there: only the six type sizes,
+  tap targets of 44px, alt text and dimensions on every image, the hero fitting a 390px first screen.
+- Found and fixed on the way: the phone bar's `:hover { color: inherit }` made CONFIRM BOOKING ink on red after a
+  tap (hover sticks on touch); the "Today" tag on the hours table failed contrast in dark; the skip link
+  was 42px tall; booking tests clicked options through a 1px input.
+- Screenshots (light and dark, 390 and 1280, a montage per width and theme): `docs/screens/p10/`;
+  recordings of Home scrolling with the menu and of a booking at 390: `docs/screens/p10/motion/`.

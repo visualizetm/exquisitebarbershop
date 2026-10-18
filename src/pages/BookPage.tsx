@@ -596,7 +596,11 @@ export function BookPage() {
           </div>
         ) : null}
         <div className="exq-step" key={step} data-dir={travel.dir}>
-          <StepHeading step={step} focusKey={selection.startAt ?? ''} number={STEP_NUMBER[step]}>
+          <StepHeading
+            step={step}
+            focusKey={selection.startAt ?? ''}
+            number={step === 'done' ? undefined : STEP_NUMBER[step]}
+          >
             {STEP_TITLES[step]}
           </StepHeading>
           {step !== 'services' && step !== 'done' ? (
