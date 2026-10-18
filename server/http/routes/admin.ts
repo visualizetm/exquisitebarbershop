@@ -31,6 +31,8 @@ import {
   ownerRescheduleRequestSchema,
   resolutionsBodySchema,
   scheduleQuerySchema,
+  searchQuerySchema,
+  searchResponseSchema,
   scheduleResponseSchema,
   serviceCreateRequestSchema,
   serviceListResponseSchema,
@@ -101,6 +103,7 @@ import {
   setStaffHours,
   upsertClosure,
 } from '../../services/adminSchedule';
+import { adminSearch } from '../../services/adminSearch';
 import { createManualBooking } from '../../services/bookingService';
 import { idempotencyKeyOf, metaOf, NO_STORE, principalOf } from '../context';
 import { scheduleDelivery } from '../delivery';
@@ -149,6 +152,13 @@ export const adminRoutes: RouteDefinition[] = [
     ctxScope(ctx);
     const { date } = parseQuery(ctx, dateQuerySchema);
     return { body: whoIsInResponseSchema.parse(await whoIsIn(date, ctx.now)), headers: NO_STORE };
+  }),
+
+  // Search ----------------------------------------------------------------
+  owner('GET', '/api/admin/search', async (ctx) => {
+    ctxScope(ctx);
+    const { q } = parseQuery(ctx, searchQuerySchema);
+    return { body: searchResponseSchema.parse(await adminSearch(q)), headers: NO_STORE };
   }),
 
   // Bookings --------------------------------------------------------------

@@ -605,3 +605,28 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D10-32 `milestone 1` through `5` commits each passed typecheck, lint, format, unit tests, the three
   end to end suites, `test:vercel-function` and the build, except milestone 3, whose first commit
   carried two lint errors in the reveal hook and a test that were fixed in the next commit.
+
+## Prompt 11: owner dashboard, barber PIN portal, demo notice, icons, social links
+
+- D11-01 Branch base: PR 5 (brand v2) and PR 6 (prompt 10) were both still open, so this branch starts
+  from the prompt 10 branch and merges the brand v2 branch (`brand/v2-final`, assets and docs only) so the
+  new marks (`crest`, `disc`, `arched`, `lockup-vertical`) exist for the `Mark` fix. Merging either PR
+  first only shrinks this diff.
+- D11-02 Decisions given with the prompt: a barber's "I'm out today" never cancels anything, it creates
+  an alert and the owner chooses per booking (Move, Keep, Cancel, Cancel and notify); barbers use one
+  shared link, `/team`, a name then a six digit PIN; the owner stays on email and password at `/admin`
+  and barbers can no longer sign in there.
+- D11-03 Search is one endpoint, `GET /api/admin/search?q=`. A stored `nameKey` on each booking (the name
+  without case and accents) with the index `{ nameKey: 1, startAt: -1 }` makes name prefix search use an
+  index. Bookings written before the field existed are backfilled once per process on the first search.
+  Phone search matches an exact number when ten digits are given and the end of the number otherwise;
+  the end-of-number regex scans the `customer.phone` index only, which is fine at a shop's volume, so no
+  extra field was added for it. A booking code matches exactly.
+- D11-04 The shell puts the old `.exq-adm` element styles on the content area only, never on the sidebar,
+  top bar or tab bar, so the old raw element styles (every `button`, `input`) cannot leak into the new kit.
+  The old pages and forms keep them until each is rebuilt from the kit in a later milestone.
+- D11-05 The bar chart is hand drawn SVG with a real table next to it for screen readers. The bars are
+  not focusable (an `aria-hidden` focusable element fails axe); hover shows the values and the table is
+  the keyboard and screen reader path.
+- D11-06 `/kit` (development builds only) gained a Dashboard section with the new parts, and its test
+  lists it.

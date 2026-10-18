@@ -361,3 +361,17 @@ commit, and what is still open.
   was 42px tall; booking tests clicked options through a 1px input.
 - Screenshots (light and dark, 390 and 1280, a montage per width and theme): `docs/screens/p10/`;
   recordings of Home scrolling with the menu and of a booking at 390: `docs/screens/p10/motion/`.
+
+## Prompt 11
+
+### M1: kit gaps, dashboard shell, search
+
+- Shipped: `Sidebar`, `StatTile`, `DataTable`, `SearchBox`, `PinPad`, `BarChart`, `Tabs`, `BottomTabs` and
+  `IconButton` (with the desktop tooltip) in `src/components/ui/`, styled in `src/styles/dashboard.css`;
+  the owner shell (ink 248px sidebar from 1024px, a top bar with search, today's date and New booking, a
+  three tab bar plus More below it) in `src/admin/shell/`; `GET /api/admin/search` with the
+  `by_name_key` index; `Mark` lost `pole` and `pill` and gained `crest`, `disc`, `arched` and
+  `lockup-vertical`.
+- Tests: `tests/unit/search.test.ts`, `tests/integration/adminSearch.test.ts`, the authz matrix row,
+  `tests/e2e/dashboard.spec.ts` (shell at 1280 and 390, the `/` shortcut, search by code, phone and
+  accent free name, axe in both themes) and the Dashboard section of `tests/e2e/kit.spec.ts`.

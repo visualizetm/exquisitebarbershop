@@ -471,6 +471,33 @@ export const issuedPasswordResponseSchema = z.object({
 export const loginResponseSchema = z.object({ user: loginViewSchema });
 
 // ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+export const searchQuerySchema = z.object({ q: z.string().trim().max(80).default('') });
+export const searchBookingHitSchema = z.object({
+  id: idSchema,
+  referenceCode: z.string(),
+  customerName: z.string(),
+  startAt: z.iso.datetime(),
+  status: bookingStatusSchema,
+  staffName: z.string(),
+  services: z.string(),
+});
+export const searchCustomerHitSchema = z.object({
+  phone: z.string(),
+  name: z.string(),
+  visits: z.int(),
+  lastVisitAt: z.iso.datetime(),
+});
+/** At most five of each. Owner only, so a full phone number is fine here. */
+export const searchResponseSchema = z.object({
+  bookings: z.array(searchBookingHitSchema),
+  customers: z.array(searchCustomerHitSchema),
+});
+export type SearchResponse = z.infer<typeof searchResponseSchema>;
+
+// ---------------------------------------------------------------------------
 // Audit and outbox viewers
 // ---------------------------------------------------------------------------
 

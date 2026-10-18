@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { Status } from '@/components/Status';
 import { DemoBanner } from '@/components/site/DemoBanner';
 import '@/styles/admin.css';
+import '@/styles/dashboard.css';
 import { AdminNav } from './components/AdminNav';
 import { AccountPage } from './pages/AccountPage';
 import { AuditPage } from './pages/AuditPage';
@@ -19,6 +20,7 @@ import { SchedulePage } from './pages/SchedulePage';
 import { TodayPage } from './pages/TodayPage';
 import { WhosInPage } from './pages/WhosInPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { AdminShell } from './shell/AdminShell';
 import { SessionProvider } from './session';
 import { useSession } from './useSession';
 
@@ -68,13 +70,20 @@ function Gate() {
   }
   if (onLogin) return <Navigate to="/admin" replace />;
 
-  const isOwner = state.me.user.role === 'owner';
+  if (state.me.user.role === 'owner') {
+    return (
+      <AdminShell>
+        {state.me.features.demo ? <DemoBanner /> : null}
+        <OwnerRoutes />
+      </AdminShell>
+    );
+  }
   return (
-    <div className="exq-adm" data-state={isOwner ? 'owner' : 'barber'}>
+    <div className="exq-adm" data-state="barber">
       <AdminNav />
       <div className="exq-adm__content">
         {state.me.features.demo ? <DemoBanner /> : null}
-        {isOwner ? <OwnerRoutes /> : <BarberRoutes />}
+        <BarberRoutes />
       </div>
     </div>
   );
@@ -91,6 +100,7 @@ function OwnerRoutes() {
       <Route path="block" element={<BlockTimePage />} />
       <Route path="whos-in" element={<WhosInPage />} />
       <Route path="customers" element={<CustomersPage />} />
+      <Route path="customers/:phone" element={<CustomersPage />} />
       <Route path="photos" element={<PhotosPage />} />
       <Route path="settings/*" element={<SettingsPage />} />
       <Route path="audit" element={<AuditPage />} />

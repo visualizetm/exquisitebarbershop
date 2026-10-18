@@ -4,6 +4,7 @@ import {
   type BookingDocument,
   type BookingStatus,
 } from '../../shared/schemas/booking';
+import { nameKeyOf } from '../../shared/lib/search';
 import { collection } from '../db/collections';
 import { AppError, isDuplicateKeyError } from '../lib/errors';
 import { newId } from '../lib/ids';
@@ -27,6 +28,7 @@ export async function insertBooking(
   const doc = bookingDocumentSchema.parse({
     _id: options?.id ?? newId(),
     ...input,
+    nameKey: nameKeyOf(input.customer.name),
     createdAt: now,
     updatedAt: now,
   });
@@ -304,4 +306,101 @@ export async function listBookingsPage(
   }
   const query: Filter<BookingDocument> = and.length > 0 ? { $and: and } : {};
   return col.find(query, sessionOf(options)).sort({ startAt: 1, _id: 1 }).limit(limit).toArray();
+}
+
+// ---------------------------------------------------------------------------
+// Owner search
+// ---------------------------------------------------------------------------
+
+/** One customer, as the search and the customer list see them: all bookings with one phone. */
+export interface CustomerSummary {
+  phone: string;
+  name: string;
+  visits: number;
+  lastVisitAt: Date;
+}
+
+type SearchMatch = { kind: 'phone'; digits: string } | { kind: 'name'; key: string };
+
+function matchFilter(match: SearchMatch): Filter<BookingDocument> {
+  if (match.kind === 'name') return { nameKey: { $regex: `^${escapeRegex(match.key)}` } };
+  // Ten digits are one exact phone; fewer match the end of the number (the last four are enough).
+  return match.digits.length === 10
+    ? { 'customer.phone': `+1${match.digits}` }
+    : { 'customer.phone': { $regex: `${escapeRegex(match.digits)}$` } };
+}
+
+/** The newest bookings matching a name prefix or a phone, for the search dropdown. */
+export async function searchBookings(
+  match: SearchMatch,
+  limit: number,
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  return col
+    .find(matchFilter(match), sessionOf(options))
+    .sort({ startAt: -1 })
+    .limit(limit)
+    .toArray();
+}
+
+/** Customers (grouped by phone) whose bookings match, most recent visit first. */
+export async function searchCustomers(
+  match: SearchMatch,
+  limit: number,
+  options?: RepoOptions,
+): Promise<CustomerSummary[]> {
+  return customerSummaries(matchFilter(match), limit, options);
+}
+
+async function customerSummaries(
+  filter: Filter<BookingDocument>,
+  limit: number,
+  options?: RepoOptions,
+  skip = 0,
+): Promise<CustomerSummary[]> {
+  const col = await collection('bookings');
+  const rows = await col
+    .aggregate<{ _id: string; name: string; visits: number; last: Date }>(
+      [
+        { $match: filter },
+        { $sort: { startAt: -1 } },
+        {
+          $group: {
+            _id: '$customer.phone',
+            name: { $first: '$customer.name' },
+            visits: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            last: { $max: '$startAt' },
+          },
+        },
+        { $sort: { last: -1, _id: 1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ],
+      sessionOf(options),
+    )
+    .toArray();
+  return rows.map((r) => ({ phone: r._id, name: r.name, visits: r.visits, lastVisitAt: r.last }));
+}
+
+/** Backfills nameKey on bookings written before the field existed. Cheap when none are missing. */
+export async function backfillNameKeys(): Promise<number> {
+  const col = await collection('bookings');
+  let total = 0;
+  for (;;) {
+    const batch = await col
+      .find({ nameKey: { $exists: false } })
+      .limit(500)
+      .toArray();
+    if (batch.length === 0) return total;
+    await col.bulkWrite(
+      batch.map((b) => ({
+        updateOne: {
+          filter: { _id: b._id },
+          update: { $set: { nameKey: nameKeyOf(b.customer.name) } },
+        },
+      })),
+    );
+    total += batch.length;
+  }
 }

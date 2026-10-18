@@ -28348,6 +28348,12 @@ var INDEXES = [
     options: { name: "customer_phone" },
     reason: "Open-bookings-per-phone guard and owner lookup of a customer history."
   },
+  {
+    collection: "bookings",
+    keys: { nameKey: 1, startAt: -1 },
+    options: { name: "by_name_key" },
+    reason: "The owner's search finds a customer by the start of the name, any case or accent."
+  },
   // slotLocks
   {
     collection: "slotLocks",
@@ -29156,6 +29162,7 @@ async function listTimeBlocksEndingAfter(instant, staffIds, options) {
 var bookingsRepo_exports = {};
 __export(bookingsRepo_exports, {
   ReferenceCodeCollision: () => ReferenceCodeCollision,
+  backfillNameKeys: () => backfillNameKeys,
   cancelBooking: () => cancelBooking,
   countOpenBookingsForPhone: () => countOpenBookingsForPhone,
   countUnseenOnline: () => countUnseenOnline,
@@ -29169,6 +29176,8 @@ __export(bookingsRepo_exports, {
   markOwnerSeen: () => markOwnerSeen,
   rescheduleBooking: () => rescheduleBooking,
   restoreBooking: () => restoreBooking,
+  searchBookings: () => searchBookings,
+  searchCustomers: () => searchCustomers,
   setBookingStatus: () => setBookingStatus,
   transitionBookingStatus: () => transitionBookingStatus,
   updateBookingNotes: () => updateBookingNotes
@@ -29217,10 +29226,28 @@ var bookingDocumentSchema = external_exports.object({
   /** Bumped on reschedule or cancel; manage links embed it so old links stop working. */
   manageTokenVersion: external_exports.int().min(1),
   /** When the owner first opened it. Online bookings without it show as new. */
-  ownerSeenAt: external_exports.date().nullable().optional()
+  ownerSeenAt: external_exports.date().nullable().optional(),
+  /** The customer name without accents or case, for the owner's search. Set on insert. */
+  nameKey: external_exports.string().max(200).optional()
 }).extend(timestampsSchema.shape).refine((v) => v.endAt.getTime() > v.startAt.getTime(), {
   message: "endAt must be after startAt"
 });
+
+// shared/lib/search.ts
+function nameKeyOf(name) {
+  return name.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
+}
+function classifySearch(input2) {
+  const trimmed = input2.trim();
+  if (trimmed === "") return { kind: "empty" };
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length >= 4 && /^[\d\s()+.-]+$/.test(trimmed)) {
+    const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+    return { kind: "phone", digits: national.slice(0, 10) };
+  }
+  const key = nameKeyOf(trimmed);
+  return key === "" ? { kind: "empty" } : { kind: "text", key };
+}
 
 // server/repos/bookingsRepo.ts
 var ReferenceCodeCollision = class extends Error {
@@ -29233,6 +29260,7 @@ async function insertBooking(input2, now2, options) {
   const doc = bookingDocumentSchema.parse({
     _id: options?.id ?? newId(),
     ...input2,
+    nameKey: nameKeyOf(input2.customer.name),
     createdAt: now2,
     updatedAt: now2
   });
@@ -29397,6 +29425,56 @@ async function listBookingsPage(filter, after, limit, options) {
   }
   const query = and.length > 0 ? { $and: and } : {};
   return col.find(query, sessionOf(options)).sort({ startAt: 1, _id: 1 }).limit(limit).toArray();
+}
+function matchFilter(match2) {
+  if (match2.kind === "name") return { nameKey: { $regex: `^${escapeRegex2(match2.key)}` } };
+  return match2.digits.length === 10 ? { "customer.phone": `+1${match2.digits}` } : { "customer.phone": { $regex: `${escapeRegex2(match2.digits)}$` } };
+}
+async function searchBookings(match2, limit, options) {
+  const col = await collection("bookings");
+  return col.find(matchFilter(match2), sessionOf(options)).sort({ startAt: -1 }).limit(limit).toArray();
+}
+async function searchCustomers(match2, limit, options) {
+  return customerSummaries(matchFilter(match2), limit, options);
+}
+async function customerSummaries(filter, limit, options, skip = 0) {
+  const col = await collection("bookings");
+  const rows = await col.aggregate(
+    [
+      { $match: filter },
+      { $sort: { startAt: -1 } },
+      {
+        $group: {
+          _id: "$customer.phone",
+          name: { $first: "$customer.name" },
+          visits: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          last: { $max: "$startAt" }
+        }
+      },
+      { $sort: { last: -1, _id: 1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ],
+    sessionOf(options)
+  ).toArray();
+  return rows.map((r) => ({ phone: r._id, name: r.name, visits: r.visits, lastVisitAt: r.last }));
+}
+async function backfillNameKeys() {
+  const col = await collection("bookings");
+  let total = 0;
+  for (; ; ) {
+    const batch = await col.find({ nameKey: { $exists: false } }).limit(500).toArray();
+    if (batch.length === 0) return total;
+    await col.bulkWrite(
+      batch.map((b) => ({
+        updateOne: {
+          filter: { _id: b._id },
+          update: { $set: { nameKey: nameKeyOf(b.customer.name) } }
+        }
+      }))
+    );
+    total += batch.length;
+  }
 }
 
 // server/repos/slotLocksRepo.ts
@@ -32825,6 +32903,26 @@ var issuedPasswordResponseSchema = external_exports.object({
   temporaryPassword: external_exports.string()
 });
 var loginResponseSchema = external_exports.object({ user: loginViewSchema });
+var searchQuerySchema = external_exports.object({ q: external_exports.string().trim().max(80).default("") });
+var searchBookingHitSchema = external_exports.object({
+  id: idSchema,
+  referenceCode: external_exports.string(),
+  customerName: external_exports.string(),
+  startAt: external_exports.iso.datetime(),
+  status: bookingStatusSchema,
+  staffName: external_exports.string(),
+  services: external_exports.string()
+});
+var searchCustomerHitSchema = external_exports.object({
+  phone: external_exports.string(),
+  name: external_exports.string(),
+  visits: external_exports.int(),
+  lastVisitAt: external_exports.iso.datetime()
+});
+var searchResponseSchema = external_exports.object({
+  bookings: external_exports.array(searchBookingHitSchema),
+  customers: external_exports.array(searchCustomerHitSchema)
+});
 var auditListQuerySchema = external_exports.object({
   entityType: external_exports.string().max(40).optional(),
   entityId: external_exports.string().max(64).optional(),
@@ -36246,6 +36344,50 @@ async function deleteClosure2(principal, id, resolutions, meta3) {
   return { body: { ok: true, ...outcome(change) }, outboxIds: change.outboxIds };
 }
 
+// server/services/adminSearch.ts
+var LIMIT = 5;
+var backfilled = null;
+function ensureNameKeys() {
+  backfilled ??= bookingsRepo_exports.backfillNameKeys().catch((error62) => {
+    backfilled = null;
+    throw error62;
+  });
+  return backfilled;
+}
+async function adminSearch(rawQuery) {
+  const query = classifySearch(rawQuery);
+  if (query.kind === "empty") return { bookings: [], customers: [] };
+  await ensureNameKeys();
+  const match2 = query.kind === "phone" ? { kind: "phone", digits: query.digits } : { kind: "name", key: query.key };
+  const code = query.kind === "text" ? normalizeReferenceCode(rawQuery) : null;
+  const [byCode, found, customers, staff] = await Promise.all([
+    code ? bookingsRepo_exports.findBookingByReferenceCode(code) : Promise.resolve(null),
+    bookingsRepo_exports.searchBookings(match2, LIMIT),
+    bookingsRepo_exports.searchCustomers(match2, LIMIT),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const staffById = new Map(staff.map((s2) => [s2._id, s2]));
+  const unique = /* @__PURE__ */ new Map();
+  for (const b of [...byCode ? [byCode] : [], ...found]) unique.set(b._id, b);
+  return {
+    bookings: [...unique.values()].slice(0, LIMIT).map((b) => ({
+      id: b._id,
+      referenceCode: b.referenceCode,
+      customerName: b.customer.name,
+      startAt: b.startAt.toISOString(),
+      status: b.status,
+      staffName: staffById.get(b.staffId)?.name ?? "Unknown",
+      services: b.services.map((s2) => s2.name).join(", ")
+    })),
+    customers: customers.map((c) => ({
+      phone: formatUsPhone(c.phone),
+      name: c.name,
+      visits: c.visits,
+      lastVisitAt: c.lastVisitAt.toISOString()
+    }))
+  };
+}
+
 // server/http/context.ts
 function principalOf(ctx) {
   if (!ctx.principal) throw new AppError("AUTH_REQUIRED", "Please sign in");
@@ -36308,6 +36450,12 @@ var adminRoutes = [
     ctxScope(ctx);
     const { date: date5 } = parseQuery(ctx, dateQuerySchema);
     return { body: whoIsInResponseSchema.parse(await whoIsIn(date5, ctx.now)), headers: NO_STORE };
+  }),
+  // Search ----------------------------------------------------------------
+  owner("GET", "/api/admin/search", async (ctx) => {
+    ctxScope(ctx);
+    const { q } = parseQuery(ctx, searchQuerySchema);
+    return { body: searchResponseSchema.parse(await adminSearch(q)), headers: NO_STORE };
   }),
   // Bookings --------------------------------------------------------------
   owner("GET", "/api/admin/bookings", async (ctx) => {

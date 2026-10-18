@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SyntheticEvent } from 'react';
+import { useParams } from 'react-router';
 import { customerResponseSchema, type CustomerResponse } from '@shared/api/admin';
 import { apiRequest } from '@/lib/api';
 import { usePageTitle } from '@/lib/usePageTitle';
@@ -10,19 +11,20 @@ import { money, phoneLabel } from '../format';
 /** There are no customer accounts: a customer is everyone who booked with one phone number. */
 export function CustomersPage() {
   usePageTitle('Customers');
-  const [phone, setPhone] = useState('');
+  const routePhone = useParams().phone ?? '';
+  const [phone, setPhone] = useState(routePhone);
   const [result, setResult] = useState<CustomerResponse | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<unknown>(null);
 
-  async function lookup(event: SyntheticEvent) {
-    event.preventDefault();
+  async function lookup(event?: SyntheticEvent, value = phone) {
+    event?.preventDefault();
     setWorking(true);
     setError(null);
     try {
       setResult(
         await apiRequest(
-          `/api/admin/customers?phone=${encodeURIComponent(phone)}`,
+          `/api/admin/customers?phone=${encodeURIComponent(value)}`,
           customerResponseSchema,
         ),
       );
@@ -33,6 +35,14 @@ export function CustomersPage() {
       setWorking(false);
     }
   }
+
+  // Arriving from the search with a phone number in the address looks it up right away.
+  useEffect(() => {
+    if (routePhone) {
+      setPhone(routePhone);
+      void lookup(undefined, routePhone);
+    }
+  }, [routePhone]);
 
   return (
     <article

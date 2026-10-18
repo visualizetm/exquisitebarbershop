@@ -111,6 +111,12 @@ export const INDEXES: readonly IndexDefinition[] = [
     options: { name: 'customer_phone' },
     reason: 'Open-bookings-per-phone guard and owner lookup of a customer history.',
   },
+  {
+    collection: 'bookings',
+    keys: { nameKey: 1, startAt: -1 },
+    options: { name: 'by_name_key' },
+    reason: "The owner's search finds a customer by the start of the name, any case or accent.",
+  },
   // slotLocks
   {
     collection: 'slotLocks',

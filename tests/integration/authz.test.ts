@@ -58,6 +58,7 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'GET /api/admin/today': 'owner',
   'GET /api/admin/schedule': 'owner',
   'GET /api/admin/whos-in': 'owner',
+  'GET /api/admin/search': 'owner',
   'GET /api/admin/bookings': 'owner',
   'POST /api/admin/bookings': 'owner',
   'GET /api/admin/bookings/:id': 'owner',

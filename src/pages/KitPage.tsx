@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
+import Copy01 from '@untitled-ui/icons-react/build/esm/Copy01';
 import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import {
+  BarChart,
   Button,
   ButtonLink,
   Card,
@@ -10,8 +13,10 @@ import {
   Chips,
   EmptyState,
   ErrorState,
+  DataTable,
   Footer,
   Header,
+  IconButton,
   Input,
   Label,
   Lightbox,
@@ -19,12 +24,16 @@ import {
   Modal,
   OptionCard,
   PhotoFrame,
+  PinPad,
   PriceRow,
   Reveal,
+  SearchBox,
   SectionHead,
   Select,
   Sheet,
+  StatTile,
   StepBar,
+  Tabs,
   Textarea,
   Ticket,
   TimeChip,
@@ -34,6 +43,7 @@ import {
 } from '@/components/ui';
 import { BarView } from '@/components/ui/BottomBar';
 import { usePageTitle } from '@/lib/usePageTitle';
+import '@/styles/dashboard.css';
 
 const STEPS = [
   { key: 'service', label: 'Service' },
@@ -59,6 +69,7 @@ const LIGHTBOX: LightboxPhoto[] = [1, 2, 3].map((n) => ({
 
 /** Every component in every state, for one theme. */
 function Specimen() {
+  const [tab, setTab] = useState('a');
   const toast = useToast();
   const [sheet, setSheet] = useState(false);
   const [modal, setModal] = useState(false);
@@ -464,6 +475,119 @@ function Specimen() {
           }}
           onIndex={setBox}
         />
+      </section>
+
+      <section className="exq-kit__block" aria-label="Dashboard">
+        <h2>Dashboard</h2>
+        <div className="exq-dash-grid" data-cols="4">
+          <StatTile
+            icon={<Calendar aria-hidden="true" />}
+            label="Bookings today"
+            value={12}
+            compare="vs last Tuesday: 9"
+          />
+          <StatTile
+            icon={<Calendar aria-hidden="true" />}
+            label="Booked value today"
+            value="$480"
+          />
+          <StatTile
+            icon={<Calendar aria-hidden="true" />}
+            label="Walk-ins today"
+            value={0}
+            loading
+          />
+        </div>
+        <div className="exq-panel">
+          <BarChart
+            title="Bookings this week"
+            nameA="This week"
+            nameB="Last week"
+            groups={[
+              { label: 'Mon', a: 6, b: 4 },
+              { label: 'Tue', a: 9, b: 7, current: true },
+              { label: 'Wed', a: 3, b: 8 },
+              { label: 'Thu', a: 0, b: 5 },
+              { label: 'Fri', a: 0, b: 11 },
+              { label: 'Sat', a: 0, b: 14 },
+              { label: 'Sun', a: 0, b: 0 },
+            ]}
+          />
+        </div>
+        <Tabs
+          label="Kit tabs"
+          tabs={[
+            { id: 'a', label: 'Profile' },
+            { id: 'b', label: 'Hours', count: 2 },
+          ]}
+          value={tab}
+          onChange={setTab}
+        >
+          <p>Panel {tab}</p>
+        </Tabs>
+        <div className="exq-panel" data-flush="true">
+          <DataTable
+            caption="Sample bookings"
+            state="ready"
+            rows={[
+              { id: '1', when: 'Today 10:00 AM', who: 'Sam Rivera' },
+              { id: '2', when: 'Today 11:00 AM', who: 'Lee Park' },
+            ]}
+            rowKey={(r) => r.id}
+            columns={[
+              { key: 'when', header: 'When', sortable: true, render: (r) => r.when },
+              { key: 'who', header: 'Client', primary: true, render: (r) => r.who },
+            ]}
+            sort={{ key: 'when', dir: 'asc' }}
+            onSort={() => undefined}
+            onOpen={() => undefined}
+            empty="Nothing here"
+          />
+        </div>
+        <div className="exq-panel" data-flush="true">
+          <DataTable
+            caption="Loading sample"
+            state="loading"
+            rows={[]}
+            rowKey={() => ''}
+            columns={[
+              { key: 'a', header: 'When', render: () => null },
+              { key: 'b', header: 'Client', render: () => null },
+            ]}
+            empty="Nothing here"
+          />
+        </div>
+        <SearchBox
+          label="Kit search"
+          placeholder="Search name, phone or code"
+          status="idle"
+          groups={[
+            {
+              label: 'Customers',
+              items: [
+                {
+                  key: 'x',
+                  text: 'Sam Rivera',
+                  title: 'Sam Rivera',
+                  detail: '(215) 555-0142, 3 visits',
+                },
+              ],
+            },
+          ]}
+          onQuery={() => undefined}
+          onChoose={() => undefined}
+        />
+        <p>
+          <span className="exq-status-chip" data-tone="ok">
+            Done
+          </span>{' '}
+          <span className="exq-status-chip" data-tone="accent">
+            No show
+          </span>{' '}
+          <span className="exq-status-chip">Confirmed</span>{' '}
+          <IconButton label="Copy manage link" icon={<Copy01 aria-hidden="true" />} />
+        </p>
+        <PinPad label="Enter your PIN" onComplete={() => undefined} />
       </section>
 
       <section className="exq-kit__block" aria-label="Motion">

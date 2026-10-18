@@ -95,7 +95,7 @@ test('the owner blocks an hour and that time disappears from /book', async ({ pa
 
   await signIn(page, E2E_OWNER);
   await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
-  await page.getByRole('link', { name: 'Block time' }).click();
+  await page.goto('/admin/block');
   await page.getByLabel('Chair').selectOption({ label: 'Jay' });
   await page.getByLabel('Day', { exact: true }).fill(local.toISODate() ?? '');
   await page.getByLabel('From', { exact: true }).fill(local.toFormat('HH:mm'));

@@ -348,6 +348,39 @@
     }
   }
 
+  /* Dashboard kit: color changes only; the tooltip and the chart values fade. */
+  .exq-sidebar__row,
+  .exq-tabs__tab,
+  .exq-table__row,
+  .exq-search__option,
+  .exq-pin__key,
+  .exq-pin__dot,
+  .exq-iconbtn,
+  .exq-alert {
+    transition:
+      background-color var(--d-fast) var(--ease-out),
+      color var(--d-fast) var(--ease-out),
+      border-color var(--d-fast) var(--ease-out);
+  }
+  .exq-iconbtn::after {
+    transition:
+      opacity var(--d-fast) var(--ease-out),
+      transform var(--d-fast) var(--ease-out);
+  }
+  .exq-chart__bar {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: exq-bar-in var(--d-slow) var(--ease-out) both;
+  }
+  .exq-chart__bar[data-series='b'] {
+    animation-delay: var(--stagger);
+  }
+  @keyframes exq-bar-in {
+    from {
+      transform: scaleY(0);
+    }
+  }
+
   /* Admin is calmer: rows change color, new rows slide in, undo slides up with the toast. */
   .exq-adm-chair__slot,
   .exq-adm-bookings__item,

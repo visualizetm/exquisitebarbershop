@@ -227,9 +227,10 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await page.getByLabel('Password').fill(PRODLIKE_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
-  await expect(page.locator('.exq-adm-nav__logo.exq-mark--light')).toHaveAttribute(
+  // The sidebar is ink in both themes, so it carries the white mark.
+  await expect(page.locator('.exq-sidebar .exq-mark--dark')).toHaveAttribute(
     'src',
-    '/brand/exq-stacked-black.svg',
+    '/brand/exq-stacked-white.svg',
   );
 
   await page.goto('/admin/photos');
