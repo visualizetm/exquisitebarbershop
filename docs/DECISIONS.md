@@ -350,3 +350,99 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D7-15 The combined `docs/screens/p7/montage.png` is the four per-width
   montages stacked at half size, so it stays under the size of the rest of the
   folder.
+
+## Prompt 8: showcase demo
+
+- D8-01 The branch is `claude/p8-showcase-demo`, stacked on `claude/p7-live-without-r2`
+  because PR 2 was not merged when this started and everything here builds on
+  `STORAGE_DRIVER=none`, `/api/health` and the production-like run. The pull request
+  targets `main` and contains PR 2's two commits until PR 2 merges.
+- D8-02 Root cause of the down screen, reproduced from the code path with the variables
+  Rob set: on `main`, `STORAGE_DRIVER` accepts only `local` and `r2`, so the value `none` fails
+  the environment schema; `/api/shop` answers 500 INTERNAL_ERROR and `/api/health` answers
+  degraded, and the layout shows the down screen. With PR 2's code the next cause is the empty
+  database: no shop settings, so `/api/shop` answers 503 CONFIG_ERROR ("not set up yet") until
+  setup runs. Demo mode removes that second cause; merging removes the first.
+- D8-03 `DEMO_MODE` waives EMAIL_DISABLED_ACK and STORAGE_DISABLED_ACK in production: the
+  switch already says "this is a showcase, no email and no real storage on purpose", and the
+  brief wants the showcase to work with the six variables. It waives nothing else:
+  MONGODB_DB_NAME, https APP_BASE_URL and CRON_SECRET stay required, and `local` is
+  still refused on Vercel. `STORAGE_DRIVER=mongo` is accepted in production only with
+  DEMO_MODE=true; previews may use it freely (they hold no real data).
+- D8-04 Auto setup lives in the router (`assertServing`), not in a page or a cron: any route
+  that is not `alwaysOn` triggers `ensureDemo()` before it answers, so the first request of any
+  kind (a page's `/api/shop`, a direct API call) sets the shop up. It calls the existing
+  `bootstrap()` with force; there is no second seeder. The lock is a `systemState` document
+  with a unique `_id`: the insert is the atomic step, a lock older than 60 seconds is taken
+  over by compare and swap, and losers poll until the settings exist (25 second limit, then
+  CONFIG_ERROR). Process memory trusts "ready" for 60 seconds so a warm instance does not ask
+  the database on every request.
+- D8-05 In demo mode `bootstrap()` creates the owner with SEED_OWNER_PASSWORD when set, else a
+  random password nobody needs: the demo sign-in button starts a normal session for the owner
+  without one, so there is no shared default password to leak. The endpoint is rate limited
+  per address (30 per 15 minutes) and audited like any sign-in.
+- D8-06 Demo routes are flagged `demoOnly` and skipped by the router while matching when the
+  mode is off, instead of throwing 404 from the handler: the answer is then byte for byte the
+  one for an address that was never built. The handlers also assert the mode (defense in
+  depth). The authorization matrix expects 404 for every role with the mode off and has a
+  second pass with the mode on (owner last, because a reset deletes the other logins).
+- D8-07 Sample bookings go through the real booking code (`createBooking` for online, the
+  manual booking service for phone and walk-in), so every sample holds its slot locks and
+  follows availability. Each sample picks the Nth day its chair is open (the seed hours close
+  two days a week) and the first slot at or after its hour; availability is reloaded for each
+  sample so earlier ones are in the way. A sample that cannot be placed is skipped with a log
+  line, never fatal. Walk-ins are placed only while the chair is working, so Today never shows
+  a walk-in at 3am. Names are obviously fictional and phones are +1215555 01XX.
+- D8-08 "Reset demo data" wipes every business collection and the photo objects, deletes the
+  non-owner logins and their sessions, clears the demo marker (which is what makes setup load the
+  sample bookings again), runs `bootstrap()` and restores the run count. The owner login and the
+  owner's session stay, so the person who pressed the button is not signed out. The page does a
+  full load afterwards because every screen holds data that no longer exists.
+- D8-09 Leaving the showcase is a deliberate, guarded step. `clearDemoData()` empties the whole
+  database but only when the `demo` marker exists; `bootstrap()` refuses a marked database while
+  DEMO_MODE is off. Both the /setup button (behind a checkbox and the setup secret) and
+  `npm run demo:clear` call it. A real shop's data cannot be cleared by this route.
+- D8-10 The `mongo` storage driver keeps images in GridFS (bucket `media`). The public id is
+  the uuid inside the key (`<uuid>.webp`), so `/api/media/:id` needs no lookup table and the
+  admin, the photos service and every public page are unchanged. Uploads PUT to the same site
+  with a signed query string (the local driver's HMAC over key and expiry, five minutes), as
+  `application/octet-stream` so Vercel hands the function the raw bytes; the route checks
+  the signature, a 3 MB cap and the image magic bytes (the stored type comes from the bytes,
+  never from the header). Confirm compares size and type exactly as for R2. Reads carry
+  `max-age` and `s-maxage` of a year with `immutable`, because an id never changes.
+- D8-11 The 3 MB limit is enforced by the server for `mongo` (413 at issue and at PUT) and the
+  browser tries 2000px at three qualities, then 1600px and 1200px, until the WebP fits, so a
+  large phone photo is shrunk instead of refused. That loop runs for every driver; only the
+  limit differs.
+- D8-12 Backups skip GridFS: with the mongo driver the daily job still purges deleted photos and
+  sweeps abandoned uploads, logs that the backup was skipped and reports `skipped`. A backup
+  written into the database it is backing up would back up nothing. The doctor shows Backups
+  as Check and Public photo URL as OK (the site serves its own photos).
+- D8-13 Not indexed, in four places, because Vercel serves the static HTML without running our
+  code: an `X-Robots-Tag` header on every API answer; the robots meta tag set at runtime from
+  `shop.demo`; and, when DEMO_MODE is set in the build environment, the same meta tag in the
+  static `index.html` and a `Disallow: /` robots.txt. The header cannot cover the HTML shell
+  without routing middleware, which cannot be tested here and could take the whole site down
+  if wrong; DEPLOY.md says DEMO_MODE must be set before the build.
+- D8-14 The booking done screen shows the manage link in demo mode (`shop.demo`), as a visible
+  address, because no email goes out. Without demo mode nothing changed.
+- D8-15 The down screen shows a Details disclosure with the error code only. `errorCodeOf`
+  maps an API answer to its code, a non-JSON answer to INVALID_RESPONSE, a failed fetch to
+  NETWORK_ERROR and a schema mismatch to UNEXPECTED_RESPONSE: kinds of failure, never values,
+  messages or stacks. A test asserts the screen text carries no connection string or secret.
+- D8-16 `docs/brand/BRAND.md` still does not exist (D6-02). The real marks are
+  `public/brand/*.svg` from Rob's upload; every logo slot was checked against them: nav
+  (wordmark from 1024px, stacked below), admin side nav (stacked), footer seal and hero primary
+  and booking card wordmark (white, inside ink bands), and the admin sign-in page, which had
+  no logo and now carries the stacked mark. The hero logo's width and height attributes had
+  the wrong ratio and were corrected.
+- D8-17 The hero was broken on phones and the earlier captures missed it: the 4:5 box was
+  shorter than its words, so the title overflowed upward over the absolutely placed logo.
+  The logo now sits in the flow above the words, in the page column, and the box has a floor
+  (`min-height`) but no ceiling, with the same floor in the ink and photo states so the page
+  still does not jump when the photo arrives (Home CLS 0, mobile performance 97).
+- D8-18 The showcase has its own production-like run: `playwright.demo.config.ts` and
+  `--profile=demo` on the same server script, which builds with DEMO_MODE, serves https on 4176
+  and sets exactly MONGODB_URI, MONGODB_DB_NAME, APP_BASE_URL, MANAGE_LINK_SECRET, CRON_SECRET,
+  DEMO_MODE and STORAGE_DRIVER=mongo on an empty database. The launch run (4174) proves the
+  opposite with the mode off: not seeded, no demo button, 404s, no media route.

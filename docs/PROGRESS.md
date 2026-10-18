@@ -237,3 +237,21 @@ commit, and what is still open.
   session without a cookie and logged a 401.
 - Open: Rob sets the variables, redeploys, runs /setup, removes the setup
   variables and redeploys; R2 and Resend later.
+
+## Prompt 8
+
+### Showcase demo
+
+- Shipped: `DEMO_MODE=true` (auto setup on the first request with a lock document, reusing
+  `bootstrap()`; owner, five barbers, services, hours and eleven sample bookings and walk-ins
+  with fictional names and 555-01XX phones); the "Enter demo dashboard" button and the demo
+  banner; Settings, Demo data, Reset demo data; `STORAGE_DRIVER=mongo` (GridFS) with
+  `GET` and `PUT /api/media/:id`, a 3 MB cap and the browser fallback resize; noindex in the
+  build, at runtime and as an API header; the manage link on the done screen; the Details
+  disclosure on the down screen; Clear demo data on /setup and `npm run demo:clear`; DEPLOY.md
+  section 11; the showcase production-like run (`npm run test:e2e:demo`) and `docs/screens/p8/`.
+- Also fixed: the Home hero overlapped its own logo on phones; the admin sign-in page had no
+  logo; the hero logo had the wrong aspect ratio.
+- Open: Rob sets DEMO_MODE=true and STORAGE_DRIVER=mongo, merges, redeploys. Before real
+  customers: leave demo mode (DEPLOY.md section 11), real contact details, hours, prices,
+  R2 and email.

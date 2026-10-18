@@ -21,11 +21,16 @@ Last commit: see the bottom of this file.
   MAINTENANCE_MODE and an API-down state in the public layout (`SiteDown`);
   `/api/health` lists the missing variable names while the deployment is
   incomplete.
+- Showcase: `DEMO_MODE=true` with `STORAGE_DRIVER=mongo` is a complete site on six variables
+  (DEPLOY.md section 11). The first request sets the shop up with sample data; the admin login
+  has "Enter demo dashboard"; photos live in GridFS and are served at `/api/media/:id`; every page
+  is noindex; Settings, Demo data resets it; `/setup` can clear it for a real launch.
 - Production-like run: `npm run test:e2e:prod` builds the bundle and serves it
   over https with the vercel.json headers, the API in production mode with the
   launch variable set (no R2), and a twin without MONGODB_URI
-  (`scripts/prodlike-server.ts`, `tests/e2e/prod/`); `npm run test:e2e` runs
-  the dev suite and then this one.
+  (`scripts/prodlike-server.ts`, `tests/e2e/prod/`); the showcase has its own
+  (`npm run test:e2e:demo`, `tests/e2e/demo/`, an empty database and only the demo
+  variables); `npm run test:e2e` runs the dev suite and then both.
 - SEO: per-route meta from `usePageMeta`, JSON-LD BarberShop from `/api/shop`,
   `/sitemap.xml` from the API, `public/robots.txt`, `public/og.png` (1200x630),
   favicons, apple touch icon and `site.webmanifest`. Brand assets are rendered
@@ -86,8 +91,8 @@ read through public URLs.
 Env var names (values never written here): MONGODB_URI, MONGODB_DB_NAME,
 APP_BASE_URL, MANAGE_LINK_SECRET, CRON_SECRET, EMAIL_PROVIDER, RESEND_API_KEY,
 EMAIL_FROM, SEED_OWNER_PASSWORD, SEED_OWNER_EMAIL, LOG_LEVEL,
-OUTBOX_AFTER_RESPONSE, MONGOMS_SYSTEM_BINARY, STORAGE_DRIVER (local, r2 or none),
-STORAGE_DISABLED_ACK, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+OUTBOX_AFTER_RESPONSE, MONGOMS_SYSTEM_BINARY, STORAGE_DRIVER (local, r2, none or mongo),
+STORAGE_DISABLED_ACK, DEMO_MODE, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
 R2_BUCKET, R2_PUBLIC_BASE_URL, R2_KEY_PREFIX, BOOTSTRAP_SECRET, EMAIL_DISABLED_ACK,
 MAINTENANCE_MODE.
 
@@ -116,6 +121,10 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
 - Photos are stored at one size (up to 2000px) and shown at 290 to 780 device
   pixels; responsive variants would cut gallery weight by about two thirds
   (audit finding, not done: two uploads per photo and an additive `thumbKey`).
+- A showcase deployment has no backup and keeps photos in the database; its sample data is
+  disposable. Real launch: DEPLOY.md section 11 ("Leaving the showcase").
+- The security headers are static, so the HTML shell cannot carry `X-Robots-Tag` in demo
+  mode; the build adds the meta tag and a closed robots.txt instead.
 - Photos and daily backups are off until Cloudflare R2 is set up
   (STORAGE_DRIVER=none at launch; DEPLOY.md section 10 switches them on).
 - The MongoDB Atlas free tier keeps no snapshots, so until R2 is on there is no
@@ -126,6 +135,8 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
 
 ## Last commit
 
-Prompt 7, 2026-10-17: the launch without R2, visible configuration failures,
+Prompt 8, 2026-10-18: the showcase demo (auto setup, demo sign-in, GridFS photos, noindex,
+down-screen details), the hero and sign-in logo fixes, the showcase production-like run and
+`docs/screens/p8/`. Before it, prompt 7, 2026-10-17: the launch without R2, visible configuration failures,
 the nav logo, the API-down copy, route-change focus, the production-like e2e
 run and `docs/screens/p7/`.

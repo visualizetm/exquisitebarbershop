@@ -176,6 +176,74 @@ Nothing in the data changes; only variables do. Bookings keep working throughout
    work. The pages pick them up at once; the first backup is written the next
    morning at 13:00 UTC.
 
+Photos kept in MongoDB by the showcase (STORAGE_DRIVER=mongo) are not copied to
+R2; see section 11.
+
 To switch R2 off again, set STORAGE_DRIVER back to `none` with
 STORAGE_DISABLED_ACK=true and redeploy. Photos already in the bucket stay there
 and are hidden until the driver is `r2` again.
+
+## 11. Showcase demo (for showing the site to the client)
+
+A fresh deployment that works with nothing but a database: no setup page, no
+Cloudflare, no Resend. The first visit loads the shop, the chairs, the services
+and some sample bookings by itself, the admin has a one-click demo sign-in, and
+photos are uploaded straight into the database. Every page tells search engines
+not to index it. Never use it for a real shop.
+
+### The Vercel variables (Production)
+
+| Name               | Value                                              | Notes                                                                      |
+| ------------------ | -------------------------------------------------- | -------------------------------------------------------------------------- |
+| MONGODB_URI        | your Atlas connection string                       | required                                                                   |
+| MONGODB_DB_NAME    | `exquisite_demo` (any name except `exquisite`)     | required; use a name of its own so real data never mixes in                |
+| APP_BASE_URL       | `https://exquisitebarbershop.visualizeclients.com` | required, https, no trailing slash                                         |
+| MANAGE_LINK_SECRET | your 32+ character secret                          | required                                                                   |
+| CRON_SECRET        | your 32+ character secret                          | required                                                                   |
+| DEMO_MODE          | `true`                                             | turns the showcase on                                                      |
+| STORAGE_DRIVER     | `mongo`                                            | photos in MongoDB (GridFS), allowed in production only with DEMO_MODE=true |
+
+Nothing else is needed. Email stays off (`EMAIL_PROVIDER` defaults to `log`),
+and demo mode waives EMAIL_DISABLED_ACK and STORAGE_DISABLED_ACK, so you can
+leave them set or delete them. BOOTSTRAP_SECRET, SEED_OWNER_EMAIL and
+SEED_OWNER_PASSWORD are not needed; if you do set SEED_OWNER_PASSWORD the
+owner login also works with the email and that password.
+
+### Steps
+
+1. Merge the pull request into `main`.
+2. Set the variables above, then redeploy (Deployments, the three dots, Redeploy).
+   DEMO_MODE must be set before that build: the build puts `noindex` into the
+   page and a closed `robots.txt` into the site when it sees DEMO_MODE=true.
+3. Open the site. The first visit takes a few seconds longer: it sets itself up.
+4. `/admin` has a **Enter demo dashboard** button. Settings, Demo data, **Reset
+   demo data** starts over from the sample shop at any time.
+
+What the demo does differently: after a booking, the confirmation screen shows
+the manage link on screen (no email is sent); the daily backup is skipped
+(photos and data live in the same database); photos are limited to 3 MB after
+the browser resize and are served by the site itself.
+
+### Leaving the showcase for a real launch
+
+The demo database holds sample data, a demo owner and the demo photos. Do not
+reuse it. Either point MONGODB_DB_NAME at a new, empty database and follow
+sections 2 to 6, or clear this one:
+
+1. Set DEMO_MODE to `false` (or delete it). Set STORAGE_DRIVER to `r2` with the
+   R2 variables (section 10) or to `none` with STORAGE_DISABLED_ACK=true. Add
+   BOOTSTRAP_SECRET, SEED_OWNER_EMAIL and SEED_OWNER_PASSWORD (the real owner), and
+   the email choice (section 8, or EMAIL_DISABLED_ACK=true). Redeploy.
+2. Open `/setup`, paste BOOTSTRAP_SECRET. Tick "I understand this deletes the
+   whole demo shop" and press **Clear demo data**. It removes every booking,
+   photo, login and setting, and works only on a database the demo filled.
+   (From a computer with the production variables in `.env`: `npm run demo:clear`.)
+3. Press **Run setup** (it creates the real owner from SEED_OWNER_*), then **Run
+   doctor**. Until step 2 is done, Run setup answers "This database still holds
+   demo data".
+4. Delete SEED_OWNER_PASSWORD and BOOTSTRAP_SECRET, redeploy, sign in, change
+   the password, and fill in the real phone, address, hours and prices.
+
+Photos stored in GridFS do not move to R2 by themselves: switching
+STORAGE_DRIVER only changes where new photos go, and clearing the demo data
+removes the old ones. Upload the real photos again once R2 is on.
