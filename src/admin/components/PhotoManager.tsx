@@ -14,7 +14,7 @@ import type { PhotoKind } from '@shared/schemas/photo';
 import { Button, EmptyState, Input, Sheet, useToast } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
-import { prepareImage, putWithProgress } from '../lib/resizeImage';
+import { postWithProgress, prepareImage, putWithProgress } from '../lib/resizeImage';
 import { ErrorNote } from './ErrorNote';
 
 type UploadState =
@@ -70,18 +70,33 @@ export function PhotoManager({
         },
       });
       setUpload({ phase: 'uploading', fraction: 0 });
-      await putWithProgress(issued.uploadUrl, issued.headers, prepared.blob, (fraction) => {
+      const onProgress = (fraction: number) => {
         setUpload({ phase: 'uploading', fraction });
-      });
+      };
+      let sent: { width: number; height: number; cloudinary?: object } = {
+        width: prepared.width,
+        height: prepared.height,
+      };
+      if (issued.method === 'POST') {
+        // Cloudinary: a signed form straight to Cloudinary; what it returns goes to the confirm step.
+        const result = await postWithProgress(
+          issued.uploadUrl,
+          issued.fields ?? {},
+          prepared.blob,
+          onProgress,
+        );
+        sent = {
+          width: result.width,
+          height: result.height,
+          cloudinary: { publicId: result.publicId, version: result.version, bytes: result.bytes },
+        };
+      } else {
+        await putWithProgress(issued.uploadUrl, issued.headers, prepared.blob, onProgress);
+      }
       setUpload({ phase: 'confirming' });
       await apiRequest('/api/admin/photos/confirm', adminPhotoResponseSchema, {
         method: 'POST',
-        body: {
-          ticket: issued.ticket,
-          width: prepared.width,
-          height: prepared.height,
-          alt: alt.trim(),
-        },
+        body: { ticket: issued.ticket, ...sent, alt: alt.trim() },
       });
       setFile(null);
       setAlt('');

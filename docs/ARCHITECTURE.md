@@ -808,6 +808,20 @@ Access
 
 ## 8b. Photos and storage (prompt 4)
 
+Prompt 10 added the `cloudinary` driver (`server/storage/cloudinary.ts`), the way photos are meant to
+run. `presignUpload` there returns a signed multipart POST (`method: 'POST'` with `fields`) instead of a
+PUT: the server signs `{timestamp, folder, public_id}` with the API secret (SHA-1 of the sorted
+parameters plus the secret) and the browser posts the file straight to
+`https://api.cloudinary.com/v1_1/<cloud>/image/upload`. A photo key is the public id
+(`<CLOUDINARY_FOLDER>/<uuid>`). Confirm takes the browser's `{ publicId, version, bytes }` and checks
+them against the Admin API (`head`) before saving; a mismatch destroys the asset. Delete is the
+signed `destroy` call, run by the daily purge; the daily job also sweeps assets in the folder older than
+24 hours that no photo record names (`sweepStorageOrphans`). Photo views carry
+`delivery: { cloud, publicId }` and the client builds `res.cloudinary.com` URLs for the four widths
+cropped to each frame (`shared/lib/cloudinary.ts`). The driver keeps no backups (images only), so the
+daily job skips them as it does for `mongo`. `npm run photos:migrate` copies GridFS or local photos
+over and rewrites their records.
+
 Storage is a port (`server/storage/types.ts`) with two drivers chosen by
 STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,
 presigned PUT URLs valid for five minutes, public reads through
@@ -1002,7 +1016,8 @@ Environments
 | SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time                                                       |
 | SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email                                                  |
 | CRON_SECRET                                                                          | later           | bearer token for internal routes                                                       |
-| STORAGE_DRIVER                                                                       | now             | local, r2, none (no photos and no backups until R2 exists) or mongo (demo only)        |
+| STORAGE_DRIVER                                                                       | now             | local, cloudinary, r2, none (no photos and no backups) or mongo (demo only)            |
+| CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_FOLDER  | production      | Cloudinary photo storage; the folder is exquisite/production or exquisite/preview      |
 | STORAGE_DISABLED_ACK                                                                 | production      | "true" allows STORAGE_DRIVER=none in production, on purpose                            |
 | DEMO_MODE                                                                            | showcase only   | "true": auto setup, demo sign-in, GridFS photos, noindex; waives both acknowledgements |
 | R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                                                            |

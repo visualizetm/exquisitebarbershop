@@ -182,6 +182,48 @@ describe('envProblems', () => {
   });
 });
 
+describe('Cloudinary photos', () => {
+  const production = {
+    ...base,
+    NODE_ENV: 'production' as const,
+    MONGODB_DB_NAME: 'exquisite_production',
+    APP_BASE_URL: 'https://exquisitebarbershop.visualizeclients.com',
+    CRON_SECRET: 'c'.repeat(40),
+    EMAIL_DISABLED_ACK: 'true' as const,
+    STORAGE_DRIVER: 'cloudinary' as const,
+  };
+  const cloudinary = {
+    CLOUDINARY_CLOUD_NAME: 'demo',
+    CLOUDINARY_API_KEY: '123456789',
+    CLOUDINARY_API_SECRET: 'secret-value',
+    CLOUDINARY_FOLDER: 'exquisite/production',
+  };
+
+  it('is allowed in production without DEMO_MODE once all four variables are set', () => {
+    expect(names({ ...production, ...cloudinary })).toEqual([]);
+  });
+
+  it('asks for each of the four variables by name, with a fix that is not a value', () => {
+    const missing = envProblems(production);
+    expect(missing.map((p) => p.name)).toEqual([
+      'CLOUDINARY_CLOUD_NAME',
+      'CLOUDINARY_API_KEY',
+      'CLOUDINARY_API_SECRET',
+      'CLOUDINARY_FOLDER',
+    ]);
+    expect(missing.map((p) => p.fix).join(' ')).toContain('exquisite/preview');
+    for (const name of Object.keys(cloudinary)) {
+      expect(names({ ...production, ...cloudinary, [name]: undefined })).toEqual([name]);
+    }
+  });
+
+  it('keeps previews in their own folder', () => {
+    const preview = { ...production, VERCEL_ENV: 'preview' as const, ...cloudinary };
+    expect(names(preview)).toEqual(['CLOUDINARY_FOLDER']);
+    expect(names({ ...preview, CLOUDINARY_FOLDER: 'exquisite/preview' })).toEqual([]);
+  });
+});
+
 describe('describeEnv and getPartialEnv', () => {
   const saved = { ...process.env };
   afterEach(() => {

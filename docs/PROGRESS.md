@@ -331,3 +331,18 @@ commit, and what is still open.
   loading; the temporary `legacy.css` is gone.
 - Tests: `tests/e2e/kit.spec.ts` (every kit section in both themes, a sheet opens in 250ms and closes in
   150ms, the modal and the swipeable lightbox), `/kit` is absent from the production build.
+
+### M5: Cloudinary photos
+
+- Shipped: the `cloudinary` storage driver (signed browser uploads, verification on confirm,
+  destroy on delete, the 24 hour orphan sweep, a signed doctor ping), `STORAGE_DRIVER=cloudinary`
+  allowed in production without DEMO_MODE and requiring the four CLOUDINARY variables (Preview must
+  use a folder that says preview), responsive images (`f_auto,q_auto,c_fill,g_auto`, four widths,
+  `sizes`, lazy below the fold, `fetchpriority=high` on the hero), the CSP naming `res.cloudinary.com`
+  and `api.cloudinary.com` only, `npm run photos:migrate -- --from mongo --to cloudinary [--dry-run]`,
+  DEPLOY.md section 10b and the env table.
+- Tests: signing and URL building (`tests/unit/cloudinary.test.ts`), the env rules, the CSP, a fake
+  Cloudinary (`tests/helpers/fakeCloudinary.ts`) driving upload, confirm, show, delete, the sweep, the
+  doctor and who can sign (`tests/integration/cloudinary.test.ts`), the migration
+  (`tests/integration/photosMigrate.test.ts`), and the browser picking the right sizes
+  (`tests/e2e/cloudinary-images.spec.ts`).

@@ -83,3 +83,62 @@ export function putWithProgress(
     xhr.send(blob);
   });
 }
+
+/** What Cloudinary answers after a signed upload. */
+export interface CloudinaryUpload {
+  publicId: string;
+  version: number;
+  width: number;
+  height: number;
+  bytes: number;
+}
+
+/**
+ * POSTs the signed form straight to Cloudinary (fields first, the file last) with progress. Nothing
+ * secret is in the form: the server signed it, and the API secret stays on the server.
+ */
+export function postWithProgress(
+  url: string,
+  fields: Record<string, string>,
+  blob: Blob,
+  onProgress: (fraction: number) => void,
+): Promise<CloudinaryUpload> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    form.append('file', blob, 'photo.webp');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(new Error(`Upload failed with ${String(xhr.status)}`));
+        return;
+      }
+      try {
+        const body = JSON.parse(xhr.responseText) as {
+          public_id: string;
+          version: number;
+          width: number;
+          height: number;
+          bytes: number;
+        };
+        resolve({
+          publicId: body.public_id,
+          version: body.version,
+          width: body.width,
+          height: body.height,
+          bytes: body.bytes,
+        });
+      } catch {
+        reject(new Error('Upload failed'));
+      }
+    };
+    xhr.onerror = () => {
+      reject(new Error('Upload failed'));
+    };
+    xhr.send(form);
+  });
+}

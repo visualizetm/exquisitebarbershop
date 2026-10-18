@@ -117,3 +117,35 @@ export async function markPurged(id: string, now: Date, options?: RepoOptions): 
   const col = await collection('photos');
   await col.updateOne({ _id: id }, { $set: { purgedAt: now } }, sessionOf(options));
 }
+
+/** Every photo key on record, deleted or not: the orphan sweep keeps what a record still points at. */
+export async function listAllKeys(options?: RepoOptions): Promise<string[]> {
+  const col = await collection('photos');
+  const docs = await col.find({}, { projection: { key: 1 }, ...sessionOf(options) }).toArray();
+  return docs.map((d) => d.key);
+}
+
+/** Points a photo record at a new object key (the storage migration). Only if it still has the old one. */
+export async function rekeyPhoto(
+  id: string,
+  from: string,
+  to: string,
+  options?: RepoOptions,
+): Promise<boolean> {
+  const col = await collection('photos');
+  const result = await col.updateOne(
+    { _id: id, key: from },
+    { $set: { key: to } },
+    sessionOf(options),
+  );
+  return result.modifiedCount === 1;
+}
+
+/** Photos whose object is not yet purged, newest last: what a storage migration walks. */
+export async function listLiveForMigration(options?: RepoOptions): Promise<PhotoDocument[]> {
+  const col = await collection('photos');
+  return col
+    .find({ deletedAt: null, purgedAt: null }, sessionOf(options))
+    .sort({ createdAt: 1 })
+    .toArray();
+}

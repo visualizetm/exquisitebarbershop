@@ -579,3 +579,20 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D10-23 Admin headings below the page title are sentence case, not caps, and the admin scale is 13, 15,
   18 and 22px: a dense working screen reads better that way. Everything else (tokens, the kit, the
   states) is shared with the public site.
+- D10-24 Cloudinary is a driver behind the existing storage port. The port's `PresignedUpload` became a
+  union (PUT for R2, local and GridFS; signed POST for Cloudinary), `uploadUrlResponse` gained
+  `method: 'POST'` and `fields`, and confirm gained an optional `cloudinary: { publicId, version, bytes }`
+  that is required, and checked against the Admin API, when the driver is Cloudinary.
+- D10-25 A Cloudinary photo key is its public id, `<CLOUDINARY_FOLDER>/<uuid>`, the same uuid the old
+  keys carried, so the migration is idempotent (the destination of a photo never changes) and a half
+  finished copy is adopted on the next run. The old GridFS objects are left in place.
+- D10-26 Backups: Cloudinary holds images, not the NDJSON export, so with this driver the daily job
+  writes no backup (it logs that, like the GridFS case) and the doctor says to turn on Atlas backups.
+  R2 stays available for anyone who wants bucket backups.
+- D10-27 The CSP no longer allows any `https:` image: images from the site itself, data and
+  `res.cloudinary.com`; connections to the site and `api.cloudinary.com`. An R2 deployment would need
+  its public host added to `img-src`.
+- D10-28 The doctor's Cloudinary check is a signed Admin API ping (nothing written), then reports
+  delivery as OK without a network call. The 10 MB limit is enforced on issue and again on confirm.
+- D10-29 The fake Cloudinary in the tests wraps `fetch` and checks the same signature and credentials
+  the real service does, so a wrong signing rule fails the test instead of passing quietly.

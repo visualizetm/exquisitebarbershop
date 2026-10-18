@@ -27863,9 +27863,13 @@ var photoKindSchema = external_exports.enum(["staff", "gallery", "hero"]);
 var PHOTO_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 var PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 var KEY_PREFIX_PATTERN = /^[a-z0-9][a-z0-9-]*\/$/;
-var photoKeySchema = external_exports.string().regex(
-  /^(?:[a-z0-9][a-z0-9-]*\/)?(?:staff\/[0-9a-f]{24}|gallery|hero)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/
+var CLOUDINARY_FOLDER_PATTERN = /^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/;
+var UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+var FILE_KEY = new RegExp(
+  `^(?:[a-z0-9][a-z0-9-]*/)?(?:staff/[0-9a-f]{24}|gallery|hero)/${UUID_PATTERN}\\.webp$`
 );
+var CLOUDINARY_KEY = new RegExp(`^(?:[a-z0-9][a-z0-9_-]*/)+${UUID_PATTERN}$`);
+var photoKeySchema = external_exports.string().refine((key) => FILE_KEY.test(key) || CLOUDINARY_KEY.test(key), "Not a photo key");
 var photoDocumentSchema = external_exports.object({
   _id: idSchema,
   kind: photoKindSchema,
@@ -27912,9 +27916,10 @@ var envSchema = external_exports.object({
   LOG_LEVEL: external_exports.enum(["debug", "info", "warn", "error"]).default("info"),
   /**
    * Where photos live: Cloudflare R2 in production, the local disk in dev and tests,
-   * "none" to run without photos until R2 exists, or "mongo" (MongoDB GridFS, demo mode only).
+   * "cloudinary" (photos on Cloudinary, signed uploads from the browser), "none" to run
+   * without photos, or "mongo" (MongoDB GridFS, demo mode only).
    */
-  STORAGE_DRIVER: external_exports.enum(["local", "r2", "none", "mongo"]).default("local"),
+  STORAGE_DRIVER: external_exports.enum(["local", "r2", "cloudinary", "none", "mongo"]).default("local"),
   /**
    * Showcase mode: the first request sets the shop up with sample data, the admin login
    * offers a one-click demo sign-in, photos can live in MongoDB (STORAGE_DRIVER=mongo),
@@ -27923,6 +27928,15 @@ var envSchema = external_exports.object({
   DEMO_MODE: external_exports.enum(["true", "false"]).default("false"),
   /** Lets production launch with STORAGE_DRIVER=none on purpose, before R2 is set up. */
   STORAGE_DISABLED_ACK: external_exports.enum(["true", "false"]).default("false"),
+  /** Cloudinary (STORAGE_DRIVER=cloudinary). The secret never leaves the server. */
+  CLOUDINARY_CLOUD_NAME: external_exports.string().optional(),
+  CLOUDINARY_API_KEY: external_exports.string().optional(),
+  CLOUDINARY_API_SECRET: external_exports.string().optional(),
+  /** The folder every upload goes into: exquisite/production, or exquisite/preview for Preview. */
+  CLOUDINARY_FOLDER: external_exports.string().regex(
+    CLOUDINARY_FOLDER_PATTERN,
+    "CLOUDINARY_FOLDER must be lowercase letters, digits, hyphens or underscores, with slashes between folders"
+  ).optional(),
   R2_ACCOUNT_ID: external_exports.string().optional(),
   R2_ACCESS_KEY_ID: external_exports.string().optional(),
   R2_SECRET_ACCESS_KEY: external_exports.string().optional(),
@@ -27969,8 +27983,8 @@ function envProblems(env, environment = environmentOf(env)) {
     need(
       "STORAGE_DRIVER",
       env.STORAGE_DRIVER !== "local",
-      "STORAGE_DRIVER must be r2, none or mongo on Vercel",
-      "Set STORAGE_DRIVER to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on."
+      "STORAGE_DRIVER must be cloudinary, r2, none or mongo on Vercel",
+      "Set STORAGE_DRIVER to cloudinary with the four CLOUDINARY variables (see DEPLOY.md), to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on."
     );
   }
   const demo = env.DEMO_MODE === "true";
@@ -27979,7 +27993,7 @@ function envProblems(env, environment = environmentOf(env)) {
       "STORAGE_DRIVER",
       demo,
       "STORAGE_DRIVER is mongo without DEMO_MODE",
-      "Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md) for a real launch."
+      "Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=cloudinary with the CLOUDINARY variables (see DEPLOY.md) for a real launch."
     );
   }
   if (env.STORAGE_DRIVER === "none" && environment === "production" && !demo) {
@@ -27987,7 +28001,7 @@ function envProblems(env, environment = environmentOf(env)) {
       "STORAGE_DISABLED_ACK",
       env.STORAGE_DISABLED_ACK === "true",
       "STORAGE_DRIVER is none, so photos and daily backups are off",
-      "Either set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md), or set STORAGE_DISABLED_ACK=true to launch without photos and backups on purpose."
+      "Either set STORAGE_DRIVER=cloudinary with the CLOUDINARY variables (see DEPLOY.md), or set STORAGE_DISABLED_ACK=true to launch without photos and backups on purpose."
     );
   }
   if (env.STORAGE_DRIVER === "r2") {
@@ -28003,6 +28017,29 @@ function envProblems(env, environment = environmentOf(env)) {
         Boolean(env[name]),
         `${name} is not set`,
         `Set ${name} from the Cloudflare R2 bucket (R2, the bucket, Settings for the public URL; Manage R2 API Tokens for the keys).`
+      );
+    }
+  }
+  if (env.STORAGE_DRIVER === "cloudinary") {
+    for (const name of [
+      "CLOUDINARY_CLOUD_NAME",
+      "CLOUDINARY_API_KEY",
+      "CLOUDINARY_API_SECRET",
+      "CLOUDINARY_FOLDER"
+    ]) {
+      need(
+        name,
+        Boolean(env[name]),
+        `${name} is not set`,
+        name === "CLOUDINARY_FOLDER" ? "Set CLOUDINARY_FOLDER to exquisite/production in Production and exquisite/preview in Preview, so previews never touch live photos." : `Set ${name} from the Cloudinary dashboard (Settings, API Keys). The API secret is server side only.`
+      );
+    }
+    if (environment === "preview" && env.CLOUDINARY_FOLDER) {
+      need(
+        "CLOUDINARY_FOLDER",
+        env.CLOUDINARY_FOLDER.includes("preview"),
+        "CLOUDINARY_FOLDER does not say preview for a preview deployment",
+        "Set CLOUDINARY_FOLDER to exquisite/preview in the Preview environment only, so preview uploads never touch production photos."
       );
     }
   }
@@ -30106,10 +30143,13 @@ var photosRepo_exports = {};
 __export(photosRepo_exports, {
   findPhotoById: () => findPhotoById,
   insertPhoto: () => insertPhoto,
+  listAllKeys: () => listAllKeys,
+  listLiveForMigration: () => listLiveForMigration,
   listPhotos: () => listPhotos,
   listUnpurged: () => listUnpurged,
   markPurged: () => markPurged,
   nextSortOrder: () => nextSortOrder,
+  rekeyPhoto: () => rekeyPhoto,
   softDeletePhoto: () => softDeletePhoto,
   updatePhoto: () => updatePhoto
 });
@@ -30170,6 +30210,24 @@ async function listUnpurged(limit, options) {
 async function markPurged(id, now2, options) {
   const col = await collection("photos");
   await col.updateOne({ _id: id }, { $set: { purgedAt: now2 } }, sessionOf(options));
+}
+async function listAllKeys(options) {
+  const col = await collection("photos");
+  const docs = await col.find({}, { projection: { key: 1 }, ...sessionOf(options) }).toArray();
+  return docs.map((d) => d.key);
+}
+async function rekeyPhoto(id, from, to, options) {
+  const col = await collection("photos");
+  const result = await col.updateOne(
+    { _id: id, key: from },
+    { $set: { key: to } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+async function listLiveForMigration(options) {
+  const col = await collection("photos");
+  return col.find({ deletedAt: null, purgedAt: null }, sessionOf(options)).sort({ createdAt: 1 }).toArray();
 }
 
 // server/repos/pendingUploadsRepo.ts
@@ -31113,6 +31171,125 @@ function createMongoDriver(config2) {
   };
 }
 
+// server/storage/cloudinary.ts
+import { createHash as createHash2 } from "node:crypto";
+
+// shared/lib/cloudinary.ts
+function cloudinaryUrl(asset, width, ratio) {
+  const transform2 = ["f_auto", "q_auto"];
+  if (ratio) transform2.push("c_fill", "g_auto", `w_${width}`, `ar_${ratio}`);
+  else transform2.push("c_limit", `w_${width}`);
+  return `https://res.cloudinary.com/${asset.cloud}/image/upload/${transform2.join(",")}/${asset.publicId}`;
+}
+
+// server/storage/cloudinary.ts
+var CLOUDINARY_MAX_BYTES = 10 * 1024 * 1024;
+var ORPHAN_AGE_MS = 24 * 60 * 6e4;
+function signParams(params, apiSecret) {
+  const joined = Object.keys(params).filter((key) => !["file", "api_key", "cloud_name", "resource_type"].includes(key)).sort().map((key) => `${key}=${String(params[key])}`).join("&");
+  return createHash2("sha1").update(`${joined}${apiSecret}`).digest("hex");
+}
+function splitKey(key) {
+  const at = key.lastIndexOf("/");
+  return { folder: key.slice(0, at), publicId: key.slice(at + 1) };
+}
+var FORMAT_TYPES = {
+  webp: "image/webp",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png"
+};
+function createCloudinaryDriver(config2) {
+  const base = (config2.apiBase ?? "https://api.cloudinary.com").replace(/\/+$/, "");
+  const api = `${base}/v1_1/${config2.cloudName}`;
+  const basic = `Basic ${Buffer.from(`${config2.apiKey}:${config2.apiSecret}`).toString("base64")}`;
+  async function admin(path, init = {}) {
+    return fetch(`${api}${path}`, {
+      ...init,
+      headers: { authorization: basic, ...init.headers }
+    });
+  }
+  return {
+    name: "cloudinary",
+    presignUpload({ key, expiresInSeconds }) {
+      const { folder: folder2, publicId } = splitKey(key);
+      const timestamp = Math.floor(Date.now() / 1e3);
+      const signed = { folder: folder2, public_id: publicId, timestamp };
+      return Promise.resolve({
+        url: `${api}/image/upload`,
+        method: "POST",
+        fields: {
+          api_key: config2.apiKey,
+          timestamp: String(timestamp),
+          folder: folder2,
+          public_id: publicId,
+          signature: signParams(signed, config2.apiSecret)
+        },
+        expiresAt: new Date(Date.now() + expiresInSeconds * 1e3)
+      });
+    },
+    async head(key) {
+      const res = await admin(`/resources/image/upload/${encodeURI(key)}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`Cloudinary lookup failed with ${String(res.status)}`);
+      const asset = await res.json();
+      return {
+        size: asset.bytes,
+        contentType: FORMAT_TYPES[asset.format] ?? `image/${asset.format}`,
+        version: asset.version
+      };
+    },
+    async delete(key) {
+      const timestamp = Math.floor(Date.now() / 1e3);
+      const signed = { invalidate: "true", public_id: key, timestamp };
+      const body = new URLSearchParams({
+        api_key: config2.apiKey,
+        invalidate: "true",
+        public_id: key,
+        timestamp: String(timestamp),
+        signature: signParams(signed, config2.apiSecret)
+      });
+      const res = await fetch(`${api}/image/destroy`, { method: "POST", body });
+      if (!res.ok) throw new Error(`Cloudinary destroy failed with ${String(res.status)}`);
+    },
+    put() {
+      return Promise.reject(
+        new Error("Cloudinary holds photos only; backups and doctor files use another driver")
+      );
+    },
+    get() {
+      return Promise.reject(new Error("Cloudinary photos are read from their public address"));
+    },
+    publicUrl(key) {
+      return cloudinaryUrl({ cloud: config2.cloudName, publicId: key }, 1600, null);
+    },
+    delivery(key) {
+      return { cloud: config2.cloudName, publicId: key };
+    },
+    async ping() {
+      const res = await admin("/ping");
+      if (!res.ok) throw new Error(`Cloudinary ping failed with ${String(res.status)}`);
+    },
+    async listOlderThan(cutoff, limit) {
+      const found = [];
+      let cursor;
+      do {
+        const query = new URLSearchParams({ prefix: `${config2.folder}/`, max_results: "500" });
+        if (cursor) query.set("next_cursor", cursor);
+        const res = await admin(`/resources/image/upload?${query.toString()}`);
+        if (!res.ok) throw new Error(`Cloudinary list failed with ${String(res.status)}`);
+        const page = await res.json();
+        for (const asset of page.resources) {
+          const created = asset.created_at ? new Date(asset.created_at).getTime() : Infinity;
+          if (created < cutoff.getTime()) found.push(asset.public_id);
+        }
+        cursor = page.next_cursor;
+      } while (cursor && found.length < limit);
+      return found.slice(0, limit);
+    }
+  };
+}
+
 // node_modules/aws4fetch/dist/aws4fetch.esm.mjs
 var encoder = new TextEncoder();
 var HOST_SERVICES = {
@@ -31462,7 +31639,9 @@ function backupsEnabled() {
   return driver === "r2" || driver === "local";
 }
 function maxUploadBytes() {
-  return getEnv2().STORAGE_DRIVER === "mongo" ? MONGO_MAX_BYTES : PHOTO_MAX_BYTES;
+  const driver = getEnv2().STORAGE_DRIVER;
+  if (driver === "mongo") return MONGO_MAX_BYTES;
+  return driver === "cloudinary" ? CLOUDINARY_MAX_BYTES : PHOTO_MAX_BYTES;
 }
 function assertStorageEnabled() {
   if (!storageEnabled()) {
@@ -31484,6 +31663,13 @@ function getStorage() {
       bucket: env.R2_BUCKET ?? "",
       publicBaseUrl: env.R2_PUBLIC_BASE_URL ?? ""
     });
+  } else if (env.STORAGE_DRIVER === "cloudinary") {
+    cached3 = createCloudinaryDriver({
+      cloudName: env.CLOUDINARY_CLOUD_NAME ?? "",
+      apiKey: env.CLOUDINARY_API_KEY ?? "",
+      apiSecret: env.CLOUDINARY_API_SECRET ?? "",
+      folder: env.CLOUDINARY_FOLDER ?? ""
+    });
   } else if (env.STORAGE_DRIVER === "mongo") {
     cached3 = createMongoDriver({ baseUrl: env.APP_BASE_URL, secret: env.MANAGE_LINK_SECRET });
   } else {
@@ -31493,6 +31679,12 @@ function getStorage() {
 }
 function keyPrefix() {
   return getEnv2().R2_KEY_PREFIX ?? "";
+}
+function newPhotoKey(kind, staffId, uuid3) {
+  const env = getEnv2();
+  if (env.STORAGE_DRIVER === "cloudinary") return `${env.CLOUDINARY_FOLDER ?? ""}/${uuid3}`;
+  const tail = kind === "staff" ? `staff/${staffId ?? ""}/${uuid3}.webp` : `${kind}/${uuid3}.webp`;
+  return `${keyPrefix()}${tail}`;
 }
 
 // server/services/availability.ts
@@ -32118,7 +32310,9 @@ var photoViewSchema = external_exports.object({
   url: external_exports.url(),
   width: external_exports.int(),
   height: external_exports.int(),
-  alt: external_exports.string()
+  alt: external_exports.string(),
+  /** Set for Cloudinary photos: the browser asks for exact sizes (four widths, cropped to the frame). */
+  delivery: external_exports.object({ cloud: external_exports.string(), publicId: external_exports.string() }).nullable().optional()
 });
 var galleryPhotoSchema = photoViewSchema.extend({
   staff: external_exports.object({ id: idSchema, name: external_exports.string(), slug: external_exports.string() }).nullable()
@@ -32151,17 +32345,27 @@ var uploadUrlRequestSchema = external_exports.object({
   size: external_exports.int().min(1).max(PHOTO_MAX_BYTES)
 });
 var uploadUrlResponseSchema = external_exports.object({
-  /** PUT the bytes here, with the same Content-Type, within five minutes. */
+  /** PUT the bytes here (or POST the form, for Cloudinary) within five minutes. */
   uploadUrl: external_exports.url(),
-  method: external_exports.literal("PUT"),
+  method: external_exports.enum(["PUT", "POST"]),
+  /** For a PUT: the headers to send, including the Content-Type. */
   headers: external_exports.record(external_exports.string(), external_exports.string()),
+  /** For a POST: the signed form fields to send before the file. Cloudinary only. */
+  fields: external_exports.record(external_exports.string(), external_exports.string()).optional(),
   key: external_exports.string(),
   /** Hand it back to confirm. It binds the key to the kind, chair, type and size. */
   ticket: external_exports.string(),
   expiresAt: external_exports.iso.datetime()
 });
+var cloudinaryResultSchema = external_exports.object({
+  publicId: external_exports.string().min(1).max(300),
+  version: external_exports.int().min(0),
+  bytes: external_exports.int().min(1)
+});
 var confirmUploadRequestSchema = external_exports.object({
   ticket: external_exports.string().min(20).max(2e3),
+  /** Required when the photo went to Cloudinary. */
+  cloudinary: cloudinaryResultSchema.optional(),
   width: external_exports.int().min(1).max(1e4),
   height: external_exports.int().min(1).max(1e4),
   alt: external_exports.string().trim().min(1).max(200)
@@ -36526,12 +36730,15 @@ var ticketSchema = external_exports.object({
   exp: external_exports.int()
 });
 function toPhotoView(p) {
+  const storage = getStorage();
+  const delivery = storage.delivery?.(p.key);
   return {
     id: p._id,
-    url: getStorage().publicUrl(p.key),
+    url: storage.publicUrl(p.key),
     width: p.width,
     height: p.height,
-    alt: p.alt
+    alt: p.alt,
+    ...delivery ? { delivery } : {}
   };
 }
 function toAdminPhotoView(p) {
@@ -36580,8 +36787,7 @@ async function issueUploadUrl(principal, input2, meta3) {
   }
   await assertCanManage(principal, input2.kind, staffId);
   if (staffId) await liveStaff(staffId);
-  const uuid3 = randomUUID2();
-  const key = keyPrefix() + (input2.kind === "staff" ? `staff/${staffId ?? ""}/${uuid3}.webp` : `${input2.kind}/${uuid3}.webp`);
+  const key = newPhotoKey(input2.kind, staffId, randomUUID2());
   const upload = await getStorage().presignUpload({
     key,
     contentType: input2.contentType,
@@ -36603,8 +36809,9 @@ async function issueUploadUrl(principal, input2, meta3) {
   });
   return {
     uploadUrl: upload.url,
-    method: "PUT",
-    headers: upload.headers,
+    method: upload.method,
+    headers: upload.method === "PUT" ? upload.headers : {},
+    ...upload.method === "POST" ? { fields: upload.fields } : {},
     key,
     ticket,
     expiresAt: upload.expiresAt.toISOString()
@@ -36621,9 +36828,13 @@ async function confirmUpload(principal, input2, meta3) {
   );
   if (!issued) throw new AppError("INVALID_TOKEN", "That upload is not valid or has expired");
   await assertCanManage(principal, issued.kind, issued.s);
-  const stored = await getStorage().head(issued.k);
+  const storage = getStorage();
+  if (storage.name === "cloudinary" && input2.cloudinary?.publicId !== issued.k) {
+    throw new AppError("INVALID_TOKEN", "That upload is not the one this ticket was issued for");
+  }
+  const stored = await storage.head(issued.k);
   if (!stored) throw new AppError("CONFLICT", "The file was not uploaded");
-  if (stored.size !== issued.n || stored.contentType !== issued.ct || stored.size > maxUploadBytes()) {
+  if (stored.size !== issued.n || stored.contentType !== issued.ct || stored.size > maxUploadBytes() || storage.name === "cloudinary" && (stored.version !== input2.cloudinary?.version || stored.size !== input2.cloudinary?.bytes)) {
     await getStorage().delete(issued.k);
     await pendingUploadsRepo_exports.deletePendingUploadByKey(issued.k);
     throw new AppError("CONFLICT", "The uploaded file does not match what was declared");
@@ -36704,6 +36915,24 @@ async function purgeDeletedPhotos(now2, limit = 50) {
     purged += 1;
   }
   return purged;
+}
+async function sweepStorageOrphans(now2, limit = 50) {
+  if (!storageEnabled()) return 0;
+  const storage = getStorage();
+  if (!storage.listOlderThan) return 0;
+  const candidates = await storage.listOlderThan(
+    new Date(now2.getTime() - ORPHAN_AGE_MS),
+    limit * 4
+  );
+  if (candidates.length === 0) return 0;
+  const known = new Set(await photosRepo_exports.listAllKeys());
+  let swept = 0;
+  for (const key of candidates) {
+    if (known.has(key) || swept >= limit) continue;
+    await storage.delete(key);
+    swept += 1;
+  }
+  return swept;
 }
 async function sweepAbandonedUploads(now2, limit = 50) {
   if (!storageEnabled()) return 0;
@@ -37490,6 +37719,43 @@ async function checkDatabase() {
   }
   return checks;
 }
+async function checkCloudinary() {
+  try {
+    const storage = getStorage();
+    await storage.ping?.();
+    return [
+      {
+        id: "storage",
+        label: "Photo storage",
+        status: "pass",
+        detail: "A signed call to the Cloudinary Admin API worked."
+      },
+      {
+        id: "storage-public",
+        label: "Public photo URL",
+        status: "pass",
+        detail: "Photos are delivered from res.cloudinary.com in the sizes each frame needs."
+      },
+      {
+        id: "backups",
+        label: "Backups",
+        status: "warn",
+        detail: "Cloudinary holds photos only, so the daily job writes no backup. Photos stay on Cloudinary; turn on MongoDB Atlas backups for the data.",
+        fix: "In MongoDB Atlas, open the cluster, Backup, and turn on continuous or scheduled snapshots (DEPLOY.md, backups)."
+      }
+    ];
+  } catch (error62) {
+    return [
+      {
+        id: "storage",
+        label: "Photo storage",
+        status: "fail",
+        detail: describe3(error62),
+        fix: "Check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET against the Cloudinary dashboard (Settings, API Keys)."
+      }
+    ];
+  }
+}
 var STORAGE_OFF_FIX = "Set up Cloudflare R2 (see DEPLOY.md) to turn on photos and daily backups.";
 async function checkStorage() {
   const checks = [];
@@ -37513,6 +37779,7 @@ async function checkStorage() {
       }
     ];
   }
+  if (getPartialEnv().STORAGE_DRIVER === "cloudinary") return checkCloudinary();
   const key = `${keyPrefix()}_doctor/${randomUUID3()}.txt`;
   const body = new TextEncoder().encode("exquisite doctor");
   let storage;
@@ -37717,13 +37984,15 @@ var daily = async (ctx) => {
   }
   const photosPurged = await purgeDeletedPhotos(ctx.now);
   const uploadsSwept = await sweepAbandonedUploads(ctx.now);
+  const orphansSwept = await sweepStorageOrphans(ctx.now);
   if (!backupsEnabled()) {
-    logger.warn("daily job: backup skipped", { reason: "STORAGE_DRIVER is mongo (GridFS)" });
+    logger.warn("daily job: backup skipped", { reason: "STORAGE_DRIVER keeps no backups" });
     return {
       body: {
         outbox,
         photosPurged,
         uploadsSwept,
+        orphansSwept,
         backup: null,
         backupsPruned: 0,
         skipped: ["backup", "backupsPruned"]
@@ -37738,6 +38007,7 @@ var daily = async (ctx) => {
       outbox,
       photosPurged,
       uploadsSwept,
+      orphansSwept,
       backup: {
         date: backup.date,
         documents: backup.collections.reduce((n2, c) => n2 + c.count, 0),

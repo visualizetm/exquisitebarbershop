@@ -34,6 +34,7 @@
     "user:reset": "tsx scripts/user-reset.ts",
     "doctor": "tsx scripts/doctor.ts",
     "demo:clear": "tsx scripts/demo-clear.ts",
+    "photos:migrate": "tsx scripts/photos-migrate.ts",
     "smoke": "tsx scripts/smoke.ts",
     "restore": "tsx scripts/restore.ts"
   },
