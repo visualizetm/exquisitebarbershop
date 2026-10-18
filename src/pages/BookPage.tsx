@@ -1,3 +1,7 @@
+import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
+import Clock from '@untitled-ui/icons-react/build/esm/Clock';
+import Scissors01 from '@untitled-ui/icons-react/build/esm/Scissors01';
+import User01 from '@untitled-ui/icons-react/build/esm/User01';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { availabilityResponseSchema, type AvailabilitySlot } from '@shared/api/availability';
@@ -15,7 +19,7 @@ import { Status } from '@/components/Status';
 import { Button, Label, Link, StepBar, Ticket, TimeChip, useBar, useToast } from '@/components/ui';
 import type { BarConfig } from '@/components/ui/barStore';
 import { formatCents } from '@shared/lib/money';
-import { formatShopDateTime } from '@shared/lib/time';
+import { formatShopDate, formatShopTime } from '@shared/lib/time';
 import { BookingCard } from '@/components/booking/BookingCard';
 import { BookingSummary } from '@/components/booking/BookingSummary';
 import { CustomerForm } from '@/components/booking/CustomerForm';
@@ -510,12 +514,27 @@ export function BookPage() {
                 {
                   label: 'Chair',
                   value: `${booked.staff.name}${booked.staffRequested ? '' : ' (first available)'}`,
+                  icon: <User01 aria-hidden="true" />,
                 },
-                { label: 'When', value: formatShopDateTime(new Date(booked.startAt)) },
-                { label: 'Services', value: booked.services.map((s) => s.name).join(', ') },
+                {
+                  label: 'Day',
+                  value: formatShopDate(new Date(booked.startAt)),
+                  icon: <Calendar aria-hidden="true" />,
+                },
+                {
+                  label: 'Time',
+                  value: formatShopTime(new Date(booked.startAt)),
+                  icon: <Clock aria-hidden="true" />,
+                },
+                {
+                  label: 'Services',
+                  value: booked.services.map((s) => s.name).join(', '),
+                  icon: <Scissors01 aria-hidden="true" />,
+                },
                 {
                   label: 'For',
                   value: `${booked.customer.name}, ${booked.customer.phone}`,
+                  icon: <User01 aria-hidden="true" />,
                 },
               ]}
               total={formatCents(booked.totalPriceCents)}

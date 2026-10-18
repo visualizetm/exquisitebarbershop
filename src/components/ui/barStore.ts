@@ -11,6 +11,8 @@ export interface BarAction {
   form?: string;
   /** ink: white on ink. paper: ink on white. red: white on red, for the final action. */
   tone: 'ink' | 'paper' | 'red';
+  /** A small icon before the label: it names what the action does (call, book). */
+  icon?: 'phone' | 'calendar';
 }
 
 export interface BarConfig {
@@ -49,7 +51,7 @@ export const NO_BAR_PREFIXES = ['/admin', '/setup', '/team', '/kit', '/portal'] 
 /** CALL and BOOK NOW, the bar on every public page unless the page says otherwise. */
 export function defaultBar(phone: string): BarConfig {
   return {
-    left: { label: 'Call', href: `tel:${phone}`, tone: 'ink' },
-    right: { label: 'Book now', to: '/book', tone: 'paper' },
+    left: { label: 'Call', href: `tel:${phone}`, tone: 'ink', icon: 'phone' },
+    right: { label: 'Book now', to: '/book', tone: 'paper', icon: 'calendar' },
   };
 }

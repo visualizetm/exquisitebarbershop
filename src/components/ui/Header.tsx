@@ -62,7 +62,7 @@ export function Header({ phone }: { phone: string }) {
             <Mark name="wordmark" className="exq-nav__logo" width={157} height={40} />
           </span>
           <span className="exq-nav__logo-narrow">
-            <Mark name="stacked" className="exq-nav__logo" width={114} height={48} />
+            <Mark name="stacked" className="exq-nav__logo" width={170} height={40} />
           </span>
         </Link>
         <nav id="exq-primary-nav" className="exq-nav__links exq-primary-nav" aria-label="Primary">

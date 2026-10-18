@@ -714,8 +714,15 @@ div.exq-chaircard {
   text-transform: uppercase;
 }
 .exq-stepbar__n {
+  display: inline-flex;
+  align-items: center;
   margin-right: var(--s1);
   font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
+.exq-stepbar__n svg {
+  width: 1.2em;
+  height: 1.2em;
 }
 .exq-stepbar__step[data-state='current'] .exq-stepbar__button {
   color: var(--fg);
@@ -789,11 +796,19 @@ div.exq-chaircard {
   border-bottom: 1px solid var(--border);
 }
 .exq-ticket__row dt {
+  display: inline-flex;
+  gap: var(--s2);
+  align-items: center;
   font-size: var(--t-label);
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);
+}
+.exq-ticket__row dt svg {
+  flex: none;
+  width: 1.3em;
+  height: 1.3em;
 }
 .exq-ticket__row dd {
   margin: 0;
@@ -833,7 +848,7 @@ div.exq-chaircard {
 .exq-toast {
   display: flex;
   align-items: center;
-  gap: var(--s4);
+  gap: var(--s3);
   width: min(100%, 440px);
   padding: var(--s3) var(--s4);
   border-left: 4px solid var(--fg-3);
@@ -851,6 +866,14 @@ div.exq-chaircard {
 }
 .exq-toast[data-tone='danger'] {
   border-left-color: var(--accent);
+}
+.exq-toast__icon {
+  display: inline-flex;
+  flex: none;
+}
+.exq-toast__icon svg {
+  width: 1.4em;
+  height: 1.4em;
 }
 .exq-toast__text {
   flex: 1 1 auto;

@@ -49,7 +49,7 @@ test('with DEMO_MODE off nothing of the showcase exists and nothing seeds itself
   expect(await (await page.request.get('/robots.txt')).text()).not.toMatch(/^Disallow: \/$/m);
 
   // The down screen names the error code, and nothing else, in a Details disclosure.
-  await page.goto('/');
+  await page.goto('/book');
   const down = page.locator('.exq-site-down[data-state="down"]');
   await expect(down).toBeVisible();
   await down.locator('summary').click();
@@ -67,7 +67,7 @@ test('a missing MONGODB_URI shows the down message and the health check names it
   expect(body.missing).toEqual(['MONGODB_URI']);
   expect(JSON.stringify(body)).not.toContain('mongodb://');
 
-  await page.goto(`${BROKEN}/`);
+  await page.goto(`${BROKEN}/book`);
   const down = page.locator('.exq-site-down[data-state="down"]');
   await expect(down).toBeVisible();
   await expect(down.locator('.exq-state__title')).toHaveText('Online booking is having a moment');

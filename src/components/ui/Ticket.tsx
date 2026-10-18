@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 export interface TicketRow {
   label: string;
   value: ReactNode;
+  /** An icon that names the kind of fact: a calendar for the day, a clock for the time, a person. */
+  icon?: ReactNode;
 }
 
 /** A check mark whose stroke draws itself (the stroke is animated in motion.css). */
@@ -50,7 +52,10 @@ export function Ticket({
       <dl className="exq-ticket__body">
         {rows.map((row) => (
           <div key={row.label} className="exq-ticket__row">
-            <dt>{row.label}</dt>
+            <dt>
+              {row.icon}
+              {row.label}
+            </dt>
             <dd>{row.value}</dd>
           </div>
         ))}

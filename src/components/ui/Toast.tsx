@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import AlertCircle from '@untitled-ui/icons-react/build/esm/AlertCircle';
+import AlertTriangle from '@untitled-ui/icons-react/build/esm/AlertTriangle';
+import CheckCircle from '@untitled-ui/icons-react/build/esm/CheckCircle';
+import InfoCircle from '@untitled-ui/icons-react/build/esm/InfoCircle';
 
 import { ToastContext } from './toastContext';
 
@@ -58,6 +62,17 @@ function ToastView({ toast, onDone }: { toast: ToastItem; onDone: (id: number) =
       onFocus={pause}
       onBlur={start}
     >
+      <span className="exq-toast__icon" aria-hidden="true">
+        {toast.tone === 'ok' ? (
+          <CheckCircle />
+        ) : toast.tone === 'warn' ? (
+          <AlertTriangle />
+        ) : toast.tone === 'danger' ? (
+          <AlertCircle />
+        ) : (
+          <InfoCircle />
+        )}
+      </span>
       <span className="exq-toast__text">{toast.text}</span>
       {toast.action ? (
         <button

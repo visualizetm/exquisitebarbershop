@@ -109,7 +109,7 @@ Off limits: scroll jacking, parallax, pinned sections, cursor effects, looping d
 ## The phone bottom bar
 
 `BottomBar`, below 1024px on every public page except `/admin`, `/setup`, `/kit` and `/portal`
-(prompt 11's barber portal must live under `/portal`, or add its prefix to `NO_BAR_PREFIXES`).
+(the barber portal lives at `/team`, which is in `NO_BAR_PREFIXES`).
 Two equal halves, each 60px plus `env(safe-area-inset-bottom)` (the page declares
 `viewport-fit=cover`), a 2px red rule on top. Default: CALL (ink, `tel:`) and BOOK NOW (white, `/book`).
 Pages change it with `useBar`: BOOK MARCUS on a profile, BACK and CONTINUE (CONFIRM BOOKING on the
@@ -129,3 +129,20 @@ has shrunk by more than 150px (the keyboard), and returns when they end.
 7. Tap targets 44px or larger. Every image has alt text and dimensions.
 8. No emoji, no em dashes, no purple, no gradient text, no bento grids, no glass, no fake numbers or
    reviews, no "scroll down" hints.
+
+## Icons (prompt 11)
+
+Icons come only from `@untitled-ui/icons-react` (deep imports). Rules: none on headings, at most one per
+button, `aria-hidden` beside a text label, and an icon-only button has an `aria-label` plus the desktop
+tooltip (`IconButton`). The one exception is `SocialIcon` (Instagram, TikTok, Facebook), because Untitled UI
+has no brand glyphs; see D11-37. Where icons appear: the bottom bar (Call, Book now), hero and Visit facts,
+the booking step bar ticks, the ticket rows (Chair, Day, Time, Services, For, Notes), toast tones, and the
+owner dashboard buttons and tiles.
+
+## The barber portal and the owner dashboard (prompt 11)
+
+Both are built from the kit (`Sidebar`, `StatTile`, `DataTable`, `SearchBox`, `PinPad`, `BarChart`, `Tabs`,
+`BottomTabs`, `IconButton`). Admin type is 13 to 22px; motion is calmer than the public site and lives only in
+`motion.css`. `/team` is a phone first page with four tabs, 48px targets and 64px PIN keys, and uses
+`--card-2` (not the light-only `--surface-2`). Toasts carry a tone icon. The demo notice is a `Modal` with a
+focus trap and an inert page behind it.

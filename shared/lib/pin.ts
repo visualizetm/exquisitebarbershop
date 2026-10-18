@@ -13,7 +13,7 @@ const REJECTED = 'Pick a PIN that is harder to guess. Avoid repeats and runs lik
  */
 export function pinProblem(pin: string): string | null {
   if (!PIN_PATTERN.test(pin)) return `Use exactly ${String(PIN_LENGTH)} digits.`;
-  const digits = [...pin].map(Number);
+  const digits = Array.from(pin, Number);
   const step = (a: number, b: number) => (b - a + 10) % 10;
   const steps = digits.slice(1).map((d, i) => step(digits[i] ?? 0, d));
   if (steps.every((s) => s === 0)) return REJECTED;

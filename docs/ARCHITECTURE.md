@@ -894,6 +894,35 @@ site to the client. It is never for a real shop.
   (when DEMO_MODE is set at build time) in `index.html` plus a `Disallow: /` robots.txt. Vercel
   serves static files without our code, so the header cannot cover the HTML shell.
 
+## 8d. Barber PIN portal, search and the resolver Move (prompt 11)
+
+Auth levels are `public | team | owner | internal`. `app.ts` sends `team` to `authenticateTeam` and everything
+else to `authenticateFromCookie`, which now rejects barber role users, so barbers cannot use `/admin`.
+
+- Cookies: owner `__Host-exq_session`, barber `__Host-exq_team` (12 hour absolute). A barber Principal has
+  `userId` = staffId, role `barber`, `email` empty; `actorOf` gives `userId` null for audit.
+- PIN storage: argon2id of HMAC-SHA256(`MANAGE_LINK_SECRET`, `pin:staffId:pin`) in `staffPins` (unique on
+  `staffId`). Setup tokens: 32 random bytes (43 characters), only the hash is stored in `setupTokens`, 72 hours,
+  single use. Sessions in `teamSessions` (TTL on expiry).
+- Failure handling: five failures lock a barber for 15 minutes (`loginThrottle` under `sha256('pin:'+staffId)`);
+  30 failures per address per 15 minutes (`rateLimits`). Wrong PIN, no PIN, hidden or unknown barber answer the
+  same `INVALID_CREDENTIALS`; only a real, locked barber gets `ACCOUNT_LOCKED` (423). Issuing a setup link or
+  "Reset PIN" deletes the PIN, ends sessions, retires old links and clears the lock.
+- Barber views (`TeamBookingView`) carry name, services, time, status and notes, never phone or email. A walk-in
+  takes a phone as input and requires an `Idempotency-Key`.
+- "I am out today": `setDayStatus`; on a conflict it keeps every affected booking and inserts a `barberOut`
+  alert. Days off ahead apply when empty, otherwise raise a `timeOffRequest` alert. Barbers pass keep-only
+  resolutions; Move, Cancel and Cancel and notify are owner only.
+- Search: `GET /api/admin/search` over `bookings.nameKey` (index `by_name_key`), phone digits and reference code.
+- Resolver Move: `applyScheduleChange` accepts `move` with `toStaffId`; options list only chairs that do the
+  service and are free for the whole booking plus buffer. The move updates the booking, re-points its
+  `slotLocks` and writes `booking.move` audit in one transaction; a concurrent change taking the same free
+  time loses at the unique `(staffId, slotStart)` index and rolls back whole. The customer link version does
+  not change because the time did not.
+- Demo: seeded barbers get PIN 246810; the sign-in shows it only when `/api/shop` says `demo`.
+- Team routes (16) are under `/api/team/*`; owner access routes are `/api/admin/staff/:id/access`,
+  `/setup-link` and `/unlock`.
+
 ## 9. Notifications: outbox and channels
 
 Pattern

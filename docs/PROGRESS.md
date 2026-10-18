@@ -433,3 +433,15 @@ commit, and what is still open.
   `demo.test.ts`, the authz matrix across anonymous, barber, owner and temporary password, and
   `tests/e2e/portal.spec.ts` (sign in, the whole barber day at 390, setup link, lockout and unlock, axe on
   every screen in both themes).
+
+### M6: demo notice, icons, social links, fixes, guides
+
+- Shipped: the demo notice (D11-36), icons on the bottom bar, hero facts, Visit facts, step bar, ticket and
+  toasts, `SocialIcon` and the footer follow links (D11-37), the footer crest, the outage fallback for public
+  pages (D11-39), the 170 by 40 phone logo (D11-41), the `/team` disc mark, Directions icons.
+- Docs: `OWNER-GUIDE.md` and `BARBER-GUIDE.md` rewritten as step by step scenarios with screens in
+  `docs/screens/p11/guide/`; `DESIGN-SYSTEM.md`, `ARCHITECTURE.md`, `SITE-REPORT.md` and `DECISIONS.md`
+  updated.
+- Captures: `tests/e2e/p11-capture.ts` (`milestones`, `guide`, `m6`, `recordings`); montages per milestone in
+  `docs/screens/p11/m*/`; recordings in `docs/screens/p11/recordings/`.
+- Tests: `tests/e2e/chrome.spec.ts`, `outage.spec.ts`, the demo notice suite in `tests/e2e/demo/demo.spec.ts`.

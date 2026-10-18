@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router';
+import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
+import Phone from '@untitled-ui/icons-react/build/esm/Phone';
 import {
   NO_BAR_PREFIXES,
   defaultBar,
@@ -45,6 +47,13 @@ function useKeyboardOpen(): boolean {
 }
 
 function Half({ action }: { action: BarAction }) {
+  const label = (
+    <>
+      {action.icon === 'phone' ? <Phone aria-hidden="true" /> : null}
+      {action.icon === 'calendar' ? <Calendar aria-hidden="true" /> : null}
+      {action.label}
+    </>
+  );
   const props = {
     className: 'exq-bar__half',
     'data-tone': action.tone,
@@ -53,14 +62,14 @@ function Half({ action }: { action: BarAction }) {
   if (action.to && !action.disabled) {
     return (
       <Link to={action.to} {...props}>
-        {action.label}
+        {label}
       </Link>
     );
   }
   if (action.href && !action.disabled) {
     return (
       <a href={action.href} {...props}>
-        {action.label}
+        {label}
       </a>
     );
   }
@@ -72,7 +81,7 @@ function Half({ action }: { action: BarAction }) {
       onClick={action.onClick}
       {...props}
     >
-      {action.label}
+      {label}
     </button>
   );
 }

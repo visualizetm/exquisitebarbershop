@@ -1,3 +1,8 @@
+import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
+import Clock from '@untitled-ui/icons-react/build/esm/Clock';
+import MessageSquare01 from '@untitled-ui/icons-react/build/esm/MessageSquare01';
+import Scissors01 from '@untitled-ui/icons-react/build/esm/Scissors01';
+import User01 from '@untitled-ui/icons-react/build/esm/User01';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { AvailabilitySlot } from '@shared/api/availability';
@@ -8,7 +13,7 @@ import {
 } from '@shared/api/bookings';
 import { formatCents } from '@shared/lib/money';
 import { formatUsPhone } from '@shared/lib/phone';
-import { formatShopDateTime } from '@shared/lib/time';
+import { formatShopDate, formatShopDateTime, formatShopTime } from '@shared/lib/time';
 import { Status } from '@/components/Status';
 import { DayPicker } from '@/components/booking/DayPicker';
 import { IcsDownload } from '@/components/booking/IcsDownload';
@@ -171,14 +176,30 @@ export function ManagePage() {
             : 'confirmed'
       }
       rows={[
-        { label: 'Chair', value: booking.staff.name },
-        { label: 'When', value: formatShopDateTime(new Date(booking.startAt)) },
-        { label: 'Services', value: booking.services.map((s) => s.name).join(', ') },
+        { label: 'Chair', value: booking.staff.name, icon: <User01 aria-hidden="true" /> },
+        {
+          label: 'Day',
+          value: formatShopDate(new Date(booking.startAt)),
+          icon: <Calendar aria-hidden="true" />,
+        },
+        {
+          label: 'Time',
+          value: formatShopTime(new Date(booking.startAt)),
+          icon: <Clock aria-hidden="true" />,
+        },
+        {
+          label: 'Services',
+          value: booking.services.map((s) => s.name).join(', '),
+          icon: <Scissors01 aria-hidden="true" />,
+        },
         {
           label: 'For',
           value: `${booking.customer.name}, ${formatUsPhone(booking.customer.phone)}`,
+          icon: <User01 aria-hidden="true" />,
         },
-        ...(booking.notes ? [{ label: 'Notes', value: booking.notes }] : []),
+        ...(booking.notes
+          ? [{ label: 'Notes', value: booking.notes, icon: <MessageSquare01 aria-hidden="true" /> }]
+          : []),
       ]}
       total={formatCents(booking.totalPriceCents)}
       actions={

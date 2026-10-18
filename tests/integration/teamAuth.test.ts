@@ -79,7 +79,9 @@ describe('setup links', () => {
     const stored = await db().collection('setupTokens').findOne({ staffId: marcus });
     expect(stored?.tokenHash).toBe(sha256Hex(token));
     expect(JSON.stringify(stored)).not.toContain(token);
-    expect(stored?.expiresAt.getTime() - stored?.createdAt.getTime()).toBe(72 * 3600_000);
+    const life = (doc: { expiresAt: Date; createdAt: Date } | null | undefined) =>
+      doc ? doc.expiresAt.getTime() - doc.createdAt.getTime() : null;
+    expect(life(stored as { expiresAt: Date; createdAt: Date } | null)).toBe(72 * 3600_000);
 
     const info = await call(server.baseUrl, 'GET', `/api/team/setup/${token}`);
     expect(info.body).toEqual({ staffName: 'Marcus' });
@@ -189,7 +191,11 @@ describe('signing in', () => {
     const session = await db().collection('teamSessions').findOne({ staffId: marcus });
     expect(session?.tokenHash).toBe(sha256Hex(token));
     expect(JSON.stringify(session)).not.toContain(token);
-    expect(session?.expiresAt.getTime() - session?.createdAt.getTime()).toBe(12 * 3600_000);
+    expect(
+      session
+        ? (session.expiresAt as Date).getTime() - (session.createdAt as Date).getTime()
+        : null,
+    ).toBe(12 * 3600_000);
     const me = teamMeResponseSchema.parse(
       (await call(server.baseUrl, 'GET', '/api/team/me', { headers: { cookie } })).body,
     );
@@ -382,7 +388,7 @@ describe('what the owner sees', () => {
     await newLink(marcus);
     await owner('POST', `/api/admin/staff/${marcus}/unlock`);
     const entries = await db().collection('auditLog').find({ entityId: marcus }).toArray();
-    const actions = entries.map((e) => e.action);
+    const actions = entries.map((e) => e.action as string);
     expect(actions).toEqual(
       expect.arrayContaining([
         'auth.pin.failure',

@@ -6,7 +6,7 @@ import {
   staffAccessResponseSchema,
   type SetupLinkResponse,
 } from '@shared/api/team';
-import { Button, Input, Modal, StatusChip, useToast } from '@/components/ui';
+import { Button, Input, Modal, useToast } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
@@ -89,14 +89,11 @@ export function AccessTab({ member }: { member: AdminStaffView }) {
       <dl className="exq-settings__facts">
         <dt>Sign in</dt>
         <dd>
-          {a.hasPin ? (
-            <StatusChip status="completed" />
-          ) : (
-            <span>
-              {a.setupLinkActive ? 'Waiting for the barber to use the link' : 'No PIN yet'}
-            </span>
-          )}
-          {a.hasPin ? ' PIN set' : ''}
+          {a.hasPin
+            ? 'PIN set'
+            : a.setupLinkActive
+              ? 'Waiting for the barber to use the link'
+              : 'No PIN yet'}
         </dd>
         <dt>Last sign in</dt>
         <dd>{a.lastSignInAt ? shopDateTime(a.lastSignInAt) : 'Never'}</dd>

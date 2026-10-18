@@ -80,6 +80,8 @@ test.describe('the website page', () => {
       await text.fill('Closed Monday for the holiday');
       await page.getByRole('button', { name: 'Save announcement' }).click();
       await expect(page.getByText(/Announcement saved/).first()).toBeVisible();
+      // A toast names its kind with an icon.
+      await expect(page.locator('.exq-toast__icon svg').first()).toBeVisible();
       await visitor.goto('/');
       await expect(visitor.locator('.exq-topstrip')).toContainText('Closed Monday for the holiday');
     } finally {
@@ -297,7 +299,7 @@ test.describe('the website page', () => {
 });
 
 test.describe('settings', () => {
-  test('shop info saves and rejects a bad social link', async ({ page }) => {
+  test('shop info saves and rejects a bad social link', async ({ page, browser }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
     await page.goto('/admin/settings');
@@ -316,6 +318,13 @@ test.describe('settings', () => {
       expect(((await shop.json()) as { social: { tiktokUrl: string } }).social.tiktokUrl).toBe(
         'https://tiktok.com/@exquisitebarberbeauty',
       );
+      // ... and the footer then shows the icon, with its words, in a new tab.
+      const visitor = await (await browser.newContext()).newPage();
+      await visitor.goto('/');
+      const link = visitor.getByRole('link', { name: 'Exquisite on TikTok' });
+      await expect(link).toHaveAttribute('href', 'https://tiktok.com/@exquisitebarberbeauty');
+      await expect(link).toHaveAttribute('target', '_blank');
+      await visitor.context().close();
     } finally {
       await tiktok.fill(original);
       await page.getByRole('button', { name: 'Save shop info' }).click();

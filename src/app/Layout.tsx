@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from 'react-router';
 import { publicShopSchema } from '@shared/api/public';
-import { SiteDown } from '@/components/site/SiteDown';
+import { OutageNotice, SiteDown } from '@/components/site/SiteDown';
 import { BottomBar, Footer, Header, ToastProvider, TopStrip } from '@/components/ui';
 import { shopJsonLd } from '@/lib/seo';
 import { errorCodeOf } from '@/lib/api';
@@ -22,6 +22,9 @@ export function PublicLayout() {
       : shop.status === 'ready' && shop.data.maintenance
         ? ('maintenance' as const)
         : null;
+  // When the API is down only booking is shown the full message. Every other page still renders
+  // its own words, the bar, the footer and the Call button, with a notice where data would be.
+  const needsBooking = pathname === '/book' || pathname === '/manage';
   const phone = shop.status === 'ready' ? shop.data.phone : __SHOP_PHONE__;
   const tel = phone.replace(/[^\d+]/g, '');
   // The strip waits for the shop settings; setup and a down site have none to show.
@@ -39,14 +42,17 @@ export function PublicLayout() {
           />
           <Header phone={tel} />
           <main id="exq-main" className="exq-main" tabIndex={-1} data-menu-inert>
-            {down ? (
+            {down === 'maintenance' || (down === 'down' && needsBooking) ? (
               <SiteDown
                 reason={down}
                 phone={phone}
                 code={shop.status === 'error' ? errorCodeOf(shop.error) : undefined}
               />
             ) : (
-              <Outlet />
+              <>
+                {down === 'down' ? <OutageNotice phone={phone} /> : null}
+                <Outlet />
+              </>
             )}
           </main>
           <Footer shop={shop.status === 'ready' ? shop.data : null} />

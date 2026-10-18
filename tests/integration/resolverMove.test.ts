@@ -228,23 +228,20 @@ describe('the resolver: Move', () => {
       email: '',
       mustChangePassword: false,
     };
-    await expect(
-      createTimeBlock(
-        barber,
-        { kind: 'chair', staffId: marcus },
-        {
-          staffId: marcus,
-          kind: 'timeOff',
-          startAt: slotAt(THU, '08:00'),
-          endAt: slotAt(THU, '21:00'),
-          resolutions: [{ bookingId: booking._id, action: 'move', toStaffId: tre }],
-        },
-        { requestId: 'test', now: new Date() },
-      ),
-    ).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: expect.stringContaining('cancel or move'),
-    });
+    const error = await createTimeBlock(
+      barber,
+      { kind: 'chair', staffId: marcus },
+      {
+        staffId: marcus,
+        kind: 'timeOff',
+        startAt: slotAt(THU, '08:00'),
+        endAt: slotAt(THU, '21:00'),
+        resolutions: [{ bookingId: booking._id, action: 'move', toStaffId: tre }],
+      },
+      { requestId: 'test', now: new Date() },
+    ).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'FORBIDDEN' });
+    expect((error as Error).message).toContain('cancel or move');
     expect((await bookingsRepo.findBookingById(booking._id))?.staffId).toBe(marcus);
   });
 });

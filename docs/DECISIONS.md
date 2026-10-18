@@ -736,3 +736,29 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D11-35 Admin type stays 13 to 22px: PIN keys and stat values are now `--t-h3`. The portal page uses
   `--card-2` rather than `--surface-2`, because `--surface-2` is a light-only value and white text on it
   failed contrast in dark.
+- D11-36 The demo notice is a blocking modal shown once per browser session on the public site, `/admin` and
+  `/team` of a demo build only. The flag lives in `sessionStorage` behind try/catch; when storage is
+  unavailable the notice shows every time rather than never. It traps focus, makes the page behind it inert
+  and closes on Escape and on "Enter the demo". Afterwards a quiet "Demo by Visualize Studio" line sits in the
+  footer. A real shop never mounts it (e2e proves no dialog on any page of the normal build).
+- D11-37 `SocialIcon` is the one logged exception to "icons only from Untitled UI": Untitled UI has no brand
+  glyphs, and a text link reading "Instagram" is not the recognizable control a customer looks for. It is
+  three small line drawings in `currentColor`, aria-hidden, inside a link that carries the accessible name
+  ("Exquisite on Instagram"), a 44px target and `rel="noopener"`. A network shows only when its URL is set in
+  Settings. Nothing else outside Untitled UI is allowed.
+- D11-38 Icon rules: never on a heading, at most one per button, always aria-hidden next to a text label; an
+  icon-only button gets an `aria-label` and the desktop tooltip. Step bar ticks add "(done)" to the hidden
+  text so the tick is not the only signal.
+- D11-39 When the API is down, a public page keeps its words, bottom bar and footer and shows an inline
+  notice with the shop's phone number; each data section says what did not load ("The menu did not load")
+  instead of an empty block. Only `/book` and `/manage` (which cannot work without the database) and
+  maintenance mode still replace the page with the full down screen.
+- D11-40 The confirmation ticket splits the old "When" row into Day and Time, each with its own icon, so a
+  screen reader reads two short facts and the time can be scanned at a glance.
+- D11-41 The phone header logo is 170 by 40px: it filled the row at 360 and 390 before, pushing the menu
+  button to the edge. A test asserts the box and that nothing scrolls sideways at both widths.
+- D11-42 `Mark` variants: the footer uses `crest` (a seal reads as a stamp on dark), the `/team` sign-in uses
+  `disc`. The lockups stay in the header only.
+- D11-43 The capture script resets the demo data (the demo reset route) before every run, because the demo
+  database outlives a server restart and earlier runs leave all-day hours behind that would show on the public
+  pages.

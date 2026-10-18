@@ -31075,7 +31075,7 @@ var DEMO_PIN = "246810";
 var REJECTED = "Pick a PIN that is harder to guess. Avoid repeats and runs like 123456.";
 function pinProblem(pin) {
   if (!PIN_PATTERN.test(pin)) return `Use exactly ${String(PIN_LENGTH)} digits.`;
-  const digits = [...pin].map(Number);
+  const digits = Array.from(pin, Number);
   const step = (a, b) => (b - a + 10) % 10;
   const steps = digits.slice(1).map((d, i) => step(digits[i] ?? 0, d));
   if (steps.every((s2) => s2 === 0)) return REJECTED;
@@ -31503,7 +31503,7 @@ async function audit(action, staffId, actor, meta3, extra = null) {
 }
 async function usableStaff(staffId) {
   const staff = await staffRepo_exports.findStaffById(staffId);
-  return staff && staff.deletedAt === null && staff.showOnWebsite ? staff : null;
+  return staff?.deletedAt === null && staff.showOnWebsite ? staff : null;
 }
 function principalFor(staff, sessionId) {
   return {

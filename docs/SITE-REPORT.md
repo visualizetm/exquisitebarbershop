@@ -171,9 +171,19 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
   API path; fixed with the `/api/(.*)` rewrite (prompt 9).
 - Proof it stays fixed: `npm run test:vercel-function`, a required CI step (DEPLOY.md section 12).
 
+## Prompt 11 additions
+
+- Owner dashboard at `/admin`: Overview, Bookings, Schedule, Customers, Team, Website, Settings, with global
+  search (`/`), quick actions, alerts and the decision resolver (Keep, Move, Cancel, Cancel and notify).
+- Barber PIN portal at `/team` (one shared link, name then 6 digit PIN, 12 hour session), one time setup links
+  at `/team/setup/:token`; barbers can no longer sign in at `/admin`.
+- Demo notice on demo builds, icons, footer social links (shown only when set in Settings), outage fallback for
+  public pages, 170 by 40 phone logo.
+- Docs: `OWNER-GUIDE.md`, `BARBER-GUIDE.md` with screens in `docs/screens/p11/guide/`.
+
 ## Last commit
 
-Prompt 10, 2026-10-18: the Shop Sign redesign (tokens, kit and /kit, frame, pages, booking, admin), the
+Prompt 11, 2026-10-18: the owner dashboard, the barber PIN portal, the demo notice, icons and social links. Before it, prompt 10, 2026-10-18: the Shop Sign redesign (tokens, kit and /kit, frame, pages, booking, admin), the
 motion system, the phone bottom bar and Cloudinary photos. Before it, prompt 9, 2026-10-18: the function runs under plain Node on Vercel (bundle, `api/index.js`, rewrite),
 with `npm run test:vercel-function` in CI. Before it, prompt 8, 2026-10-18: the showcase demo (auto setup, demo sign-in, GridFS photos, noindex,
 down-screen details), the hero and sign-in logo fixes, the showcase production-like run and

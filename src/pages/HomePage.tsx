@@ -1,3 +1,6 @@
+import Clock from '@untitled-ui/icons-react/build/esm/Clock';
+import MarkerPin01 from '@untitled-ui/icons-react/build/esm/MarkerPin01';
+import NavigationPointer01 from '@untitled-ui/icons-react/build/esm/NavigationPointer01';
 import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import { galleryResponseSchema } from '@shared/api/photos';
 import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@shared/api/public';
@@ -9,6 +12,7 @@ import { TodaysChairs } from '@/components/site/TodaysChairs';
 import {
   ButtonAnchor,
   ButtonLink,
+  ErrorState,
   Label,
   Lines,
   Link,
@@ -82,11 +86,17 @@ export function HomePage() {
               style={{ '--rise-i': 6 } as React.CSSProperties}
             >
               <div>
-                <dt>{today?.length === 0 ? 'Today' : 'Open today'}</dt>
+                <dt>
+                  <Clock aria-hidden="true" />
+                  {today?.length === 0 ? 'Today' : 'Open today'}
+                </dt>
                 <dd>{today ? hoursLabel(today) : ''}</dd>
               </div>
               <div>
-                <dt>Find us</dt>
+                <dt>
+                  <MarkerPin01 aria-hidden="true" />
+                  Find us
+                </dt>
                 <dd>{data?.address.line1 ?? ''}</dd>
               </div>
               <div>
@@ -114,7 +124,13 @@ export function HomePage() {
             All chairs
           </Link>
         </SectionHead>
-        <TodaysChairs staff={staff.status === 'ready' ? staff.data.staff : null} />
+        {staff.status === 'error' ? (
+          <ErrorState title="The chairs did not load">
+            Call the shop and we will get you in.
+          </ErrorState>
+        ) : (
+          <TodaysChairs staff={staff.status === 'ready' ? staff.data.staff : null} />
+        )}
       </section>
 
       <section className="exq-band exq-dark exq-home__services" aria-labelledby="exq-home-services">
@@ -122,6 +138,8 @@ export function HomePage() {
           <SectionHead label="The menu" title="Services" id="exq-home-services" />
           {services.status === 'ready' ? (
             <ServiceRows services={services.data.services} limit={5} showDescription />
+          ) : services.status === 'error' ? (
+            <ErrorState title="The menu did not load">Call the shop for prices.</ErrorState>
           ) : null}
           <p className="exq-home__more">
             <Link className="exq-link-row" to="/services">
@@ -161,6 +179,7 @@ export function HomePage() {
                   variant="outline"
                   target="_blank"
                   rel="noopener noreferrer"
+                  icon={<NavigationPointer01 aria-hidden="true" />}
                 >
                   Directions
                 </ButtonAnchor>
@@ -174,6 +193,10 @@ export function HomePage() {
               </p>
             </div>
           </Reveal>
+        ) : shop.status === 'error' ? (
+          <ErrorState title="The shop details did not load">
+            Call the shop for hours and directions.
+          </ErrorState>
         ) : (
           <div className="exq-visit__grid exq-visit__grid--loading" aria-hidden="true" />
         )}

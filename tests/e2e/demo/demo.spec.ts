@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { staffIds, uploadSamplePhoto } from '../photos';
 
@@ -8,6 +9,15 @@ import { staffIds, uploadSamplePhoto } from '../photos';
  * first visit to Home sets the shop up.
  */
 test.describe.configure({ mode: 'serial' });
+
+const NOTICE_FLAG = 'exq-demo-notice-seen';
+// The notice blocks the page on a first visit; every test but the notice's own has already seen it.
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.titlePath.includes('the demo notice')) return;
+  await page.addInitScript((flag) => {
+    sessionStorage.setItem(flag, '1');
+  }, NOTICE_FLAG);
+});
 
 const REFERENCE = /[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{4}/;
 const BANNER = 'Demo mode. Sample data, resets anytime.';
@@ -274,6 +284,131 @@ test('the barber portal shows the demo PIN, and it opens the portal', async ({ p
   await expect(page.locator('.exq-team-day')).toHaveCount(7);
   // The one wrong PIN is a 401 the browser logs; nothing else may be.
   expect(errors.filter((e) => !e.includes('401'))).toEqual([]);
+});
+
+test.describe('the demo notice', () => {
+  const BODY =
+    'This site is a demo built by Visualize Studio for Exquisite Barber & Beauty Lounge. Bookings made here are not real and nothing is sent to the shop. It is a preview for Visualize clients.';
+  test('blocks the first visit with the words, a link, and the page behind unreachable', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const dialog = page.getByRole('dialog', { name: 'This is a demo' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(BODY);
+    const about = dialog.getByRole('link', { name: 'visualizestudio.org' });
+    await expect(about).toHaveAttribute('href', 'https://visualizestudio.org');
+    await expect(about).toHaveAttribute('target', '_blank');
+    await expect(about).toHaveAttribute('rel', /noopener/);
+    await expect(dialog.getByRole('button', { name: 'Enter the demo' })).toBeVisible();
+    // Tab cycles inside the dialog (or out to the browser itself) and never reaches the page.
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press('Tab');
+      expect(
+        await page.evaluate(
+          () => document.activeElement?.closest('header, main, footer, nav, .exq-bar') ?? null,
+        ),
+      ).toBeNull();
+    }
+    const blocked = await page.evaluate(() =>
+      document
+        .elementsFromPoint(window.innerWidth / 2, 10)
+        .some((el) => el.tagName === 'DIALOG' || el.closest('dialog') !== null),
+    );
+    expect(blocked).toBe(true);
+  });
+
+  test('Escape closes it, and it stays away for the rest of the session on every area', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page.getByRole('dialog', { name: 'This is a demo' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'This is a demo' })).toBeHidden();
+    // The footer keeps a small line afterwards.
+    await expect(page.getByRole('link', { name: 'Demo by Visualize Studio' })).toHaveAttribute(
+      'href',
+      'https://visualizestudio.org',
+    );
+    for (const path of ['/', '/services', '/admin/login', '/team']) {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('dialog[open]'), path).toHaveCount(0);
+    }
+  });
+
+  test('Enter the demo closes it too, and the admin and the barber portal show it first thing', async ({
+    browser,
+    baseURL,
+  }) => {
+    for (const path of ['/admin/login', '/team']) {
+      const fresh = await (
+        await browser.newContext({ ignoreHTTPSErrors: true, ...(baseURL ? { baseURL } : {}) })
+      ).newPage();
+      await fresh.goto(path);
+      const dialog = fresh.getByRole('dialog', { name: 'This is a demo' });
+      await expect(dialog, path).toBeVisible();
+      await dialog.getByRole('button', { name: 'Enter the demo' }).click();
+      await expect(dialog, path).toBeHidden();
+      await fresh.context().close();
+    }
+  });
+
+  test('with storage blocked it shows on every page load', async ({ page }) => {
+    await page.addInitScript(() => {
+      const blocked = () => {
+        throw new DOMException('blocked', 'SecurityError');
+      };
+      Object.defineProperty(window, 'sessionStorage', {
+        get: blocked,
+        configurable: true,
+      });
+    });
+    await page.goto('/');
+    const dialog = page.getByRole('dialog', { name: 'This is a demo' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Enter the demo' }).click();
+    await expect(dialog).toBeHidden();
+    await page.reload();
+    await expect(page.getByRole('dialog', { name: 'This is a demo' })).toBeVisible();
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`passes axe with no layout shift, ${theme}`, async ({ page }) => {
+      await page.addInitScript((t) => {
+        localStorage.setItem('exq-theme', t);
+      }, theme);
+      await page.goto('/');
+      const dialog = page.getByRole('dialog', { name: 'This is a demo' });
+      await expect(dialog).toBeVisible();
+      await page.waitForFunction(() =>
+        document.getAnimations().every((a) => a.playState !== 'running'),
+      );
+      const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+      expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.html ?? ''}`)).toEqual([]);
+      // An overlay: it moves nothing on the page behind it.
+      const shift = await page.evaluate(
+        () =>
+          new Promise<number>((resolve) => {
+            let total = 0;
+            const observer = new PerformanceObserver((list) => {
+              for (const entry of list.getEntries()) {
+                const shiftEntry = entry as PerformanceEntry & {
+                  value: number;
+                  hadRecentInput: boolean;
+                };
+                if (!shiftEntry.hadRecentInput) total += shiftEntry.value;
+              }
+            });
+            observer.observe({ type: 'layout-shift', buffered: true });
+            setTimeout(() => {
+              resolve(total);
+            }, 300);
+          }),
+      );
+      expect(shift).toBeLessThan(0.1);
+    });
+  }
 });
 
 test('Reset demo data wipes the changes and loads the sample shop again', async ({ page }) => {

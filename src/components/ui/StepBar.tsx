@@ -1,3 +1,5 @@
+import Check from '@untitled-ui/icons-react/build/esm/Check';
+
 export interface Step<K extends string> {
   key: K;
   label: string;
@@ -33,9 +35,12 @@ export function StepBar<K extends string>({
               <span className="exq-stepbar__bar" aria-hidden="true" />
               <span className="exq-stepbar__label">
                 <span className="exq-stepbar__n" aria-hidden="true">
-                  {i + 1}
+                  {state === 'done' ? <Check /> : i + 1}
                 </span>
-                <span className="exq-visually-hidden">Step {i + 1}: </span>
+                <span className="exq-visually-hidden">
+                  Step {i + 1}
+                  {state === 'done' ? ' (done)' : ''}:{' '}
+                </span>
                 {step.label}
               </span>
             </button>

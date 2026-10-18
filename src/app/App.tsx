@@ -12,6 +12,7 @@ import { ServicesPage } from '@/pages/ServicesPage';
 import { SetupPage } from '@/pages/SetupPage';
 import { VisitPage } from '@/pages/VisitPage';
 import { Status } from '@/components/Status';
+import { DemoNotice } from '@/components/site/DemoNotice';
 
 // The staff area is its own chunk: public visitors never download it.
 const AdminApp = lazy(() => import('@/admin/AdminApp'));
@@ -23,6 +24,7 @@ const KitPage = import.meta.env.DEV ? lazy(() => import('@/pages/KitPage')) : nu
 export function App() {
   return (
     <BrowserRouter>
+      <DemoNotice />
       <Routes>
         <Route element={<PublicLayout />}>
           <Route index element={<HomePage />} />

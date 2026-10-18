@@ -66,7 +66,7 @@ async function audit(
 /** A barber who can sign in: on the team page and not removed. */
 async function usableStaff(staffId: string) {
   const staff = await staffRepo.findStaffById(staffId);
-  return staff && staff.deletedAt === null && staff.showOnWebsite ? staff : null;
+  return staff?.deletedAt === null && staff.showOnWebsite ? staff : null;
 }
 
 function principalFor(staff: { _id: string }, sessionId: string): Principal {
