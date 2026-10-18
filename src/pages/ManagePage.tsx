@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import type { AvailabilitySlot } from '@shared/api/availability';
 import {
   manageBookingResponseSchema,
@@ -14,7 +14,7 @@ import { DayPicker } from '@/components/booking/DayPicker';
 import { IcsDownload } from '@/components/booking/IcsDownload';
 import { StepHeading } from '@/components/booking/StepHeading';
 import { TimePicker } from '@/components/booking/TimePicker';
-import { Button, ButtonLink, Sheet, Ticket, TimeChip, useToast } from '@/components/ui';
+import { Button, ButtonLink, Link, Sheet, Ticket, TimeChip, useToast } from '@/components/ui';
 import { ApiRequestError, apiRequest } from '@/lib/api';
 import { slotLabel } from '@/lib/booking/state';
 import { useApi } from '@/lib/useApi';
@@ -191,6 +191,7 @@ export function ManagePage() {
 
   return (
     <article className="exq-manage exq-wrap exq-section" data-state={mode}>
+      <p className="exq-label">Your booking</p>
       <h1 className="exq-manage__title">Manage your booking</h1>
       <p className="exq-manage__reference">
         Reference code <strong className="exq-num">{booking.referenceCode}</strong>

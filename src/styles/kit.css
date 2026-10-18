@@ -352,11 +352,18 @@ textarea.exq-field__control {
   cursor: pointer;
 }
 .exq-option__input {
+  /* Covers the whole card: the card is the control, the check and the colors only show its state. */
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   opacity: 0;
-  pointer-events: none;
+  cursor: pointer;
+}
+.exq-option__input:disabled {
+  cursor: not-allowed;
 }
 .exq-option__body {
   display: flex;

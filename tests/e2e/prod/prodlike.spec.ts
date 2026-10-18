@@ -255,3 +255,11 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('the kit page is not in the production build', async ({ page }) => {
+  await page.goto('/kit');
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+  const index = await (await page.request.get('/')).text();
+  const assets = [...index.matchAll(/\/assets\/[\w.-]+\.js/g)].map((m) => m[0]);
+  for (const asset of assets) expect(asset).not.toMatch(/Kit/i);
+});

@@ -349,10 +349,18 @@
   }
 
   /* Admin is calmer: rows change color, new rows slide in, undo slides up with the toast. */
-  .exq-adm-row-motion {
-    transition: background-color var(--d-base) var(--ease-out);
+  .exq-adm-chair__slot,
+  .exq-adm-bookings__item,
+  .exq-adm-booking,
+  .exq-adm-block,
+  .exq-seg__btn {
+    transition:
+      background-color var(--d-base) var(--ease-out),
+      color var(--d-base) var(--ease-out),
+      border-color var(--d-base) var(--ease-out);
   }
-  .exq-adm-enter {
+  .exq-adm-bookings__item[data-new='true'],
+  .exq-adm-block {
     animation: exq-adm-enter var(--d-base) var(--ease-out) both;
   }
   @keyframes exq-adm-enter {

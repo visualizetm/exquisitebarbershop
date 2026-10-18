@@ -318,3 +318,16 @@ commit, and what is still open.
 - Tests: `tests/e2e/motion.spec.ts` (hero timing and full opacity, hidden below the fold and revealed
   once, nothing hidden or transformed under reduced motion, nothing hidden without
   IntersectionObserver, a no-JavaScript page, CLS under 0.1, a view transition on navigation).
+
+### M4: Book, Manage, overlays and the admin restyle
+
+- Shipped: Book with the four part StepBar (1 SERVICE, 2 BARBER, 3 TIME, 4 DETAILS; day and time share a
+  part, details and confirm share a part), numbered ink circles on every step heading, OptionCards for
+  services, barbers and "Anyone available", the day strip with open counts, times grouped into morning,
+  afternoon and evening, the details form built from the kit's Input and Textarea, the confirmation and
+  Manage as a Ticket (it rises and its check draws itself), the cancel confirmation in a Sheet, step
+  content that slides the way you are travelling; the admin screens on the new tokens with the 13 to
+  22px scale, color fades on status changes, new items sliding in and still skeleton blocks while
+  loading; the temporary `legacy.css` is gone.
+- Tests: `tests/e2e/kit.spec.ts` (every kit section in both themes, a sheet opens in 250ms and closes in
+  150ms, the modal and the swipeable lightbox), `/kit` is absent from the production build.

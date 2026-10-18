@@ -4,7 +4,6 @@ import { App } from './app/App';
 import '@fontsource-variable/jost/wght.css';
 import './styles/reset.css';
 import './styles/tokens.css';
-import './styles/legacy.css';
 import './styles/base.css';
 import './styles/kit.css';
 import './styles/frame.css';

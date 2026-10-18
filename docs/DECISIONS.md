@@ -570,3 +570,12 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   same width either way, so a photo arriving after the shop data does not move the text (CLS).
 - D10-20 The Menu on Home shows each service's description and duration (the mockup shows one line);
   on Services the group name sits over a 2px rule, as in the mockup.
+- D10-21 The booking flow keeps its six URL steps (services, barber, day, time, details, confirm); the
+  progress bar shows four parts and the bar's "time" part opens the times directly when a day is
+  already chosen. Auto advance after picking a day or a time is unchanged, so CONTINUE is disabled on
+  those steps until something is chosen.
+- D10-22 The step slide is derived while rendering (travel direction from the previous step index) and
+  the step is remounted by key, so the heading takes focus on every step as before.
+- D10-23 Admin headings below the page title are sentence case, not caps, and the admin scale is 13, 15,
+  18 and 22px: a dense working screen reads better that way. Everything else (tokens, the kit, the
+  states) is shared with the public site.
