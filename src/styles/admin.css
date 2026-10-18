@@ -1,7 +1,23 @@
-/* The staff dashboard. Loaded with the admin chunk. 14 to 24px type only. */
+/* The staff dashboard. Loaded with the admin chunk. 13 to 22px type only. */
+
+/* The admin type scale: tighter than the public one, nothing above 22px. */
+.exq-app[data-state='admin'] {
+  --t-label: 13px;
+  --t-body: 15px;
+  --t-h3: 18px;
+  --t-h2: 22px;
+  --t-display: 22px;
+  --t-price: 18px;
+}
+.exq-adm h2,
+.exq-adm h3,
+.exq-adm h4 {
+  text-transform: none;
+  letter-spacing: 0;
+}
 
 .exq-app[data-state='admin'] {
-  font-size: var(--fs-2);
+  font-size: var(--t-body);
 }
 .exq-main--admin {
   display: block;
@@ -18,15 +34,15 @@
   width: 100%;
 }
 .exq-adm h1 {
-  font-size: var(--fs-4);
+  font-size: var(--t-h2);
   margin-bottom: var(--s4);
 }
 .exq-adm h2 {
-  font-size: var(--fs-3);
+  font-size: var(--t-h3);
   margin-bottom: var(--s3);
 }
 .exq-adm h3 {
-  font-size: var(--fs-2);
+  font-size: var(--t-body);
   margin-bottom: var(--s2);
 }
 .exq-adm section {
@@ -64,7 +80,7 @@
   background: transparent;
   color: var(--fg-2);
   font: inherit;
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
@@ -86,7 +102,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   color: var(--fg-2);
   margin-bottom: var(--s4);
 }
@@ -110,7 +126,7 @@
   align-items: center;
   min-height: 44px;
   padding: 0 var(--s3);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-card);
   font-weight: 500;
 }
 .exq-adm-nav__link > span[data-state='active'] {
@@ -153,8 +169,8 @@
 /* Generic admin surfaces -------------------------------------------------- */
 .exq-adm-error {
   padding: var(--s3) var(--s4);
-  border: 1px solid var(--red-200);
-  border-radius: var(--r-md);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-card);
   background: var(--accent-soft);
   margin-bottom: var(--s4);
 }
@@ -162,7 +178,7 @@
   margin-top: var(--s2);
   padding-left: var(--s4);
   list-style: disc;
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
 }
 .exq-adm form {
   display: flex;
@@ -179,7 +195,7 @@
 }
 .exq-adm form fieldset {
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   padding: var(--s3) var(--s4);
   display: flex;
   flex-wrap: wrap;
@@ -198,7 +214,7 @@
   min-height: 44px;
   padding: var(--s2) var(--s3);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   background: var(--card);
   color: var(--fg);
   font: inherit;
@@ -211,7 +227,7 @@
   accent-color: var(--accent);
 }
 .exq-adm
-  button:not(.exq-btn):not(.exq-chip):not(.exq-seg__btn):not(.exq-sheet__close):not(
+  button:not(.exq-btn):not(.exq-chip):not(.exq-seg__btn):not(.exq-dialog__close):not(
     .exq-toast__action
   ):not(.exq-adm-tabs__tab):not(.exq-stepbar__button) {
   display: inline-flex;
@@ -224,7 +240,7 @@
   background: transparent;
   color: var(--fg);
   font: inherit;
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   font-weight: 500;
   cursor: pointer;
 }
@@ -243,7 +259,7 @@
 }
 .exq-adm details {
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   padding: var(--s3) var(--s4);
   margin-bottom: var(--s2);
 }
@@ -279,7 +295,7 @@
 .exq-adm-blocktime__entry {
   padding: var(--s3) var(--s4);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   background: var(--card);
 }
 .exq-adm-bookings__link {
@@ -299,7 +315,7 @@
 .exq-adm-bookings__services,
 .exq-adm-bookings__chair {
   color: var(--fg-2);
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
 }
 .exq-adm-bookings__status,
 .exq-adm-bookings__source,
@@ -309,7 +325,7 @@
   padding: 0 var(--s2);
   border-radius: var(--r-pill);
   background: var(--card-2);
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   font-weight: 500;
 }
 .exq-adm-bookings__status[data-state='completed'],
@@ -342,15 +358,15 @@
 .exq-adm-today__stats > div {
   padding: var(--s3) var(--s4);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   background: var(--card);
 }
 .exq-adm-today__stats dt {
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   color: var(--fg-3);
 }
 .exq-adm-today__stats dd {
-  font-size: var(--fs-4);
+  font-size: var(--t-h2);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -374,11 +390,11 @@
   gap: var(--s3);
 }
 .exq-adm-chair__name {
-  font-size: var(--fs-3);
+  font-size: var(--t-h3);
   margin: 0;
 }
 .exq-adm-chair__hours {
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   color: var(--fg-3);
 }
 .exq-adm-chair__slot {
@@ -386,14 +402,14 @@
   flex-direction: column;
   gap: var(--s1);
   padding: var(--s3);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-card);
   background: var(--card-2);
 }
 .exq-adm-chair__slot[data-state='now'] {
   border-left: 4px solid var(--accent);
 }
 .exq-adm-chair__label {
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -407,7 +423,7 @@
   text-decoration: none;
 }
 .exq-adm-chair__services {
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   color: var(--fg-2);
 }
 .exq-adm-chair__empty {
@@ -431,12 +447,12 @@
 .exq-adm-conflict {
   margin-top: var(--s4);
   padding: var(--s4);
-  border: 1px solid var(--red-200);
-  border-radius: var(--r-md);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-card);
   background: var(--accent-soft);
 }
 .exq-adm-conflict__title {
-  font-size: var(--fs-3);
+  font-size: var(--t-h3);
 }
 .exq-adm-conflict__list {
   gap: var(--s3);
@@ -445,7 +461,7 @@
 .exq-adm-conflict__item {
   padding: var(--s3) var(--s4);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   background: var(--card);
 }
 .exq-adm-conflict__fieldset {
@@ -470,12 +486,12 @@
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
   cursor: pointer;
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
 }
 .exq-adm-conflict__option:has(input:checked) {
-  background: var(--selected-bg);
-  border-color: var(--selected-bg);
-  color: var(--selected-fg);
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
 }
 .exq-adm-conflict__option[data-state='disabled'] {
   opacity: 0.45;
@@ -496,14 +512,14 @@
   gap: var(--s3);
   padding: var(--s3);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   background: var(--card);
 }
 .exq-adm-photos__thumb {
   width: 96px;
   height: 120px;
   object-fit: cover;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-card);
   background: var(--card-2);
 }
 .exq-adm-photos__body {
@@ -535,7 +551,7 @@
   margin: var(--s8) auto;
   padding: var(--s5);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   background: var(--card);
 }
 .exq-adm-login__field {
@@ -544,7 +560,7 @@
   gap: var(--s1);
 }
 .exq-adm-login__error {
-  color: var(--danger);
+  color: var(--accent-text);
 }
 .exq-adm-login__submit {
   width: 100%;
@@ -571,7 +587,7 @@
 .exq-adm-login__demo-button {
   background: transparent;
   color: var(--fg);
-  border: 1px solid var(--border-strong, var(--fg));
+  border: 1px solid var(--fg-3);
 }
 .exq-adm-settings__demo {
   display: flex;
@@ -586,4 +602,20 @@
   .exq-app[data-state='admin'] .exq-toasts {
     bottom: calc(76px + env(safe-area-inset-bottom));
   }
+}
+
+/* Loading: still skeleton blocks under the word, nothing loops. */
+.exq-app[data-state='admin'] .exq-status[data-state='loading'] {
+  padding-bottom: 188px;
+}
+.exq-app[data-state='admin'] .exq-status[data-state='loading']::after {
+  content: '';
+  display: block;
+  height: 56px;
+  margin-top: var(--s3);
+  border-radius: var(--r-card);
+  background: var(--card-2);
+  box-shadow:
+    0 68px 0 var(--card-2),
+    0 136px 0 var(--card-2);
 }

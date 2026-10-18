@@ -12,7 +12,7 @@ export function EmptyState({
 }) {
   return (
     <div className="exq-state" data-tone="empty" data-state="empty">
-      <p className="exq-state__title exq-h">{title}</p>
+      <p className="exq-state__title exq-h3">{title}</p>
       {children ? <p>{children}</p> : null}
       {action}
     </div>
@@ -31,7 +31,7 @@ export function ErrorState({
 }) {
   return (
     <div className="exq-state" data-tone="error" data-state="error" role="alert">
-      <p className="exq-state__title exq-h">{title}</p>
+      <p className="exq-state__title exq-h3">{title}</p>
       {children ? <p>{children}</p> : null}
       {action}
     </div>

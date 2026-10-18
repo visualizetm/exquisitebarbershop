@@ -51,6 +51,13 @@ export const shopSettingsSeed: ShopSettingsInput = {
     rewards: false,
     smsReminders: false,
   },
+  // PLACEHOLDER the owner edits this in prompt 11; until then the strip says this
+  announcement: {
+    enabled: true,
+    text: 'Walk ins welcome',
+    linkLabel: 'Book online',
+    linkUrl: '/book',
+  },
 };
 
 /**

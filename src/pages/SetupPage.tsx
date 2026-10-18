@@ -126,7 +126,7 @@ export function SetupPage() {
           required
         />
         <p className="exq-setup__actions">
-          <Button type="submit" variant="secondary" loading={working === 'doctor'}>
+          <Button type="submit" variant="outline" loading={working === 'doctor'}>
             Run doctor
           </Button>
           <Button
@@ -167,7 +167,7 @@ export function SetupPage() {
         </label>
         <p className="exq-setup__actions">
           <Button
-            variant="secondary"
+            variant="outline"
             loading={working === 'clear'}
             disabled={secret.length === 0 || !confirmClear || working !== null}
             onClick={() => void run('clear')}

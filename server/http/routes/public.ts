@@ -90,6 +90,7 @@ export const publicRoutes: RouteDefinition[] = [
           requireEmail: settings.booking.requireEmail,
           cancelCutoffMinutes: settings.booking.cancelCutoffMinutes,
         },
+        announcement: settings.announcement,
         heroPhoto: hero,
         maintenance: getEnv().MAINTENANCE_MODE === 'true',
         demo: demoEnabled(),

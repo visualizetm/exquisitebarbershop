@@ -9,6 +9,8 @@ export const photoViewSchema = z.object({
   width: z.int(),
   height: z.int(),
   alt: z.string(),
+  /** Set for Cloudinary photos: the browser asks for exact sizes (four widths, cropped to the frame). */
+  delivery: z.object({ cloud: z.string(), publicId: z.string() }).nullable().optional(),
 });
 export type PhotoView = z.infer<typeof photoViewSchema>;
 
@@ -55,10 +57,13 @@ export const uploadUrlRequestSchema = z.object({
 export type UploadUrlRequest = z.input<typeof uploadUrlRequestSchema>;
 
 export const uploadUrlResponseSchema = z.object({
-  /** PUT the bytes here, with the same Content-Type, within five minutes. */
+  /** PUT the bytes here (or POST the form, for Cloudinary) within five minutes. */
   uploadUrl: z.url(),
-  method: z.literal('PUT'),
+  method: z.enum(['PUT', 'POST']),
+  /** For a PUT: the headers to send, including the Content-Type. */
   headers: z.record(z.string(), z.string()),
+  /** For a POST: the signed form fields to send before the file. Cloudinary only. */
+  fields: z.record(z.string(), z.string()).optional(),
   key: z.string(),
   /** Hand it back to confirm. It binds the key to the kind, chair, type and size. */
   ticket: z.string(),
@@ -66,8 +71,17 @@ export const uploadUrlResponseSchema = z.object({
 });
 export type UploadUrlResponse = z.infer<typeof uploadUrlResponseSchema>;
 
+/** What Cloudinary answered after the browser upload; the server checks it against the asset itself. */
+export const cloudinaryResultSchema = z.object({
+  publicId: z.string().min(1).max(300),
+  version: z.int().min(0),
+  bytes: z.int().min(1),
+});
+
 export const confirmUploadRequestSchema = z.object({
   ticket: z.string().min(20).max(2000),
+  /** Required when the photo went to Cloudinary. */
+  cloudinary: cloudinaryResultSchema.optional(),
   width: z.int().min(1).max(10_000),
   height: z.int().min(1).max(10_000),
   alt: z.string().trim().min(1).max(200),

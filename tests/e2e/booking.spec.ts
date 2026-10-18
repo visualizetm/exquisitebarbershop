@@ -19,7 +19,15 @@ async function fillDetails(page: Page, email: string) {
     .getByLabel('Mobile phone')
     .fill(`215555${String(Math.floor(Math.random() * 9000) + 1000)}`);
   await page.getByLabel(/^Email/).fill(email);
-  await page.getByRole('button', { name: 'Review booking' }).click();
+  // On a phone the bottom bar carries Continue; on desktop the form has its own button.
+  const phone = (page.viewportSize()?.width ?? 1280) < 1024;
+  // The bar steps aside while a field has focus; closing the keyboard brings it back.
+  if (phone) await page.getByLabel(/^Email/).blur();
+  await (
+    phone
+      ? page.locator('.exq-bar').getByRole('button', { name: 'Continue' })
+      : page.getByRole('button', { name: 'Review booking' })
+  ).click();
   await expect(page.getByRole('heading', { name: 'Review and confirm' })).toBeFocused();
 }
 
@@ -101,7 +109,12 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
       ],
       staff: 'dee',
       startAt,
-      customer: { name: 'Faster Customer', phone: '2155550199', email: null },
+      customer: {
+        name: 'Faster Customer',
+        // A fresh number each run: one phone may hold only a few open bookings.
+        phone: `215555${String(Math.floor(Math.random() * 9000) + 1000)}`,
+        email: null,
+      },
     },
   });
   expect(taken.status(), await taken.text()).toBe(201);
@@ -142,7 +155,7 @@ test('the summary card is disabled until the details step and hidden on a phone'
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(card).toBeHidden();
-  await expect(page.locator('.exq-sticky')).toContainText('$30');
+  await expect(page.locator('.exq-bar__summary')).toContainText('$30');
 });
 
 test('on a phone the Continue bar stays after tapping a service and Confirm appears once', async ({
@@ -152,7 +165,7 @@ test('on a phone the Continue bar stays after tapping a service and Confirm appe
   await page.goto('/book?barber=marcus');
   await page.getByLabel(/Classic Cut/).click();
   // The checkbox keeps focus; the bar must not treat it as typing.
-  await expect(page.locator('.exq-sticky')).toHaveAttribute('data-state', 'shown');
+  await expect(page.locator('.exq-bar')).toHaveAttribute('data-state', 'shown');
   await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue' }).click();
   await pickFirstDayAndTime(page, 1);

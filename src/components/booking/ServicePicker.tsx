@@ -1,6 +1,6 @@
 import type { PublicService } from '@shared/api/public';
 import { formatCents, priceLabel } from '@shared/lib/money';
-import { Button, StickyCTA } from '@/components/ui';
+import { Button, OptionCard } from '@/components/ui';
 
 export interface ServicePickerProps {
   services: PublicService[];
@@ -10,7 +10,7 @@ export interface ServicePickerProps {
   onContinue: () => void;
 }
 
-/** Services as selectable rows with price and duration. The total rides in a sticky bar on phones. */
+/** Services as option cards with price and duration. On phones the bottom bar carries the total and Continue. */
 export function ServicePicker({
   services,
   selected,
@@ -41,7 +41,7 @@ export function ServicePicker({
         return (
           <fieldset key={group} className="exq-service-picker__group">
             <legend className="exq-service-picker__legend exq-label">{group}</legend>
-            <ul className="exq-service-picker__list">
+            <ul className="exq-service-picker__list exq-bare">
               {items.map((service) => {
                 const checked = selected.includes(service.id);
                 const disabled = !checked && full;
@@ -51,34 +51,26 @@ export function ServicePicker({
                     className="exq-service-option"
                     data-state={checked ? 'selected' : disabled ? 'disabled' : 'idle'}
                   >
-                    <label className="exq-service-option__label">
-                      <input
-                        type="checkbox"
-                        className="exq-service-option__input"
-                        checked={checked}
-                        disabled={disabled}
-                        onChange={() => {
-                          toggle(service.id);
-                        }}
-                      />
-                      <span className="exq-service-option__check" aria-hidden="true" />
-                      <span className="exq-service-option__text">
-                        <span className="exq-service-option__name">{service.name}</span>
-                        {service.description ? (
-                          <span className="exq-service-option__description">
-                            {service.description}
+                    <OptionCard
+                      kind="checkbox"
+                      selected={checked}
+                      disabled={disabled}
+                      title={service.name}
+                      description={service.description || undefined}
+                      meta={
+                        <>
+                          <span className="exq-service-option__price exq-price">
+                            {priceLabel(service)}
                           </span>
-                        ) : null}
-                      </span>
-                      <span className="exq-service-option__meta">
-                        <span className="exq-service-option__duration">
-                          {service.durationMinutes} min
-                        </span>
-                        <span className="exq-service-option__price exq-price">
-                          {priceLabel(service)}
-                        </span>
-                      </span>
-                    </label>
+                          <span className="exq-service-option__duration">
+                            {service.durationMinutes} min
+                          </span>
+                        </>
+                      }
+                      onChange={() => {
+                        toggle(service.id);
+                      }}
+                    />
                   </li>
                 );
               })}
@@ -97,16 +89,6 @@ export function ServicePicker({
           Continue
         </Button>
       </p>
-      <StickyCTA
-        primary={chosen.length === 0 ? 'Pick a service' : totalLabel}
-        secondary={
-          chosen.length === 0 ? undefined : `${totalMinutes} min, ${chosen.length} selected`
-        }
-      >
-        <Button disabled={chosen.length === 0} onClick={onContinue}>
-          Continue
-        </Button>
-      </StickyCTA>
     </div>
   );
 }

@@ -26,6 +26,10 @@ async function signInAsOwner(page: Page) {
 }
 
 async function expectNoAxeViolations(page: Page, label: string) {
+  // The home hero settles within 700ms; axe must read the colors it ends on, not a half faded frame.
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== 'running'),
+  );
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   const summary = results.violations.map(
     (v) => `${v.id}: ${v.help} (${v.nodes.map((n) => n.target.join(' ')).join('; ')})`,

@@ -118,7 +118,7 @@ export function ServicesSettings() {
               </span>
               {s.deletedAt ? null : (
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   onClick={() => {
                     setEditing(s);
@@ -207,7 +207,7 @@ function RemoveService({
         Removed services stay on past bookings. Future bookings that include it are listed first.
       </p>
       <Button
-        variant="secondary"
+        variant="outline"
         size="sm"
         disabled={removal.state.status === 'working'}
         onClick={() => {

@@ -1,150 +1,131 @@
 # Design system
 
-The source of truth for how the site and the dashboard look. Tokens live in
-`src/styles/tokens.css`; semantic surfaces and global type in `src/styles/base.css`;
-the kit in `src/styles/kit.css` and `src/components/ui/`. Every component is seen
-in every state on `/kit` (development builds only).
+The source of truth for how the site and the dashboard look: direction "Shop Sign" (bold,
+editorial, black and white with red as the accent). The brief and page plan are in
+`docs/brand/DESIGN-DIRECTION-V2.md`. Tokens live in `src/styles/tokens.css` (the one CSS
+variables file); global type and layout in `base.css`; components in `kit.css`; the page frame in
+`frame.css`; everything that moves in `motion.css`. Every component is seen in every state, in both
+themes, on `/kit` (development builds only; the production build contains no kit chunk).
 
 ## Tokens
 
-| Group   | Tokens                                                                                                                                                              |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ink     | `--ink` #111111, `--ink-2` #1F1F1F, `--ink-3` #333333, `--text-2` #4A4A4A, `--text-3` #6B6B6B, `--line` #D9D9D9, `--surface-2` #F4F4F4, `--paper` #FFFFFF           |
-| Red     | `--red-50` to `--red-900` (#FDF2F4, #FBE0E5, #F5B8C3, #EC8698, #E04C66, #C8102E, #A80D27, #870A1F, #650818, #440510), `--red-on-dark` #FF5470                       |
-| Meaning | `--ok` #1E7A46, `--warn` #9A6700, `--info` #1F5FAD, `--danger` = `--red-600`                                                                                        |
-| Type    | `--font` Jost, `--fs-1` 14, `--fs-2` 16, `--fs-3` 18 (20), `--fs-4` 24 (28), `--fs-5` 34 (44), `--fs-6` 48 (72) at 1024px and up; `--lh-tight` 1.1, `--lh-body` 1.5 |
-| Space   | `--s1` 4, `--s2` 8, `--s3` 12, `--s4` 16, `--s5` 24, `--s6` 32, `--s7` 48, `--s8` 64, `--s9` 96                                                                     |
-| Shape   | `--r-sm` 8, `--r-md` 16, `--r-pill` 999; the arch frame is `999px 999px 16px 16px`                                                                                  |
-| Shadow  | `--shadow-1` soft card, `--shadow-2` sheets and toasts                                                                                                              |
+| Group   | Tokens                                                                                                                                                                              |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ink     | `--ink` #111111, `--ink-2` #1F1F1F, `--ink-3` #333333, `--text-2` #4A4A4A, `--text-3` #6B6B6B, `--line` #D9D9D9, `--surface-2` #F4F4F4, `--paper` #FFFFFF, `--mute-on-dark` #A8A8A8 |
+| Red     | `--red` #C8102E, `--red-600` #A80D27, `--red-on-dark` #FF5470, `--red-50` #FDF2F4                                                                                                   |
+| Meaning | `--ok` #1E7A46, `--warn` #9A6700, `--info` #1F5FAD (lighter in dark)                                                                                                                |
+| Type    | `--font` Jost Variable; `--t-label` 13, `--t-body` 17 (18), `--t-h3` 22 (26), `--t-h2` 36 (56), `--t-display` 52 (96), `--t-price` 22; the value in brackets applies from 1024px    |
+| Space   | `--s1` 4, `--s2` 8, `--s3` 12, `--s4` 16, `--s5` 24, `--s6` 32, `--s7` 48, `--s8` 64, `--s9` 96; `--hit` 44; `--rule` 2; `--wrap` 1200                                              |
+| Shape   | `--r-card` 4 (cards, inputs, photos), `--r-pill` (buttons, chips); the phone bottom bar is square                                                                                   |
+| Motion  | `--ease-out`, `--ease-in`, `--d-fast` 150ms, `--d-base` 250ms, `--d-slow` 400ms, `--stagger` 60ms                                                                                   |
+| Shadow  | `--shadow-pop` (hover lift, toasts, popovers)                                                                                                                                       |
 
-Semantic surfaces (tokens.css) derive from the tokens: `--bg`, `--card`,
-`--card-2`, `--border`, `--fg`, `--fg-2`, `--fg-3`, `--accent`,
-`--accent-strong`, `--accent-text`, `--accent-soft`, `--selected-bg`,
-`--selected-fg`, `--band-border`, `--card-shadow`. Light by default. `.exq-dark`
-switches a block to ink inside a light page (bg #111, cards #1F1F1F with no
-shadow, borders #333, red text #FF5470).
+`--t-display` is `clamp(40px, 13.4vw, 52px)` on phones: exactly 52px from 385px wide, a little
+smaller below so EXQUISITE never clips on a 360px screen.
+
+Semantic surfaces (also in tokens.css) derive from the palette: `--bg`, `--card`, `--card-2`,
+`--border`, `--fg`, `--fg-2`, `--fg-3`, `--accent` (red fills), `--accent-hover`, `--accent-text`
+(red text: #C8102E on paper, #FF5470 on ink), `--accent-soft`, `--on-accent`, `--solid-bg` and
+`--solid-fg` (the "ink" button and the selected card: ink in light, paper in dark), `--solid-fg-2`,
+`--band-line`, `--scrim`. `.exq-dark` scopes an ink band inside any page; it stays ink in both
+themes.
 
 ## Themes
 
-Three modes everywhere, public site and admin: System (default, follows
-`prefers-color-scheme`), Light and Dark. The choice is stored in localStorage
-under `exq-theme` and applied as `data-theme="light|dark"` on `<html>`; with no
-attribute, System applies. An inline script in `index.html` sets the attribute
-and the `theme-color` meta before the first paint; its sha256 is listed in the
-CSP (`vercel.json`), checked by `tests/unit/csp.test.ts`. `theme-color` is
-#FFFFFF in light and #111111 in dark, kept live by `src/lib/theme.ts`.
+System (default), Light and Dark everywhere. The choice is stored under `exq-theme` and applied as
+`data-theme="light|dark"` on `<html>`; with none, `prefers-color-scheme` decides. An inline script in
+`index.html` applies it before first paint (its sha256 is in the CSP, checked by
+`tests/unit/csp.test.ts`). The dark rules are scoped to `[data-theme='dark']` and to the media query,
+so any element can carry `data-theme` (the kit page shows both side by side).
 
-Dark values (same list under `[data-theme="dark"]` and under
-`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`;
-values change, names never):
-
-| Token                  | Dark             | Notes                                                |
-| ---------------------- | ---------------- | ---------------------------------------------------- |
-| `--bg`                 | #111111          | page                                                 |
-| `--card`               | #1A1A1A          | cards, sheets, the nav                               |
-| `--card-2`             | #222222          | nested surfaces, hover                               |
-| `--border`             | #2E2E2E          | lines, 3:1 against the page                          |
-| `--fg`                 | #F4F4F4          | text                                                 |
-| `--fg-2`               | #B8B8B8          | secondary text                                       |
-| `--fg-3`               | #8C8C8C          | tertiary text, 5.6:1 on #111                         |
-| `--accent`             | #C8102E          | red buttons keep white text                          |
-| `--accent-text`        | #FF5470          | red text and live dots                               |
-| `--selected-bg`        | #FFFFFF          | selected chips, days, segments invert to paper       |
-| `--selected-fg`        | #111111          |                                                      |
-| `--cta-bg`, `--cta-fg` | #C8102E, #FFFFFF | the emphasis button; paper on ink inside light bands |
-| `--band-border`        | #2E2E2E          | top border of ink bands (the CTA band, the footer)   |
-| `--ok` etc             | lighter          | #5CC98A, #E3B341, #7FB2FF, danger #FF5470            |
-| `--card-shadow`        | none             | cards are lighter than the page instead              |
-
-Inside `.exq-dark` bands the dark theme uses bg #1A1A1A and border #2E2E2E so
-they still read as bands. Photos and scrims never change. Brand marks swap with
-CSS: the `Mark` component renders the black and white files and
-`.exq-mark--light` or `.exq-mark--dark` hides the other one. Switching is
-instant; `html[data-theme-switching]` fades background, color and border for
-150ms and not at all under reduced motion. Nothing moves on a switch.
-
-Toggle: `ThemeMenu` (icon button with sun, moon and monitor; `aria-label`
-"Theme: System"; a menu of `menuitemradio` items with arrow keys, Enter, Space
-and Escape) in the public Nav, and `ThemeSwitch` (a `.exq-seg` radiogroup) in
-the mobile menu Sheet and on the admin Account page. Axe (wcag2a and wcag2aa)
-passes in both themes on Home, Book, admin Today and Account
-(`tests/e2e/theme.spec.ts`).
+Dark values: background #111, cards #1F1F1F, borders #333, red text #FF5470, selected cards and the
+primary button invert to paper. Marks swap by CSS (`Mark` renders both files); in an ink band the
+white mark always shows.
 
 ## Type
 
-- Jost only, self-hosted, weights 400, 500 and 700.
-- Headings: 700, uppercase, letter-spacing -0.01em, line height 1.1. h1 `--fs-6`,
-  h2 `--fs-5`, h3 `--fs-4`, h4 `--fs-3`.
-- Section labels (`.exq-label`): 500, uppercase, letter-spacing .16em, 14px.
-  Never above the hero H1.
-- Body: 16px or larger at line height 1.5. 14px is for labels, captions and
-  admin density only.
-- Prices and times: `.exq-price` or `.exq-num` for tabular numerals.
-- Marketing pages use at most the six sizes. Admin uses 14 to 24px.
-
-## Shape, color and motion
-
-- Pill buttons and chips; 16px cards, inputs, sheets and tickets; the arch for
-  photos. No other radii.
-- Colors only from the tokens. Red is for actions and live states (next open,
-  selected time). Semantic colors only carry meaning (ok, warn, danger, info).
-- Text contrast 4.5:1: `--text-3` on paper is 5.7:1, `--red-500` on paper 6.0:1,
-  `--red-on-dark` on ink 6.5:1, `--line` on ink 13:1.
-- Hover brightens (`filter: brightness`), never fades, bounces or moves layout.
-  Nothing essential is hover only.
-- Transitions only on state changes, 150 to 180ms, and off under
-  `prefers-reduced-motion`. No reveals, parallax, scroll or cursor effects.
-- Text on photos only over a scrim; names and prices sit under photos.
-- Tap targets 44px or larger, including the small button size (44px tall,
-  slim padding) and inline text links in the footer and the "more" lines.
-  Every image has alt text and dimensions.
-
-## Brand assets
-
-- `public/brand/` holds the real marks (black and white of each, plus the pill).
-- `public/og.png` (1200x630, white primary logo on ink), `favicon.ico`,
-  `favicon.svg`, `icon-192.png`, `icon-512.png`, `icon-512-maskable.png` and
-  `apple-touch-icon.png` are rendered from the marks by
-  `npx tsx scripts/brand-assets.ts`; rerun it when the marks change.
-- `site.webmanifest` uses ink (#111111) for theme and background.
+- Jost Variable (`@fontsource-variable/jost`, self-hosted, one latin file preloaded,
+  `font-display: swap`), weights 400 to 900.
+- Label 600 caps +14% tracking, red. Body 400, line height 1.55. h3 700. h2 800 caps, line height 1,
+  -1.5%. Display 900 caps, line height .95, -2%. Price 700, tabular numerals.
+- Public pages use these six sizes and no others; the admin uses 13 to 22px. Button text is label
+  size. `tests/unit/motionCss.test.ts` fails if a kit stylesheet names another font size or a literal
+  color.
 
 ## Kit
 
-| Component                        | Props                                                                               | States (data-state)                                  | Used by                                                             |
-| -------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------- |
-| Button, ButtonLink, ButtonAnchor | variant primary, secondary, inverse; size sm, md, lg; block; icon; loading; pressed | default, hover (CSS), pressed, disabled, loading     | everywhere                                                          |
-| Input, Select, Textarea          | label, hint, error, warning, plus native attributes                                 | default, error, warning (focus via CSS)              | Book, Manage, admin forms                                           |
-| Chip, ChipLink, Chips            | selected, count, sub, tone ink or accent; Chips scroll                              | default, selected, disabled                          | filters, days, groups                                               |
-| Card                             | pad none, md, lg; interactive; as                                                   | static, interactive                                  | admin Today, settings lists                                         |
-| Sheet                            | open, title, size md or lg, onClose                                                 | open, closed                                         | Nav menu, Lightbox, confirms, admin forms                           |
-| Toast (ToastProvider, useToast)  | text, tone, action, duration                                                        | tone neutral, ok, warn, danger                       | every action                                                        |
-| EmptyState, ErrorState           | title, children, action                                                             | empty, error                                         | lists, loads                                                        |
-| Nav                              | none (reads the route)                                                              | open, closed                                         | public layout                                                       |
-| Footer                           | shop                                                                                | loading, ready                                       | public layout                                                       |
-| StepBar                          | steps, current, onJump                                                              | per step: done, current, todo                        | Book                                                                |
-| StickyCTA                        | primary, secondary, desktop hide or show                                            | shown, hidden (while typing)                         | Book, profile                                                       |
-| PhotoArch                        | photo, name, tone, sizes, priority                                                  | loading, loaded, placeholder                         | ChairCard, profile                                                  |
-| ChairCard, ChairCardSkeleton     | name, specialty, chairNumber, photo, status, statusLabel, to, selected, onSelect    | next-open, in, off, closed, none, selected, loading  | Home strip, Chairs, Book                                            |
-| TimeChip, TimeChipLink           | label, sub, selected, disabled, startAt, onClick or to                              | default, selected, disabled                          | Book, profile openings                                              |
-| Ticket                           | code, heading, rows, total, actions, state                                          | confirmed, cancelled, completed                      | Book done, Manage                                                   |
-| Lightbox                         | photos, index, onClose, onIndex                                                     | open (via Sheet)                                     | Home work, Gallery, profile                                         |
-| ThemeMenu, ThemeSwitch           | none (read the stored choice); ThemeSwitch label                                    | open, closed; per item selected, idle                | Nav, mobile menu, admin Account                                     |
-| Mark                             | name (primary, wordmark, stacked, q-icon, seal, pole, pill), alt, width, height     | light or dark file shown by CSS                      | Nav (wordmark from 1024px, stacked below), admin side nav (stacked) |
-| DemoBanner                       | none                                                                                | demo (dashed, accent-soft)                           | admin sign-in, admin content (demo mode)                            |
-| SiteDown                         | reason (down, maintenance), phone, code                                             | down, maintenance; Details disclosure shows the code | public layout when the API fails                                    |
+| Component                                          | Props                                                                                          | States (data-state)                                     |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Button, ButtonLink, ButtonAnchor                   | variant primary, accent, outline, ghost, onink; size sm, md, lg; block; icon; loading; pressed | default, hover (CSS), pressed, disabled, loading        |
+| Input, Select, Textarea                            | label, hint, error, warning, native attributes                                                 | default, focus (CSS), error, warning, disabled          |
+| Chip, ChipLink, Chips                              | selected, count, sub, tone; Chips scroll                                                       | default, selected, disabled                             |
+| Card                                               | pad none, md, lg; interactive                                                                  | static, interactive                                     |
+| OptionCard                                         | kind checkbox, radio, button; selected, disabled, title, description, meta, lead               | default, hover, selected (ink, red underline), disabled |
+| Label, SectionHead                                 | label, title, level, aside                                                                     |                                                         |
+| PriceRow                                           | name, description, price, meta, to                                                             | row, link                                               |
+| PhotoFrame                                         | photo, name, ratio 4:5, 1:1, 16:9; sizes; priority                                             | loading, loaded, placeholder                            |
+| ChairCard, ChairCardSkeleton                       | name, specialty, chairNumber, photo, status, statusLabel, to, selected                         | next-open, in, off, closed, none, selected, loading     |
+| TimeChip, TimeChipLink                             | label, sub, selected, disabled, startAt                                                        | default, selected, disabled                             |
+| StepBar                                            | steps, current, onJump                                                                         | per step: done (red), current (ink), todo (gray)        |
+| Ticket                                             | code, heading, rows, total, actions, state                                                     | confirmed (check draws), cancelled, completed           |
+| Toast (ToastProvider, useToast)                    | text, tone, action, duration                                                                   | neutral, ok, warn, danger                               |
+| EmptyState, ErrorState                             | title, children, action                                                                        | empty, error                                            |
+| Sheet, Modal, Lightbox (Dialog)                    | open, title, size, onClose                                                                     | open, closed                                            |
+| Reveal, Lines                                      | kind rise or wipe; lines, mode load or scroll                                                  | data-reveal hidden, shown                               |
+| TopStrip, Header, MobileMenu                       | announcement; phone                                                                            | open, closed                                            |
+| BottomBar (BarView, useBar)                        | per page through `useBar`                                                                      | shown, hidden (keyboard)                                |
+| Footer                                             | shop                                                                                           | loading, ready                                          |
+| ThemeMenu, ThemeSwitch, Mark, DemoBanner, SiteDown | as before                                                                                      |                                                         |
 
-Layout helpers: `.exq-wrap` (1200px, 16px gutters, 32px from 768px),
-`.exq-section`, `.exq-grid[data-cols][data-md][data-lg]`, `.exq-strip` (sideways
-on phones, grid from 768px), `.exq-band` with `.exq-dark` for ink bands,
-`.exq-seg` segmented control.
+## Motion
+
+CSS, IntersectionObserver and the View Transitions API; no library (see DECISIONS D10). Only
+transform and opacity move, plus clip-path on photo wipes and the stroke of the drawn check; colors
+may change state; no layout property animates. `motion.css` is the only file with a `transition` or an
+`animation`, and `tests/unit/motionCss.test.ts` checks it (durations from tokens, allowed properties,
+no loops except the spinner).
+
+| Where                   | What                                                                                                                 | Time                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Page change             | cross-fade with an 8px rise (View Transitions)                                                                       | 250ms                   |
+| Home hero on load       | H1 lines rise (clipped, 60ms apart), then sub, buttons, info row rise 12px                                           | done by 610ms           |
+| Scroll reveals          | chair cards, price rows, gallery tiles, Visit rise 16px, 60ms stagger; photos wipe up (clip-path)                    | 250ms, 400ms            |
+| CTA band headline       | the same line rise, on scroll                                                                                        | 400ms                   |
+| Buttons                 | press .97; hover sweeps a red fill left to right (primary, outline); spinner keeps width                             | 150ms, 250ms            |
+| Cards and chips         | hover lift -2px with `--shadow-pop` (desktop); selected color; red underline grows 0 to 32px                         | 150ms                   |
+| Sheets, modal, lightbox | sheet from the bottom (phone) or side (desktop); modal scales from .96; backdrop to 50% ink                          | open 250ms, close 150ms |
+| Phone menu              | slides down, links stagger in, hamburger becomes an X                                                                | 250ms, 60ms stagger     |
+| Booking                 | step bar segment fills red; step content slides the way you go; time chips pop; the ticket rises and its check draws | 250ms, 400ms            |
+| Toasts                  | slide up above the bottom bar, leave after 4s (7s with an action), pause on hover or focus                           | 250ms                   |
+| Admin                   | row color fades, new rows slide in, skeleton blocks (still)                                                          | 250ms                   |
+
+Progressive by construction: content is visible by default. `src/lib/motion.ts` adds `motion-ready` to
+`<html>` only when IntersectionObserver exists and the visitor allows motion. Only then do elements
+below the fold start hidden (`useReveal` hides an element only if it starts below the viewport), and
+anything already in view at load is never hidden. If scripts fail, nothing was hidden. Under
+`prefers-reduced-motion: reduce` no motion rules apply at all and every transition is switched off.
+Off limits: scroll jacking, parallax, pinned sections, cursor effects, looping decoration, timers.
+
+## The phone bottom bar
+
+`BottomBar`, below 1024px on every public page except `/admin`, `/setup`, `/kit` and `/portal`
+(prompt 11's barber portal must live under `/portal`, or add its prefix to `NO_BAR_PREFIXES`).
+Two equal halves, each 60px plus `env(safe-area-inset-bottom)` (the page declares
+`viewport-fit=cover`), a 2px red rule on top. Default: CALL (ink, `tel:`) and BOOK NOW (white, `/book`).
+Pages change it with `useBar`: BOOK MARCUS on a profile, BACK and CONTINUE (CONFIRM BOOKING on the
+last step) in booking, with a thin summary row above. The bar publishes its height as `--bar-h`; the
+page pads by it and toasts sit above it. It hides while a text field has focus or the visual viewport
+has shrunk by more than 150px (the keyboard), and returns when they end.
 
 ## Rules for new UI
 
-1. Build from the kit. Never fork a component; add a prop or a state instead.
-2. Keep the existing `exq-*` and `exq-adm-*` class names and data-state values;
-   style through them or wrap them.
+1. Build from the kit. Never fork a component; add a prop or a state. Prompt 11's dashboard and
+   portal screens are assembled from these parts.
+2. Keep the `exq-*` and `exq-adm-*` class names and `data-state` values.
 3. Phone first at 390, then 768, then 1280.
-4. Every action gives feedback: a Toast or an inline message.
-5. Choices are visible as chips with counts. Sheets, not page takeovers.
-6. No emoji, no em dashes, no purple, no gradients except the hero scrim, no
-   bento grids, no glass, no fake numbers or reviews.
+4. Colors and sizes only from the tokens; durations only from the motion tokens.
+5. Every action gives feedback: a Toast, an inline message or a state change.
+6. Text on photos only over a solid chip or scrim; names and prices sit under photos.
+7. Tap targets 44px or larger. Every image has alt text and dimensions.
+8. No emoji, no em dashes, no purple, no gradient text, no bento grids, no glass, no fake numbers or
+   reviews, no "scroll down" hints.

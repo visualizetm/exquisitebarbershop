@@ -82,6 +82,42 @@ export const featureFlagsSchema = z.object({
   smsReminders: z.boolean().default(false),
 });
 
+/** A link target: a path on this site or an https address. */
+const announcementLinkSchema = z
+  .string()
+  .trim()
+  .max(200)
+  .refine(
+    (v) => v === '' || (v.startsWith('/') && !v.startsWith('//')) || v.startsWith('https://'),
+    {
+      message: 'Use a path such as /book or an https address',
+    },
+  );
+
+/** The line in the thin ink strip above the header. The link is optional (leave both parts empty). */
+export const announcementSchema = z
+  .object({
+    enabled: z.boolean(),
+    text: z.string().trim().max(80),
+    linkLabel: z.string().trim().max(30),
+    linkUrl: announcementLinkSchema,
+  })
+  .refine((a) => !a.enabled || a.text.length > 0, {
+    path: ['text'],
+    message: 'Add the announcement text, or switch it off',
+  })
+  .refine((a) => (a.linkLabel === '') === (a.linkUrl === ''), {
+    path: ['linkUrl'],
+    message: 'Give the link both a label and an address, or leave both empty',
+  });
+export type Announcement = z.infer<typeof announcementSchema>;
+export const DEFAULT_ANNOUNCEMENT: Announcement = {
+  enabled: true,
+  text: 'Walk ins welcome',
+  linkLabel: 'Book online',
+  linkUrl: '/book',
+};
+
 export const shopSettingsDocumentSchema = z
   .object({
     _id: z.literal(SHOP_SETTINGS_ID),
@@ -97,6 +133,7 @@ export const shopSettingsDocumentSchema = z
     notifications: notificationSettingsSchema,
     features: featureFlagsSchema,
     permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
+    announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
     /** The service "next open" times are computed for. Null means each chair's shortest service. */
     nextOpenServiceId: idSchema.nullable().default(null),
   })

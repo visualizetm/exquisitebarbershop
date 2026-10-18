@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { availabilityResponseSchema, type AvailabilitySlot } from '@shared/api/availability';
 import {
   createBookingResponseSchema,
@@ -12,7 +12,8 @@ import {
   publicStaffResponseSchema,
 } from '@shared/api/public';
 import { Status } from '@/components/Status';
-import { Button, StepBar, StickyCTA, Ticket, TimeChip, useToast } from '@/components/ui';
+import { Button, Label, Link, StepBar, Ticket, TimeChip, useBar, useToast } from '@/components/ui';
+import type { BarConfig } from '@/components/ui/barStore';
 import { formatCents } from '@shared/lib/money';
 import { formatShopDateTime } from '@shared/lib/time';
 import { BookingCard } from '@/components/booking/BookingCard';
@@ -44,14 +45,40 @@ import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
 
-const STEPS = [
-  { key: 'services', label: 'Services' },
-  { key: 'barber', label: 'Chair' },
-  { key: 'day', label: 'Day' },
+/** The four parts of the progress bar. Day and time are one part, details and confirm another. */
+const PARTS = [
+  { key: 'service', label: 'Service' },
+  { key: 'barber', label: 'Barber' },
   { key: 'time', label: 'Time' },
   { key: 'details', label: 'Details' },
-  { key: 'confirm', label: 'Confirm' },
 ] as const;
+type PartKey = (typeof PARTS)[number]['key'];
+
+const PART_OF: Record<BookStep, PartKey> = {
+  services: 'service',
+  barber: 'barber',
+  day: 'time',
+  time: 'time',
+  details: 'details',
+  confirm: 'details',
+  done: 'details',
+};
+/** Where a part of the bar takes you when it is pressed. */
+const STEP_OF: Record<PartKey, BookStep> = {
+  service: 'services',
+  barber: 'barber',
+  time: 'day',
+  details: 'details',
+};
+const STEP_NUMBER: Record<BookStep, number> = {
+  services: 1,
+  barber: 2,
+  day: 3,
+  time: 3,
+  details: 4,
+  confirm: 4,
+  done: 4,
+};
 
 const STEP_TITLES: Record<BookStep, string> = {
   services: 'Choose your services',
@@ -62,6 +89,14 @@ const STEP_TITLES: Record<BookStep, string> = {
   confirm: 'Review and confirm',
   done: 'You are booked',
 };
+
+/** Tells the phone bottom bar what to say. A component so it can sit in the ready branch. */
+function BookBar({ config }: { config: BarConfig | null }) {
+  useBar(config);
+  return null;
+}
+
+const STEP_ORDER: BookStep[] = ['services', 'barber', 'day', 'time', 'details', 'confirm'];
 
 interface ConflictState {
   message: string;
@@ -79,6 +114,15 @@ export function BookPage() {
   const toast = useToast();
   const selection = useMemo(() => readSelection(params), [params]);
   const step = resolveStep(selection);
+  // Step content slides the way you are travelling; the first render and a same step render do not.
+  const stepIndex = step === 'done' ? STEP_ORDER.length : STEP_ORDER.indexOf(step);
+  const [travel, setTravel] = useState<{ index: number; dir: 'none' | 'forward' | 'back' }>({
+    index: stepIndex,
+    dir: 'none',
+  });
+  if (travel.index !== stepIndex) {
+    setTravel({ index: stepIndex, dir: stepIndex > travel.index ? 'forward' : 'back' });
+  }
 
   const shop = useShop();
   const services = useApi('/api/services', publicServicesResponseSchema);
@@ -226,6 +270,69 @@ export function BookPage() {
     }
   };
 
+  const bar = ((): BarConfig | null => {
+    if (step === 'done') return null;
+    const totalCents = chosenServices.reduce((sum, x) => sum + x.priceCents, 0);
+    const minutes = chosenServices.reduce((sum, x) => sum + x.durationMinutes, 0);
+    const summary =
+      chosenServices.length === 0 ? undefined : (
+        <>
+          <span>
+            {chosenServices.some((x) => x.priceFrom) ? 'From ' : ''}
+            {formatCents(totalCents)}
+          </span>
+          <span>
+            {minutes} min{chosenStaff ? ` with ${chosenStaff}` : ''}
+          </span>
+        </>
+      );
+    const before = STEP_ORDER[STEP_ORDER.indexOf(step) - 1];
+    const left: BarConfig['left'] = before
+      ? {
+          label: 'Back',
+          onClick: () => {
+            goTo(before);
+          },
+          tone: 'ink',
+        }
+      : { label: 'Back', to: '/', tone: 'ink' };
+    const next = (disabled: boolean, to: BookStep): BarConfig['right'] => ({
+      label: 'Continue',
+      disabled,
+      onClick: () => {
+        goTo(to);
+      },
+      tone: 'paper',
+    });
+    let right: BarConfig['right'];
+    switch (step) {
+      case 'services':
+        right = next(selection.serviceIds.length === 0, selection.staff ? 'day' : 'barber');
+        break;
+      case 'barber':
+        right = next(!selection.staff, 'day');
+        break;
+      case 'day':
+        right = next(!selection.date, 'time');
+        break;
+      case 'time':
+        right = next(!selection.startAt, 'details');
+        break;
+      case 'details':
+        right = { label: 'Continue', form: 'exq-details-form', tone: 'paper' };
+        break;
+      case 'confirm':
+        right = {
+          label: 'Confirm booking',
+          disabled: submitting,
+          onClick: () => void submit(),
+          tone: 'red',
+        };
+        break;
+    }
+    return { mode: 'booking', summary, left, right };
+  })();
+
   const renderStep = () => {
     switch (step) {
       case 'services':
@@ -354,7 +461,7 @@ export function BookPage() {
                 ) : (
                   <p>
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       onClick={() => {
                         goTo('day');
                       }}
@@ -370,19 +477,9 @@ export function BookPage() {
                 {submitError}
               </p>
             ) : null}
-            <StickyCTA
-              primary={`${chosenServices.some((s) => s.priceFrom) ? 'From ' : ''}${formatCents(
-                chosenServices.reduce((sum, s) => sum + s.priceCents, 0),
-              )}`}
-              secondary={`${String(chosenServices.reduce((sum, s) => sum + s.durationMinutes, 0))} min with ${staffName}`}
-            >
-              <Button loading={submitting} onClick={() => void submit()}>
-                {submitting ? 'Booking' : 'Confirm booking'}
-              </Button>
-            </StickyCTA>
             <p className="exq-book-confirm__actions">
               <Button
-                variant="secondary"
+                variant="outline"
                 disabled={submitting}
                 onClick={() => {
                   goTo('details');
@@ -426,7 +523,7 @@ export function BookPage() {
                   <IcsDownload booking={booked} shop={shop.data} manageUrl={manageUrl} />
                   <Link
                     className="exq-btn"
-                    data-variant="secondary"
+                    data-variant="outline"
                     data-size="md"
                     to={confirmation.managePath}
                   >
@@ -479,27 +576,44 @@ export function BookPage() {
 
   return (
     <article className="exq-book exq-wrap exq-section" data-state={step}>
+      <BookBar config={bar} />
       <div className="exq-book__main">
-        <h1 className="exq-book__title">Book your chair</h1>
-        <p className="exq-book__sub">Takes about a minute.</p>
+        <div className="exq-book__head">
+          <Label>Book online</Label>
+          <h1 className="exq-book__title">Book your chair</h1>
+          <p className="exq-book__sub">Takes about a minute.</p>
+        </div>
         {step !== 'done' ? (
           <div className="exq-book-steps">
-            <StepBar steps={STEPS} current={step} onJump={goTo} />
+            <StepBar
+              steps={PARTS}
+              current={PART_OF[step]}
+              onJump={(key) => {
+                // The time part goes straight to the times when a day is already chosen.
+                goTo(key === 'time' && selection.date ? 'time' : STEP_OF[key]);
+              }}
+            />
           </div>
         ) : null}
-        <StepHeading step={step} focusKey={selection.startAt ?? ''}>
-          {STEP_TITLES[step]}
-        </StepHeading>
-        {step !== 'services' && step !== 'done' ? (
-          <section className="exq-book-selection" aria-label="Your selection">
-            <BookingSummary
-              services={chosenServices}
-              staffName={staffName}
-              startAt={selection.startAt}
-            />
-          </section>
-        ) : null}
-        {renderStep()}
+        <div className="exq-step" key={step} data-dir={travel.dir}>
+          <StepHeading
+            step={step}
+            focusKey={selection.startAt ?? ''}
+            number={step === 'done' ? undefined : STEP_NUMBER[step]}
+          >
+            {STEP_TITLES[step]}
+          </StepHeading>
+          {step !== 'services' && step !== 'done' ? (
+            <section className="exq-book-selection" aria-label="Your selection">
+              <BookingSummary
+                services={chosenServices}
+                staffName={staffName}
+                startAt={selection.startAt}
+              />
+            </section>
+          ) : null}
+          {renderStep()}
+        </div>
       </div>
       {step !== 'done' ? (
         <BookingCard

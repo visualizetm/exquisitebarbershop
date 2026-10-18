@@ -508,3 +508,100 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   same builder and tracer locally. What is not proven: that Vercel's platform hands the
   function the original request path after a rewrite (the documented Express-on-Vercel pattern
   relies on it), which the first deploy's `/api/health` and `/api/staff/marcus` will confirm.
+
+## Prompt 10: redesign, motion, phone bar, Cloudinary
+
+- D10-01 Branch from main after PR 4 merged (main = 17fa43d), branch `claude/p10-shop-sign-redesign`.
+- D10-02 The mockup board (`docs/brand/website/exq_site_mobile_board.png`) and `docs/brand/BRAND.md`
+  are not in the repository, so the written brief is the source; it is saved as
+  `docs/brand/DESIGN-DIRECTION-V2.md`.
+- D10-03 Tokens follow the brief exactly, with three additions the brief did not list but needs:
+  `--mute-on-dark` (#A8A8A8, 7.6:1 on ink, for gray text on ink because `--text-3` is only 3.5:1 on
+  #111), `--hit` (44px tap target) and `--rule` (2px). `--t-display` uses `clamp(40px, 13.4vw, 52px)` so
+  it is 52px from 385px wide and EXQUISITE (9 heavy caps) never clips on a 360px phone.
+- D10-04 In dark, `--card-2` is `--ink-2`, not `--ink-3`: red text (#FF5470) on #333 is 4.1:1 and failed
+  axe. Borders stay #333.
+- D10-05 Button text is label size (13px, 600, caps, +14% tracking) everywhere, including the bottom
+  bar: it is the only size in the scale that fits "CONFIRM BOOKING" in half of a 390px screen.
+- D10-06 The dark theme keeps explicit values in two blocks (the attribute and the media query)
+  instead of `light-dark()`, which iOS before 17.5 ignores; a missing declaration there would drop all
+  colors on an older iPhone.
+- D10-07 Every `transition` and `animation` lives in `motion.css`, inside
+  `prefers-reduced-motion: no-preference`, so reduced motion is one switch and the rules are testable.
+  The check mark draws with `stroke-dashoffset`, the one property besides transform, opacity and
+  clip-path (the brief asks for it by name).
+- D10-08 No animation library. Sheet drag-to-close is not built (a tap on the backdrop, the X and
+  Escape close it); the lightbox swipes with CSS scroll snap, so nothing needed a library.
+- D10-09 Toasts leave after 4s; a toast with an Undo action stays 7s so the action is usable (hover and
+  focus pause both).
+- D10-10 Dialogs are the native `<dialog>` with `@starting-style` and `allow-discrete` transitions.
+  Browsers without them open and close instantly; content stays mounted for `--d-fast` so the exit
+  does not show an empty box.
+- D10-11 The announcement is stored as `{ enabled, text, linkLabel, linkUrl }` in shop settings
+  (default "Walk ins welcome" with a "Book online" link to `/book`). Older settings documents get
+  the default on read, so nothing needs a migration. The strip is an empty ink bar while shop data
+  loads so the page does not shift.
+- D10-12 The bar hides when a text field has focus or the visual viewport has shrunk by more than
+  150px. Focus alone is what a desktop browser at phone width can show (the tests), and the viewport
+  check is what iOS and Android report; together they cover both. The cost: with the keyboard up
+  the bar is out of reach, so the last field is finished with the keyboard's own Go key (the form
+  submits) or by closing the keyboard.
+- D10-13 On the first booking step BACK links to the home page; on later steps it goes one step back
+  with the choices kept. On the details step CONTINUE submits the form (the `form` attribute), so
+  validation messages appear as before.
+- D10-14 The bar's routes: hidden under `/admin`, `/setup`, `/kit` and `/portal`. Prompt 11's barber
+  portal is not built yet; it should live under `/portal`, or add its prefix to `NO_BAR_PREFIXES`.
+- D10-15 With JavaScript off nothing in a single page app can render, so `index.html` carries a
+  `<noscript>` block: the name, the phone (from the seed, the same value the down screen uses) and
+  the address. Every reveal is already visible by default, so a page that loses its script mid way is
+  never left hidden.
+- D10-16 Header is sticky on every width (the strip scrolls away), because the phone bar carries only
+  Call and Book and the menu must stay reachable. The announcement strip is 40px, not thinner, so its
+  link is a real tap target.
+- D10-17 View transitions: the app uses the declarative BrowserRouter, whose `viewTransition` prop does
+  nothing (only data routers honor it). Rather than change the router, the kit `Link` and `NavLink`
+  take the click and run the navigation inside `document.startViewTransition` with `flushSync`. It is
+  skipped for modified clicks, new-tab links, reduced motion and browsers without the API, so there is
+  no fallback animation.
+- D10-18 Reveals hide an element only after measuring it (below the fold, motion ready) and do it
+  without a transition, so nothing fades out after first paint. A photo wipe clips the child, not the
+  element the observer watches, because an element clipped away entirely never counts as on screen.
+- D10-19 Home's right half stays empty on desktop when there is no hero photo. The text column keeps the
+  same width either way, so a photo arriving after the shop data does not move the text (CLS).
+- D10-20 The Menu on Home shows each service's description and duration (the mockup shows one line);
+  on Services the group name sits over a 2px rule, as in the mockup.
+- D10-21 The booking flow keeps its six URL steps (services, barber, day, time, details, confirm); the
+  progress bar shows four parts and the bar's "time" part opens the times directly when a day is
+  already chosen. Auto advance after picking a day or a time is unchanged, so CONTINUE is disabled on
+  those steps until something is chosen.
+- D10-22 The step slide is derived while rendering (travel direction from the previous step index) and
+  the step is remounted by key, so the heading takes focus on every step as before.
+- D10-23 Admin headings below the page title are sentence case, not caps, and the admin scale is 13, 15,
+  18 and 22px: a dense working screen reads better that way. Everything else (tokens, the kit, the
+  states) is shared with the public site.
+- D10-24 Cloudinary is a driver behind the existing storage port. The port's `PresignedUpload` became a
+  union (PUT for R2, local and GridFS; signed POST for Cloudinary), `uploadUrlResponse` gained
+  `method: 'POST'` and `fields`, and confirm gained an optional `cloudinary: { publicId, version, bytes }`
+  that is required, and checked against the Admin API, when the driver is Cloudinary.
+- D10-25 A Cloudinary photo key is its public id, `<CLOUDINARY_FOLDER>/<uuid>`, the same uuid the old
+  keys carried, so the migration is idempotent (the destination of a photo never changes) and a half
+  finished copy is adopted on the next run. The old GridFS objects are left in place.
+- D10-26 Backups: Cloudinary holds images, not the NDJSON export, so with this driver the daily job
+  writes no backup (it logs that, like the GridFS case) and the doctor says to turn on Atlas backups.
+  R2 stays available for anyone who wants bucket backups.
+- D10-27 The CSP no longer allows any `https:` image: images from the site itself, data and
+  `res.cloudinary.com`; connections to the site and `api.cloudinary.com`. An R2 deployment would need
+  its public host added to `img-src`.
+- D10-28 The doctor's Cloudinary check is a signed Admin API ping (nothing written), then reports
+  delivery as OK without a network call. The 10 MB limit is enforced on issue and again on confirm.
+- D10-29 The fake Cloudinary in the tests wraps `fetch` and checks the same signature and credentials
+  the real service does, so a wrong signing rule fails the test instead of passing quietly.
+- D10-30 Performance is measured on a build served with brotli, because Vercel compresses text and a
+  plain Node server does not (73 to 76 uncompressed, 95 to 97 compressed). `scripts/prodlike-server.ts` now
+  compresses so the local run matches what visitors get.
+- D10-31 Screenshots and recordings were captured once, in the last milestone, from the dev e2e server
+  with sample photos; earlier milestones were checked by eye with throwaway captures. Full page
+  captures show the fixed phone bar mid page; that is the capture, not the layout.
+- D10-32 `milestone 1` through `5` commits each passed typecheck, lint, format, unit tests, the three
+  end to end suites, `test:vercel-function` and the build, except milestone 3, whose first commit
+  carried two lint errors in the reveal hook and a test that were fixed in the next commit.

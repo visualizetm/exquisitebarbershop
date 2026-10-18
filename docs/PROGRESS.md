@@ -271,3 +271,93 @@ commit, and what is still open.
   replay, the demo flow end to end) as a required CI step with a bundle freshness check; the
   production-like e2e servers load the real function file; DEPLOY.md, SITE-REPORT, CLAUDE.md.
 - Open: merge, let Vercel deploy, open `/api/health`: JSON, not an error page.
+
+## Prompt 10
+
+### M1: tokens, kit and /kit
+
+- Shipped: `src/styles/tokens.css` rewritten (one variables file, the Shop Sign palette, the six
+  type sizes, motion tokens, dark values per the brief); `@fontsource-variable/jost` replaces the
+  three static weights; `base.css`, `kit.css`, `frame.css`, `motion.css` split by job; the kit
+  rebuilt (Button variants primary, accent, outline, ghost, onink; OptionCard, Label,
+  SectionHead, PriceRow, PhotoFrame, ChairCard, StepBar with numbers, Ticket with a drawn check,
+  Toast with pause on hover, Dialog under Sheet, Modal and Lightbox, Reveal and Lines, TopStrip,
+  Header, MobileMenu, BottomBar); `/kit` shows every component in every state in both themes;
+  `docs/DESIGN-SYSTEM.md` and `docs/brand/DESIGN-DIRECTION-V2.md`; `announcement` in shop settings
+  and the public shop response (the editor is prompt 11's).
+- Transitional: `src/styles/legacy.css` aliases the old token names for the pages not yet rebuilt
+  (removed in M4); the old Nav, Footer and StickyCTA still run until M2.
+- Tests: `tests/unit/motionCss.test.ts` (durations from tokens, allowed animated properties, no
+  loops but the spinner, no literal colors or font sizes in the kit stylesheets).
+
+### M2: the frame
+
+- Shipped: TopStrip (announcement from shop settings, default "Walk ins welcome" plus a red
+  "Book online" link; an empty ink bar while settings load), the Header (stacked logo below 1024px,
+  wordmark above, hamburger that becomes an X, a Book a chair button always visible on desktop), the
+  full-screen ink MobileMenu (big caps links, theme switch, Call and Book, page behind inert), the
+  phone BottomBar (CALL and BOOK NOW; BOOK MARCUS on a profile; BACK and CONTINUE, then CONFIRM
+  BOOKING, with a total row in booking; hides for the keyboard; publishes `--bar-h`), a Footer with
+  no build stamp and no staff link, `viewport-fit=cover`, and a no-JavaScript fallback in
+  `index.html`. The old Nav and StickyCTA are gone; the build sha is only in `/api/health`.
+- Tests: `tests/e2e/frame.spec.ts` (bar visible at 390 and 60px tall, hidden at 1280 and in /admin,
+  /setup and /kit, labels per page and per booking step, hidden while a field has focus, never
+  covers the page end, no build text or staff link on any public page, the menu).
+
+### M3: the public pages
+
+- Shipped: Home in the order of the brief (hero text with the four line H1 and EXQUISITE in red, the
+  info row from shop data, the hero photo only when one exists, Today's chairs, The Menu in an ink
+  band, The Work hidden when empty, Visit with today highlighted, the ink CTA band); Services as an ink
+  page with group chips and counts and PriceRows that link to `/book?service=id`; The Chairs
+  ("Pick your chair"); the profile (portrait, name in display type, next 3 openings, services, work);
+  Gallery (2 and 3 columns, barber chips, swipeable lightbox); Visit.
+- Motion on these pages: hero line rise and settle by 610ms, scroll reveals with stagger, photo wipes,
+  the CTA line rise, and page transitions (a 250ms cross-fade through `document.startViewTransition`,
+  taken in the kit `Link`).
+- Tests: `tests/e2e/motion.spec.ts` (hero timing and full opacity, hidden below the fold and revealed
+  once, nothing hidden or transformed under reduced motion, nothing hidden without
+  IntersectionObserver, a no-JavaScript page, CLS under 0.1, a view transition on navigation).
+
+### M4: Book, Manage, overlays and the admin restyle
+
+- Shipped: Book with the four part StepBar (1 SERVICE, 2 BARBER, 3 TIME, 4 DETAILS; day and time share a
+  part, details and confirm share a part), numbered ink circles on every step heading, OptionCards for
+  services, barbers and "Anyone available", the day strip with open counts, times grouped into morning,
+  afternoon and evening, the details form built from the kit's Input and Textarea, the confirmation and
+  Manage as a Ticket (it rises and its check draws itself), the cancel confirmation in a Sheet, step
+  content that slides the way you are travelling; the admin screens on the new tokens with the 13 to
+  22px scale, color fades on status changes, new items sliding in and still skeleton blocks while
+  loading; the temporary `legacy.css` is gone.
+- Tests: `tests/e2e/kit.spec.ts` (every kit section in both themes, a sheet opens in 250ms and closes in
+  150ms, the modal and the swipeable lightbox), `/kit` is absent from the production build.
+
+### M5: Cloudinary photos
+
+- Shipped: the `cloudinary` storage driver (signed browser uploads, verification on confirm,
+  destroy on delete, the 24 hour orphan sweep, a signed doctor ping), `STORAGE_DRIVER=cloudinary`
+  allowed in production without DEMO_MODE and requiring the four CLOUDINARY variables (Preview must
+  use a folder that says preview), responsive images (`f_auto,q_auto,c_fill,g_auto`, four widths,
+  `sizes`, lazy below the fold, `fetchpriority=high` on the hero), the CSP naming `res.cloudinary.com`
+  and `api.cloudinary.com` only, `npm run photos:migrate -- --from mongo --to cloudinary [--dry-run]`,
+  DEPLOY.md section 10b and the env table.
+- Tests: signing and URL building (`tests/unit/cloudinary.test.ts`), the env rules, the CSP, a fake
+  Cloudinary (`tests/helpers/fakeCloudinary.ts`) driving upload, confirm, show, delete, the sweep, the
+  doctor and who can sign (`tests/integration/cloudinary.test.ts`), the migration
+  (`tests/integration/photosMigrate.test.ts`), and the browser picking the right sizes
+  (`tests/e2e/cloudinary-images.spec.ts`).
+
+### M6: QA
+
+- Lighthouse mobile on the production-like build (served with brotli like Vercel): Home 95 / 100 / 96 / 69,
+  Services 96 / 100 / 96 / 69, Book 97 / 100 / 96 / 69 (performance, accessibility, best practices, SEO;
+  the SEO score is the showcase build's noindex), CLS 0 on all three, LCP 2.2 to 2.5s. Without
+  compression the same build scored 73 to 76: the local https server now compresses like Vercel's edge.
+- Axe (WCAG 2 A and AA): nothing on any public page or booking step, light or dark, at 390 and 1280
+  (`tests/e2e/rules.spec.ts`), plus the earlier admin runs. Also tested there: only the six type sizes,
+  tap targets of 44px, alt text and dimensions on every image, the hero fitting a 390px first screen.
+- Found and fixed on the way: the phone bar's `:hover { color: inherit }` made CONFIRM BOOKING ink on red after a
+  tap (hover sticks on touch); the "Today" tag on the hours table failed contrast in dark; the skip link
+  was 42px tall; booking tests clicked options through a 1px input.
+- Screenshots (light and dark, 390 and 1280, a montage per width and theme): `docs/screens/p10/`;
+  recordings of Home scrolling with the menu and of a booking at 390: `docs/screens/p10/motion/`.

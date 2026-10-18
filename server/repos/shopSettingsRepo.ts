@@ -1,5 +1,6 @@
 import { SHOP_SETTINGS_ID } from '../../shared/lib/constants';
 import {
+  DEFAULT_ANNOUNCEMENT,
   DEFAULT_STAFF_PERMISSIONS,
   shopSettingsDocumentSchema,
   shopSettingsInputSchema,
@@ -17,6 +18,7 @@ function fill(doc: ShopSettingsDocument): ShopSettingsDocument {
     ...doc,
     permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
     nextOpenServiceId: stored.nextOpenServiceId ?? null,
+    announcement: stored.announcement ?? DEFAULT_ANNOUNCEMENT,
   };
 }
 

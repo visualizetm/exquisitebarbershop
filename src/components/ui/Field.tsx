@@ -46,6 +46,7 @@ function frame(
   );
 }
 
+/** Text input. States: default, focus (CSS), error, warning, disabled. */
 export function Input({
   label,
   hint,

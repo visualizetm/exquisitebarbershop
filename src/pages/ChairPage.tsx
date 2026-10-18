@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import { galleryResponseSchema } from '@shared/api/photos';
 import {
   publicServicesResponseSchema,
@@ -8,7 +8,20 @@ import {
 } from '@shared/api/public';
 import { priceLabel } from '@shared/lib/money';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
-import { ButtonLink, Chips, ErrorState, PhotoArch, StickyCTA, TimeChipLink } from '@/components/ui';
+import {
+  ButtonLink,
+  Chips,
+  ErrorState,
+  Label,
+  Link,
+  PhotoFrame,
+  PriceRow,
+  Reveal,
+  SectionHead,
+  TimeChipLink,
+  useBar,
+} from '@/components/ui';
+import { useShop } from '@/app/useShop';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
@@ -26,6 +39,21 @@ export function ChairPage() {
   const services = useApi('/api/services', publicServicesResponseSchema);
   const work = useApi(slug ? `/api/gallery?staff=${encoded}&limit=6` : null, galleryResponseSchema);
   const profile = result.status === 'ready' ? result.data.staff : null;
+  const shop = useShop();
+  const phone = (shop.status === 'ready' ? shop.data.phone : __SHOP_PHONE__).replace(/[^\d+]/g, '');
+  // On a profile the phone bar books this barber, and the booking opens with them chosen.
+  useBar(
+    profile?.acceptsOnlineBooking
+      ? {
+          left: { label: 'Call', href: `tel:${phone}`, tone: 'ink' },
+          right: {
+            label: `Book ${profile.name}`,
+            to: `/book?barber=${encodeURIComponent(profile.slug)}`,
+            tone: 'paper',
+          },
+        }
+      : null,
+  );
   usePageMeta({
     title: profile?.name ?? 'The chairs',
     description: profile
@@ -48,7 +76,7 @@ export function ChairPage() {
         <ErrorState
           title={notFound ? 'That chair is no longer listed' : undefined}
           action={
-            <ButtonLink to="/chairs" variant="secondary">
+            <ButtonLink to="/chairs" variant="outline">
               See all chairs
             </ButtonLink>
           }
@@ -67,25 +95,26 @@ export function ChairPage() {
     staff.chairNumber !== null ? `Chair ${String(staff.chairNumber).padStart(2, '0')}` : null;
 
   return (
-    <article className="exq-chair exq-wrap exq-section" data-state="ready">
-      <div className="exq-chair__top">
-        <div className="exq-chair__photo">
-          <PhotoArch
+    <article className="exq-chair" data-state="ready">
+      <div className="exq-wrap exq-section exq-chair__top">
+        <Reveal kind="wipe" className="exq-chair__photo">
+          <PhotoFrame
             photo={staff.photo ?? null}
             name={staff.name}
             priority
-            sizes="(min-width: 768px) 360px, 100vw"
+            sizes="(min-width: 1024px) 480px, 100vw"
           />
-        </div>
+        </Reveal>
         <div className="exq-chair__intro">
-          {badge ? <p className="exq-chair__chair exq-chaircard__badge">{badge}</p> : null}
-          <h1 className="exq-chair__name">{staff.name}</h1>
+          {badge ? <Label>{badge}</Label> : null}
+          <h1 className="exq-display exq-chair__name">{staff.name}</h1>
           <p className="exq-chair__title">{staff.title}</p>
           {staff.specialty ? <p className="exq-chair__specialty">{staff.specialty}</p> : null}
-          {staff.bio ? <p className="exq-chair__bio">{staff.bio}</p> : null}
+          {staff.bio ? <p className="exq-chair__bio exq-muted">{staff.bio}</p> : null}
           {staff.instagramHandle ? (
             <p className="exq-chair__social">
               <a
+                className="exq-link-row"
                 href={`https://instagram.com/${staff.instagramHandle}`}
                 rel="noopener noreferrer"
                 target="_blank"
@@ -108,12 +137,11 @@ export function ChairPage() {
 
       {staff.acceptsOnlineBooking ? (
         <section
-          className="exq-chair__openings"
+          className="exq-wrap exq-section exq-chair__openings"
           aria-labelledby="exq-chair-openings"
           data-state={openings.status}
         >
-          <p className="exq-label">Next openings</p>
-          <h2 id="exq-chair-openings">Next openings</h2>
+          <SectionHead label="Next openings" title="Pick a time" id="exq-chair-openings" />
           {open?.service && open.openings.length > 0 ? (
             <>
               <Chips label="Next openings">
@@ -141,55 +169,47 @@ export function ChairPage() {
       ) : null}
 
       {offered.length > 0 ? (
-        <section className="exq-chair__services" aria-labelledby="exq-chair-services">
-          <p className="exq-label">Services</p>
-          <h2 id="exq-chair-services">What {staff.name} does</h2>
-          <ul className="exq-services__list">
-            {offered.map((service) => (
-              <li
-                key={service.id}
-                className="exq-service"
-                data-state={service.priceFrom ? 'from' : 'fixed'}
-              >
-                <Link
-                  to={`${bookPath}&service=${encodeURIComponent(service.id)}`}
-                  className="exq-service__row"
-                  aria-label={`Book ${service.name} with ${staff.name}, ${service.durationMinutes} minutes, ${priceLabel(service)}`}
+        <section
+          className="exq-band exq-dark exq-chair__services"
+          aria-labelledby="exq-chair-services"
+        >
+          <div className="exq-wrap exq-section">
+            <SectionHead
+              label="The menu"
+              title={`What ${staff.name} does`}
+              id="exq-chair-services"
+            />
+            <ul className="exq-services__list exq-bare">
+              {offered.map((service) => (
+                <Reveal
+                  as="li"
+                  key={service.id}
+                  className="exq-service"
+                  data-state={service.priceFrom ? 'from' : 'fixed'}
                 >
-                  <span className="exq-service__main">
-                    <span className="exq-service__name">{service.name}</span>
-                  </span>
-                  <span className="exq-service__meta">
-                    <span className="exq-service__duration">{service.durationMinutes} min</span>
-                    <span className="exq-service__price exq-price">{priceLabel(service)}</span>
-                    <span className="exq-service__book">Book</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                  <PriceRow
+                    name={service.name}
+                    meta={`${String(service.durationMinutes)} min`}
+                    price={priceLabel(service)}
+                    to={`${bookPath}&service=${encodeURIComponent(service.id)}`}
+                    label={`Book ${service.name} with ${staff.name}, ${String(service.durationMinutes)} minutes, ${priceLabel(service)}`}
+                  />
+                </Reveal>
+              ))}
+            </ul>
+          </div>
         </section>
       ) : null}
 
       {work.status === 'ready' && work.data.photos.length > 0 ? (
-        <section className="exq-chair__work" aria-labelledby="exq-chair-work">
-          <p className="exq-label">Gallery</p>
-          <h2 id="exq-chair-work">{staff.name}'s work</h2>
-          <PhotoGrid photos={work.data.photos} columns="work" />
-          <p className="exq-home__more">
-            <Link to={`/gallery?staff=${encodeURIComponent(staff.slug)}`}>
-              See all of {staff.name}'s work
+        <section className="exq-wrap exq-section exq-chair__work" aria-labelledby="exq-chair-work">
+          <SectionHead label="The work" title={`${staff.name}'s work`} id="exq-chair-work">
+            <Link className="exq-link-row" to={`/gallery?staff=${encodeURIComponent(staff.slug)}`}>
+              See all
             </Link>
-          </p>
+          </SectionHead>
+          <PhotoGrid photos={work.data.photos} columns="work" />
         </section>
-      ) : null}
-
-      {staff.acceptsOnlineBooking ? (
-        <StickyCTA>
-          <ButtonLink to={bookPath} block>
-            Book {staff.name}
-          </ButtonLink>
-        </StickyCTA>
       ) : null}
     </article>
   );

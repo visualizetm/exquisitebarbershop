@@ -1,65 +1,44 @@
-/* Public page layout. Components come from the kit; this file only places them. */
+/*
+ * The public pages: Home, Services, The Chairs, a profile, Gallery and Visit.
+ * Phone first at 390; wider rules from 768 and 1024.
+ */
 
-/* Hero ------------------------------------------------------------------- */
-.exq-hero {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  /* The box has a floor, never a ceiling: if the words need more room (a phone), it grows. The
-     same floor in the ink and photo states keeps the page from jumping when the photo arrives. */
-  min-height: min(125vw, 72vh);
-  background: var(--ink);
-  color: var(--paper);
+/* Headings set line by line (the hero, the CTA band) ----------------------------- */
+.exq-lines {
+  margin: 0;
 }
-.exq-hero[data-state='ink'] {
-  background: var(--bg);
-}
-.exq-hero__img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.exq-hero__scrim {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to top,
-    rgba(17, 17, 17, 0.92) 0%,
-    rgba(17, 17, 17, 0.55) 45%,
-    rgba(17, 17, 17, 0.05) 100%
-  );
-}
-/* The brand mark in the ink hero: in the flow above the words, in the page column, so the two
-   can never overlap. The auto bottom margin keeps it at the top while the words sit at the bottom
-   of a tall hero. */
-.exq-hero__brand {
-  position: relative;
-  padding-top: var(--s6);
-  margin-bottom: auto;
-}
-.exq-hero__logo {
+.exq-lines__line {
   display: block;
-  width: min(56vw, 280px);
-  height: auto;
-  opacity: 0.9;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+  margin-bottom: -0.06em;
 }
-.exq-hero__content {
-  position: relative;
-  padding-block: var(--s5) var(--s6);
-  display: flex;
-  flex-direction: column;
+.exq-lines__text {
+  display: block;
+}
+.exq-lines__text[data-accent='true'] {
+  color: var(--accent-text);
+}
+
+/* Home: the hero --------------------------------------------------------------------- */
+.exq-hero {
+  background: var(--bg);
+  padding-block: var(--s5) var(--s7);
+}
+.exq-hero__grid {
+  display: grid;
+  gap: var(--s6);
+}
+.exq-hero__text {
+  display: grid;
   gap: var(--s4);
+  align-content: start;
 }
-.exq-hero__title {
-  color: var(--fg);
-  max-width: 14ch;
+.exq-hero__label {
+  text-wrap: balance;
 }
-.exq-hero__lead {
-  font-size: var(--fs-3);
-  max-width: 36ch;
+.exq-hero__sub {
+  max-width: 30em;
   color: var(--fg-2);
 }
 .exq-hero__actions {
@@ -67,278 +46,250 @@
   flex-wrap: wrap;
   gap: var(--s3);
 }
-@media (min-width: 768px) {
+.exq-hero__actions .exq-btn {
+  flex: 1 1 auto;
+}
+.exq-hero__info {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s3);
+  margin: var(--s2) 0 0;
+  padding-top: var(--s4);
+  border-top: var(--rule) solid var(--fg);
+}
+.exq-hero__info dt {
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.exq-hero__info dd {
+  min-height: 3.1em;
+  margin: var(--s1) 0 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.exq-hero__photo {
+  width: 100%;
+  max-width: 480px;
+}
+@media (min-width: 1024px) {
   .exq-hero {
-    min-height: clamp(480px, 56.25vw, 640px);
+    padding-block: var(--s8) var(--s6);
   }
-  .exq-hero__content {
-    padding-block: var(--s6) var(--s8);
+  .exq-hero__grid {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: center;
+    gap: var(--s8);
   }
-  .exq-hero__logo {
-    width: min(30vw, 360px);
+  .exq-hero__text {
+    gap: var(--s5);
+  }
+  .exq-hero__actions .exq-btn {
+    flex: 0 0 auto;
   }
 }
 
-/* Sections ---------------------------------------------------------------- */
-.exq-home__chairs h2,
-.exq-home__services h2,
-.exq-home__work h2,
-.exq-home__visit h2,
-.exq-services h1,
-.exq-chairs h1,
-.exq-gallery h1,
-.exq-visit h1,
-.exq-chair__openings h2,
-.exq-chair__services h2,
-.exq-chair__work h2 {
-  margin-top: var(--s1);
-  margin-bottom: var(--s5);
-}
+/* Home: sections --------------------------------------------------------------------- */
 .exq-home__more {
-  margin-top: var(--s5);
-  font-weight: 500;
+  margin-top: var(--s4);
 }
-.exq-home__cta h2 {
-  color: var(--fg);
-  margin-bottom: var(--s5);
+.exq-cta {
+  display: grid;
+  gap: var(--s5);
+  justify-items: start;
 }
-.exq-chairs__fallback {
-  margin-top: var(--s3);
+@media (min-width: 1024px) {
+  .exq-cta {
+    padding-block: var(--s9);
+  }
 }
 
-/* Service rows ----------------------------------------------------------- */
-.exq-services__menu .exq-chips {
-  margin-bottom: var(--s5);
+/* Menu rows ----------------------------------------------------------------------------- */
+.exq-services__menu {
+  display: grid;
+  gap: var(--s5);
 }
-.exq-services__list {
-  display: flex;
-  flex-direction: column;
-  border-top: 1px solid var(--border);
+.exq-menugroup__title {
+  padding-bottom: var(--s2);
+  border-bottom: var(--rule) solid var(--fg);
 }
 .exq-service {
   border-bottom: 1px solid var(--border);
 }
-.exq-service__row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  min-height: 64px;
-  padding: var(--s3) 0;
-  text-decoration: none;
-  color: var(--fg);
+.exq-service:last-child {
+  border-bottom: 0;
 }
-.exq-service__row:hover {
-  color: var(--fg);
+.exq-services__list[data-state='preview'] .exq-service:last-child {
+  border-bottom: 1px solid var(--border);
 }
-.exq-service__row:hover .exq-service__book {
-  filter: brightness(1.12);
+
+/* Chairs --------------------------------------------------------------------------------- */
+.exq-chairs__fallback {
+  margin-top: var(--s4);
 }
-.exq-service__main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s1);
+
+/* A profile -------------------------------------------------------------------------------- */
+.exq-chair__top {
+  display: grid;
+  gap: var(--s5);
 }
-.exq-service__name {
-  font-weight: 500;
-  font-size: var(--fs-3);
+.exq-chair__photo {
+  width: 100%;
+  max-width: 480px;
 }
-.exq-service__description {
+.exq-chair__intro {
+  display: grid;
+  gap: var(--s3);
+  align-content: center;
+  justify-items: start;
+}
+.exq-chair__title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.exq-chair__bio {
+  max-width: 34em;
+}
+.exq-chair__actions {
+  margin-top: var(--s2);
+}
+.exq-chair__walk-in {
+  font-weight: 600;
   color: var(--fg-2);
 }
-.exq-service__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--s4);
-}
-.exq-service__duration {
-  color: var(--fg-3);
-  font-variant-numeric: tabular-nums;
-}
-.exq-service__price {
-  font-weight: 500;
-}
-.exq-service__book {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-  padding: 0 var(--s4);
-  border-radius: var(--r-pill);
-  background: var(--accent);
-  color: var(--paper);
-  font-size: var(--fs-1);
-  font-weight: 500;
+.exq-chair__openings-note {
+  margin-top: var(--s3);
 }
 @media (min-width: 768px) {
-  .exq-service__row {
-    flex-direction: row;
+  .exq-chair__top {
+    grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
-    gap: var(--s5);
-  }
-  .exq-service__meta {
-    flex: 0 0 auto;
-    min-width: 280px;
-    justify-content: flex-end;
+    gap: var(--s7);
   }
 }
 
-/* Photo grid --------------------------------------------------------------- */
+/* Gallery grids ------------------------------------------------------------------------------ */
 .exq-photo-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s3);
+  gap: var(--s2);
+}
+@media (min-width: 768px) {
+  .exq-photo-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s4);
+  }
 }
 .exq-photo-grid__button {
   display: block;
   width: 100%;
   padding: 0;
   border: 0;
-  border-radius: var(--r-md);
-  overflow: hidden;
-  background: var(--card-2);
+  background: none;
   cursor: pointer;
-  aspect-ratio: 4 / 5;
-}
-.exq-photo-grid__button img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: filter 150ms;
-}
-.exq-photo-grid__button:hover img {
-  filter: brightness(1.08);
-}
-.exq-gallery__more {
-  margin-top: var(--s5);
 }
 .exq-gallery .exq-chips {
   margin-bottom: var(--s5);
 }
-@media (min-width: 1024px) {
-  .exq-photo-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--s4);
-  }
+.exq-gallery__more {
+  margin-top: var(--s6);
+  text-align: center;
 }
 
-/* Hours and visit --------------------------------------------------------- */
-.exq-hours {
-  margin: 0;
-  border-top: 1px solid var(--border);
-}
-.exq-hours__row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--s4);
-  padding: var(--s2) 0;
-  border-bottom: 1px solid var(--border);
-}
-.exq-hours__row[data-today='true'] {
-  font-weight: 700;
-  color: var(--accent-text);
-}
-.exq-hours__today {
-  font-size: var(--fs-1);
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  margin-left: var(--s2);
-}
-.exq-hours__row[data-state='closed'] .exq-hours__times {
-  color: var(--fg-3);
-}
-.exq-hours__row[data-today='true'][data-state='closed'] .exq-hours__times {
-  color: inherit;
-}
-.exq-hours dd {
-  margin: 0;
-}
+/* Visit ----------------------------------------------------------------------------------- */
 .exq-visit__grid {
   display: grid;
   gap: var(--s6);
 }
+.exq-visit__grid--loading {
+  min-height: 320px;
+}
 .exq-visit__where {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: var(--s5);
+  align-content: start;
+}
+.exq-visit__heading {
+  margin-bottom: var(--s3);
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.exq-visit__subheading {
+  margin-top: var(--s4);
+  font-size: var(--t-body);
+  letter-spacing: 0;
 }
 .exq-visit__address-text {
+  margin-bottom: var(--s4);
+  font-size: var(--t-h3);
   font-style: normal;
-  font-size: var(--fs-3);
+  font-weight: 700;
+  line-height: 1.25;
 }
 .exq-visit__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s3);
-  margin-top: var(--s4);
-}
-.exq-visit h2,
-.exq-visit h3 {
-  margin-bottom: var(--s3);
 }
 .exq-visit__policy-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: var(--s2);
-  margin-bottom: var(--s4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-@media (min-width: 768px) {
+.exq-hours {
+  margin: 0;
+  border-top: var(--rule) solid var(--fg);
+}
+.exq-hours__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: var(--hit);
+  padding: var(--s3) var(--s2);
+  border-bottom: 1px solid var(--border);
+}
+.exq-hours__row dt,
+.exq-hours__row dd {
+  margin: 0;
+}
+.exq-hours__row[data-state='closed'] {
+  color: var(--fg-3);
+}
+.exq-hours__row[data-today='true'] {
+  padding-left: var(--s3);
+  box-shadow: inset 4px 0 0 var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+.exq-hours__today {
+  margin-left: var(--s2);
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+@media (min-width: 1024px) {
   .exq-visit__grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--s8);
   }
 }
 
-/* Profile ----------------------------------------------------------------- */
-.exq-chair__top {
+/* Not found ---------------------------------------------------------------------------------- */
+.exq-not-found {
   display: grid;
   gap: var(--s5);
-  margin-bottom: var(--s7);
-}
-.exq-chair__photo {
-  max-width: 360px;
-}
-.exq-chair__intro {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
-}
-.exq-chair__chair {
-  align-self: flex-start;
-}
-.exq-chair__title {
-  font-size: var(--fs-3);
-  color: var(--fg-2);
-}
-.exq-chair__bio {
-  max-width: 60ch;
-}
-.exq-chair__actions {
-  margin-top: var(--s2);
-}
-.exq-chair__openings,
-.exq-chair__services,
-.exq-chair__work {
-  margin-bottom: var(--s7);
-}
-.exq-chair__openings-note {
-  margin-top: var(--s3);
-  font-size: var(--fs-1);
-}
-.exq-chair__walk-in {
-  font-weight: 500;
-  color: var(--fg-2);
-}
-@media (min-width: 768px) {
-  .exq-chair__top {
-    grid-template-columns: 360px 1fr;
-    align-items: start;
-    gap: var(--s7);
-  }
-  .exq-chair .exq-sticky-space {
-    display: none;
-  }
+  justify-items: start;
 }
 
 /* Setup ------------------------------------------------------------------ */
@@ -359,11 +310,11 @@
   gap: var(--s3);
 }
 .exq-setup__force {
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   color: var(--fg-2);
 }
 .exq-setup__error {
-  color: var(--danger);
+  color: var(--accent-text);
 }
 .exq-setup__list {
   display: flex;
@@ -377,11 +328,11 @@
   gap: var(--s3);
   padding: var(--s3) var(--s4);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-card);
   background: var(--card);
 }
 .exq-setup__status {
-  font-size: var(--fs-1);
+  font-size: var(--t-label);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -393,7 +344,7 @@
   color: var(--warn);
 }
 .exq-setup__check[data-state='fail'] .exq-setup__status {
-  color: var(--danger);
+  color: var(--accent-text);
 }
 .exq-setup__fix {
   color: var(--fg-2);

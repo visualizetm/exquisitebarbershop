@@ -12,7 +12,7 @@ async function signInAsOwner(page: Page) {
 
 test("the home strip shows today's chairs and each card books that chair", async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible();
   const cards = page.locator(
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );
@@ -73,10 +73,10 @@ test('the gallery opens a photo in the lightbox with the barber and a book link'
     has: page.locator('img[alt="Knotless braids by Dee"]'),
   });
   await tile.first().click();
-  const dialog = page.locator('dialog.exq-sheet[open]');
+  const dialog = page.locator('dialog.exq-dialog[open]');
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'By Dee' })).toBeVisible();
-  await expect(dialog.locator('img')).toHaveAttribute('alt', 'Knotless braids by Dee');
+  await expect(dialog.locator('img[alt="Knotless braids by Dee"]').first()).toBeVisible();
   await expect(dialog.getByRole('link', { name: 'Book Dee' })).toHaveAttribute(
     'href',
     '/book?barber=dee',

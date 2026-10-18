@@ -31,10 +31,11 @@ import {
 import {
   assertStorageEnabled,
   getStorage,
-  keyPrefix,
   maxUploadBytes,
+  newPhotoKey,
   storageEnabled,
 } from '../storage';
+import { ORPHAN_AGE_MS } from '../storage/cloudinary';
 import { actorOf } from './access';
 import type { ServiceMeta } from './adminBookings';
 import { cursors } from './adminBookings';
@@ -59,12 +60,15 @@ const ticketSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export function toPhotoView(p: PhotoDocument): PhotoView {
+  const storage = getStorage();
+  const delivery = storage.delivery?.(p.key);
   return {
     id: p._id,
-    url: getStorage().publicUrl(p.key),
+    url: storage.publicUrl(p.key),
     width: p.width,
     height: p.height,
     alt: p.alt,
+    ...(delivery ? { delivery } : {}),
   };
 }
 
@@ -148,10 +152,7 @@ export async function issueUploadUrl(
   await assertCanManage(principal, input.kind, staffId);
   if (staffId) await liveStaff(staffId);
 
-  const uuid = randomUUID();
-  const key =
-    keyPrefix() +
-    (input.kind === 'staff' ? `staff/${staffId ?? ''}/${uuid}.webp` : `${input.kind}/${uuid}.webp`);
+  const key = newPhotoKey(input.kind, staffId, randomUUID());
   const upload = await getStorage().presignUpload({
     key,
     contentType: input.contentType,
@@ -173,8 +174,9 @@ export async function issueUploadUrl(
   });
   return {
     uploadUrl: upload.url,
-    method: 'PUT',
-    headers: upload.headers,
+    method: upload.method,
+    headers: upload.method === 'PUT' ? upload.headers : {},
+    ...(upload.method === 'POST' ? { fields: upload.fields } : {}),
     key,
     ticket,
     expiresAt: upload.expiresAt.toISOString(),
@@ -197,12 +199,20 @@ export async function confirmUpload(
   if (!issued) throw new AppError('INVALID_TOKEN', 'That upload is not valid or has expired');
   await assertCanManage(principal, issued.kind, issued.s);
 
-  const stored = await getStorage().head(issued.k);
+  const storage = getStorage();
+  // On Cloudinary the browser reports what it got back; it must be the asset this ticket was issued
+  // for, so a ticket cannot be used to claim someone else's upload.
+  if (storage.name === 'cloudinary' && input.cloudinary?.publicId !== issued.k) {
+    throw new AppError('INVALID_TOKEN', 'That upload is not the one this ticket was issued for');
+  }
+  const stored = await storage.head(issued.k);
   if (!stored) throw new AppError('CONFLICT', 'The file was not uploaded');
   if (
     stored.size !== issued.n ||
     stored.contentType !== issued.ct ||
-    stored.size > maxUploadBytes()
+    stored.size > maxUploadBytes() ||
+    (storage.name === 'cloudinary' &&
+      (stored.version !== input.cloudinary?.version || stored.size !== input.cloudinary?.bytes))
   ) {
     // The object stays nowhere: a mismatch is removed before the caller hears about it.
     await getStorage().delete(issued.k);
@@ -300,6 +310,29 @@ export async function purgeDeletedPhotos(now: Date, limit = 50): Promise<number>
     purged += 1;
   }
   return purged;
+}
+
+/**
+ * Cloudinary only: removes assets in the folder that are over 24 hours old and that no photo record
+ * points at (an upload whose confirm never came, or a record that was lost). Safe to run repeatedly.
+ */
+export async function sweepStorageOrphans(now: Date, limit = 50): Promise<number> {
+  if (!storageEnabled()) return 0;
+  const storage = getStorage();
+  if (!storage.listOlderThan) return 0;
+  const candidates = await storage.listOlderThan(
+    new Date(now.getTime() - ORPHAN_AGE_MS),
+    limit * 4,
+  );
+  if (candidates.length === 0) return 0;
+  const known = new Set(await photosRepo.listAllKeys());
+  let swept = 0;
+  for (const key of candidates) {
+    if (known.has(key) || swept >= limit) continue;
+    await storage.delete(key);
+    swept += 1;
+  }
+  return swept;
 }
 
 /** Removes objects behind upload URLs that were issued over an hour ago and never confirmed. */

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { ToastContext } from './toastContext';
@@ -10,12 +10,63 @@ export interface ToastInput {
   tone?: ToastTone;
   /** An inline action such as Undo. The toast closes after it runs. */
   action?: { label: string; onClick: () => void };
-  /** Milliseconds before it goes away. Toasts with an action stay longer. */
+  /** Milliseconds before it goes away. Toasts with an action stay longer so Undo is usable. */
   duration?: number;
 }
 
 interface ToastItem extends ToastInput {
   id: number;
+}
+
+/** One toast. It leaves after its time, and the clock stops while the pointer or focus is on it. */
+function ToastView({ toast, onDone }: { toast: ToastItem; onDone: (id: number) => void }) {
+  const remaining = useRef(toast.duration ?? (toast.action ? 7000 : 4000));
+  const startedAt = useRef(0);
+  const timer = useRef<number | undefined>(undefined);
+
+  const start = useCallback(() => {
+    startedAt.current = Date.now();
+    timer.current = window.setTimeout(() => {
+      onDone(toast.id);
+    }, remaining.current);
+  }, [onDone, toast.id]);
+  const pause = useCallback(() => {
+    window.clearTimeout(timer.current);
+    remaining.current = Math.max(0, remaining.current - (Date.now() - startedAt.current));
+  }, []);
+
+  useEffect(() => {
+    start();
+    return () => {
+      window.clearTimeout(timer.current);
+    };
+  }, [start]);
+
+  return (
+    <div
+      className="exq-toast"
+      data-tone={toast.tone ?? 'neutral'}
+      role="status"
+      onMouseEnter={pause}
+      onMouseLeave={start}
+      onFocus={pause}
+      onBlur={start}
+    >
+      <span className="exq-toast__text">{toast.text}</span>
+      {toast.action ? (
+        <button
+          type="button"
+          className="exq-toast__action"
+          onClick={() => {
+            toast.action?.onClick();
+            onDone(toast.id);
+          }}
+        >
+          {toast.action.label}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -26,17 +77,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setItems((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const show = useCallback(
-    (input: ToastInput) => {
-      const id = next.current++;
-      setItems((prev) => [...prev.slice(-2), { ...input, id }]);
-      const ms = input.duration ?? (input.action ? 7000 : 4000);
-      window.setTimeout(() => {
-        dismiss(id);
-      }, ms);
-    },
-    [dismiss],
-  );
+  const show = useCallback((input: ToastInput) => {
+    const id = next.current++;
+    setItems((prev) => [...prev.slice(-2), { ...input, id }]);
+  }, []);
 
   const value = useMemo(() => show, [show]);
 
@@ -45,21 +89,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="exq-toasts" aria-live="polite" aria-atomic="false">
         {items.map((t) => (
-          <div key={t.id} className="exq-toast" data-tone={t.tone ?? 'neutral'} role="status">
-            <span className="exq-toast__text">{t.text}</span>
-            {t.action ? (
-              <button
-                type="button"
-                className="exq-toast__action"
-                onClick={() => {
-                  t.action?.onClick();
-                  dismiss(t.id);
-                }}
-              >
-                {t.action.label}
-              </button>
-            ) : null}
-          </div>
+          <ToastView key={t.id} toast={t} onDone={dismiss} />
         ))}
       </div>
     </ToastContext.Provider>

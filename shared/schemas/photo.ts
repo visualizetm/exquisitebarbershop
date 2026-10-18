@@ -12,15 +12,24 @@ export const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 /** An optional folder every key sits under, so preview deployments can share a bucket. */
 export const KEY_PREFIX_PATTERN = /^[a-z0-9][a-z0-9-]*\/$/;
 
+/** A Cloudinary folder: lowercase segments joined by slashes, such as exquisite/production. */
+export const CLOUDINARY_FOLDER_PATTERN = /^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/;
+
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+
 /**
  * Object keys are always server generated: `staff/<staffId>/<uuid>.webp`,
  * `gallery/<uuid>.webp` or `hero/<uuid>.webp`, under R2_KEY_PREFIX when set.
  */
+const FILE_KEY = new RegExp(
+  `^(?:[a-z0-9][a-z0-9-]*/)?(?:staff/[0-9a-f]{24}|gallery|hero)/${UUID_PATTERN}\\.webp$`,
+);
+/** A Cloudinary public id: the folder, then a uuid, with no extension. */
+const CLOUDINARY_KEY = new RegExp(`^(?:[a-z0-9][a-z0-9_-]*/)+${UUID_PATTERN}$`);
+
 export const photoKeySchema = z
   .string()
-  .regex(
-    /^(?:[a-z0-9][a-z0-9-]*\/)?(?:staff\/[0-9a-f]{24}|gallery|hero)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/,
-  );
+  .refine((key) => FILE_KEY.test(key) || CLOUDINARY_KEY.test(key), 'Not a photo key');
 
 export const photoDocumentSchema = z.object({
   _id: idSchema,

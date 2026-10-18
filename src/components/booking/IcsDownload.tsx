@@ -30,7 +30,7 @@ export function IcsDownload({
   return (
     <a
       className="exq-ics-download exq-btn"
-      data-variant="secondary"
+      data-variant="outline"
       data-size="md"
       href={href}
       download={`appointment-${booking.referenceCode}.ics`}

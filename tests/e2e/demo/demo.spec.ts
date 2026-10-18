@@ -62,7 +62,7 @@ test('the first visit sets the shop up by itself and Home loads fully', async ({
   const response = await page.goto('/');
   expect(response?.status()).toBe(200);
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible();
   const cards = page.locator(
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );
@@ -87,28 +87,24 @@ test('every public page renders with intentional placeholders and no console err
   const errors = watchConsole(page);
   await page.goto('/');
   await expectUp(page);
-  // No photos yet: the ink hero carries the white primary mark, and the work section is hidden.
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
-  await expect(page.locator('.exq-hero__logo')).toHaveAttribute(
-    'src',
-    '/brand/exq-primary-white.svg',
-  );
+  // No photos yet: the text hero stands alone, and the work section is hidden.
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expect(page.locator('.exq-home__work')).toHaveCount(0);
 
   await page.goto('/services');
   await expectUp(page);
-  await expect(page.locator('.exq-service__row').first()).toBeVisible();
+  await expect(page.locator('.exq-pricerow').first()).toBeVisible();
 
   await page.goto('/chairs');
   await expectUp(page);
   await expect(
-    page.locator('.exq-chaircard .exq-arch[data-state="placeholder"]').first(),
+    page.locator('.exq-chaircard .exq-photoframe[data-state="placeholder"]').first(),
   ).toBeVisible();
 
   await page.goto('/chairs/marcus');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
-  await expect(page.locator('.exq-chair .exq-arch[data-state="placeholder"]')).toBeVisible();
+  await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await expect(page.locator('.exq-chair__work')).toHaveCount(0);
 
   await page.goto('/gallery');
@@ -117,7 +113,7 @@ test('every public page renders with intentional placeholders and no console err
 
   await page.goto('/visit');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Visit', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Find us', exact: true })).toBeVisible();
 
   await page.goto('/manage');
   await expectUp(page);
@@ -237,7 +233,7 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
   // Public pages, signed out: the portrait, the gallery tile, the work strip and the hero.
   await page.context().clearCookies();
   await page.goto('/chairs/marcus');
-  const arch = page.locator('.exq-chair .exq-arch[data-state="loaded"] img');
+  const arch = page.locator('.exq-chair .exq-photoframe[data-state="loaded"] img');
   await expect(arch).toHaveAttribute('src', /\/api\/media\//);
   expect(await arch.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await expect(page.locator('.exq-chair__work .exq-photo-grid__item').first()).toBeVisible();
@@ -264,7 +260,7 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
   await page.goto('/admin/settings/demo');
   await expect(page.getByRole('heading', { name: 'Demo data', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Reset demo data' }).click();
-  const sheet = page.locator('dialog.exq-sheet[open]');
+  const sheet = page.locator('dialog.exq-dialog[open]');
   await expect(sheet.getByRole('heading', { name: 'Reset demo data?' })).toBeVisible();
   await sheet.getByRole('button', { name: 'Reset it' }).click();
 
@@ -281,11 +277,11 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
   );
   await page.context().clearCookies();
   await page.goto('/chairs/marcus');
-  await expect(page.locator('.exq-chair .exq-arch[data-state="placeholder"]')).toBeVisible();
+  await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await page.goto('/gallery');
   await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();
   await page.goto('/');
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expectUp(page);
   expect(errors).toEqual([]);
 });

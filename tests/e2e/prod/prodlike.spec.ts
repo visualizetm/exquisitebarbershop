@@ -128,9 +128,9 @@ test('every public page loads fully with placeholders and no console errors', as
 
   await page.goto('/');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible();
   // The ink hero and the initials placeholders stand in for photos; nothing looks unfinished.
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expect(page.locator('.exq-home__work')).toHaveCount(0);
   await expect(page.locator('.exq-nav__logo-wide .exq-mark--light')).toBeVisible();
   await expect(page.locator('.exq-nav__logo-narrow .exq-mark--light')).toBeHidden();
@@ -140,11 +140,11 @@ test('every public page loads fully with placeholders and no console errors', as
   await page.goto('/services');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Services', exact: true })).toBeVisible();
-  await expect(page.locator('.exq-service__row').first()).toBeVisible();
+  await expect(page.locator('.exq-pricerow').first()).toBeVisible();
 
   await page.goto('/chairs');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'The chairs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pick your chair' })).toBeVisible();
   const cards = page.locator('.exq-chaircard[data-state]:not([data-state="loading"])');
   await expect(cards.first()).toBeVisible();
   expect(await cards.count()).toBeGreaterThanOrEqual(6);
@@ -152,7 +152,7 @@ test('every public page loads fully with placeholders and no console errors', as
   await page.goto('/chairs/marcus');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
-  await expect(page.locator('.exq-chair .exq-arch[data-state="placeholder"]')).toBeVisible();
+  await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await expect(page.locator('.exq-chair__work')).toHaveCount(0);
 
   await page.goto('/gallery');
@@ -163,7 +163,7 @@ test('every public page loads fully with placeholders and no console errors', as
 
   await page.goto('/visit');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Visit', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Find us', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Call/ })).toBeVisible();
 
   await page.goto('/manage');
@@ -254,4 +254,12 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('the kit page is not in the production build', async ({ page }) => {
+  await page.goto('/kit');
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+  const index = await (await page.request.get('/')).text();
+  const assets = [...index.matchAll(/\/assets\/[\w.-]+\.js/g)].map((m) => m[0]);
+  for (const asset of assets) expect(asset).not.toMatch(/Kit/i);
 });

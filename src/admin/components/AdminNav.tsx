@@ -76,7 +76,7 @@ export function AdminNav() {
     </p>
   );
   const signOut = (
-    <Button variant="secondary" size="sm" loading={working} onClick={() => void logout()}>
+    <Button variant="outline" size="sm" loading={working} onClick={() => void logout()}>
       Sign out
     </Button>
   );
