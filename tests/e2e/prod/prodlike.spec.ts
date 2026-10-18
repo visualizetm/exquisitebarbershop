@@ -226,7 +226,7 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await page.getByLabel('Email').fill(PRODLIKE_OWNER.email);
   await page.getByLabel('Password').fill(PRODLIKE_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
   // The sidebar is ink in both themes, so it carries the white mark.
   await expect(page.locator('.exq-sidebar .exq-mark--dark')).toHaveAttribute(
     'src',
@@ -253,7 +253,7 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
 
   // Signing in left no 401 behind, and the day loaded.
   await page.goto('/admin');
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

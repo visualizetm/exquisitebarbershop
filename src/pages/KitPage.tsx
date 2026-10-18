@@ -91,6 +91,7 @@ function Specimen() {
               text: 'Walk ins welcome',
               linkLabel: 'Book online',
               linkUrl: '/book',
+              endsOn: '',
             }}
             loading={false}
           />

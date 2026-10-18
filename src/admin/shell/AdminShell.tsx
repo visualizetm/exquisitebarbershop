@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, matchPath, useLocation, useNavigate } from 'react-router';
 import BarChart01 from '@untitled-ui/icons-react/build/esm/BarChart01';
 import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
 import ClipboardCheck from '@untitled-ui/icons-react/build/esm/ClipboardCheck';
@@ -21,11 +21,28 @@ import {
 } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { todayInShop, shopDateLabel } from '../format';
-import { NewBookingPage } from '../pages/NewBookingPage';
+import { BookingSheet } from '../bookings/BookingSheet';
+import { AnnouncementPanel } from '../panels/AnnouncementPanel';
+import { BarberOutPanel } from '../panels/BarberOutPanel';
+import { BlockTimePanel } from '../panels/BlockTimePanel';
+import { NewBookingPanel } from '../panels/NewBookingPanel';
 import { useMe, useSession } from '../useSession';
 import { GlobalSearch } from './GlobalSearch';
 import { ICON, OWNER_ITEMS } from './ownerNav';
 import { QuickContext, type NewBookingPrefill, type QuickApi } from './quick';
+
+type Panel =
+  | { kind: 'new'; prefill: NewBookingPrefill }
+  | { kind: 'block' }
+  | { kind: 'out'; staffId?: string | undefined }
+  | { kind: 'announcement' };
+
+const PANEL_TITLE: Record<Panel['kind'], string> = {
+  new: 'New booking',
+  block: 'Block time',
+  out: 'Barber out',
+  announcement: 'Announcement',
+};
 
 /**
  * The owner dashboard frame: the ink sidebar from 1024px, a top bar with search, today's date
@@ -38,28 +55,45 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [newOpen, setNewOpen] = useState<NewBookingPrefill | null>(null);
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [leaving, setLeaving] = useState(false);
 
   const changed = useCallback(() => {
     setVersion((v) => v + 1);
   }, []);
+  // On the bookings pages the open booking lives in the address (/admin/bookings/:id), so a link
+  // to one works and the back button closes it. Anywhere else it is plain state.
+  const routeId = matchPath('/admin/bookings/:id', location.pathname)?.params.id ?? null;
+  const onBookings = location.pathname.startsWith('/admin/bookings');
+  const activeBookingId = routeId ?? bookingId;
   const api = useMemo<QuickApi>(
     () => ({
       openNewBooking: (prefill = {}) => {
-        setNewOpen(prefill);
+        setPanel({ kind: 'new', prefill });
       },
       openBooking: (id) => {
-        void navigate(`/admin/bookings/${id}`);
+        if (onBookings) void navigate(`/admin/bookings/${id}${location.search}`);
+        else setBookingId(id);
       },
       closeBooking: () => {
-        void navigate('/admin/bookings');
+        setBookingId(null);
+        if (routeId) void navigate(`/admin/bookings${location.search}`);
+      },
+      openBlock: () => {
+        setPanel({ kind: 'block' });
+      },
+      openBarberOut: (staffId) => {
+        setPanel({ kind: 'out', staffId });
+      },
+      openAnnouncement: () => {
+        setPanel({ kind: 'announcement' });
       },
       version,
       changed,
     }),
-    [navigate, version, changed],
+    [navigate, version, changed, onBookings, routeId, location.search],
   );
 
   async function logout() {
@@ -134,7 +168,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               icon={<Plus aria-hidden="true" />}
               aria-label="New booking"
               onClick={() => {
-                setNewOpen({});
+                setPanel({ kind: 'new', prefill: {} });
               }}
             >
               New booking
@@ -203,15 +237,50 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </Sheet>
 
         <Sheet
-          open={newOpen !== null}
-          title="New booking"
-          size="lg"
+          open={panel !== null}
+          title={panel ? PANEL_TITLE[panel.kind] : ''}
+          size={panel?.kind === 'new' ? 'lg' : 'md'}
           onClose={() => {
-            setNewOpen(null);
+            setPanel(null);
           }}
         >
-          <div className="exq-adm">
-            <NewBookingPage embedded />
+          <div className="exq-panelhost">
+            {panel?.kind === 'new' ? (
+              <NewBookingPanel
+                prefill={panel.prefill}
+                onDone={() => {
+                  setPanel(null);
+                }}
+              />
+            ) : null}
+            {panel?.kind === 'block' ? (
+              <BlockTimePanel
+                onDone={() => {
+                  setPanel(null);
+                }}
+              />
+            ) : null}
+            {panel?.kind === 'out' ? (
+              <BarberOutPanel
+                {...(panel.staffId ? { staffId: panel.staffId } : {})}
+                onDone={() => {
+                  setPanel(null);
+                }}
+              />
+            ) : null}
+            {panel?.kind === 'announcement' ? (
+              <AnnouncementPanel
+                onDone={() => {
+                  setPanel(null);
+                }}
+              />
+            ) : null}
+          </div>
+        </Sheet>
+
+        <Sheet open={activeBookingId !== null} title="Booking" size="lg" onClose={api.closeBooking}>
+          <div className="exq-panelhost">
+            {activeBookingId ? <BookingSheet key={activeBookingId} id={activeBookingId} /> : null}
           </div>
         </Sheet>
       </div>

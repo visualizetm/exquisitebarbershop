@@ -25,8 +25,8 @@ import { applyScheduleChange } from './scheduleChanges';
 
 type Resolutions = readonly ConflictResolution[] | undefined;
 
-function outcome(r: { kept: string[]; cancelled: string[] }): ConflictOutcome {
-  return { kept: r.kept, cancelled: r.cancelled };
+function outcome(r: { kept: string[]; moved: string[]; cancelled: string[] }): ConflictOutcome {
+  return { kept: r.kept, moved: r.moved, cancelled: r.cancelled };
 }
 
 async function requireLiveStaff(staffId: string): Promise<void> {

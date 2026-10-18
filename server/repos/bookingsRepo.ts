@@ -404,3 +404,103 @@ export async function backfillNameKeys(): Promise<number> {
     total += batch.length;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Owner bookings table and overview
+// ---------------------------------------------------------------------------
+
+export interface TableFilter {
+  /** Start time bounds: from inclusive, to exclusive. */
+  from?: Date;
+  to?: Date;
+  staffId?: string;
+  status?: BookingStatus;
+}
+
+function tableQuery(filter: TableFilter): Filter<BookingDocument> {
+  const query: Filter<BookingDocument> = {};
+  if (filter.from || filter.to) {
+    query.startAt = {
+      ...(filter.from ? { $gte: filter.from } : {}),
+      ...(filter.to ? { $lt: filter.to } : {}),
+    };
+  }
+  if (filter.staffId) query.staffId = filter.staffId;
+  if (filter.status) query.status = filter.status;
+  return query;
+}
+
+export type TableSortKey = 'when' | 'client' | 'status' | 'source';
+
+/** One page of the owner's bookings table: stable order, the chosen column first. */
+export async function tablePage(
+  filter: TableFilter,
+  sort: { key: TableSortKey; dir: 1 | -1 },
+  skip: number,
+  limit: number,
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  const first: Record<TableSortKey, string> = {
+    when: 'startAt',
+    client: 'nameKey',
+    status: 'status',
+    source: 'source',
+  };
+  const order: Record<string, 1 | -1> = { [first[sort.key]]: sort.dir };
+  if (sort.key !== 'when') order.startAt = -1;
+  order._id = 1;
+  return col
+    .find(tableQuery(filter), sessionOf(options))
+    .sort(order)
+    .skip(skip)
+    .limit(limit)
+    .toArray();
+}
+
+export async function countTable(filter: TableFilter, options?: RepoOptions): Promise<number> {
+  const col = await collection('bookings');
+  return col.countDocuments(tableQuery(filter), sessionOf(options));
+}
+
+export async function findBookingsByIds(
+  ids: readonly string[],
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  if (ids.length === 0) return [];
+  const col = await collection('bookings');
+  return col.find({ _id: { $in: [...ids] } }, sessionOf(options)).toArray();
+}
+
+/** Bookings that start in [start, end), any status, for the weekly counts. */
+export async function listBookingsStartingBetween(
+  range: { start: Date; end: Date },
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  return col
+    .find({ startAt: { $gte: range.start, $lt: range.end } }, sessionOf(options))
+    .sort({ startAt: 1 })
+    .toArray();
+}
+
+/**
+ * Gives a confirmed booking to another chair at the same time. The time does not change, so the
+ * customer's manage link stays valid (no token version bump).
+ */
+export async function moveBookingToStaff(
+  id: string,
+  staffId: string,
+  now: Date,
+  options?: RepoOptions,
+): Promise<BookingDocument> {
+  const col = await collection('bookings');
+  const updated = await col.findOneAndUpdate(
+    { _id: id, status: 'confirmed' },
+    { $set: { staffId, staffRequested: true, updatedAt: now } },
+    { returnDocument: 'after', ...sessionOf(options) },
+  );
+  if (!updated)
+    throw new AppError('BOOKING_NOT_RESCHEDULABLE', 'This booking can no longer be moved');
+  return updated;
+}

@@ -141,7 +141,7 @@ export async function deleteService(
     alsoAffected: (upcoming) => upcoming.filter((b) => b.services.some((s) => s.serviceId === id)),
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds,
   };
 }
@@ -230,6 +230,7 @@ export async function updateStaff(
     body: {
       staff: toStaffView(change.result, await loginStaffIds()),
       kept: change.kept,
+      moved: change.moved,
       cancelled: change.cancelled,
     },
     outboxIds: change.outboxIds,
@@ -292,7 +293,7 @@ export async function deleteStaff(
     },
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds,
   };
 }

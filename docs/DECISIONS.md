@@ -630,3 +630,28 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   the keyboard and screen reader path.
 - D11-06 `/kit` (development builds only) gained a Dashboard section with the new parts, and its test
   lists it.
+- D11-07 The resolver gained Move on the server (it was listed for milestone 3 but milestone 2's quick
+  actions already needed it). `moveOptions` on each affected booking lists chairs that do every service,
+  work the whole duration and hold no lock over it. Applying a move releases the old locks and takes the
+  same time on the new chair inside the change's transaction, so a booking made a moment earlier makes the
+  lock insert fail and the whole change (time off included) is undone with SLOT_TAKEN. A test runs two
+  changes racing for the same chair.
+- D11-08 A move is silent: the time does not change, so the customer's manage link stays valid (no token
+  version bump) and no email goes out. The owner can still choose Cancel and notify, or Resend confirmation
+  from the booking panel. The alternative, an email on every move, would also have invalidated the
+  customer's link.
+- D11-09 Alerts are a collection (`alerts`, index `{ status, createdAt }`) with a repository and a count of
+  still-affected bookings computed when the overview loads. A barber-out alert whose bookings have all been
+  moved or cancelled closes itself on the next load. Alerts are created by the barber portal (milestone 5).
+- D11-10 `GET /api/shop` is no longer cached for 60 seconds (`max-age=0, must-revalidate`) because Website
+  changes must show right away. It is one small document read.
+- D11-11 The booking panel opens from the address only on the bookings pages (`/admin/bookings/:id` over the
+  list, back button closes it). From the overview, the schedule and the search it is plain state, so those
+  pages keep their own address.
+- D11-12 Booking status chips say Confirmed, Done, No show and Cancelled (the API value stays `completed`).
+- D11-13 The legacy element rules in `admin.css` (every `button`, `ul`) now apply only to unclassed
+  elements and `exq-adm-*` classes, so kit parts inside the dashboard are never restyled by them. They go
+  when the last old page is rebuilt.
+- D11-14 Announcement text is up to 90 characters and may have a last day (`endsOn`); the public API
+  switches it off after that day. Social links are three optional https URLs checked against the network's
+  own host (`social` in shop settings), seeded with Instagram only.

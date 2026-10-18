@@ -34,6 +34,7 @@ import {
   rescheduleBookingAs,
   rescheduleStart,
 } from './bookingService';
+import { shopSnapshot } from './bookingNotifications';
 import {
   toAdminBookingView,
   toBookingView,
@@ -101,7 +102,11 @@ function workingView(staffId: string, date: string, source: ScheduleSource) {
   return { ranges: rangeViews(day.ranges), reason: day.reason };
 }
 
-function whoIsInFor(staff: StaffDocument, date: string, source: ScheduleSource): WhoIsInEntry {
+export function whoIsInFor(
+  staff: StaffDocument,
+  date: string,
+  source: ScheduleSource,
+): WhoIsInEntry {
   const working = workingRangesFor(staff._id, date, source);
   const bounds = shopDayBounds(date);
   const blocks = source.timeBlocks.filter(
@@ -128,7 +133,7 @@ async function viewOf(booking: BookingDocument): Promise<AdminBookingView> {
   return toAdminBookingView(booking, staff ?? unknownStaff(booking.staffId));
 }
 
-function activeStaff(staff: StaffDocument[]): StaffDocument[] {
+export function activeStaff(staff: StaffDocument[]): StaffDocument[] {
   return staff.filter((s) => s.deletedAt === null).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
@@ -366,7 +371,61 @@ export async function bookingDetail(
     audit: audit.map(toAuditView),
     outbox: outbox.map(toOutboxView),
     transitions: allowedTransitions(principal, scope, fresh.status),
+    managePath: scope.kind === 'all' ? manageLinkFor(fresh) : null,
   };
+}
+
+/**
+ * Sends the customer their confirmation again (a lost email, a corrected address). Needs an email
+ * on file and a confirmed booking. Each resend is its own message, so the sequence based dedupe
+ * key that stops double sends does not apply.
+ */
+export async function resendConfirmation(
+  principal: Principal,
+  scope: Scope,
+  id: string,
+  meta: ServiceMeta,
+): Promise<Changed<{ ok: true }>> {
+  const booking = await loadBookingInScope(scope, id);
+  const email = booking.customer.email;
+  if (!email) throw new AppError('CONFLICT', 'This booking has no email address to send to');
+  if (booking.status !== 'confirmed')
+    throw new AppError('INVALID_TRANSITION', 'Only a confirmed booking can be confirmed again');
+  const [settings, staff] = await Promise.all([
+    shopSettingsRepo.requireShopSettings(),
+    staffRepo.findStaffById(booking.staffId),
+  ]);
+  const row = await emailOutboxRepo.enqueueOutboxMessage(
+    {
+      channel: 'email',
+      to: email,
+      template: 'bookingConfirmed',
+      payload: {
+        booking: toBookingView(booking, staff ?? unknownStaff(booking.staffId)),
+        shop: shopSnapshot(settings),
+        previousStartAt: null,
+        cancelReason: null,
+        managePath: manageLinkFor(booking),
+      },
+      dedupeKey: `booking:${booking._id}:resend:${meta.now.getTime()}`,
+      bookingId: booking._id,
+    },
+    meta.now,
+  );
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: 'booking.resend',
+      entityType: 'booking',
+      entityId: booking._id,
+      before: null,
+      after: null,
+      meta: null,
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+  return { body: { ok: true }, outboxIds: row ? [row._id] : [] };
 }
 
 // ---------------------------------------------------------------------------

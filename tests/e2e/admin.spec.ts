@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { DateTime } from 'luxon';
 import { E2E_BARBER, E2E_OWNER } from '../../scripts/e2e-accounts';
 import { myScheduleResponseSchema } from '../../shared/api/admin';
+import { bookPublicly } from './owner';
 
 const SHOP_ZONE = 'America/New_York';
 
@@ -21,29 +22,6 @@ async function signIn(page: Page, account: { email: string; password: string }) 
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
 
-/** Books Classic Cut with a chair through the public flow; returns the code and start time. */
-async function bookPublicly(
-  page: Page,
-  barber: string,
-): Promise<{ code: string; startAt: string }> {
-  await page.goto(`/book?barber=${barber}`);
-  await page.getByLabel(/Classic Cut/).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.locator('.exq-day-option[data-state="available"] button').first().click();
-  const first = page.locator('.exq-time-option button').first();
-  const startAt = (await first.getAttribute('data-start')) ?? '';
-  await first.click();
-  await page.getByLabel('Name').fill('Admin Flow Customer');
-  await page
-    .getByLabel('Mobile phone')
-    .fill(`215555${String(Math.floor(Math.random() * 9000) + 1000)}`);
-  await page.getByRole('button', { name: 'Review booking' }).click();
-  await page.getByRole('button', { name: 'Confirm booking' }).click();
-  await expect(page.getByRole('heading', { name: 'You are booked' })).toBeFocused();
-  const code = (await page.locator('.exq-book-done__code').textContent()) ?? '';
-  return { code: code.trim(), startAt };
-}
-
 test('a logged-out visit to /admin redirects to the sign in page', async ({ page }) => {
   await page.goto('/admin/schedule');
   await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Fschedule$/);
@@ -52,7 +30,7 @@ test('a logged-out visit to /admin redirects to the sign in page', async ({ page
   expect(api.status()).toBe(401);
 });
 
-test('a public booking shows as new for the owner, who marks it completed', async ({
+test('a public booking shows as new for the owner, who marks it done and undoes it', async ({
   page,
   context,
 }) => {
@@ -60,26 +38,28 @@ test('a public booking shows as new for the owner, who marks it completed', asyn
   await context.clearCookies();
 
   await signIn(page, E2E_OWNER);
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
-  await expect(page.locator('.exq-adm-today__new')).toContainText('New online bookings');
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Bookings', exact: true }).click();
-  await page.getByLabel('Search name, phone or reference').fill(code);
-  await page.getByRole('button', { name: 'Show bookings' }).click();
-  // The search by reference code narrows the list to this one booking.
-  await expect(page.locator('.exq-adm-bookings__item')).toHaveCount(1);
-  const row = page.locator('.exq-adm-bookings__item').filter({ hasText: 'Admin Flow Customer' });
-  await expect(row).toHaveAttribute('data-new', 'true');
-  await expect(row.locator('.exq-adm-bookings__new')).toHaveText('New');
+  // It is flagged New in the list until the owner opens it.
+  await page.goto('/admin/bookings');
+  await expect(page.locator('.exq-table__new').first()).toBeVisible();
 
-  await row.getByRole('link').click();
-  await expect(page.locator('.exq-adm-booking')).toHaveAttribute('data-state', 'confirmed');
-  await page.getByRole('button', { name: 'Mark completed' }).click();
-  await expect(page.locator('.exq-adm-booking')).toHaveAttribute('data-state', 'completed');
-  await expect(page.locator('.exq-adm-booking__status')).toHaveText('Completed');
-  // Opening it cleared the new flag, and the change can be undone.
-  await expect(page.locator('.exq-adm-booking')).toHaveAttribute('data-new', 'false');
-  await expect(page.getByRole('button', { name: 'Undo, back to confirmed' })).toBeVisible();
+  // The search finds it by its code and opens the panel.
+  await page.goto('/admin');
+  const search = page.getByRole('combobox', { name: 'Search bookings and customers' });
+  await search.fill(code);
+  await page
+    .getByRole('option', { name: /Admin Flow Customer/ })
+    .first()
+    .click();
+  const sheet = page.getByRole('dialog', { name: 'Booking' });
+  await expect(sheet.getByText(code)).toBeVisible();
+  await sheet.getByRole('button', { name: 'Mark done' }).click();
+  await expect(sheet.locator('.exq-status-chip[data-status="completed"]')).toBeVisible();
+  // The toast offers Undo, and the history lists the change.
+  await page.getByRole('button', { name: 'Undo' }).first().click();
+  await expect(sheet.locator('.exq-status-chip[data-status="confirmed"]')).toBeVisible();
+  await expect(sheet.getByText(/Status changed, by the owner/).first()).toBeVisible();
 });
 
 test('the owner blocks an hour and that time disappears from /book', async ({ page, browser }) => {
@@ -94,14 +74,15 @@ test('the owner blocks an hour and that time disappears from /book', async ({ pa
   const local = DateTime.fromISO(startAt, { zone: SHOP_ZONE });
 
   await signIn(page, E2E_OWNER);
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
-  await page.goto('/admin/block');
-  await page.getByLabel('Chair').selectOption({ label: 'Jay' });
-  await page.getByLabel('Day', { exact: true }).fill(local.toISODate() ?? '');
-  await page.getByLabel('From', { exact: true }).fill(local.toFormat('HH:mm'));
-  await page.getByLabel('To', { exact: true }).fill(local.plus({ hours: 1 }).toFormat('HH:mm'));
-  await page.getByRole('button', { name: 'Block this time' }).click();
-  await expect(page.locator('.exq-adm-blockform__done')).toContainText('Time blocked');
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await page.getByRole('button', { name: 'Block time' }).click();
+  const panel = page.getByRole('dialog', { name: 'Block time' });
+  await panel.getByLabel('Barber').selectOption({ label: 'Jay' });
+  await panel.getByLabel('Day', { exact: true }).fill(local.toISODate() ?? '');
+  await panel.getByLabel('From', { exact: true }).fill(local.toFormat('HH:mm'));
+  await panel.getByLabel('To', { exact: true }).fill(local.plus({ hours: 1 }).toFormat('HH:mm'));
+  await panel.getByRole('button', { name: 'Block this time' }).click();
+  await expect(page.getByText('Time blocked.')).toBeVisible();
 
   // A new customer in a fresh browser: availability is cached for ten seconds per browser.
   const customer = await (await browser.newContext()).newPage();

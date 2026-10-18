@@ -27794,9 +27794,11 @@ var announcementLinkSchema = external_exports.string().trim().max(200).refine(
 );
 var announcementSchema = external_exports.object({
   enabled: external_exports.boolean(),
-  text: external_exports.string().trim().max(80),
+  text: external_exports.string().trim().max(90),
   linkLabel: external_exports.string().trim().max(30),
-  linkUrl: announcementLinkSchema
+  linkUrl: announcementLinkSchema,
+  /** The last day the strip shows (shop date), or empty to keep it until it is switched off. */
+  endsOn: external_exports.union([external_exports.literal(""), isoDateSchema]).default("")
 }).refine((a) => !a.enabled || a.text.length > 0, {
   path: ["text"],
   message: "Add the announcement text, or switch it off"
@@ -27808,7 +27810,35 @@ var DEFAULT_ANNOUNCEMENT = {
   enabled: true,
   text: "Walk ins welcome",
   linkLabel: "Book online",
-  linkUrl: "/book"
+  linkUrl: "/book",
+  endsOn: ""
+};
+function announcementIsLive(a, today) {
+  return a.enabled && (a.endsOn === "" || today <= a.endsOn);
+}
+function socialUrl(domain2, label) {
+  return external_exports.string().trim().max(200).refine(
+    (v) => {
+      if (v === "") return true;
+      try {
+        const url2 = new URL(v);
+        return url2.protocol === "https:" && (url2.hostname === domain2 || url2.hostname.endsWith(`.${domain2}`));
+      } catch {
+        return false;
+      }
+    },
+    { message: `Use the full https address of the ${label} page, or leave it empty` }
+  );
+}
+var socialLinksSchema = external_exports.object({
+  instagramUrl: socialUrl("instagram.com", "Instagram"),
+  tiktokUrl: socialUrl("tiktok.com", "TikTok"),
+  facebookUrl: socialUrl("facebook.com", "Facebook")
+});
+var DEFAULT_SOCIAL_LINKS = {
+  instagramUrl: "",
+  tiktokUrl: "",
+  facebookUrl: ""
 };
 var shopSettingsDocumentSchema = external_exports.object({
   _id: external_exports.literal(SHOP_SETTINGS_ID),
@@ -27825,6 +27855,7 @@ var shopSettingsDocumentSchema = external_exports.object({
   features: featureFlagsSchema,
   permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
   announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
+  social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
   nextOpenServiceId: idSchema.nullable().default(null)
 }).extend(timestampsSchema.shape);
@@ -28272,7 +28303,8 @@ var COLLECTIONS = {
   scheduleGuards: "scheduleGuards",
   photos: "photos",
   pendingUploads: "pendingUploads",
-  systemState: "systemState"
+  systemState: "systemState",
+  alerts: "alerts"
 };
 var DAY_SECONDS = 24 * 60 * 60;
 var INDEXES = [
@@ -28353,6 +28385,13 @@ var INDEXES = [
     keys: { nameKey: 1, startAt: -1 },
     options: { name: "by_name_key" },
     reason: "The owner's search finds a customer by the start of the name, any case or accent."
+  },
+  // alerts
+  {
+    collection: "alerts",
+    keys: { status: 1, createdAt: 1 },
+    options: { name: "open_queue" },
+    reason: "The overview lists open alerts, oldest first, without a collection scan."
   },
   // slotLocks
   {
@@ -28591,7 +28630,9 @@ var apiErrorSchema = external_exports.object({
         endAt: external_exports.iso.datetime(),
         customerName: external_exports.string(),
         services: external_exports.array(external_exports.string()),
-        hasEmail: external_exports.boolean()
+        hasEmail: external_exports.boolean(),
+        /** Chairs that do every service of this booking and are free for all of it: where it can move. */
+        moveOptions: external_exports.array(external_exports.object({ staffId: external_exports.string(), staffName: external_exports.string() })).optional()
       })
     ).optional(),
     /** For SLOT_TAKEN: the next open times so the UI can offer them right away. */
@@ -28643,7 +28684,12 @@ function fill(doc) {
     ...doc,
     permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
     nextOpenServiceId: stored.nextOpenServiceId ?? null,
-    announcement: stored.announcement ?? DEFAULT_ANNOUNCEMENT
+    announcement: { ...DEFAULT_ANNOUNCEMENT, ...stored.announcement },
+    // Shops set up before the social links existed keep their Instagram link from the handle.
+    social: stored.social ?? {
+      ...DEFAULT_SOCIAL_LINKS,
+      instagramUrl: `https://instagram.com/${doc.instagramHandle}`
+    }
   };
 }
 function withDefaults(doc) {
@@ -29165,20 +29211,25 @@ __export(bookingsRepo_exports, {
   backfillNameKeys: () => backfillNameKeys,
   cancelBooking: () => cancelBooking,
   countOpenBookingsForPhone: () => countOpenBookingsForPhone,
+  countTable: () => countTable,
   countUnseenOnline: () => countUnseenOnline,
   findBookingById: () => findBookingById,
   findBookingByReferenceCode: () => findBookingByReferenceCode,
+  findBookingsByIds: () => findBookingsByIds,
   insertBooking: () => insertBooking,
   listBookingsBetween: () => listBookingsBetween,
   listBookingsForPhone: () => listBookingsForPhone,
   listBookingsPage: () => listBookingsPage,
+  listBookingsStartingBetween: () => listBookingsStartingBetween,
   listUpcomingConfirmed: () => listUpcomingConfirmed,
   markOwnerSeen: () => markOwnerSeen,
+  moveBookingToStaff: () => moveBookingToStaff,
   rescheduleBooking: () => rescheduleBooking,
   restoreBooking: () => restoreBooking,
   searchBookings: () => searchBookings,
   searchCustomers: () => searchCustomers,
   setBookingStatus: () => setBookingStatus,
+  tablePage: () => tablePage,
   transitionBookingStatus: () => transitionBookingStatus,
   updateBookingNotes: () => updateBookingNotes
 });
@@ -29475,6 +29526,55 @@ async function backfillNameKeys() {
     );
     total += batch.length;
   }
+}
+function tableQuery(filter) {
+  const query = {};
+  if (filter.from || filter.to) {
+    query.startAt = {
+      ...filter.from ? { $gte: filter.from } : {},
+      ...filter.to ? { $lt: filter.to } : {}
+    };
+  }
+  if (filter.staffId) query.staffId = filter.staffId;
+  if (filter.status) query.status = filter.status;
+  return query;
+}
+async function tablePage(filter, sort, skip, limit, options) {
+  const col = await collection("bookings");
+  const first = {
+    when: "startAt",
+    client: "nameKey",
+    status: "status",
+    source: "source"
+  };
+  const order = { [first[sort.key]]: sort.dir };
+  if (sort.key !== "when") order.startAt = -1;
+  order._id = 1;
+  return col.find(tableQuery(filter), sessionOf(options)).sort(order).skip(skip).limit(limit).toArray();
+}
+async function countTable(filter, options) {
+  const col = await collection("bookings");
+  return col.countDocuments(tableQuery(filter), sessionOf(options));
+}
+async function findBookingsByIds(ids, options) {
+  if (ids.length === 0) return [];
+  const col = await collection("bookings");
+  return col.find({ _id: { $in: [...ids] } }, sessionOf(options)).toArray();
+}
+async function listBookingsStartingBetween(range, options) {
+  const col = await collection("bookings");
+  return col.find({ startAt: { $gte: range.start, $lt: range.end } }, sessionOf(options)).sort({ startAt: 1 }).toArray();
+}
+async function moveBookingToStaff(id, staffId, now2, options) {
+  const col = await collection("bookings");
+  const updated = await col.findOneAndUpdate(
+    { _id: id, status: "confirmed" },
+    { $set: { staffId, staffRequested: true, updatedAt: now2 } },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
+  if (!updated)
+    throw new AppError("BOOKING_NOT_RESCHEDULABLE", "This booking can no longer be moved");
+  return updated;
 }
 
 // server/repos/slotLocksRepo.ts
@@ -30433,6 +30533,66 @@ async function releaseDemoLock(holder) {
   await col.deleteOne({ _id: "demoLock", holder });
 }
 
+// server/repos/alertsRepo.ts
+var alertsRepo_exports = {};
+__export(alertsRepo_exports, {
+  closeAlert: () => closeAlert,
+  findAlertById: () => findAlertById,
+  insertAlert: () => insertAlert,
+  listOpenAlerts: () => listOpenAlerts
+});
+
+// shared/schemas/alert.ts
+var alertKindSchema = external_exports.enum(["barberOut", "timeOffRequest"]);
+var alertDocumentSchema = external_exports.object({
+  _id: idSchema,
+  kind: alertKindSchema,
+  staffId: idSchema,
+  /** Shop dates covered, first and last day inclusive. */
+  fromDate: isoDateSchema,
+  toDate: isoDateSchema,
+  /** The same range as UTC instants: what the time off covers. */
+  startAt: external_exports.date(),
+  endAt: external_exports.date(),
+  reason: external_exports.string().trim().max(200).nullable(),
+  status: external_exports.enum(["open", "resolved", "dismissed"]),
+  resolvedAt: external_exports.date().nullable(),
+  resolvedByUserId: idSchema.nullable()
+}).extend(timestampsSchema.shape);
+
+// server/repos/alertsRepo.ts
+async function insertAlert(input2, now2, options) {
+  const doc = alertDocumentSchema.parse({
+    _id: newId(),
+    ...input2,
+    status: "open",
+    resolvedAt: null,
+    resolvedByUserId: null,
+    createdAt: now2,
+    updatedAt: now2
+  });
+  const col = await collection("alerts");
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findAlertById(id, options) {
+  const col = await collection("alerts");
+  return col.findOne({ _id: id }, sessionOf(options));
+}
+async function listOpenAlerts(options) {
+  const col = await collection("alerts");
+  return col.find({ status: "open" }, sessionOf(options)).sort({ createdAt: 1 }).toArray();
+}
+async function closeAlert(id, status, userId, now2, options) {
+  const col = await collection("alerts");
+  const result = await col.updateOne(
+    { _id: id, status: "open" },
+    { $set: { status, resolvedAt: now2, resolvedByUserId: userId, updatedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+
 // server/auth/cookies.ts
 var SESSION_COOKIE = "__Host-exq_session";
 var TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -30672,12 +30832,20 @@ var shopSettingsSeed = {
     rewards: false,
     smsReminders: false
   },
-  // PLACEHOLDER the owner edits this in prompt 11; until then the strip says this
+  // PLACEHOLDER the owner edits this in Website, Announcement
   announcement: {
     enabled: true,
     text: "Walk ins welcome",
     linkLabel: "Book online",
-    linkUrl: "/book"
+    linkUrl: "/book",
+    endsOn: ""
+  },
+  social: {
+    instagramUrl: "https://instagram.com/exquisitebarberbeauty",
+    tiktokUrl: "",
+    // PLACEHOLDER
+    facebookUrl: ""
+    // PLACEHOLDER
   }
 };
 var ownerLoginSeed = {
@@ -32483,6 +32651,7 @@ var publicShopSchema = external_exports.object({
   }),
   /** The line in the strip above the header. Absent from older responses; the client then shows none. */
   announcement: announcementSchema.optional(),
+  social: socialLinksSchema.optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
@@ -32553,7 +32722,7 @@ var meResponseSchema = external_exports.object({
   staff: publicStaffSchema.nullable(),
   permissions: external_exports.object({ barbersCanBlockTime: external_exports.boolean() }),
   /** What this deployment can do at all, whatever the role: photos need storage, demo is the showcase mode. */
-  features: external_exports.object({ photos: external_exports.boolean(), demo: external_exports.boolean() })
+  features: external_exports.object({ photos: external_exports.boolean(), demo: external_exports.boolean(), email: external_exports.boolean() })
 });
 var changePasswordRequestSchema = external_exports.object({
   currentPassword: external_exports.string().min(1).max(256),
@@ -32563,15 +32732,21 @@ var okResponseSchema = external_exports.object({ ok: external_exports.literal(tr
 var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
 
 // shared/api/admin.ts
-var conflictActionSchema = external_exports.enum(["keep", "cancel", "cancelAndNotify"]);
+var conflictActionSchema = external_exports.enum(["keep", "move", "cancel", "cancelAndNotify"]);
 var conflictResolutionSchema = external_exports.object({
   bookingId: idSchema,
-  action: conflictActionSchema
+  action: conflictActionSchema,
+  /** For "move": the chair that takes the booking at the same time. */
+  toStaffId: idSchema.optional()
+}).refine((v) => v.action === "move" === (v.toStaffId !== void 0), {
+  message: "Moving a booking needs a chair, and only a move has one",
+  path: ["toStaffId"]
 });
 var resolutionsSchema = external_exports.array(conflictResolutionSchema).max(500).optional();
 var conflictOutcomeSchema = external_exports.object({
   kept: external_exports.array(idSchema),
-  cancelled: external_exports.array(idSchema)
+  cancelled: external_exports.array(idSchema),
+  moved: external_exports.array(idSchema).default([])
 });
 var adminBookingViewSchema = bookingViewSchema.extend({
   /** An online booking the owner has not opened yet. */
@@ -32700,7 +32875,9 @@ var bookingDetailResponseSchema = external_exports.object({
   audit: external_exports.array(auditEntryViewSchema),
   outbox: external_exports.array(outboxMessageViewSchema),
   /** Allowed next statuses for the caller. */
-  transitions: external_exports.array(bookingStatusSchema)
+  transitions: external_exports.array(bookingStatusSchema),
+  /** The customer's manage link path (owner only), for "Copy manage link". Empty for barbers. */
+  managePath: external_exports.string().nullable().default(null)
 });
 var bookingResponseSchema = external_exports.object({ booking: adminBookingViewSchema });
 var statusChangeRequestSchema = external_exports.object({
@@ -32903,6 +33080,88 @@ var issuedPasswordResponseSchema = external_exports.object({
   temporaryPassword: external_exports.string()
 });
 var loginResponseSchema = external_exports.object({ user: loginViewSchema });
+var overviewStatSchema = external_exports.object({ value: external_exports.int(), compare: external_exports.int().nullable() });
+var activityKindSchema = external_exports.enum(["booked", "canceled", "rescheduled", "noShow", "walkIn"]);
+var activityEntrySchema = external_exports.object({
+  id: idSchema,
+  at: external_exports.iso.datetime(),
+  kind: activityKindSchema,
+  bookingId: idSchema,
+  clientName: external_exports.string(),
+  staffName: external_exports.string(),
+  status: bookingStatusSchema
+});
+var overviewChairSchema = external_exports.object({
+  staff: staffRefSchema,
+  photo: photoViewSchema.nullable(),
+  status: external_exports.enum(["in", "off", "closed"]),
+  current: adminBookingViewSchema.nullable(),
+  next: adminBookingViewSchema.nullable()
+});
+var alertViewSchema = external_exports.object({
+  id: idSchema,
+  kind: alertKindSchema,
+  staffId: idSchema,
+  staffName: external_exports.string(),
+  fromDate: isoDateSchema,
+  toDate: isoDateSchema,
+  startAt: external_exports.iso.datetime(),
+  endAt: external_exports.iso.datetime(),
+  reason: external_exports.string().nullable(),
+  createdAt: external_exports.iso.datetime(),
+  /** Confirmed bookings the owner still has to decide on, counted when the page loads. */
+  affectedCount: external_exports.int()
+});
+var overviewResponseSchema = external_exports.object({
+  date: isoDateSchema,
+  now: external_exports.iso.datetime(),
+  /** "Tuesday": the compare line says "vs last Tuesday". */
+  weekdayName: external_exports.string(),
+  stats: external_exports.object({
+    bookings: overviewStatSchema,
+    bookedValueCents: overviewStatSchema,
+    walkIns: overviewStatSchema,
+    noShowsWeek: overviewStatSchema
+  }),
+  /** Monday to Sunday: bookings this week against last week. */
+  week: external_exports.array(
+    external_exports.object({
+      date: isoDateSchema,
+      label: external_exports.string(),
+      thisWeek: external_exports.int(),
+      lastWeek: external_exports.int(),
+      today: external_exports.boolean()
+    })
+  ),
+  chairs: external_exports.array(overviewChairSchema),
+  activity: external_exports.array(activityEntrySchema),
+  alerts: external_exports.array(alertViewSchema)
+});
+var bookingRangeSchema = external_exports.enum(["today", "tomorrow", "week", "upcoming", "past", "all"]);
+var bookingSortKeySchema = external_exports.enum(["when", "client", "status", "source"]);
+var BOOKING_TABLE_PAGE_SIZE = 25;
+var bookingTableQuerySchema = external_exports.object({
+  range: bookingRangeSchema.default("upcoming"),
+  staffId: idSchema.optional(),
+  status: bookingStatusSchema.optional(),
+  sort: bookingSortKeySchema.default("when"),
+  dir: external_exports.enum(["asc", "desc"]).optional(),
+  page: external_exports.coerce.number().int().min(1).max(1e4).default(1)
+});
+var bookingTableResponseSchema = external_exports.object({
+  rows: external_exports.array(adminBookingViewSchema),
+  total: external_exports.int(),
+  page: external_exports.int(),
+  pageSize: external_exports.int(),
+  /** How many bookings each quick filter holds, with the barber and status filters applied. */
+  counts: external_exports.object({
+    today: external_exports.int(),
+    tomorrow: external_exports.int(),
+    week: external_exports.int(),
+    upcoming: external_exports.int(),
+    past: external_exports.int()
+  })
+});
 var searchQuerySchema = external_exports.object({ q: external_exports.string().trim().max(80).default("") });
 var searchBookingHitSchema = external_exports.object({
   id: idSchema,
@@ -35291,14 +35550,14 @@ async function todaySummary(date5, now2) {
     bookingsRepo_exports.listBookingsBetween(shopDayBounds(day)),
     bookingsRepo_exports.countUnseenOnline()
   ]);
-  const live = bookings.filter((b) => b.status !== "cancelled");
+  const live2 = bookings.filter((b) => b.status !== "cancelled");
   const count = (status) => bookings.filter((b) => b.status === status).length;
   const whoIsIn2 = activeStaff(data.staff).map((s2) => whoIsInFor(s2, day, data.source));
   const isToday = day === shopDateOf(now2);
   const nextUp = activeStaff(data.staff).filter(
-    (s2) => live.some((b) => b.staffId === s2._id) || whoIsIn2.some((w) => w.staff.id === s2._id && w.status === "in")
+    (s2) => live2.some((b) => b.staffId === s2._id) || whoIsIn2.some((w) => w.staff.id === s2._id && w.status === "in")
   ).map((s2) => {
-    const next2 = live.filter(
+    const next2 = live2.filter(
       (b) => b.staffId === s2._id && b.status === "confirmed" && (!isToday || b.endAt > now2)
     ).sort((a, b) => a.startAt.getTime() - b.startAt.getTime())[0];
     return { staff: toStaffRef(s2), booking: next2 ? toAdminBookingView(next2, s2) : null };
@@ -35314,10 +35573,10 @@ async function todaySummary(date5, now2) {
       cancelled: count("cancelled"),
       newOnline
     },
-    chairsBooked: new Set(live.map((b) => b.staffId)).size,
+    chairsBooked: new Set(live2.map((b) => b.staffId)).size,
     chairsWorking: whoIsIn2.filter((w) => w.status === "in").length,
-    expectedRevenueCents: live.filter((b) => b.status === "confirmed" || b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
-    completedRevenueCents: live.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
+    expectedRevenueCents: live2.filter((b) => b.status === "confirmed" || b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
+    completedRevenueCents: live2.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
     nextUp,
     whoIsIn: whoIsIn2
   };
@@ -35445,8 +35704,51 @@ async function bookingDetail(principal, scope, id, now2) {
     booking: await viewOf(fresh),
     audit: audit2.map(toAuditView),
     outbox: outbox.map(toOutboxView),
-    transitions: allowedTransitions(principal, scope, fresh.status)
+    transitions: allowedTransitions(principal, scope, fresh.status),
+    managePath: scope.kind === "all" ? manageLinkFor(fresh) : null
   };
+}
+async function resendConfirmation(principal, scope, id, meta3) {
+  const booking = await loadBookingInScope(scope, id);
+  const email3 = booking.customer.email;
+  if (!email3) throw new AppError("CONFLICT", "This booking has no email address to send to");
+  if (booking.status !== "confirmed")
+    throw new AppError("INVALID_TRANSITION", "Only a confirmed booking can be confirmed again");
+  const [settings, staff] = await Promise.all([
+    shopSettingsRepo_exports.requireShopSettings(),
+    staffRepo_exports.findStaffById(booking.staffId)
+  ]);
+  const row = await emailOutboxRepo_exports.enqueueOutboxMessage(
+    {
+      channel: "email",
+      to: email3,
+      template: "bookingConfirmed",
+      payload: {
+        booking: toBookingView(booking, staff ?? unknownStaff(booking.staffId)),
+        shop: shopSnapshot(settings),
+        previousStartAt: null,
+        cancelReason: null,
+        managePath: manageLinkFor(booking)
+      },
+      dedupeKey: `booking:${booking._id}:resend:${meta3.now.getTime()}`,
+      bookingId: booking._id
+    },
+    meta3.now
+  );
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action: "booking.resend",
+      entityType: "booking",
+      entityId: booking._id,
+      before: null,
+      after: null,
+      meta: null,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+  return { body: { ok: true }, outboxIds: row ? [row._id] : [] };
 }
 async function changeBookingStatus(principal, scope, id, input2, meta3) {
   const booking = await loadBookingInScope(scope, id);
@@ -35698,10 +36000,30 @@ function summarize(booking, staffById) {
     hasEmail: booking.customer.email !== null
   };
 }
+function heldSpan(booking) {
+  return { start: booking.startAt, end: addMinutes(booking.endAt, booking.bufferMinutes) };
+}
+function canTake(snapshot, booking, staff) {
+  if (staff.deletedAt !== null) return false;
+  if (!booking.services.every((s2) => staff.serviceIds.includes(s2.serviceId))) return false;
+  return isWithinWorkingTime({ ...booking, staffId: staff._id }, staff, snapshot.source);
+}
+async function moveOptionsFor(snapshot, booking, session) {
+  const options = [];
+  const sorted = [...snapshot.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const staff of sorted) {
+    if (staff._id === booking.staffId || !canTake(snapshot, booking, staff)) continue;
+    const locks = await slotLocksRepo_exports.listSlotLocksForStaff(staff._id, heldSpan(booking), {
+      session
+    });
+    if (locks.length === 0) options.push({ staffId: staff._id, staffName: staff.name });
+  }
+  return options;
+}
 async function applyScheduleChange(change) {
-  const choices = new Map((change.resolutions ?? []).map((r) => [r.bookingId, r.action]));
-  if (!change.allowCancel && [...choices.values()].some((a) => a !== "keep")) {
-    throw new AppError("FORBIDDEN", "Only the owner can cancel bookings");
+  const choices = new Map((change.resolutions ?? []).map((r) => [r.bookingId, r]));
+  if (!change.allowCancel && [...choices.values()].some((r) => r.action !== "keep")) {
+    throw new AppError("FORBIDDEN", "Only the owner can cancel or move bookings");
   }
   return withTransaction(async (session) => {
     const scope = change.staffIds === "all" ? null : [...change.staffIds];
@@ -35722,15 +36044,62 @@ async function applyScheduleChange(change) {
       throw new AppError(
         "SCHEDULE_CONFLICT",
         unresolved.length === 1 ? "One upcoming booking would fall outside working time. Choose what to do with it." : `${unresolved.length} upcoming bookings would fall outside working time. Choose what to do with each.`,
-        { extra: { affected: [...affected.values()].map((b) => summarize(b, after.staffById)) } }
+        {
+          extra: {
+            affected: await Promise.all(
+              [...affected.values()].map(async (b) => ({
+                ...summarize(b, after.staffById),
+                moveOptions: await moveOptionsFor(after, b, session)
+              }))
+            )
+          }
+        }
       );
     }
     const kept = [];
+    const moved = [];
     const cancelled = [];
     const outboxIds = [];
     const settings = affected.size > 0 ? await shopSettingsRepo_exports.requireShopSettings({ session }) : null;
     for (const booking of affected.values()) {
-      const action = choices.get(booking._id);
+      const choice = choices.get(booking._id);
+      const action = choice?.action;
+      if (choice?.action === "move" && choice.toStaffId) {
+        const target = after.staffById.get(choice.toStaffId);
+        if (!target || !canTake(after, booking, target)) {
+          throw new AppError(
+            "SLOT_TAKEN",
+            `${target?.name ?? "That chair"} can not take this booking`
+          );
+        }
+        await scheduleGuardsRepo_exports.bumpScheduleGuards([target._id], change.now, { session });
+        await slotLocksRepo_exports.releaseSlotLocks(booking._id, { session });
+        await slotLocksRepo_exports.acquireSlotLocks(
+          target._id,
+          heldSpan(booking),
+          { holderType: "booking", holderId: booking._id },
+          change.now,
+          { session }
+        );
+        await relockBlocks(booking.staffId, heldSpan(booking), change.now, session);
+        await bookingsRepo_exports.moveBookingToStaff(booking._id, target._id, change.now, { session });
+        await auditLogRepo_exports.appendAuditEntry(
+          {
+            actor: change.actor,
+            action: "booking.move",
+            entityType: "booking",
+            entityId: booking._id,
+            before: { staffId: booking.staffId },
+            after: { staffId: target._id },
+            meta: { change: change.audit.action },
+            requestId: change.requestId
+          },
+          change.now,
+          { session }
+        );
+        moved.push(booking._id);
+        continue;
+      }
       if (action === "keep" || !settings) {
         kept.push(booking._id);
         await auditLogRepo_exports.appendAuditEntry(
@@ -35775,13 +36144,13 @@ async function applyScheduleChange(change) {
         entityId: change.audit.entityId(result),
         before: null,
         after: null,
-        meta: { ...change.audit.meta, kept, cancelled },
+        meta: { ...change.audit.meta, kept, moved, cancelled },
         requestId: change.requestId
       },
       change.now,
       { session }
     );
-    return { result, kept, cancelled, outboxIds };
+    return { result, kept, moved, cancelled, outboxIds };
   });
 }
 
@@ -35862,7 +36231,7 @@ async function deleteService(principal, id, resolutions, meta3) {
     alsoAffected: (upcoming) => upcoming.filter((b) => b.services.some((s2) => s2.serviceId === id))
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds
   };
 }
@@ -35930,6 +36299,7 @@ async function updateStaff2(principal, id, input2, meta3) {
     body: {
       staff: toStaffView(change.result, await loginStaffIds()),
       kept: change.kept,
+      moved: change.moved,
       cancelled: change.cancelled
     },
     outboxIds: change.outboxIds
@@ -35975,7 +36345,7 @@ async function deleteStaff(principal, id, resolutions, meta3) {
     }
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds
   };
 }
@@ -36072,7 +36442,7 @@ async function retryOutboxMessage(principal, id, meta3) {
 
 // server/services/adminSchedule.ts
 function outcome(r) {
-  return { kept: r.kept, cancelled: r.cancelled };
+  return { kept: r.kept, moved: r.moved, cancelled: r.cancelled };
 }
 async function requireLiveStaff(staffId) {
   const staff = await staffRepo_exports.findStaffById(staffId);
@@ -36342,495 +36712,6 @@ async function deleteClosure2(principal, id, resolutions, meta3) {
     }
   });
   return { body: { ok: true, ...outcome(change) }, outboxIds: change.outboxIds };
-}
-
-// server/services/adminSearch.ts
-var LIMIT = 5;
-var backfilled = null;
-function ensureNameKeys() {
-  backfilled ??= bookingsRepo_exports.backfillNameKeys().catch((error62) => {
-    backfilled = null;
-    throw error62;
-  });
-  return backfilled;
-}
-async function adminSearch(rawQuery) {
-  const query = classifySearch(rawQuery);
-  if (query.kind === "empty") return { bookings: [], customers: [] };
-  await ensureNameKeys();
-  const match2 = query.kind === "phone" ? { kind: "phone", digits: query.digits } : { kind: "name", key: query.key };
-  const code = query.kind === "text" ? normalizeReferenceCode(rawQuery) : null;
-  const [byCode, found, customers, staff] = await Promise.all([
-    code ? bookingsRepo_exports.findBookingByReferenceCode(code) : Promise.resolve(null),
-    bookingsRepo_exports.searchBookings(match2, LIMIT),
-    bookingsRepo_exports.searchCustomers(match2, LIMIT),
-    staffRepo_exports.listStaff({ includeDeleted: true })
-  ]);
-  const staffById = new Map(staff.map((s2) => [s2._id, s2]));
-  const unique = /* @__PURE__ */ new Map();
-  for (const b of [...byCode ? [byCode] : [], ...found]) unique.set(b._id, b);
-  return {
-    bookings: [...unique.values()].slice(0, LIMIT).map((b) => ({
-      id: b._id,
-      referenceCode: b.referenceCode,
-      customerName: b.customer.name,
-      startAt: b.startAt.toISOString(),
-      status: b.status,
-      staffName: staffById.get(b.staffId)?.name ?? "Unknown",
-      services: b.services.map((s2) => s2.name).join(", ")
-    })),
-    customers: customers.map((c) => ({
-      phone: formatUsPhone(c.phone),
-      name: c.name,
-      visits: c.visits,
-      lastVisitAt: c.lastVisitAt.toISOString()
-    }))
-  };
-}
-
-// server/http/context.ts
-function principalOf(ctx) {
-  if (!ctx.principal) throw new AppError("AUTH_REQUIRED", "Please sign in");
-  return ctx.principal;
-}
-function metaOf(ctx) {
-  return {
-    ip: clientIp(ctx.req),
-    userAgent: headerValue(ctx.req, "user-agent"),
-    requestId: ctx.requestId,
-    now: ctx.now
-  };
-}
-function idempotencyKeyOf(ctx) {
-  const key = headerValue(ctx.req, "idempotency-key");
-  if (!key || key.length < 8 || key.length > 128) {
-    throw new AppError(
-      "BAD_REQUEST",
-      "An Idempotency-Key header of 8 to 128 characters is required"
-    );
-  }
-  return key;
-}
-var NO_STORE = { "Cache-Control": "no-store" };
-
-// server/http/delivery.ts
-function scheduleDelivery(outboxIds) {
-  if (outboxIds.length === 0 || getEnv2().OUTBOX_AFTER_RESPONSE === "off") return;
-  runAfterResponse("outbox.deliver", () => deliverOutboxIds(outboxIds));
-}
-
-// server/http/routes/admin.ts
-var idParams = external_exports.object({ id: idSchema });
-function owner(method, path, handler2) {
-  return { method, path, auth: "owner", handler: handler2 };
-}
-function ctxScope(ctx) {
-  const principal = principalOf(ctx);
-  return { principal, scope: ownerScope(principal) };
-}
-var adminRoutes = [
-  // Today, schedule, who is in --------------------------------------------
-  owner("GET", "/api/admin/today", async (ctx) => {
-    ctxScope(ctx);
-    const { date: date5 } = parseQuery(ctx, dateQuerySchema);
-    return {
-      body: todayResponseSchema.parse(await todaySummary(date5, ctx.now)),
-      headers: NO_STORE
-    };
-  }),
-  owner("GET", "/api/admin/schedule", async (ctx) => {
-    const { scope } = ctxScope(ctx);
-    const query = parseQuery(ctx, scheduleQuerySchema);
-    return {
-      body: scheduleResponseSchema.parse(await scheduleForDay(scope, query, ctx.now)),
-      headers: NO_STORE
-    };
-  }),
-  owner("GET", "/api/admin/whos-in", async (ctx) => {
-    ctxScope(ctx);
-    const { date: date5 } = parseQuery(ctx, dateQuerySchema);
-    return { body: whoIsInResponseSchema.parse(await whoIsIn(date5, ctx.now)), headers: NO_STORE };
-  }),
-  // Search ----------------------------------------------------------------
-  owner("GET", "/api/admin/search", async (ctx) => {
-    ctxScope(ctx);
-    const { q } = parseQuery(ctx, searchQuerySchema);
-    return { body: searchResponseSchema.parse(await adminSearch(q)), headers: NO_STORE };
-  }),
-  // Bookings --------------------------------------------------------------
-  owner("GET", "/api/admin/bookings", async (ctx) => {
-    const { scope } = ctxScope(ctx);
-    const query = parseQuery(ctx, bookingListQuerySchema);
-    return {
-      body: bookingListResponseSchema.parse(await listBookings(scope, query)),
-      headers: NO_STORE
-    };
-  }),
-  owner("POST", "/api/admin/bookings", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const key = idempotencyKeyOf(ctx);
-    const input2 = await parseBody(ctx, manualBookingRequestSchema);
-    const outcome2 = await createManualBooking(input2, actorOf2(principal), {
-      ...metaOf(ctx),
-      idempotencyKey: key
-    });
-    scheduleDelivery(outcome2.outboxIds);
-    return {
-      status: outcome2.status,
-      body: manualBookingResponseSchema.parse(outcome2.body),
-      headers: { ...NO_STORE, "Idempotent-Replayed": outcome2.replayed ? "true" : "false" }
-    };
-  }),
-  owner("GET", "/api/admin/bookings/:id", async (ctx) => {
-    const { principal, scope } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    return {
-      body: bookingDetailResponseSchema.parse(await bookingDetail(principal, scope, id, ctx.now)),
-      headers: NO_STORE
-    };
-  }),
-  owner("PATCH", "/api/admin/bookings/:id", async (ctx) => {
-    const { principal, scope } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const { notes } = await parseBody(ctx, bookingNotesRequestSchema);
-    return {
-      body: bookingResponseSchema.parse(
-        await updateBookingNotes2(principal, scope, id, notes, metaOf(ctx))
-      )
-    };
-  }),
-  owner("POST", "/api/admin/bookings/:id/status", async (ctx) => {
-    const { principal, scope } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const input2 = await parseBody(ctx, statusChangeRequestSchema);
-    const done = await changeBookingStatus(principal, scope, id, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: bookingResponseSchema.parse(done.body) };
-  }),
-  owner("POST", "/api/admin/bookings/:id/cancel", async (ctx) => {
-    const { principal, scope } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const input2 = await parseBody(ctx, ownerCancelRequestSchema);
-    const done = await changeBookingStatus(
-      principal,
-      scope,
-      id,
-      { status: "cancelled", notify: input2.notify, reason: input2.reason },
-      metaOf(ctx)
-    );
-    scheduleDelivery(done.outboxIds);
-    return { body: bookingResponseSchema.parse(done.body) };
-  }),
-  owner("POST", "/api/admin/bookings/:id/reschedule", async (ctx) => {
-    const { principal, scope } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const input2 = await parseBody(ctx, ownerRescheduleRequestSchema);
-    const done = await ownerReschedule(principal, scope, id, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return {
-      body: createBookingResponseSchema.extend({ booking: bookingResponseSchema.shape.booking }).parse(done.body)
-    };
-  }),
-  // Customers -------------------------------------------------------------
-  owner("GET", "/api/admin/customers", async (ctx) => {
-    ctxScope(ctx);
-    const { phone } = parseQuery(ctx, customerQuerySchema);
-    return {
-      body: customerResponseSchema.parse(await customerByPhone(phone, ctx.now)),
-      headers: NO_STORE
-    };
-  }),
-  // Time blocks and day status -------------------------------------------
-  owner("GET", "/api/admin/time-blocks", async (ctx) => {
-    ctxScope(ctx);
-    const query = parseQuery(ctx, timeBlockListQuerySchema);
-    return {
-      body: timeBlockListResponseSchema.parse(await listTimeBlocks(query)),
-      headers: NO_STORE
-    };
-  }),
-  owner("POST", "/api/admin/time-blocks", async (ctx) => {
-    const { principal, scope } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, timeBlockCreateRequestSchema);
-    const done = await createTimeBlock(principal, scope, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { status: 201, body: timeBlockResponseSchema.parse(done.body) };
-  }),
-  owner("DELETE", "/api/admin/time-blocks/:id", async (ctx) => {
-    const { principal, scope } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
-    const done = await deleteTimeBlock2(principal, scope, id, resolutions, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: conflictOnlyResponseSchema.parse(done.body) };
-  }),
-  owner("POST", "/api/admin/staff/:id/day", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const input2 = await parseBody(ctx, dayStatusRequestSchema);
-    const done = await setDayStatus(principal, id, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: dayStatusResponseSchema.parse(done.body) };
-  }),
-  // Services --------------------------------------------------------------
-  owner("GET", "/api/admin/services", async (ctx) => {
-    ctxScope(ctx);
-    return { body: serviceListResponseSchema.parse(await listServices2()), headers: NO_STORE };
-  }),
-  owner("POST", "/api/admin/services", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, serviceCreateRequestSchema);
-    return {
-      status: 201,
-      body: serviceResponseSchema.parse(await createService(principal, input2, metaOf(ctx)))
-    };
-  }),
-  owner("PATCH", "/api/admin/services/:id", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const input2 = await parseBody(ctx, serviceUpdateRequestSchema);
-    return {
-      body: serviceResponseSchema.parse(await updateService2(principal, id, input2, metaOf(ctx)))
-    };
-  }),
-  owner("DELETE", "/api/admin/services/:id", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
-    const done = await deleteService(principal, id, resolutions, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: conflictOnlyResponseSchema.parse(done.body) };
-  }),
-  // Staff -----------------------------------------------------------------
-  owner("GET", "/api/admin/staff", async (ctx) => {
-    ctxScope(ctx);
-    return { body: staffListResponseSchema.parse(await listStaff2()), headers: NO_STORE };
-  }),
-  owner("POST", "/api/admin/staff", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, staffCreateRequestSchema);
-    return {
-      status: 201,
-      body: staffResponseSchema.parse(await createStaff(principal, input2, metaOf(ctx)))
-    };
-  }),
-  owner("PATCH", "/api/admin/staff/:id", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const input2 = await parseBody(ctx, staffUpdateRequestSchema);
-    const done = await updateStaff2(principal, id, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: staffMutationResponseSchema.parse(done.body) };
-  }),
-  owner("POST", "/api/admin/staff/:id/slug", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const { slug } = await parseBody(ctx, staffSlugRequestSchema);
-    return {
-      body: staffResponseSchema.parse(await renameStaffSlug2(principal, id, slug, metaOf(ctx)))
-    };
-  }),
-  owner("DELETE", "/api/admin/staff/:id", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
-    const done = await deleteStaff(principal, id, resolutions, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: conflictOnlyResponseSchema.parse(done.body) };
-  }),
-  owner("PUT", "/api/admin/staff/:id/hours", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const input2 = await parseBody(ctx, hoursRequestSchema);
-    const done = await setStaffHours2(principal, id, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: conflictOnlyResponseSchema.parse(done.body) };
-  }),
-  // Hours, closures, settings --------------------------------------------
-  owner("GET", "/api/admin/hours", async (ctx) => {
-    ctxScope(ctx);
-    return { body: hoursResponseSchema.parse(await getAllHours()), headers: NO_STORE };
-  }),
-  owner("PUT", "/api/admin/hours", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, hoursRequestSchema);
-    const done = await setShopHours2(principal, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: conflictOnlyResponseSchema.parse(done.body) };
-  }),
-  owner("GET", "/api/admin/closures", async (ctx) => {
-    ctxScope(ctx);
-    const query = parseQuery(ctx, closureListQuerySchema);
-    return {
-      body: closureListResponseSchema.parse(await listClosures(query, shopDateOf(ctx.now))),
-      headers: NO_STORE
-    };
-  }),
-  owner("PUT", "/api/admin/closures", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, closureUpsertRequestSchema);
-    const done = await upsertClosure2(principal, input2, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: closureResponseSchema.parse(done.body) };
-  }),
-  owner("DELETE", "/api/admin/closures/:id", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
-    const done = await deleteClosure2(principal, id, resolutions, metaOf(ctx));
-    scheduleDelivery(done.outboxIds);
-    return { body: conflictOnlyResponseSchema.parse(done.body) };
-  }),
-  owner("GET", "/api/admin/settings", async (ctx) => {
-    ctxScope(ctx);
-    return { body: settingsResponseSchema.parse(await getSettings()), headers: NO_STORE };
-  }),
-  owner("PUT", "/api/admin/settings", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, settingsRequestSchema);
-    return { body: settingsResponseSchema.parse(await putSettings(principal, input2, metaOf(ctx))) };
-  }),
-  // Logins ----------------------------------------------------------------
-  owner("GET", "/api/admin/users", async (ctx) => {
-    ctxScope(ctx);
-    return { body: loginListResponseSchema.parse(await listLogins()), headers: NO_STORE };
-  }),
-  owner("POST", "/api/admin/users", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, loginCreateRequestSchema);
-    const issued = await createStaffLogin(principal, input2, metaOf(ctx));
-    return {
-      status: 201,
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword
-      }),
-      headers: NO_STORE
-    };
-  }),
-  owner("POST", "/api/admin/users/:id/reset-password", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const issued = await resetLoginPassword(principal, id, metaOf(ctx));
-    return {
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword
-      }),
-      headers: NO_STORE
-    };
-  }),
-  owner("POST", "/api/admin/users/:id/disable", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, false, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
-  }),
-  owner("POST", "/api/admin/users/:id/enable", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, true, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
-  }),
-  // Audit and outbox ------------------------------------------------------
-  owner("GET", "/api/admin/audit", async (ctx) => {
-    ctxScope(ctx);
-    const query = parseQuery(ctx, auditListQuerySchema);
-    return { body: auditListResponseSchema.parse(await listAudit(query)), headers: NO_STORE };
-  }),
-  owner("GET", "/api/admin/outbox", async (ctx) => {
-    ctxScope(ctx);
-    const query = parseQuery(ctx, outboxListQuerySchema);
-    return { body: outboxListResponseSchema.parse(await listOutbox(query)), headers: NO_STORE };
-  }),
-  owner("POST", "/api/admin/outbox/:id/retry", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const queued = await retryOutboxMessage(principal, id, metaOf(ctx));
-    runAfterResponse("outbox.retry", () => deliverOutboxIds([queued]));
-    return { body: { ok: true } };
-  })
-];
-
-// server/services/nextOpening.ts
-var LOOKAHEAD_DAYS2 = 14;
-function openingLabel(startAt, now2) {
-  const day = shopDateOf(startAt);
-  const today = shopDateOf(now2);
-  const tomorrow = shopDayStart(today).plus({ days: 1 }).toISODate() ?? "";
-  const time3 = formatShopTime(startAt);
-  if (day === today) return time3;
-  if (day === tomorrow) return `Tomorrow ${time3}`;
-  return `${toShopTime(startAt).toFormat("ccc")} ${time3}`;
-}
-function serviceForChair(staff, services, preferredId) {
-  const offered = services.filter((s2) => staff.serviceIds.includes(s2._id));
-  const preferred = preferredId ? offered.find((s2) => s2._id === preferredId) : void 0;
-  if (preferred) return preferred;
-  return [...offered].sort(
-    (a, b) => a.durationMinutes - b.durationMinutes || a.sortOrder - b.sortOrder
-  )[0] ?? null;
-}
-async function loadShared(now2) {
-  const [services, settings] = await Promise.all([
-    servicesRepo_exports.listPublicServices(),
-    shopSettingsRepo_exports.requireShopSettings()
-  ]);
-  const today = shopDateOf(now2);
-  const ctx = await loadAvailabilityContext({
-    fromDate: today,
-    toDate: shopDayStart(today).plus({ days: LOOKAHEAD_DAYS2 }).toISODate() ?? today,
-    serviceIds: services.map((s2) => s2._id),
-    now: now2
-  });
-  const windowDays = Math.min(LOOKAHEAD_DAYS2, ctx.settings.bookingWindowDays);
-  const toDate = shopDayStart(today).plus({ days: windowDays }).toISODate() ?? today;
-  return { ctx, services, today, toDate, preferred: settings.nextOpenServiceId };
-}
-function slotsFor(shared, staff, service, limit, now2) {
-  if (!service) return [];
-  const result = computeAvailability(
-    { fromDate: shared.today, toDate: shared.toDate, staff: staff._id },
-    { ...shared.ctx, services: [service] }
-  );
-  return nextOpenSlots(result, now2, limit);
-}
-async function nextOpenings(now2) {
-  const shared = await loadShared(now2);
-  const staff = await staffRepo_exports.listPublicStaff();
-  const chairs = staff.map((s2) => {
-    const working = workingRangesFor(s2._id, shared.today, shared.ctx);
-    const status = working.ranges.length > 0 ? "in" : working.reason === "closed" ? "closed" : "off";
-    const service = serviceForChair(s2, shared.services, shared.preferred);
-    const [slot] = slotsFor(shared, s2, service, 1, now2);
-    return {
-      staff: { id: s2._id, slug: s2.slug, name: s2.name },
-      status,
-      nextOpen: slot ? slot.startAt.toISOString() : null,
-      nextOpenLabel: slot ? openingLabel(slot.startAt, now2) : null,
-      serviceId: service?._id ?? null
-    };
-  });
-  return { date: shared.today, chairs };
-}
-async function staffOpenings(slug, count, now2) {
-  const staff = await staffRepo_exports.findStaffBySlug(slug.toLowerCase());
-  if (!staff || staff.deletedAt || !staff.showOnWebsite) {
-    throw new AppError("NOT_FOUND", "That chair is no longer listed");
-  }
-  const shared = await loadShared(now2);
-  const service = serviceForChair(staff, shared.services, shared.preferred);
-  const openings = slotsFor(shared, staff, service, count, now2).map((slot) => ({
-    startAt: slot.startAt.toISOString(),
-    endAt: slot.endAt.toISOString(),
-    date: shopDateOf(slot.startAt),
-    label: openingLabel(slot.startAt, now2)
-  }));
-  return {
-    staff: { id: staff._id, slug: staff.slug, name: staff.name },
-    service: service ? { id: service._id, name: service.name, durationMinutes: service.durationMinutes } : null,
-    openings
-  };
 }
 
 // server/services/photosService.ts
@@ -37151,6 +37032,722 @@ function isOrderCursor(v) {
   return typeof v === "object" && v !== null && typeof v.s === "number" && typeof v.i === "string";
 }
 
+// server/services/alerts.ts
+async function listAlertViews(now2) {
+  const open2 = await alertsRepo_exports.listOpenAlerts();
+  if (open2.length === 0) return [];
+  const staff = await staffRepo_exports.listStaff({ includeDeleted: true });
+  const names = new Map(staff.map((s2) => [s2._id, s2.name]));
+  const views = [];
+  for (const alert of open2) {
+    const affected = await bookingsRepo_exports.listBookingsBetween(
+      { start: alert.startAt, end: alert.endAt },
+      { staffId: alert.staffId, statuses: ["confirmed"] }
+    );
+    if (affected.length === 0 && alert.kind === "barberOut") {
+      await alertsRepo_exports.closeAlert(alert._id, "resolved", null, now2);
+      continue;
+    }
+    views.push({
+      id: alert._id,
+      kind: alert.kind,
+      staffId: alert.staffId,
+      staffName: names.get(alert.staffId) ?? "Former staff",
+      fromDate: alert.fromDate,
+      toDate: alert.toDate,
+      startAt: alert.startAt.toISOString(),
+      endAt: alert.endAt.toISOString(),
+      reason: alert.reason,
+      createdAt: alert.createdAt.toISOString(),
+      affectedCount: affected.length
+    });
+  }
+  return views;
+}
+
+// server/services/adminDashboard.ts
+var DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+function weekStart(date5) {
+  return shopDayStart(date5).startOf("week");
+}
+var live = (b) => b.status !== "cancelled";
+var valueOf = (list) => list.filter(live).reduce((sum, b) => sum + b.totalPriceCents, 0);
+async function overview(now2) {
+  const today = shopDateOf(now2);
+  const monday = weekStart(today);
+  const lastMonday = monday.minus({ weeks: 1 });
+  const nextMonday = monday.plus({ weeks: 1 });
+  const todayStart = shopDayStart(today);
+  const sameDayLastWeek = todayStart.minus({ weeks: 1 }).toISODate() ?? today;
+  const [data, weekBookings, photos, alerts, audit2] = await Promise.all([
+    loadScheduleData(today, today),
+    bookingsRepo_exports.listBookingsStartingBetween({
+      start: lastMonday.toJSDate(),
+      end: nextMonday.toJSDate()
+    }),
+    staffPhotoMap(),
+    listAlertViews(now2),
+    auditLogRepo_exports.listAuditPage({ entityType: "booking", actionPrefix: "booking." }, null, 60)
+  ]);
+  const dateOf = (b) => shopDateOf(b.startAt);
+  const onDate = (date5) => weekBookings.filter((b) => dateOf(b) === date5);
+  const todays = onDate(today);
+  const lastSame = onDate(sameDayLastWeek);
+  const thisWeek = weekBookings.filter((b) => b.startAt >= monday.toJSDate());
+  const lastWeek = weekBookings.filter((b) => b.startAt < monday.toJSDate());
+  const compareDay = lastSame.filter(live).length > 0;
+  const compareWeek = lastWeek.filter(live).length > 0;
+  const walkIns = (list) => list.filter((b) => live(b) && b.source === "walkIn").length;
+  const noShows = (list) => list.filter((b) => b.status === "noShow").length;
+  const week = DAY_LABELS.map((label, i) => {
+    const date5 = monday.plus({ days: i }).toISODate() ?? today;
+    const lastDate = lastMonday.plus({ days: i }).toISODate() ?? today;
+    return {
+      date: date5,
+      label,
+      thisWeek: onDate(date5).filter(live).length,
+      lastWeek: onDate(lastDate).filter(live).length,
+      today: date5 === today
+    };
+  });
+  const chairs = activeStaff(data.staff).map((s2) => {
+    const who = whoIsInFor(s2, today, data.source);
+    const mine = todays.filter((b) => b.staffId === s2._id && b.status === "confirmed").sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+    const current = mine.find((b) => b.startAt <= now2 && b.endAt > now2) ?? null;
+    const next2 = mine.find((b) => b.startAt > now2) ?? null;
+    return {
+      staff: toStaffRef(s2),
+      photo: photos.get(s2._id) ?? null,
+      status: who.status === "in" ? "in" : who.status === "closed" ? "closed" : "off",
+      current: current ? toAdminBookingView(current, s2) : null,
+      next: next2 ? toAdminBookingView(next2, s2) : null
+    };
+  });
+  return {
+    date: today,
+    now: now2.toISOString(),
+    weekdayName: todayStart.toFormat("cccc"),
+    stats: {
+      bookings: {
+        value: todays.filter(live).length,
+        compare: compareDay ? lastSame.filter(live).length : null
+      },
+      bookedValueCents: { value: valueOf(todays), compare: compareDay ? valueOf(lastSame) : null },
+      walkIns: { value: walkIns(todays), compare: compareDay ? walkIns(lastSame) : null },
+      noShowsWeek: { value: noShows(thisWeek), compare: compareWeek ? noShows(lastWeek) : null }
+    },
+    week,
+    chairs,
+    activity: await activityFrom(audit2),
+    alerts
+  };
+}
+async function activityFrom(audit2) {
+  const picked = [];
+  for (const entry of audit2) {
+    const after = entry.after ?? {};
+    const meta3 = entry.meta ?? {};
+    if (entry.action === "booking.create")
+      picked.push({ entry, kind: meta3.source === "walkIn" ? "walkIn" : "booked" });
+    else if (entry.action === "booking.cancel") picked.push({ entry, kind: "canceled" });
+    else if (entry.action === "booking.reschedule") picked.push({ entry, kind: "rescheduled" });
+    else if (entry.action === "booking.status" && after.status === "noShow")
+      picked.push({ entry, kind: "noShow" });
+    if (picked.length === 8) break;
+  }
+  const [bookings, staff] = await Promise.all([
+    bookingsRepo_exports.findBookingsByIds(picked.map((p) => p.entry.entityId)),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const byId = new Map(bookings.map((b) => [b._id, b]));
+  const staffById = new Map(staff.map((s2) => [s2._id, s2.name]));
+  const out = [];
+  for (const { entry, kind } of picked) {
+    const b = byId.get(entry.entityId);
+    if (!b) continue;
+    out.push({
+      id: entry._id,
+      at: entry.at.toISOString(),
+      kind,
+      bookingId: b._id,
+      clientName: b.customer.name,
+      staffName: staffById.get(b.staffId) ?? "Former staff",
+      status: b.status
+    });
+  }
+  return out;
+}
+function rangeBounds(range, now2) {
+  const today = shopDateOf(now2);
+  const start = shopDayStart(today);
+  switch (range) {
+    case "today":
+      return { from: start.toJSDate(), to: start.plus({ days: 1 }).toJSDate() };
+    case "tomorrow":
+      return { from: start.plus({ days: 1 }).toJSDate(), to: start.plus({ days: 2 }).toJSDate() };
+    case "week": {
+      const monday = weekStart(today);
+      return { from: monday.toJSDate(), to: monday.plus({ weeks: 1 }).toJSDate() };
+    }
+    case "upcoming":
+      return { from: now2 };
+    case "past":
+      return { to: now2 };
+    default:
+      return {};
+  }
+}
+async function bookingTable(input2, now2) {
+  const query = bookingTableQuerySchema.parse(input2);
+  const base = {
+    ...query.staffId ? { staffId: query.staffId } : {},
+    ...query.status ? { status: query.status } : {}
+  };
+  const dir = query.dir ?? (query.range === "past" ? "desc" : "asc");
+  const filter = { ...base, ...rangeBounds(query.range, now2) };
+  const skip = (query.page - 1) * BOOKING_TABLE_PAGE_SIZE;
+  const ranges = ["today", "tomorrow", "week", "upcoming", "past"];
+  const [rows, total, staff, ...counts] = await Promise.all([
+    bookingsRepo_exports.tablePage(
+      filter,
+      { key: query.sort, dir: dir === "asc" ? 1 : -1 },
+      skip,
+      BOOKING_TABLE_PAGE_SIZE
+    ),
+    bookingsRepo_exports.countTable(filter),
+    staffRepo_exports.listStaff({ includeDeleted: true }),
+    ...ranges.map((r) => bookingsRepo_exports.countTable({ ...base, ...rangeBounds(r, now2) }))
+  ]);
+  const staffById = new Map(staff.map((s2) => [s2._id, s2]));
+  return {
+    rows: rows.map(
+      (b) => toAdminBookingView(
+        b,
+        staffById.get(b.staffId) ?? { _id: b.staffId, name: "Former staff", slug: "former-staff" }
+      )
+    ),
+    total,
+    page: query.page,
+    pageSize: BOOKING_TABLE_PAGE_SIZE,
+    counts: {
+      today: counts[0] ?? 0,
+      tomorrow: counts[1] ?? 0,
+      week: counts[2] ?? 0,
+      upcoming: counts[3] ?? 0,
+      past: counts[4] ?? 0
+    }
+  };
+}
+
+// server/services/adminSearch.ts
+var LIMIT = 5;
+var backfilled = null;
+function ensureNameKeys() {
+  backfilled ??= bookingsRepo_exports.backfillNameKeys().catch((error62) => {
+    backfilled = null;
+    throw error62;
+  });
+  return backfilled;
+}
+async function adminSearch(rawQuery) {
+  const query = classifySearch(rawQuery);
+  if (query.kind === "empty") return { bookings: [], customers: [] };
+  await ensureNameKeys();
+  const match2 = query.kind === "phone" ? { kind: "phone", digits: query.digits } : { kind: "name", key: query.key };
+  const code = query.kind === "text" ? normalizeReferenceCode(rawQuery) : null;
+  const [byCode, found, customers, staff] = await Promise.all([
+    code ? bookingsRepo_exports.findBookingByReferenceCode(code) : Promise.resolve(null),
+    bookingsRepo_exports.searchBookings(match2, LIMIT),
+    bookingsRepo_exports.searchCustomers(match2, LIMIT),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const staffById = new Map(staff.map((s2) => [s2._id, s2]));
+  const unique = /* @__PURE__ */ new Map();
+  for (const b of [...byCode ? [byCode] : [], ...found]) unique.set(b._id, b);
+  return {
+    bookings: [...unique.values()].slice(0, LIMIT).map((b) => ({
+      id: b._id,
+      referenceCode: b.referenceCode,
+      customerName: b.customer.name,
+      startAt: b.startAt.toISOString(),
+      status: b.status,
+      staffName: staffById.get(b.staffId)?.name ?? "Unknown",
+      services: b.services.map((s2) => s2.name).join(", ")
+    })),
+    customers: customers.map((c) => ({
+      phone: formatUsPhone(c.phone),
+      name: c.name,
+      visits: c.visits,
+      lastVisitAt: c.lastVisitAt.toISOString()
+    }))
+  };
+}
+
+// server/http/context.ts
+function principalOf(ctx) {
+  if (!ctx.principal) throw new AppError("AUTH_REQUIRED", "Please sign in");
+  return ctx.principal;
+}
+function metaOf(ctx) {
+  return {
+    ip: clientIp(ctx.req),
+    userAgent: headerValue(ctx.req, "user-agent"),
+    requestId: ctx.requestId,
+    now: ctx.now
+  };
+}
+function idempotencyKeyOf(ctx) {
+  const key = headerValue(ctx.req, "idempotency-key");
+  if (!key || key.length < 8 || key.length > 128) {
+    throw new AppError(
+      "BAD_REQUEST",
+      "An Idempotency-Key header of 8 to 128 characters is required"
+    );
+  }
+  return key;
+}
+var NO_STORE = { "Cache-Control": "no-store" };
+
+// server/http/delivery.ts
+function scheduleDelivery(outboxIds) {
+  if (outboxIds.length === 0 || getEnv2().OUTBOX_AFTER_RESPONSE === "off") return;
+  runAfterResponse("outbox.deliver", () => deliverOutboxIds(outboxIds));
+}
+
+// server/http/routes/admin.ts
+var idParams = external_exports.object({ id: idSchema });
+function owner(method, path, handler2) {
+  return { method, path, auth: "owner", handler: handler2 };
+}
+function ctxScope(ctx) {
+  const principal = principalOf(ctx);
+  return { principal, scope: ownerScope(principal) };
+}
+var adminRoutes = [
+  // Today, schedule, who is in --------------------------------------------
+  owner("GET", "/api/admin/today", async (ctx) => {
+    ctxScope(ctx);
+    const { date: date5 } = parseQuery(ctx, dateQuerySchema);
+    return {
+      body: todayResponseSchema.parse(await todaySummary(date5, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
+  owner("GET", "/api/admin/schedule", async (ctx) => {
+    const { scope } = ctxScope(ctx);
+    const query = parseQuery(ctx, scheduleQuerySchema);
+    return {
+      body: scheduleResponseSchema.parse(await scheduleForDay(scope, query, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
+  owner("GET", "/api/admin/whos-in", async (ctx) => {
+    ctxScope(ctx);
+    const { date: date5 } = parseQuery(ctx, dateQuerySchema);
+    return { body: whoIsInResponseSchema.parse(await whoIsIn(date5, ctx.now)), headers: NO_STORE };
+  }),
+  // Overview and the bookings table -----------------------------------------
+  owner("GET", "/api/admin/overview", async (ctx) => {
+    ctxScope(ctx);
+    return { body: overviewResponseSchema.parse(await overview(ctx.now)), headers: NO_STORE };
+  }),
+  owner("GET", "/api/admin/booking-table", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, bookingTableQuerySchema);
+    return {
+      body: bookingTableResponseSchema.parse(await bookingTable(query, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
+  // Search ----------------------------------------------------------------
+  owner("GET", "/api/admin/search", async (ctx) => {
+    ctxScope(ctx);
+    const { q } = parseQuery(ctx, searchQuerySchema);
+    return { body: searchResponseSchema.parse(await adminSearch(q)), headers: NO_STORE };
+  }),
+  // Bookings --------------------------------------------------------------
+  owner("GET", "/api/admin/bookings", async (ctx) => {
+    const { scope } = ctxScope(ctx);
+    const query = parseQuery(ctx, bookingListQuerySchema);
+    return {
+      body: bookingListResponseSchema.parse(await listBookings(scope, query)),
+      headers: NO_STORE
+    };
+  }),
+  owner("POST", "/api/admin/bookings", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const key = idempotencyKeyOf(ctx);
+    const input2 = await parseBody(ctx, manualBookingRequestSchema);
+    const outcome2 = await createManualBooking(input2, actorOf2(principal), {
+      ...metaOf(ctx),
+      idempotencyKey: key
+    });
+    scheduleDelivery(outcome2.outboxIds);
+    return {
+      status: outcome2.status,
+      body: manualBookingResponseSchema.parse(outcome2.body),
+      headers: { ...NO_STORE, "Idempotent-Replayed": outcome2.replayed ? "true" : "false" }
+    };
+  }),
+  owner("GET", "/api/admin/bookings/:id", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    return {
+      body: bookingDetailResponseSchema.parse(await bookingDetail(principal, scope, id, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
+  owner("PATCH", "/api/admin/bookings/:id", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { notes } = await parseBody(ctx, bookingNotesRequestSchema);
+    return {
+      body: bookingResponseSchema.parse(
+        await updateBookingNotes2(principal, scope, id, notes, metaOf(ctx))
+      )
+    };
+  }),
+  owner("POST", "/api/admin/bookings/:id/status", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const input2 = await parseBody(ctx, statusChangeRequestSchema);
+    const done = await changeBookingStatus(principal, scope, id, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: bookingResponseSchema.parse(done.body) };
+  }),
+  owner("POST", "/api/admin/bookings/:id/cancel", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const input2 = await parseBody(ctx, ownerCancelRequestSchema);
+    const done = await changeBookingStatus(
+      principal,
+      scope,
+      id,
+      { status: "cancelled", notify: input2.notify, reason: input2.reason },
+      metaOf(ctx)
+    );
+    scheduleDelivery(done.outboxIds);
+    return { body: bookingResponseSchema.parse(done.body) };
+  }),
+  owner("POST", "/api/admin/bookings/:id/resend", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await resendConfirmation(principal, scope, id, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: { ok: true } };
+  }),
+  owner("POST", "/api/admin/bookings/:id/reschedule", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const input2 = await parseBody(ctx, ownerRescheduleRequestSchema);
+    const done = await ownerReschedule(principal, scope, id, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return {
+      body: createBookingResponseSchema.extend({ booking: bookingResponseSchema.shape.booking }).parse(done.body)
+    };
+  }),
+  // Customers -------------------------------------------------------------
+  owner("GET", "/api/admin/customers", async (ctx) => {
+    ctxScope(ctx);
+    const { phone } = parseQuery(ctx, customerQuerySchema);
+    return {
+      body: customerResponseSchema.parse(await customerByPhone(phone, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
+  // Time blocks and day status -------------------------------------------
+  owner("GET", "/api/admin/time-blocks", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, timeBlockListQuerySchema);
+    return {
+      body: timeBlockListResponseSchema.parse(await listTimeBlocks(query)),
+      headers: NO_STORE
+    };
+  }),
+  owner("POST", "/api/admin/time-blocks", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, timeBlockCreateRequestSchema);
+    const done = await createTimeBlock(principal, scope, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { status: 201, body: timeBlockResponseSchema.parse(done.body) };
+  }),
+  owner("DELETE", "/api/admin/time-blocks/:id", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await deleteTimeBlock2(principal, scope, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner("POST", "/api/admin/staff/:id/day", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const input2 = await parseBody(ctx, dayStatusRequestSchema);
+    const done = await setDayStatus(principal, id, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: dayStatusResponseSchema.parse(done.body) };
+  }),
+  // Services --------------------------------------------------------------
+  owner("GET", "/api/admin/services", async (ctx) => {
+    ctxScope(ctx);
+    return { body: serviceListResponseSchema.parse(await listServices2()), headers: NO_STORE };
+  }),
+  owner("POST", "/api/admin/services", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, serviceCreateRequestSchema);
+    return {
+      status: 201,
+      body: serviceResponseSchema.parse(await createService(principal, input2, metaOf(ctx)))
+    };
+  }),
+  owner("PATCH", "/api/admin/services/:id", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const input2 = await parseBody(ctx, serviceUpdateRequestSchema);
+    return {
+      body: serviceResponseSchema.parse(await updateService2(principal, id, input2, metaOf(ctx)))
+    };
+  }),
+  owner("DELETE", "/api/admin/services/:id", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await deleteService(principal, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  // Staff -----------------------------------------------------------------
+  owner("GET", "/api/admin/staff", async (ctx) => {
+    ctxScope(ctx);
+    return { body: staffListResponseSchema.parse(await listStaff2()), headers: NO_STORE };
+  }),
+  owner("POST", "/api/admin/staff", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, staffCreateRequestSchema);
+    return {
+      status: 201,
+      body: staffResponseSchema.parse(await createStaff(principal, input2, metaOf(ctx)))
+    };
+  }),
+  owner("PATCH", "/api/admin/staff/:id", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const input2 = await parseBody(ctx, staffUpdateRequestSchema);
+    const done = await updateStaff2(principal, id, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: staffMutationResponseSchema.parse(done.body) };
+  }),
+  owner("POST", "/api/admin/staff/:id/slug", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { slug } = await parseBody(ctx, staffSlugRequestSchema);
+    return {
+      body: staffResponseSchema.parse(await renameStaffSlug2(principal, id, slug, metaOf(ctx)))
+    };
+  }),
+  owner("DELETE", "/api/admin/staff/:id", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await deleteStaff(principal, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner("PUT", "/api/admin/staff/:id/hours", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const input2 = await parseBody(ctx, hoursRequestSchema);
+    const done = await setStaffHours2(principal, id, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  // Hours, closures, settings --------------------------------------------
+  owner("GET", "/api/admin/hours", async (ctx) => {
+    ctxScope(ctx);
+    return { body: hoursResponseSchema.parse(await getAllHours()), headers: NO_STORE };
+  }),
+  owner("PUT", "/api/admin/hours", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, hoursRequestSchema);
+    const done = await setShopHours2(principal, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner("GET", "/api/admin/closures", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, closureListQuerySchema);
+    return {
+      body: closureListResponseSchema.parse(await listClosures(query, shopDateOf(ctx.now))),
+      headers: NO_STORE
+    };
+  }),
+  owner("PUT", "/api/admin/closures", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, closureUpsertRequestSchema);
+    const done = await upsertClosure2(principal, input2, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: closureResponseSchema.parse(done.body) };
+  }),
+  owner("DELETE", "/api/admin/closures/:id", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await deleteClosure2(principal, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner("GET", "/api/admin/settings", async (ctx) => {
+    ctxScope(ctx);
+    return { body: settingsResponseSchema.parse(await getSettings()), headers: NO_STORE };
+  }),
+  owner("PUT", "/api/admin/settings", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, settingsRequestSchema);
+    return { body: settingsResponseSchema.parse(await putSettings(principal, input2, metaOf(ctx))) };
+  }),
+  // Logins ----------------------------------------------------------------
+  owner("GET", "/api/admin/users", async (ctx) => {
+    ctxScope(ctx);
+    return { body: loginListResponseSchema.parse(await listLogins()), headers: NO_STORE };
+  }),
+  owner("POST", "/api/admin/users", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, loginCreateRequestSchema);
+    const issued = await createStaffLogin(principal, input2, metaOf(ctx));
+    return {
+      status: 201,
+      body: issuedPasswordResponseSchema.parse({
+        user: toLoginView(issued.user, await staffMap()),
+        temporaryPassword: issued.temporaryPassword
+      }),
+      headers: NO_STORE
+    };
+  }),
+  owner("POST", "/api/admin/users/:id/reset-password", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const issued = await resetLoginPassword(principal, id, metaOf(ctx));
+    return {
+      body: issuedPasswordResponseSchema.parse({
+        user: toLoginView(issued.user, await staffMap()),
+        temporaryPassword: issued.temporaryPassword
+      }),
+      headers: NO_STORE
+    };
+  }),
+  owner("POST", "/api/admin/users/:id/disable", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const user = await setLoginActive(principal, id, false, metaOf(ctx));
+    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
+  }),
+  owner("POST", "/api/admin/users/:id/enable", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const user = await setLoginActive(principal, id, true, metaOf(ctx));
+    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
+  }),
+  // Audit and outbox ------------------------------------------------------
+  owner("GET", "/api/admin/audit", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, auditListQuerySchema);
+    return { body: auditListResponseSchema.parse(await listAudit(query)), headers: NO_STORE };
+  }),
+  owner("GET", "/api/admin/outbox", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, outboxListQuerySchema);
+    return { body: outboxListResponseSchema.parse(await listOutbox(query)), headers: NO_STORE };
+  }),
+  owner("POST", "/api/admin/outbox/:id/retry", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const queued = await retryOutboxMessage(principal, id, metaOf(ctx));
+    runAfterResponse("outbox.retry", () => deliverOutboxIds([queued]));
+    return { body: { ok: true } };
+  })
+];
+
+// server/services/nextOpening.ts
+var LOOKAHEAD_DAYS2 = 14;
+function openingLabel(startAt, now2) {
+  const day = shopDateOf(startAt);
+  const today = shopDateOf(now2);
+  const tomorrow = shopDayStart(today).plus({ days: 1 }).toISODate() ?? "";
+  const time3 = formatShopTime(startAt);
+  if (day === today) return time3;
+  if (day === tomorrow) return `Tomorrow ${time3}`;
+  return `${toShopTime(startAt).toFormat("ccc")} ${time3}`;
+}
+function serviceForChair(staff, services, preferredId) {
+  const offered = services.filter((s2) => staff.serviceIds.includes(s2._id));
+  const preferred = preferredId ? offered.find((s2) => s2._id === preferredId) : void 0;
+  if (preferred) return preferred;
+  return [...offered].sort(
+    (a, b) => a.durationMinutes - b.durationMinutes || a.sortOrder - b.sortOrder
+  )[0] ?? null;
+}
+async function loadShared(now2) {
+  const [services, settings] = await Promise.all([
+    servicesRepo_exports.listPublicServices(),
+    shopSettingsRepo_exports.requireShopSettings()
+  ]);
+  const today = shopDateOf(now2);
+  const ctx = await loadAvailabilityContext({
+    fromDate: today,
+    toDate: shopDayStart(today).plus({ days: LOOKAHEAD_DAYS2 }).toISODate() ?? today,
+    serviceIds: services.map((s2) => s2._id),
+    now: now2
+  });
+  const windowDays = Math.min(LOOKAHEAD_DAYS2, ctx.settings.bookingWindowDays);
+  const toDate = shopDayStart(today).plus({ days: windowDays }).toISODate() ?? today;
+  return { ctx, services, today, toDate, preferred: settings.nextOpenServiceId };
+}
+function slotsFor(shared, staff, service, limit, now2) {
+  if (!service) return [];
+  const result = computeAvailability(
+    { fromDate: shared.today, toDate: shared.toDate, staff: staff._id },
+    { ...shared.ctx, services: [service] }
+  );
+  return nextOpenSlots(result, now2, limit);
+}
+async function nextOpenings(now2) {
+  const shared = await loadShared(now2);
+  const staff = await staffRepo_exports.listPublicStaff();
+  const chairs = staff.map((s2) => {
+    const working = workingRangesFor(s2._id, shared.today, shared.ctx);
+    const status = working.ranges.length > 0 ? "in" : working.reason === "closed" ? "closed" : "off";
+    const service = serviceForChair(s2, shared.services, shared.preferred);
+    const [slot] = slotsFor(shared, s2, service, 1, now2);
+    return {
+      staff: { id: s2._id, slug: s2.slug, name: s2.name },
+      status,
+      nextOpen: slot ? slot.startAt.toISOString() : null,
+      nextOpenLabel: slot ? openingLabel(slot.startAt, now2) : null,
+      serviceId: service?._id ?? null
+    };
+  });
+  return { date: shared.today, chairs };
+}
+async function staffOpenings(slug, count, now2) {
+  const staff = await staffRepo_exports.findStaffBySlug(slug.toLowerCase());
+  if (!staff || staff.deletedAt || !staff.showOnWebsite) {
+    throw new AppError("NOT_FOUND", "That chair is no longer listed");
+  }
+  const shared = await loadShared(now2);
+  const service = serviceForChair(staff, shared.services, shared.preferred);
+  const openings = slotsFor(shared, staff, service, count, now2).map((slot) => ({
+    startAt: slot.startAt.toISOString(),
+    endAt: slot.endAt.toISOString(),
+    date: shopDateOf(slot.startAt),
+    label: openingLabel(slot.startAt, now2)
+  }));
+  return {
+    staff: { id: staff._id, slug: staff.slug, name: staff.name },
+    service: service ? { id: service._id, name: service.name, durationMinutes: service.durationMinutes } : null,
+    openings
+  };
+}
+
 // server/http/routes/public.ts
 var SITEMAP_PATHS = ["/", "/services", "/chairs", "/gallery", "/visit", "/book"];
 function escapeXml(value) {
@@ -37191,7 +37788,7 @@ var publicRoutes = [
     method: "GET",
     path: "/api/shop",
     auth: "public",
-    handler: async () => {
+    handler: async (ctx) => {
       const [settings, hours, hero] = await Promise.all([
         shopSettingsRepo_exports.requireShopSettings(),
         weeklyHoursRepo_exports.getShopHours(),
@@ -37215,12 +37812,17 @@ var publicRoutes = [
           requireEmail: settings.booking.requireEmail,
           cancelCutoffMinutes: settings.booking.cancelCutoffMinutes
         },
-        announcement: settings.announcement,
+        // Past its end date the strip is off, so a stale offer never lingers on the site.
+        announcement: {
+          ...settings.announcement,
+          enabled: announcementIsLive(settings.announcement, shopDateOf(ctx.now))
+        },
+        social: settings.social,
         heroPhoto: hero,
         maintenance: getEnv2().MAINTENANCE_MODE === "true",
         demo: demoEnabled()
       });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -37332,7 +37934,11 @@ async function meFor(userId) {
     },
     staff: staff && !staff.deletedAt ? toPublicStaff(staff) : null,
     permissions: { barbersCanBlockTime: settings.permissions.barbersCanBlockTime },
-    features: { photos: storageEnabled(), demo: demoEnabled() }
+    features: {
+      photos: storageEnabled(),
+      demo: demoEnabled(),
+      email: getEnv2().EMAIL_PROVIDER === "resend"
+    }
   });
 }
 var authRoutes = [

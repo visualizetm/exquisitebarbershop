@@ -44,7 +44,7 @@ export function phoneLabel(e164: string): string {
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {
   confirmed: 'Confirmed',
-  completed: 'Completed',
+  completed: 'Done',
   noShow: 'No show',
   cancelled: 'Cancelled',
 };
@@ -60,8 +60,25 @@ export const TRANSITION_LABEL: Record<BookingStatus, string> = {
 export const SOURCE_LABEL: Record<string, string> = {
   online: 'Online',
   phone: 'Phone',
+  owner: 'Phone',
   walkIn: 'Walk-in',
+  barber: 'Walk-in',
 };
+
+/** "Today 2:14 PM", otherwise "Mon, Oct 12, 2:14 PM": for the activity list. */
+export function shopWhen(iso: string, today: string): string {
+  const dt = DateTime.fromISO(iso, { zone: SHOP_TIMEZONE });
+  return dt.toISODate() === today
+    ? `Today ${dt.toFormat('h:mm a')}`
+    : dt.toFormat('ccc, LLL d, h:mm a');
+}
+
+/** "Marcus Reed" becomes "Marcus R.", for lists where the full name is not needed. */
+export function firstNameLastInitial(name: string): string {
+  const [first = '', ...rest] = name.trim().split(/\s+/);
+  const last = rest.at(-1);
+  return last ? `${first} ${last[0]?.toUpperCase() ?? ''}.` : first;
+}
 
 export function newIdempotencyKey(): string {
   return `adm-${crypto.randomUUID()}`;

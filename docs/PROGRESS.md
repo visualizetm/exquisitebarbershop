@@ -375,3 +375,17 @@ commit, and what is still open.
 - Tests: `tests/unit/search.test.ts`, `tests/integration/adminSearch.test.ts`, the authz matrix row,
   `tests/e2e/dashboard.spec.ts` (shell at 1280 and 390, the `/` shortcut, search by code, phone and
   accent free name, axe in both themes) and the Dashboard section of `tests/e2e/kit.spec.ts`.
+
+### M2: Overview and Bookings
+
+- Shipped: the Overview (alerts strip, quick actions, four stat tiles with compare lines only when last
+  week has data, Now and next, the week chart with a text table, the latest eight events), the Bookings
+  table (25 per page, sortable, quick filters with counts, barber and status filters, state in the
+  address), the booking panel (Reschedule, Cancel or Cancel and notify, Mark done, No show with Undo, Resend
+  confirmation with its reason when email is off, Copy manage link, notes, history), and the quick action
+  panels (New booking, Walk-in, Block time, Barber out today, Edit announcement). Server: `GET
+/api/admin/overview`, `GET /api/admin/booking-table`, `POST /api/admin/bookings/:id/resend`, the `alerts`
+  collection, Move in the resolver, `features.email` on `/api/auth/me`.
+- Tests: `tests/integration/adminDashboard.test.ts`, `resolverMove.test.ts` (including the race), the
+  authz matrix rows, and `tests/e2e/dashboard.spec.ts` (overview, filters, deep link, cancel, announcement,
+  axe in both themes at 1280 and 390 on the overview, the list and the panel).

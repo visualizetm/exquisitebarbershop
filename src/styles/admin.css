@@ -226,10 +226,7 @@
   height: 20px;
   accent-color: var(--accent);
 }
-.exq-adm
-  button:not(.exq-btn):not(.exq-chip):not(.exq-seg__btn):not(.exq-dialog__close):not(
-    .exq-toast__action
-  ):not(.exq-adm-tabs__tab):not(.exq-stepbar__button) {
+.exq-adm button:is(:not([class]), [class*='exq-adm-']) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -244,15 +241,15 @@
   font-weight: 500;
   cursor: pointer;
 }
-.exq-adm button[type='submit']:not(.exq-btn) {
+.exq-adm button[type='submit']:is(:not([class]), [class*='exq-adm-']) {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--paper);
 }
-.exq-adm button:not(.exq-btn):hover {
+.exq-adm button:is(:not([class]), [class*='exq-adm-']):hover {
   filter: brightness(1.1);
 }
-.exq-adm button:not(.exq-btn):disabled {
+.exq-adm button:is(:not([class]), [class*='exq-adm-']):disabled {
   opacity: 0.45;
   cursor: not-allowed;
   filter: none;
@@ -268,8 +265,8 @@
   font-weight: 500;
   min-height: 32px;
 }
-.exq-adm ol,
-.exq-adm ul {
+.exq-adm ol:is(:not([class]), [class*='exq-adm-']),
+.exq-adm ul:is(:not([class]), [class*='exq-adm-']) {
   display: flex;
   flex-direction: column;
   gap: var(--s2);

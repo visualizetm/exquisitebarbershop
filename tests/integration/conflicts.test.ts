@@ -158,7 +158,7 @@ describe('conflict rule: weekly hours', () => {
       resolutions: [{ bookingId: booking._id, action: 'keep' }],
     });
     expect(kept.status).toBe(200);
-    expect(kept.body).toEqual({ ok: true, kept: [booking._id], cancelled: [] });
+    expect(kept.body).toEqual({ ok: true, kept: [booking._id], moved: [], cancelled: [] });
     expect(await statusOf(booking._id)).toBe('confirmed');
     expect(
       await db()
@@ -220,7 +220,7 @@ describe('conflict rule: weekly hours', () => {
     const res = await asOwner('PUT', '/api/admin/hours', {
       days: thuOnly([{ start: '09:00', end: '18:00' }]),
     });
-    expect(res.body).toEqual({ ok: true, kept: [], cancelled: [] });
+    expect(res.body).toEqual({ ok: true, kept: [], moved: [], cancelled: [] });
   });
 
   it('a choice for a booking that is not affected is ignored, never cancelled', async () => {
@@ -229,7 +229,7 @@ describe('conflict rule: weekly hours', () => {
       days: thuOnly([{ start: '09:00', end: '18:00' }]),
       resolutions: [{ bookingId: safe._id, action: 'cancel' }],
     });
-    expect(res.body).toEqual({ ok: true, kept: [], cancelled: [] });
+    expect(res.body).toEqual({ ok: true, kept: [], moved: [], cancelled: [] });
     expect(await statusOf(safe._id)).toBe('confirmed');
   });
 });
@@ -278,7 +278,7 @@ describe('conflict rule: closures', () => {
     const ok = await asOwner('DELETE', `/api/admin/closures/${id}`, {
       resolutions: [{ bookingId: late._id, action: 'cancel' }],
     });
-    expect(ok.body).toEqual({ ok: true, kept: [], cancelled: [late._id] });
+    expect(ok.body).toEqual({ ok: true, kept: [], moved: [], cancelled: [late._id] });
   });
 });
 
@@ -398,7 +398,7 @@ describe('conflict rule: removing chairs and services', () => {
     const ok = await asOwner('DELETE', `/api/admin/staff/${id}`, {
       resolutions: [{ bookingId: booking._id, action: 'cancelAndNotify' }],
     });
-    expect(ok.body).toEqual({ ok: true, kept: [], cancelled: [booking._id] });
+    expect(ok.body).toEqual({ ok: true, kept: [], moved: [], cancelled: [booking._id] });
     expect((await staffRepo.findStaffById(id))?.deletedAt).not.toBeNull();
     expect((await usersRepo.findUserById(login._id))?.isActive).toBe(false);
     expect(
@@ -427,7 +427,7 @@ describe('conflict rule: removing chairs and services', () => {
     const ok = await asOwner('DELETE', `/api/admin/services/${serviceId}`, {
       resolutions: [{ bookingId: withIt._id, action: 'keep' }],
     });
-    expect(ok.body).toEqual({ ok: true, kept: [withIt._id], cancelled: [] });
+    expect(ok.body).toEqual({ ok: true, kept: [withIt._id], moved: [], cancelled: [] });
     expect((await servicesRepo.findServiceById(serviceId))?.deletedAt).not.toBeNull();
   });
 

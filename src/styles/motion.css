@@ -362,7 +362,7 @@
       color var(--d-fast) var(--ease-out),
       border-color var(--d-fast) var(--ease-out);
   }
-  .exq-iconbtn::after {
+  [data-tip]::after {
     transition:
       opacity var(--d-fast) var(--ease-out),
       transform var(--d-fast) var(--ease-out);

@@ -112,3 +112,24 @@ export function Textarea({
     />
   ));
 }
+
+/** A checkbox with its label, 44px tall so a thumb can hit it. */
+export function Checkbox({
+  label,
+  hint,
+  className,
+  ...rest
+}: { label: ReactNode; hint?: ReactNode } & Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  return (
+    <label
+      className={`exq-check ${className ?? ''}`.trim()}
+      data-state={rest.disabled ? 'disabled' : 'default'}
+    >
+      <input {...rest} type="checkbox" />
+      <span>
+        {label}
+        {hint ? <span className="exq-check__hint">{hint}</span> : null}
+      </span>
+    </label>
+  );
+}

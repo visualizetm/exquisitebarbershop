@@ -81,6 +81,8 @@ export const apiErrorSchema = z.object({
           customerName: z.string(),
           services: z.array(z.string()),
           hasEmail: z.boolean(),
+          /** Chairs that do every service of this booking and are free for all of it: where it can move. */
+          moveOptions: z.array(z.object({ staffId: z.string(), staffName: z.string() })).optional(),
         }),
       )
       .optional(),

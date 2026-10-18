@@ -276,8 +276,11 @@
 .exq-dark .exq-iconbtn:hover {
   background: var(--ink-3);
 }
+[data-tip] {
+  position: relative;
+}
 @media (hover: hover) and (min-width: 1024px) {
-  .exq-iconbtn::after {
+  [data-tip]::after {
     content: attr(data-tip);
     position: absolute;
     top: calc(100% + 4px);
@@ -294,8 +297,9 @@
     opacity: 0;
     transform: translate(-50%, 2px);
   }
-  .exq-iconbtn:hover::after,
-  .exq-iconbtn:focus-visible::after {
+  [data-tip]:hover::after,
+  [data-tip]:focus-visible::after,
+  [data-tip]:focus-within::after {
     opacity: 1;
     transform: translate(-50%, 0);
   }
@@ -335,7 +339,8 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .exq-dash-grid[data-cols='split'] {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: start;
   }
 }
 .exq-panel {
@@ -478,10 +483,10 @@
 }
 .exq-chairrow {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 36px minmax(0, 1fr);
   gap: var(--s3);
   align-items: center;
-  padding: var(--s3) 0;
+  padding: var(--s2) 0;
   border-top: 1px solid var(--border);
 }
 .exq-chairrow:first-child {
@@ -490,8 +495,9 @@
 .exq-chairrow__avatar {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
+  font-size: var(--t-label);
   overflow: hidden;
   border-radius: 50%;
   background: var(--solid-bg);
@@ -517,7 +523,7 @@
   color: var(--fg-2);
   font-size: var(--t-label);
 }
-.exq-chairrow__lines button {
+.exq-chairrow__btn {
   padding: 0;
   border: 0;
   background: none;
@@ -580,7 +586,7 @@
 }
 .exq-activity__btn {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
   gap: var(--s3);
   align-items: center;
   width: 100%;
@@ -944,7 +950,9 @@
   font-size: var(--t-h3);
   font-weight: 600;
 }
+.exq-adm .exq-chart__legend,
 .exq-chart__legend {
+  flex-direction: row;
   display: flex;
   gap: var(--s4);
   margin-bottom: var(--s2);
@@ -980,7 +988,7 @@
 .exq-chart__value {
   fill: var(--fg-2);
   font-family: var(--font);
-  font-size: 12px;
+  font-size: 13px;
 }
 .exq-chart__label[data-current='true'] {
   fill: var(--fg);
@@ -1047,4 +1055,334 @@
   bottom: calc(100% + 4px);
   left: 0;
   right: auto;
+}
+
+/* Checkbox */
+.exq-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  min-height: var(--hit);
+  padding-block: 10px;
+  cursor: pointer;
+}
+.exq-check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--red);
+}
+.exq-check__hint {
+  display: block;
+  color: var(--fg-2);
+  font-size: var(--t-label);
+}
+.exq-check[data-state='disabled'] {
+  color: var(--fg-3);
+  cursor: not-allowed;
+}
+
+/* Resolver: one card per affected booking, four choices each. */
+.exq-resolver {
+  display: grid;
+  gap: var(--s3);
+}
+.exq-resolver__title {
+  margin: 0;
+  font-size: var(--t-h3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.exq-resolver__count {
+  margin: 0;
+  font-weight: 700;
+}
+.exq-resolver__list {
+  display: grid;
+  gap: var(--s3);
+}
+.exq-resolver__item {
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.exq-resolver__item[data-state='open'] {
+  border-left: 4px solid var(--red);
+}
+.exq-resolver__item[data-state='decided'] {
+  border-left: 4px solid var(--ok);
+}
+.exq-resolver__fieldset {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.exq-resolver__who {
+  padding: 0;
+  margin-bottom: var(--s2);
+}
+.exq-resolver__meta {
+  display: block;
+  color: var(--fg-2);
+  font-size: var(--t-label);
+}
+.exq-resolver__choices {
+  display: grid;
+  gap: var(--s2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 768px) {
+  .exq-resolver__choices {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.exq-resolver__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.exq-choice {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-height: 64px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+  cursor: pointer;
+}
+.exq-choice input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.exq-choice__label {
+  font-weight: 700;
+}
+.exq-choice__help {
+  color: var(--fg-2);
+  font-size: var(--t-label);
+  line-height: 1.3;
+}
+.exq-choice[data-state='selected'] {
+  background: var(--solid-bg);
+  border-color: var(--solid-bg);
+  color: var(--solid-fg);
+}
+.exq-choice[data-state='selected'] .exq-choice__help {
+  color: var(--solid-fg-2);
+}
+.exq-choice[data-state='disabled'] {
+  background: var(--card-2);
+  color: var(--fg-3);
+  cursor: not-allowed;
+}
+.exq-choice[data-state='disabled'] .exq-choice__help {
+  color: var(--fg-3);
+}
+.exq-choice:focus-within {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+/* Panels (the side sheets): one column of fields. */
+.exq-panelbody {
+  display: grid;
+  gap: var(--s4);
+  align-content: start;
+}
+.exq-panelbody__row {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: end;
+}
+.exq-fieldset {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.exq-fieldset legend {
+  padding: 0;
+  margin-bottom: var(--s2);
+  font-weight: 600;
+}
+.exq-announce-preview {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+
+/* Booking sheet */
+.exq-bsheet {
+  display: grid;
+  gap: var(--s4);
+  align-content: start;
+}
+.exq-bsheet__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0;
+}
+.exq-bsheet__code {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.exq-bsheet__facts {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+.exq-bsheet__fact {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: var(--s3);
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--border);
+}
+.exq-bsheet__fact dt {
+  color: var(--fg-2);
+  font-size: var(--t-label);
+  font-weight: 600;
+}
+.exq-bsheet__fact dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.exq-bsheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.exq-bsheet__tip {
+  display: inline-flex;
+}
+.exq-bsheet__why {
+  margin: 0;
+  font-size: var(--t-label);
+}
+.exq-bsheet__panel {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card-2);
+}
+.exq-bsheet__h {
+  margin: 0 0 var(--s2);
+  font-size: var(--t-body);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.exq-bsheet__history {
+  display: grid;
+  gap: var(--s2);
+  color: var(--fg-2);
+  font-size: var(--t-label);
+}
+.exq-bsheet__when {
+  display: block;
+  color: var(--fg);
+  font-weight: 600;
+}
+.exq-bsheet__skeleton {
+  min-height: 240px;
+}
+.exq-btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Overview and bookings page layouts */
+.exq-chairrow__body {
+  min-width: 0;
+}
+.exq-chairrow__lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--s4);
+  margin: 2px 0 0;
+}
+@media (min-width: 1024px) {
+  .exq-chairrow__body {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr);
+    align-items: center;
+    gap: var(--s3);
+  }
+  .exq-chairrow__lines {
+    margin: 0;
+  }
+}
+.exq-chart__placeholder {
+  min-height: 280px;
+}
+.exq-activity__placeholder {
+  min-height: 120px;
+}
+.exq-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s3) var(--s5);
+  margin-bottom: var(--s4);
+}
+.exq-filters__selects {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  width: 100%;
+}
+@media (min-width: 768px) {
+  .exq-filters__selects {
+    grid-template-columns: repeat(2, 200px);
+    width: auto;
+  }
+}
+.exq-pager {
+  display: inline-flex;
+  gap: var(--s2);
+}
+
+/* The side panels pad their own content. */
+.exq-panelhost {
+  min-width: 0;
+}
+
+/* Legacy .exq-adm section spacing does not apply to the new panels. */
+.exq-adm .exq-panel {
+  margin-bottom: var(--s4);
+}
+
+.exq-bsheet__name {
+  margin: 0;
+  font-size: var(--t-h3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.exq-table__new {
+  margin-left: var(--s2);
+}
+
+.exq-chart__today {
+  fill: var(--accent-text);
 }

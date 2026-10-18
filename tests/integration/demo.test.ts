@@ -149,7 +149,7 @@ describe('the demo owner login', () => {
     const me = await call(server.baseUrl, 'GET', '/api/auth/me', { headers: { cookie } });
     const parsed = meResponseSchema.parse(me.body);
     expect(parsed.user.role).toBe('owner');
-    expect(parsed.features).toEqual({ photos: true, demo: true });
+    expect(parsed.features).toEqual({ photos: true, demo: true, email: false });
     const today = await call(server.baseUrl, 'GET', '/api/admin/today', { headers: { cookie } });
     expect(today.status).toBe(200);
     const bookings = await call(server.baseUrl, 'GET', '/api/admin/bookings', {

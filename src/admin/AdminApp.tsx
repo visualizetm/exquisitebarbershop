@@ -6,20 +6,17 @@ import '@/styles/dashboard.css';
 import { AdminNav } from './components/AdminNav';
 import { AccountPage } from './pages/AccountPage';
 import { AuditPage } from './pages/AuditPage';
-import { BlockTimePage } from './pages/BlockTimePage';
 import { BookingDetailPage } from './pages/BookingDetailPage';
-import { BookingsPage } from './pages/BookingsPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { LoginPage } from './pages/LoginPage';
 import { MySchedulePage } from './pages/MySchedulePage';
-import { NewBookingPage } from './pages/NewBookingPage';
 import { OutboxPage } from './pages/OutboxPage';
 import { PhotosPage } from './pages/PhotosPage';
 import { SchedulePage } from './pages/SchedulePage';
-import { TodayPage } from './pages/TodayPage';
-import { WhosInPage } from './pages/WhosInPage';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { BookingsPage } from './bookings/BookingsPage';
+import { OverviewPage } from './overview/OverviewPage';
 import { AdminShell } from './shell/AdminShell';
 import { SessionProvider } from './session';
 import { useSession } from './useSession';
@@ -92,13 +89,12 @@ function Gate() {
 function OwnerRoutes() {
   return (
     <Routes>
-      <Route index element={<TodayPage />} />
+      <Route index element={<OverviewPage />} />
       <Route path="schedule" element={<SchedulePage />} />
       <Route path="bookings" element={<BookingsPage />} />
-      <Route path="bookings/new" element={<NewBookingPage />} />
-      <Route path="bookings/:id" element={<BookingDetailPage />} />
-      <Route path="block" element={<BlockTimePage />} />
-      <Route path="whos-in" element={<WhosInPage />} />
+      <Route path="bookings/:id" element={<BookingsPage />} />
+      <Route path="team" element={<Navigate to="/admin/settings/staff" replace />} />
+      <Route path="website" element={<Navigate to="/admin/settings/services" replace />} />
       <Route path="customers" element={<CustomersPage />} />
       <Route path="customers/:phone" element={<CustomersPage />} />
       <Route path="photos" element={<PhotosPage />} />

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 export interface BarGroup {
   label: string;
@@ -10,7 +10,6 @@ export interface BarGroup {
   current?: boolean;
 }
 
-const W = 640;
 const H = 240;
 const PAD = { top: 16, right: 8, bottom: 32, left: 32 };
 
@@ -31,6 +30,21 @@ export function BarChart({
   nameB: string;
 }) {
   const id = useId();
+  const ref = useRef<HTMLElement>(null);
+  // The drawing is as wide as its box, so one unit is one pixel and the labels stay 13px.
+  const [W, setW] = useState(480);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry?.contentRect.width ?? 0);
+      if (width >= 200) setW(width);
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
   const [hot, setHot] = useState<number | null>(null);
   const max = Math.max(1, ...groups.flatMap((g) => [g.a, g.b]));
   const top = Math.max(4, Math.ceil(max / 4) * 4);
@@ -42,7 +56,7 @@ export function BarChart({
   const ticks = [0, top / 4, top / 2, (top * 3) / 4, top];
 
   return (
-    <figure className="exq-chart" data-state="ready">
+    <figure ref={ref} className="exq-chart" data-state="ready">
       <figcaption className="exq-chart__title">{title}</figcaption>
       <ul className="exq-chart__legend exq-bare" aria-hidden="true">
         <li>
@@ -122,8 +136,9 @@ export function BarChart({
                 className="exq-chart__label"
                 data-current={g.current ? 'true' : 'false'}
               >
-                {g.current ? `${g.label} (today)` : g.label}
+                {g.label}
               </text>
+              {g.current ? <circle cx={cx} cy={H - 24} r={3} className="exq-chart__today" /> : null}
               {hot === i ? (
                 <text
                   x={cx}

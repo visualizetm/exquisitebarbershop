@@ -1,3 +1,4 @@
+import { getEnv } from '../../env';
 import {
   changePasswordRequestSchema,
   loginRequestSchema,
@@ -36,7 +37,11 @@ async function meFor(userId: string): Promise<MeResponse> {
     },
     staff: staff && !staff.deletedAt ? toPublicStaff(staff) : null,
     permissions: { barbersCanBlockTime: settings.permissions.barbersCanBlockTime },
-    features: { photos: storageEnabled(), demo: demoEnabled() },
+    features: {
+      photos: storageEnabled(),
+      demo: demoEnabled(),
+      email: getEnv().EMAIL_PROVIDER === 'resend',
+    },
   });
 }
 

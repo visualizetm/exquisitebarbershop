@@ -5,6 +5,8 @@ import {
   bookingDetailResponseSchema,
   bookingListQuerySchema,
   bookingListResponseSchema,
+  bookingTableQuerySchema,
+  bookingTableResponseSchema,
   bookingNotesRequestSchema,
   bookingResponseSchema,
   closureListQuerySchema,
@@ -27,6 +29,7 @@ import {
   manualBookingResponseSchema,
   outboxListQuerySchema,
   outboxListResponseSchema,
+  overviewResponseSchema,
   ownerCancelRequestSchema,
   ownerRescheduleRequestSchema,
   resolutionsBodySchema,
@@ -67,6 +70,7 @@ import {
   customerByPhone,
   listBookings,
   ownerReschedule,
+  resendConfirmation,
   scheduleForDay,
   todaySummary,
   updateBookingNotes,
@@ -103,6 +107,7 @@ import {
   setStaffHours,
   upsertClosure,
 } from '../../services/adminSchedule';
+import { bookingTable, overview } from '../../services/adminDashboard';
 import { adminSearch } from '../../services/adminSearch';
 import { createManualBooking } from '../../services/bookingService';
 import { idempotencyKeyOf, metaOf, NO_STORE, principalOf } from '../context';
@@ -152,6 +157,20 @@ export const adminRoutes: RouteDefinition[] = [
     ctxScope(ctx);
     const { date } = parseQuery(ctx, dateQuerySchema);
     return { body: whoIsInResponseSchema.parse(await whoIsIn(date, ctx.now)), headers: NO_STORE };
+  }),
+
+  // Overview and the bookings table -----------------------------------------
+  owner('GET', '/api/admin/overview', async (ctx) => {
+    ctxScope(ctx);
+    return { body: overviewResponseSchema.parse(await overview(ctx.now)), headers: NO_STORE };
+  }),
+  owner('GET', '/api/admin/booking-table', async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, bookingTableQuerySchema);
+    return {
+      body: bookingTableResponseSchema.parse(await bookingTable(query, ctx.now)),
+      headers: NO_STORE,
+    };
   }),
 
   // Search ----------------------------------------------------------------
@@ -224,6 +243,13 @@ export const adminRoutes: RouteDefinition[] = [
     );
     scheduleDelivery(done.outboxIds);
     return { body: bookingResponseSchema.parse(done.body) };
+  }),
+  owner('POST', '/api/admin/bookings/:id/resend', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await resendConfirmation(principal, scope, id, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: { ok: true } };
   }),
   owner('POST', '/api/admin/bookings/:id/reschedule', async (ctx) => {
     const { principal, scope } = ctxScope(ctx);

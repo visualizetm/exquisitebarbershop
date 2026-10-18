@@ -15,6 +15,11 @@ export interface NewBookingPrefill {
 export interface QuickApi {
   openNewBooking: (prefill?: NewBookingPrefill) => void;
   openBooking: (id: string) => void;
+  /** Block time on one chair (a break, or time off). */
+  openBlock: () => void;
+  /** Mark a barber out for a day, with the resolver for booked clients. */
+  openBarberOut: (staffId?: string) => void;
+  openAnnouncement: () => void;
   /** Closes the booking panel (and leaves /admin/bookings/:id if the URL opened it). */
   closeBooking: () => void;
   version: number;

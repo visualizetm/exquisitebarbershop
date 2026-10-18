@@ -21,6 +21,8 @@ import { staffInputSchema, staffUpdateSchema } from '../schemas/staff';
 import { actorTypeSchema, timeBlockKindSchema } from '../schemas/timeBlock';
 import { staffSelectorSchema } from './availability';
 import { bookingViewSchema } from './bookings';
+import { photoViewSchema } from './photos';
+import { alertKindSchema } from '../schemas/alert';
 import { meUserSchema } from './auth';
 
 // ---------------------------------------------------------------------------
@@ -29,15 +31,22 @@ import { meUserSchema } from './auth';
 
 /**
  * The owner's choice for one booking a schedule change would leave outside
- * working time: keep it as an exception, or cancel it with or without telling
- * the customer. Barbers may only keep.
+ * working time: keep it as an exception, move it to another chair at the same
+ * time, or cancel it with or without telling the customer. Barbers may only keep.
  */
-export const conflictActionSchema = z.enum(['keep', 'cancel', 'cancelAndNotify']);
+export const conflictActionSchema = z.enum(['keep', 'move', 'cancel', 'cancelAndNotify']);
 export type ConflictAction = z.infer<typeof conflictActionSchema>;
-export const conflictResolutionSchema = z.object({
-  bookingId: idSchema,
-  action: conflictActionSchema,
-});
+export const conflictResolutionSchema = z
+  .object({
+    bookingId: idSchema,
+    action: conflictActionSchema,
+    /** For "move": the chair that takes the booking at the same time. */
+    toStaffId: idSchema.optional(),
+  })
+  .refine((v) => (v.action === 'move') === (v.toStaffId !== undefined), {
+    message: 'Moving a booking needs a chair, and only a move has one',
+    path: ['toStaffId'],
+  });
 export type ConflictResolution = z.infer<typeof conflictResolutionSchema>;
 export const resolutionsSchema = z.array(conflictResolutionSchema).max(500).optional();
 
@@ -45,6 +54,7 @@ export const resolutionsSchema = z.array(conflictResolutionSchema).max(500).opti
 export const conflictOutcomeSchema = z.object({
   kept: z.array(idSchema),
   cancelled: z.array(idSchema),
+  moved: z.array(idSchema).default([]),
 });
 export type ConflictOutcome = z.infer<typeof conflictOutcomeSchema>;
 
@@ -207,6 +217,8 @@ export const bookingDetailResponseSchema = z.object({
   outbox: z.array(outboxMessageViewSchema),
   /** Allowed next statuses for the caller. */
   transitions: z.array(bookingStatusSchema),
+  /** The customer's manage link path (owner only), for "Copy manage link". Empty for barbers. */
+  managePath: z.string().nullable().default(null),
 });
 export type BookingDetailResponse = z.infer<typeof bookingDetailResponseSchema>;
 
@@ -469,6 +481,111 @@ export const issuedPasswordResponseSchema = z.object({
   temporaryPassword: z.string(),
 });
 export const loginResponseSchema = z.object({ user: loginViewSchema });
+
+// ---------------------------------------------------------------------------
+// Overview
+// ---------------------------------------------------------------------------
+
+/** One number for today (or this week) and, only when last week has data, the same number then. */
+export const overviewStatSchema = z.object({ value: z.int(), compare: z.int().nullable() });
+
+export const activityKindSchema = z.enum(['booked', 'canceled', 'rescheduled', 'noShow', 'walkIn']);
+export type ActivityKind = z.infer<typeof activityKindSchema>;
+export const activityEntrySchema = z.object({
+  id: idSchema,
+  at: z.iso.datetime(),
+  kind: activityKindSchema,
+  bookingId: idSchema,
+  clientName: z.string(),
+  staffName: z.string(),
+  status: bookingStatusSchema,
+});
+
+export const overviewChairSchema = z.object({
+  staff: staffRefSchema,
+  photo: photoViewSchema.nullable(),
+  status: z.enum(['in', 'off', 'closed']),
+  current: adminBookingViewSchema.nullable(),
+  next: adminBookingViewSchema.nullable(),
+});
+
+export const alertViewSchema = z.object({
+  id: idSchema,
+  kind: alertKindSchema,
+  staffId: idSchema,
+  staffName: z.string(),
+  fromDate: isoDateSchema,
+  toDate: isoDateSchema,
+  startAt: z.iso.datetime(),
+  endAt: z.iso.datetime(),
+  reason: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  /** Confirmed bookings the owner still has to decide on, counted when the page loads. */
+  affectedCount: z.int(),
+});
+export type AlertView = z.infer<typeof alertViewSchema>;
+
+export const overviewResponseSchema = z.object({
+  date: isoDateSchema,
+  now: z.iso.datetime(),
+  /** "Tuesday": the compare line says "vs last Tuesday". */
+  weekdayName: z.string(),
+  stats: z.object({
+    bookings: overviewStatSchema,
+    bookedValueCents: overviewStatSchema,
+    walkIns: overviewStatSchema,
+    noShowsWeek: overviewStatSchema,
+  }),
+  /** Monday to Sunday: bookings this week against last week. */
+  week: z.array(
+    z.object({
+      date: isoDateSchema,
+      label: z.string(),
+      thisWeek: z.int(),
+      lastWeek: z.int(),
+      today: z.boolean(),
+    }),
+  ),
+  chairs: z.array(overviewChairSchema),
+  activity: z.array(activityEntrySchema),
+  alerts: z.array(alertViewSchema),
+});
+export type OverviewResponse = z.infer<typeof overviewResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Bookings table (server paged, sortable)
+// ---------------------------------------------------------------------------
+
+export const bookingRangeSchema = z.enum(['today', 'tomorrow', 'week', 'upcoming', 'past', 'all']);
+export type BookingRange = z.infer<typeof bookingRangeSchema>;
+export const bookingSortKeySchema = z.enum(['when', 'client', 'status', 'source']);
+export type BookingSortKey = z.infer<typeof bookingSortKeySchema>;
+export const BOOKING_TABLE_PAGE_SIZE = 25;
+
+export const bookingTableQuerySchema = z.object({
+  range: bookingRangeSchema.default('upcoming'),
+  staffId: idSchema.optional(),
+  status: bookingStatusSchema.optional(),
+  sort: bookingSortKeySchema.default('when'),
+  dir: z.enum(['asc', 'desc']).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+});
+export type BookingTableQuery = z.input<typeof bookingTableQuerySchema>;
+export const bookingTableResponseSchema = z.object({
+  rows: z.array(adminBookingViewSchema),
+  total: z.int(),
+  page: z.int(),
+  pageSize: z.int(),
+  /** How many bookings each quick filter holds, with the barber and status filters applied. */
+  counts: z.object({
+    today: z.int(),
+    tomorrow: z.int(),
+    week: z.int(),
+    upcoming: z.int(),
+    past: z.int(),
+  }),
+});
+export type BookingTableResponse = z.infer<typeof bookingTableResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Search

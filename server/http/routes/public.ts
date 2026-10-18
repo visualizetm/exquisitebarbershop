@@ -10,6 +10,8 @@ import {
   type PublicService,
   type PublicStaff,
 } from '../../../shared/api/public';
+import { shopDateOf } from '../../../shared/lib/time';
+import { announcementIsLive } from '../../../shared/schemas/shopSettings';
 import type { ServiceDocument } from '../../../shared/schemas/service';
 import type { StaffDocument } from '../../../shared/schemas/staff';
 import { getEnv } from '../../env';
@@ -66,7 +68,7 @@ export const publicRoutes: RouteDefinition[] = [
     method: 'GET',
     path: '/api/shop',
     auth: 'public',
-    handler: async () => {
+    handler: async (ctx) => {
       const [settings, hours, hero] = await Promise.all([
         shopSettingsRepo.requireShopSettings(),
         weeklyHoursRepo.getShopHours(),
@@ -90,12 +92,17 @@ export const publicRoutes: RouteDefinition[] = [
           requireEmail: settings.booking.requireEmail,
           cancelCutoffMinutes: settings.booking.cancelCutoffMinutes,
         },
-        announcement: settings.announcement,
+        // Past its end date the strip is off, so a stale offer never lingers on the site.
+        announcement: {
+          ...settings.announcement,
+          enabled: announcementIsLive(settings.announcement, shopDateOf(ctx.now)),
+        },
+        social: settings.social,
         heroPhoto: hero,
         maintenance: getEnv().MAINTENANCE_MODE === 'true',
         demo: demoEnabled(),
       });
-      return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
+      return { body, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } };
     },
   },
   {

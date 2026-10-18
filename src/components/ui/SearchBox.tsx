@@ -95,9 +95,10 @@ export function SearchBox({
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       setActive((a) => (flat.length === 0 ? -1 : (a - 1 + flat.length) % flat.length));
-    } else if (event.key === 'Enter' && active >= 0) {
+    } else if (event.key === 'Enter' && flat.length > 0) {
+      // Enter takes the highlighted result, or the first one when none is highlighted.
       event.preventDefault();
-      choose(active);
+      choose(active >= 0 ? active : 0);
     } else if (event.key === 'Escape') {
       if (open) event.stopPropagation();
       setOpen(false);

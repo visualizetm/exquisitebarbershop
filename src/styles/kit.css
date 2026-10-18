@@ -970,6 +970,11 @@ div.exq-chaircard {
     border-left: var(--rule) solid var(--accent);
     border-radius: 0;
   }
+  /* The side sheet is as tall as the window; its content scrolls inside it. */
+  .exq-dialog[data-variant='sheet'] .exq-dialog__inner {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
   .exq-dialog[data-variant='sheet'][data-size='lg'] {
     width: min(720px, 100%);
     max-height: none;

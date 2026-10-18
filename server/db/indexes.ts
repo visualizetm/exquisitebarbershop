@@ -20,6 +20,7 @@ export const COLLECTIONS = {
   photos: 'photos',
   pendingUploads: 'pendingUploads',
   systemState: 'systemState',
+  alerts: 'alerts',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -116,6 +117,13 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { nameKey: 1, startAt: -1 },
     options: { name: 'by_name_key' },
     reason: "The owner's search finds a customer by the start of the name, any case or accent.",
+  },
+  // alerts
+  {
+    collection: 'alerts',
+    keys: { status: 1, createdAt: 1 },
+    options: { name: 'open_queue' },
+    reason: 'The overview lists open alerts, oldest first, without a collection scan.',
   },
   // slotLocks
   {

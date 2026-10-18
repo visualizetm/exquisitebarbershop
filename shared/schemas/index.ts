@@ -16,3 +16,4 @@ export * from './rateLimit';
 export * from './loginThrottle';
 export * from './scheduleGuard';
 export * from './photo';
+export * from './alert';
