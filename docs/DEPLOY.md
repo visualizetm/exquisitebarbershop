@@ -92,6 +92,12 @@ Production only ever deploys from `main`; branches get preview deployments.
    three dots on the latest deployment, Redeploy. A deployment reads the
    variables once, at build time, so every change needs a new one.
 
+3. **Open `https://<your site>/api/health`. It must answer JSON, never a Vercel error
+   page.** Healthy is `{"ok":true,...}`. If a setting is missing it is
+   `{"ok":false,"status":"config","missing":["NAME", ...]}` (names only): set those and redeploy.
+   A page that is not JSON means the function itself is broken; see section 12.
+   Do this after every deploy.
+
 Until setup has run (next step), the pages show "Online booking is having a
 moment" and `/api/health` reports what is missing. That is expected.
 
@@ -247,3 +253,24 @@ sections 2 to 6, or clear this one:
 Photos stored in GridFS do not move to R2 by themselves: switching
 STORAGE_DRIVER only changes where new photos go, and clearing the demo data
 removes the old ones. Upload the real photos again once R2 is on.
+
+## 12. How the function is built, and how it is checked
+
+Vercel runs the API with plain Node ESM, which cannot resolve imports written without
+a file extension. So nothing under `server/` ships as separate files:
+
+- `server/vercel-entry.ts` is the real function body. `npm run build:api` (also run by
+  `npm run build`) bundles it with esbuild into one file, `server/bundle/app.mjs`, which is
+  committed. `mongodb` and `@node-rs/argon2` stay external (native code); Vercel packs them
+  from node_modules.
+- `api/index.js` is the function Vercel sees: plain JavaScript that loads the bundle. If the bundle
+  cannot load, it answers JSON `FUNCTION_LOAD_FAILED` instead of Vercel's error page.
+- `vercel.json` rewrites `/api/(.*)` to the function (Vercel's own routing sends only one-segment
+  paths to a catch-all file), rewrites everything else to `index.html`, and includes the bundle
+  in the function.
+- After changing anything in `server/`, `shared/` or `seed/`, run `npm run build:api` and commit
+  `server/bundle/app.mjs`. CI rebuilds it and fails if the committed copy differs.
+- `npm run test:vercel-function` runs the function under plain `node` from a directory holding
+  only what Vercel would ship (the traced files, and the output of `vercel build`), calls
+  `/api/health`, the demo flow and the upload path, and replays Vercel's routing table. It is a
+  required CI step. If it fails, the site would have been down.

@@ -8,7 +8,8 @@ Last commit: see the bottom of this file.
 ## Stack and hosting
 
 - Vite 7, React 19, TypeScript strict, React Router 7 (BrowserRouter, real paths).
-- One Vercel serverless function (`api/[...path].ts`) over `server/`, MongoDB
+- One Vercel serverless function (`api/index.js`, which loads the committed bundle
+  `server/bundle/app.mjs` built from `server/`), MongoDB
   (Atlas, replica set, transactions), zod schemas shared from `shared/`.
 - Luxon for time in America/New_York. Jost self-hosted from `@fontsource/jost`.
 - Hosting: Vercel (Vite preset). `vercel.json` rewrites every non-API path to
@@ -133,9 +134,23 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
   screenshots in `docs/guide/` from `tests/e2e/guide.ts`; audit tooling in
   `tests/e2e/audit.ts` and `docs/screens/audit/`.
 
+## Known history
+
+- Through prompt 8 the API never ran in production. Vercel runs the compiled function with
+  plain Node ESM; `api/[...path].ts` imported `../server/http/app` without an extension, so every
+  `/api/*` request answered Vercel's own 500 FUNCTION_INVOCATION_FAILED (ERR_MODULE_NOT_FOUND)
+  before any of our code ran. Every earlier explanation of the down screen (missing R2 variables,
+  STORAGE_DRIVER, an empty database) was a guess about code that had never executed there.
+  Fixed in prompt 9 (bundle, `api/index.js`, JSON error answers); CI had been green because
+  Vitest, Playwright and the production-like run all load the server through tsx or Vite.
+- Vercel routed `api/[...path]` as a single path segment, which would have 404'd every nested
+  API path; fixed with the `/api/(.*)` rewrite (prompt 9).
+- Proof it stays fixed: `npm run test:vercel-function`, a required CI step (DEPLOY.md section 12).
+
 ## Last commit
 
-Prompt 8, 2026-10-18: the showcase demo (auto setup, demo sign-in, GridFS photos, noindex,
+Prompt 9, 2026-10-18: the function runs under plain Node on Vercel (bundle, `api/index.js`, rewrite),
+with `npm run test:vercel-function` in CI. Before it, prompt 8, 2026-10-18: the showcase demo (auto setup, demo sign-in, GridFS photos, noindex,
 down-screen details), the hero and sign-in logo fixes, the showcase production-like run and
 `docs/screens/p8/`. Before it, prompt 7, 2026-10-17: the launch without R2, visible configuration failures,
 the nav logo, the API-down copy, route-change focus, the production-like e2e

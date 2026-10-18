@@ -1,3 +1,4 @@
+CORRECTION (prompt 9): the API never ran on Vercel until prompt 9 (ERR_MODULE_NOT_FOUND on an extensionless import), so statements here about production behavior (the env gate, setup, health, demo mode, a root cause of the down screen) were never observed there; they were checked under tsx, Vite or a local build. See docs/reports/09-vercel-function.md.
 REPORT 07: LIVE WITHOUT R2, VISIBLE FAILURES, THREE UI FIXES
 Commits (2026-10-17): a3cb1e2 code and tests; 3d3fced docs and captures. PR: https://github.com/visualizetm/exquisitebarbershop/pull/2 into main, CI green on 3d3fced.
 1 Storage: STORAGE_DRIVER=none, allowed in production only with STORAGE_DISABLED_ACK=true. Upload routes 503 STORAGE_DISABLED; photo reads empty so pages show placeholders; Photos screen one empty state; daily cron runs the outbox only; doctor warns Photo storage, Public photo URL and Backups with the R2 fix.

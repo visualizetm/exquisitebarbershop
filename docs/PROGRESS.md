@@ -255,3 +255,19 @@ commit, and what is still open.
 - Open: Rob sets DEMO_MODE=true and STORAGE_DRIVER=mongo, merges, redeploys. Before real
   customers: leave demo mode (DEPLOY.md section 11), real contact details, hours, prices,
   R2 and email.
+
+## Prompt 9
+
+### The function never loaded on Vercel
+
+- Root cause: Vercel runs the compiled function with plain Node ESM, where the extensionless
+  relative imports of `api/[...path].ts` do not resolve (ERR_MODULE_NOT_FOUND), so the API had
+  never run in production.
+- Shipped: the API as one committed esbuild bundle (`server/bundle/app.mjs`, built by
+  `npm run build:api` and by `npm run build`) behind a plain-JS `api/index.js` that answers JSON
+  `FUNCTION_LOAD_FAILED` if the bundle cannot load; a catch-all in the bundle entry; the function
+  moved to `api/index.js` with a `/api/(.*)` rewrite because Vercel routed `[...path]` as one
+  segment; `npm run test:vercel-function` (plain node, nft trace, `vercel build` output, routing
+  replay, the demo flow end to end) as a required CI step with a bundle freshness check; the
+  production-like e2e servers load the real function file; DEPLOY.md, SITE-REPORT, CLAUDE.md.
+- Open: merge, let Vercel deploy, open `/api/health`: JSON, not an error page.

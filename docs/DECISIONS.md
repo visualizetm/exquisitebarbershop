@@ -446,3 +446,65 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   and sets exactly MONGODB_URI, MONGODB_DB_NAME, APP_BASE_URL, MANAGE_LINK_SECRET, CRON_SECRET,
   DEMO_MODE and STORAGE_DRIVER=mongo on an empty database. The launch run (4174) proves the
   opposite with the mode off: not seeded, no demo button, 404s, no media route.
+
+## Prompt 9: the function never loaded on Vercel
+
+- D9-01 PR 3 (prompt 8) was not merged, so this branch is `claude/p9-vercel-function-fix`
+  from `claude/p8-showcase-demo`. The pull request contains PR 2 and PR 3 until they merge.
+- D9-02 The real root cause, reproduced exactly: Vercel compiles `api/[...path].ts` file by file
+  and runs it with plain Node ESM, where `import '../server/http/app'` has no extension, so the
+  function died with ERR_MODULE_NOT_FOUND before any of our code ran. Every earlier "root cause"
+  (reports 05 to 08: missing R2 variables, STORAGE_DRIVER=none, an empty database) was a guess
+  about code that never executed in production. They were reproduced under tsx, which resolves
+  extensionless imports, so the reproductions proved nothing about Vercel.
+- D9-03 Option A, one esbuild bundle. Option B (`.js` on every relative import in about 230
+  files, NodeNext resolution, a lint rule) changes every file, fights the bundler-style
+  resolution the app and tests use, and depends on Vercel compiling and tracing every file the
+  way I hope it does. With a bundle there are no relative imports left to resolve, and the exact
+  file that ships is the file the test runs.
+- D9-04 The bundle is committed (`server/bundle/app.mjs`, 1.4 MB) behind a tiny hand-written
+  `api/index.js`. Vercel finds functions from the repository's files and traces what they
+  import; a file only the build command writes might not exist then. Committing it makes the
+  shipped file independent of build order. `npm run build` regenerates it (so a stale copy
+  cannot hide) and CI fails when the committed copy differs from a fresh build.
+- D9-05 `api/index.js` is plain JavaScript with no imports of ours. It loads the bundle with a
+  dynamic import inside the handler, so a load failure (a native add-on, a bad deploy) becomes
+  JSON `FUNCTION_LOAD_FAILED` (503) instead of Vercel's FUNCTION_INVOCATION_FAILED page. A last
+  catch in the bundle's own entry (`server/vercel-entry.ts`) answers JSON INTERNAL_ERROR for
+  anything thrown outside the router. Neither answer carries the underlying message, which can
+  hold paths or connection strings; both are logged with connection strings redacted. The code
+  joined the shared error list so the down screen's Details shows it.
+- D9-06 External packages: `mongodb` and `@node-rs/argon2` (native add-ons), resolved from
+  node_modules by Vercel's tracer. Everything else is plain JavaScript and is bundled. `ws` is
+  an optional peer that `@vercel/functions` imports lazily in `upgradeWebSocket`, which nothing
+  calls. The build fails if a dev-only package (vite, vitest, tsx, mongodb-memory-server,
+  esbuild, playwright) ends up in the bundle. The argon2 Linux x64 binary ships (verified in
+  Vercel's own build output).
+- D9-07 Second production bug, found by running Vercel's own `vercel build` and reading the
+  routing table it generates: `api/[...path]` is routed as `^/api/([^/]+)$`, ONE path segment.
+  `/api/health` and `/api/shop` would have worked; `/api/auth/login`, `/api/staff/marcus`,
+  `/api/admin/*` and the cron path would have answered Vercel's 404. Fix: the function is
+  `api/index.js` (the standard single-function layout) with the rewrite `/api/(.*)` to `/api`,
+  which Vercel turns into `^/api(?:/(.*))$`. The router reads the original request path; the test
+  also proves it ignores a query Vercel might add. `/sitemap.xml` still rewrites to
+  `/api/sitemap.xml`, which the same rule then sends to the function.
+- D9-08 Vercel's tracer packed `.data/uploads` (a developer's local uploads) into the function
+  because the local storage driver wrote `resolve('.data', 'uploads')` as a literal. The path is
+  now built at run time and `vercel.json` excludes `.data/**`; the test fails if either ships.
+- D9-09 `npm run test:vercel-function` builds the bundle, then ships it two ways into temp
+  directories holding nothing else (the files `@vercel/nft` traces from `api/index.js`, and the
+  output of Vercel's own `vercel build`, which needs no token) and runs each with plain `node`
+  through a bare HTTP server: no env gives JSON `{ ok: false, missing }`; the showcase env on an
+  empty in-memory database gives auto setup, health, the shop, the demo sign-in, a GridFS upload
+  and its public address; a deleted bundle gives JSON FUNCTION_LOAD_FAILED. It then replays
+  Vercel's generated routing table for API and page paths of every depth. The Vercel CLI is run
+  with `npx vercel@64.5.0`, not installed, to keep installs light; a stub `.vercel/project.json`
+  (git-ignored) stands in for a linked project. CI sets REQUIRE_VERCEL_BUILD=1 so the step cannot
+  quietly skip; locally it skips with a note if the CLI cannot be fetched.
+- D9-10 The production-like e2e servers (launch and showcase) now load `api/index.js` and the
+  bundle instead of the TypeScript router, so those 12 tests exercise the shipped function too.
+- D9-11 Limits: nothing here can call Vercel itself, and the Vercel API refused this session
+  (403), so the failed deployment's files could not be inspected; the fix rests on running the
+  same builder and tracer locally. What is not proven: that Vercel's platform hands the
+  function the original request path after a rewrite (the documented Express-on-Vercel pattern
+  relies on it), which the first deploy's `/api/health` and `/api/staff/marcus` will confirm.

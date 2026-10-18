@@ -24,8 +24,8 @@ Contents
 ## 1. Overview and principles
 
 - One Vite + React single page app served as static files from Vercel, with one
-  serverless function (`api/[...path].ts`) that routes every `/api/*` request
-  through `server/http`.
+  serverless function (`api/index.js`, loading the bundle `server/bundle/app.mjs`) that
+  routes every `/api/*` request through `server/http`. See DEPLOY.md section 12.
 - MongoDB (Atlas in production, mongodb-memory-server in tests) accessed through
   the official driver, one cached client per process, transactions for every
   multi-document write.
