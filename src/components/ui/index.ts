@@ -4,7 +4,7 @@ export { BottomTabs, type BottomTabItem } from './BottomTabs';
 export { Card } from './Card';
 export { ChairCard, ChairCardSkeleton, type ChairStatus } from './ChairCard';
 export { Chip, ChipLink, Chips } from './Chip';
-export { Checkbox, Input, Select, Textarea } from './Field';
+export { Checkbox, Input, Select, Switch, Textarea } from './Field';
 export { DataTable, type Column, type SortState } from './DataTable';
 export { Footer } from './Footer';
 export { Header } from './Header';

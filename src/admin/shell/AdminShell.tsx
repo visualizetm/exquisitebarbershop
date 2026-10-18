@@ -24,6 +24,7 @@ import { todayInShop, shopDateLabel } from '../format';
 import { BookingSheet } from '../bookings/BookingSheet';
 import { AnnouncementPanel } from '../panels/AnnouncementPanel';
 import { BarberOutPanel } from '../panels/BarberOutPanel';
+import { AlertPanel } from '../panels/AlertPanel';
 import { BlockTimePanel } from '../panels/BlockTimePanel';
 import { NewBookingPanel } from '../panels/NewBookingPanel';
 import { useMe, useSession } from '../useSession';
@@ -33,7 +34,8 @@ import { QuickContext, type NewBookingPrefill, type QuickApi } from './quick';
 
 type Panel =
   | { kind: 'new'; prefill: NewBookingPrefill }
-  | { kind: 'block' }
+  | { kind: 'block'; staffId?: string | undefined; blockKind?: 'block' | 'timeOff' | undefined }
+  | { kind: 'alert'; id: string }
   | { kind: 'out'; staffId?: string | undefined }
   | { kind: 'announcement' };
 
@@ -42,6 +44,7 @@ const PANEL_TITLE: Record<Panel['kind'], string> = {
   block: 'Block time',
   out: 'Barber out',
   announcement: 'Announcement',
+  alert: 'Needs a decision',
 };
 
 /**
@@ -81,8 +84,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
         setBookingId(null);
         if (routeId) void navigate(`/admin/bookings${location.search}`);
       },
-      openBlock: () => {
-        setPanel({ kind: 'block' });
+      openBlock: (options) => {
+        setPanel({ kind: 'block', staffId: options?.staffId, blockKind: options?.kind });
+      },
+      openAlert: (id) => {
+        setPanel({ kind: 'alert', id });
       },
       openBarberOut: (staffId) => {
         setPanel({ kind: 'out', staffId });
@@ -255,6 +261,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
             ) : null}
             {panel?.kind === 'block' ? (
               <BlockTimePanel
+                {...(panel.staffId ? { staffId: panel.staffId } : {})}
+                {...(panel.blockKind ? { initialKind: panel.blockKind } : {})}
+                onDone={() => {
+                  setPanel(null);
+                }}
+              />
+            ) : null}
+            {panel?.kind === 'alert' ? (
+              <AlertPanel
+                id={panel.id}
                 onDone={() => {
                   setPanel(null);
                 }}

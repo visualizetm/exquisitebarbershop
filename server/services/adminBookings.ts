@@ -2,14 +2,19 @@ import type {
   AdminBookingView,
   BookingDetailResponse,
   BookingListQuery,
+  CustomerListQuery,
+  CustomerListResponse,
   CustomerResponse,
   MyScheduleResponse,
   ScheduleResponse,
+  ScheduleWeekResponse,
   TodayResponse,
   WhoIsInEntry,
 } from '../../shared/api/admin';
+import { CUSTOMER_PAGE_SIZE } from '../../shared/api/admin';
 import { formatUsPhone, normalizeUsPhone } from '../../shared/lib/phone';
 import { normalizeReferenceCode } from '../../shared/lib/referenceCode';
+import { classifySearch } from '../../shared/lib/search';
 import { addMinutes, shopDateOf, shopDayBounds, shopDayStart } from '../../shared/lib/time';
 import type { BookingDocument, BookingStatus } from '../../shared/schemas/booking';
 import type { StaffDocument } from '../../shared/schemas/staff';
@@ -19,6 +24,7 @@ import { AppError } from '../lib/errors';
 import {
   auditLogRepo,
   bookingsRepo,
+  customerNotesRepo,
   emailOutboxRepo,
   scheduleGuardsRepo,
   shopSettingsRepo,
@@ -213,6 +219,50 @@ export async function scheduleForDay(
       blocks: data.source.timeBlocks
         .filter((b) => b.staffId === s._id && b.startAt < bounds.end && b.endAt > bounds.start)
         .map(toTimeBlockView),
+    })),
+  };
+}
+
+/** Monday to Sunday of the week holding a date: one row per chair, one count per day. */
+export async function scheduleWeek(
+  date: string | undefined,
+  now: Date,
+): Promise<ScheduleWeekResponse> {
+  const today = shopDateOf(now);
+  const monday = shopDayStart(date ?? today).startOf('week');
+  const dates = Array.from({ length: 7 }, (_, i) => monday.plus({ days: i }).toISODate() ?? today);
+  const first = dates[0] ?? today;
+  const last = dates[6] ?? today;
+  const [data, bookings] = await Promise.all([
+    loadScheduleData(first, last),
+    bookingsRepo.listBookingsStartingBetween({
+      start: shopDayBounds(first).start,
+      end: shopDayBounds(last).end,
+    }),
+  ]);
+  return {
+    days: dates.map((d, i) => ({
+      date: d,
+      label: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i] ?? d,
+      today: d === today,
+    })),
+    rows: activeStaff(data.staff).map((s) => ({
+      staff: toStaffRef(s),
+      cells: dates.map((d) => {
+        const who = whoIsInFor(s, d, data.source);
+        return {
+          date: d,
+          count: bookings.filter(
+            (b) => b.staffId === s._id && b.status !== 'cancelled' && shopDateOf(b.startAt) === d,
+          ).length,
+          status:
+            who.status === 'in'
+              ? ('working' as const)
+              : who.status === 'closed'
+                ? ('closed' as const)
+                : ('off' as const),
+        };
+      }),
     })),
   };
 }
@@ -651,12 +701,20 @@ export async function customerByPhone(rawPhone: string, now: Date): Promise<Cust
       details: [{ path: 'phone', message: 'Enter a valid US phone number' }],
     });
   }
-  const bookings = await bookingsRepo.listBookingsForPhone(phone, 200);
-  const staffById = new Map(
-    (await staffRepo.listStaff({ includeDeleted: true })).map((s) => [s._id, s]),
-  );
+  const [bookings, note, allStaff] = await Promise.all([
+    bookingsRepo.listBookingsForPhone(phone, 200),
+    customerNotesRepo.getNote(phone),
+    staffRepo.listStaff({ includeDeleted: true }),
+  ]);
+  const staffById = new Map(allStaff.map((s) => [s._id, s]));
   const by = (status: BookingStatus) => bookings.filter((b) => b.status === status);
+  const counts = new Map<string, number>();
+  for (const b of bookings.filter((x) => x.status !== 'cancelled'))
+    counts.set(b.staffId, (counts.get(b.staffId) ?? 0) + 1);
+  const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const usualStaff = usual ? staffById.get(usual[0]) : undefined;
   return {
+    phoneE164: phone,
     phone: formatUsPhone(phone),
     names: [...new Set(bookings.map((b) => b.customer.name))],
     emails: [...new Set(bookings.flatMap((b) => (b.customer.email ? [b.customer.email] : [])))],
@@ -669,5 +727,73 @@ export async function customerByPhone(rawPhone: string, now: Date): Promise<Cust
     },
     completedSpendCents: by('completed').reduce((sum, b) => sum + b.totalPriceCents, 0),
     bookings: bookings.map((b) => toAdminBookingView(b, staffName(staffById, b.staffId))),
+    notes: note?.notes ?? null,
+    usualBarber: usualStaff ? toStaffRef(usualStaff) : null,
   };
+}
+
+/** The customer list: grouped by phone, searchable by name, phone or last four digits. */
+export async function customerList(query: CustomerListQuery): Promise<CustomerListResponse> {
+  const parsed = classifySearch(query.q);
+  const match =
+    parsed.kind === 'phone'
+      ? ({ kind: 'phone', digits: parsed.digits } as const)
+      : parsed.kind === 'text'
+        ? ({ kind: 'name', key: parsed.key } as const)
+        : null;
+  const dir = query.dir ?? (query.sort === 'name' ? 'asc' : 'desc');
+  const { rows, total } = await bookingsRepo.customerPage(
+    match,
+    { key: query.sort, dir: dir === 'asc' ? 1 : -1 },
+    (query.page - 1) * CUSTOMER_PAGE_SIZE,
+    CUSTOMER_PAGE_SIZE,
+  );
+  const [notes, staff] = await Promise.all([
+    customerNotesRepo.listNotesFor(rows.map((r) => r.phone)),
+    staffRepo.listStaff({ includeDeleted: true }),
+  ]);
+  const hasNote = new Set(notes.map((n) => n.phone));
+  const names = new Map(staff.map((s) => [s._id, s.name]));
+  return {
+    rows: rows.map((r) => ({
+      phoneE164: r.phone,
+      phone: formatUsPhone(r.phone),
+      name: r.name,
+      bookings: r.bookings,
+      visits: r.visits,
+      noShows: r.noShows,
+      lastVisitAt: r.lastVisitAt ? r.lastVisitAt.toISOString() : null,
+      usualBarber: r.usualStaffId ? (names.get(r.usualStaffId) ?? null) : null,
+      hasNotes: hasNote.has(r.phone),
+    })),
+    total,
+    page: query.page,
+    pageSize: CUSTOMER_PAGE_SIZE,
+  };
+}
+
+export async function saveCustomerNotes(
+  principal: Principal,
+  rawPhone: string,
+  notes: string,
+  meta: ServiceMeta,
+): Promise<{ notes: string | null }> {
+  const phone = normalizeUsPhone(rawPhone);
+  if (!phone) throw new AppError('VALIDATION_ERROR', 'Enter a valid US phone number');
+  const before = await customerNotesRepo.getNote(phone);
+  const saved = await customerNotesRepo.saveNote(phone, notes, meta.now);
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: 'customer.notes',
+      entityType: 'customer',
+      entityId: phone,
+      before: null,
+      after: null,
+      meta: { hadNote: before !== null, hasNote: saved !== null },
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+  return { notes: saved?.notes ?? null };
 }

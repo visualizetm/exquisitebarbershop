@@ -133,3 +133,38 @@ export function Checkbox({
     </label>
   );
 }
+
+/** An on/off switch. The visible label says what it is now; it is a button with role switch. */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+  busy = false,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: ReactNode;
+  disabled?: boolean;
+  busy?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      className="exq-switch"
+      data-state={checked ? 'on' : 'off'}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      onClick={() => {
+        onChange(!checked);
+      }}
+    >
+      <span className="exq-switch__track" aria-hidden="true">
+        <span className="exq-switch__thumb" />
+      </span>
+      <span className="exq-switch__label">{label}</span>
+    </button>
+  );
+}

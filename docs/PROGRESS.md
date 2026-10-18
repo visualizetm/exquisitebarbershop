@@ -389,3 +389,17 @@ commit, and what is still open.
 - Tests: `tests/integration/adminDashboard.test.ts`, `resolverMove.test.ts` (including the race), the
   authz matrix rows, and `tests/e2e/dashboard.spec.ts` (overview, filters, deep link, cancel, announcement,
   axe in both themes at 1280 and 390 on the overview, the list and the panel).
+
+### M3: Schedule, Customers, Team
+
+- Shipped: the Schedule (day grid with a column per chair, hatched blocks, gray time off, a red now line,
+  click an empty slot or a chair's plus to open New booking filled in; week table of counts that opens a
+  day), Customers (list grouped by phone, search, sort, a panel with history and a private note), Team
+  (cards with an In or Off today switch and the next booking; a profile page with Profile, Services, Working
+  hours and Time off tabs; Add barber; Remove from schedule through the resolver), the alert resolver
+  (Decide on the overview strip), and the removed barber redirect. Server: `GET /api/admin/schedule/week`,
+  `GET /api/admin/customer-list`, `PUT /api/admin/customers/notes`, `POST /api/admin/alerts/:id/resolve`
+  and `/dismiss`, the `customerNotes` collection.
+- Tests: `tests/integration/customersAlerts.test.ts`, `removedStaff.test.ts`, the authz rows and
+  `tests/e2e/team.spec.ts` (schedule, week, customers, resolver Move end to end, add and remove a barber,
+  the In or Off switch, axe in both themes at 1280 and 390 on every new screen).

@@ -8,15 +8,17 @@ import { AccountPage } from './pages/AccountPage';
 import { AuditPage } from './pages/AuditPage';
 import { BookingDetailPage } from './pages/BookingDetailPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
-import { CustomersPage } from './pages/CustomersPage';
+import { CustomersPage } from './customers/CustomersPage';
 import { LoginPage } from './pages/LoginPage';
 import { MySchedulePage } from './pages/MySchedulePage';
 import { OutboxPage } from './pages/OutboxPage';
 import { PhotosPage } from './pages/PhotosPage';
-import { SchedulePage } from './pages/SchedulePage';
+import { SchedulePage } from './schedule/SchedulePage';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { BookingsPage } from './bookings/BookingsPage';
 import { OverviewPage } from './overview/OverviewPage';
+import { TeamDetailPage } from './team/TeamDetailPage';
+import { TeamPage } from './team/TeamPage';
 import { AdminShell } from './shell/AdminShell';
 import { SessionProvider } from './session';
 import { useSession } from './useSession';
@@ -93,7 +95,8 @@ function OwnerRoutes() {
       <Route path="schedule" element={<SchedulePage />} />
       <Route path="bookings" element={<BookingsPage />} />
       <Route path="bookings/:id" element={<BookingsPage />} />
-      <Route path="team" element={<Navigate to="/admin/settings/staff" replace />} />
+      <Route path="team" element={<TeamPage />} />
+      <Route path="team/:id" element={<TeamDetailPage />} />
       <Route path="website" element={<Navigate to="/admin/settings/services" replace />} />
       <Route path="customers" element={<CustomersPage />} />
       <Route path="customers/:phone" element={<CustomersPage />} />

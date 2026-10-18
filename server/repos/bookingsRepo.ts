@@ -504,3 +504,93 @@ export async function moveBookingToStaff(
     throw new AppError('BOOKING_NOT_RESCHEDULABLE', 'This booking can no longer be moved');
   return updated;
 }
+
+// ---------------------------------------------------------------------------
+// Customer list (customers are everyone who booked with one phone number)
+// ---------------------------------------------------------------------------
+
+export interface CustomerRow {
+  phone: string;
+  name: string;
+  bookings: number;
+  visits: number;
+  noShows: number;
+  lastVisitAt: Date | null;
+  usualStaffId: string | null;
+}
+
+export type CustomerSortKey = 'name' | 'visits' | 'last' | 'noShows';
+
+/** One page of customers, grouped from bookings, with the totals the list shows. */
+export async function customerPage(
+  match: SearchMatch | null,
+  sort: { key: CustomerSortKey; dir: 1 | -1 },
+  skip: number,
+  limit: number,
+  options?: RepoOptions,
+): Promise<{ rows: CustomerRow[]; total: number }> {
+  const col = await collection('bookings');
+  const sortField: Record<CustomerSortKey, string> = {
+    name: 'nameKey',
+    visits: 'visits',
+    last: 'lastVisit',
+    noShows: 'noShows',
+  };
+  const [result] = await col
+    .aggregate<{
+      rows: {
+        _id: string;
+        name: string;
+        bookings: number;
+        visits: number;
+        noShows: number;
+        lastVisit: Date | null;
+        staff: { id: string; gone: boolean }[];
+      }[];
+      total: { n: number }[];
+    }>(
+      [
+        ...(match ? [{ $match: matchFilter(match) }] : []),
+        { $sort: { startAt: -1 } },
+        {
+          $group: {
+            _id: '$customer.phone',
+            name: { $first: '$customer.name' },
+            nameKey: { $first: '$nameKey' },
+            bookings: { $sum: 1 },
+            visits: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            noShows: { $sum: { $cond: [{ $eq: ['$status', 'noShow'] }, 1, 0] } },
+            lastVisit: { $max: { $cond: [{ $eq: ['$status', 'completed'] }, '$startAt', null] } },
+            staff: { $push: { id: '$staffId', gone: { $eq: ['$status', 'cancelled'] } } },
+          },
+        },
+        {
+          $facet: {
+            rows: [
+              { $sort: { [sortField[sort.key]]: sort.dir, _id: 1 } },
+              { $skip: skip },
+              { $limit: limit },
+            ],
+            total: [{ $count: 'n' }],
+          },
+        },
+      ],
+      sessionOf(options),
+    )
+    .toArray();
+  const rows = (result?.rows ?? []).map((r) => {
+    const counts = new Map<string, number>();
+    for (const s of r.staff) if (!s.gone) counts.set(s.id, (counts.get(s.id) ?? 0) + 1);
+    const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      phone: r._id,
+      name: r.name,
+      bookings: r.bookings,
+      visits: r.visits,
+      noShows: r.noShows,
+      lastVisitAt: r.lastVisit,
+      usualStaffId: usual?.[0] ?? null,
+    };
+  });
+  return { rows, total: result?.total[0]?.n ?? 0 };
+}

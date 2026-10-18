@@ -51,7 +51,15 @@ export function OverviewPage() {
       {data && data.alerts.length > 0 ? (
         <div className="exq-alerts" role="region" aria-label="Needs a decision">
           {data.alerts.map((alert) => (
-            <div key={alert.id} className="exq-alert" data-kind={alert.kind}>
+            <button
+              key={alert.id}
+              type="button"
+              className="exq-alert"
+              data-kind={alert.kind}
+              onClick={() => {
+                quick.openAlert(alert.id);
+              }}
+            >
               <AlertTriangle aria-hidden="true" />
               <span className="exq-alert__text">
                 {alert.kind === 'barberOut'
@@ -60,7 +68,8 @@ export function OverviewPage() {
                 {alert.affectedCount}{' '}
                 {alert.affectedCount === 1 ? 'booking needs' : 'bookings need'} a decision.
               </span>
-            </div>
+              <span className="exq-alert__go">Decide</span>
+            </button>
           ))}
         </div>
       ) : null}

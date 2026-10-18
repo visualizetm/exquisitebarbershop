@@ -21,6 +21,7 @@ export const COLLECTIONS = {
   pendingUploads: 'pendingUploads',
   systemState: 'systemState',
   alerts: 'alerts',
+  customerNotes: 'customerNotes',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -124,6 +125,13 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { status: 1, createdAt: 1 },
     options: { name: 'open_queue' },
     reason: 'The overview lists open alerts, oldest first, without a collection scan.',
+  },
+  // customerNotes
+  {
+    collection: 'customerNotes',
+    keys: { phone: 1 },
+    options: { name: 'uniq_phone', unique: true },
+    reason: 'One private note per customer phone number.',
   },
   // slotLocks
   {

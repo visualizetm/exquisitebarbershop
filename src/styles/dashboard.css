@@ -1386,3 +1386,357 @@
 .exq-chart__today {
   fill: var(--accent-text);
 }
+
+/* Schedule: day grid */
+.exq-schedule__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--s2) var(--s3);
+}
+.exq-schedule__placeholder {
+  min-height: 360px;
+}
+.exq-daygrid {
+  --time-w: 56px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--time-w) repeat(var(--cols), minmax(160px, 1fr));
+  grid-template-rows: 44px auto;
+  overflow: auto;
+  max-height: calc(100dvh - 190px);
+}
+.exq-daygrid__corner,
+.exq-daygrid__head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 44px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.exq-daygrid__corner {
+  left: 0;
+  z-index: 4;
+}
+.exq-daygrid__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding-inline: var(--s3);
+  border-left: 1px solid var(--border);
+  font-weight: 700;
+}
+.exq-daygrid__head[data-state='off'] {
+  color: var(--fg-3);
+}
+.exq-daygrid__head .exq-iconbtn {
+  width: 32px;
+  height: 32px;
+}
+.exq-daygrid__ruler {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--card);
+}
+.exq-daygrid__ruler span {
+  position: absolute;
+  right: var(--s2);
+  transform: translateY(-50%);
+  color: var(--fg-3);
+  font-size: var(--t-label);
+}
+.exq-daygrid__ruler span:first-child {
+  transform: translateY(0);
+}
+.exq-daygrid__col {
+  position: relative;
+  border-left: 1px solid var(--border);
+  cursor: copy;
+}
+.exq-daygrid__off {
+  position: absolute;
+  inset-inline: 0;
+  display: grid;
+  align-content: start;
+  padding: var(--s2);
+  background: var(--card-2);
+  color: var(--fg-3);
+  font-size: var(--t-label);
+  font-weight: 600;
+  cursor: default;
+}
+.exq-daygrid__block {
+  position: absolute;
+  inset-inline: 0;
+  z-index: 1;
+  padding: 2px var(--s2);
+  overflow: hidden;
+  color: var(--fg-2);
+  font-size: var(--t-label);
+  font-weight: 600;
+  cursor: default;
+}
+.exq-daygrid__line {
+  position: absolute;
+  inset-inline: 0;
+  height: 1px;
+  background: var(--border);
+}
+.exq-daygrid__hatch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.exq-daygrid__blocklabel {
+  position: relative;
+  color: var(--fg-2);
+}
+.exq-daygrid__block[data-kind='block'] {
+  background: var(--card-2);
+  color: var(--border);
+}
+.exq-daygrid__block[data-kind='timeOff'],
+.exq-daygrid__block[data-kind='dayOff'] {
+  background: var(--card-2);
+}
+.exq-daygrid__booking {
+  position: absolute;
+  inset-inline: 3px;
+  z-index: 2;
+  display: grid;
+  align-content: start;
+  gap: 0;
+  padding: 2px var(--s2);
+  overflow: hidden;
+  border: 1px solid var(--solid-bg);
+  border-left-width: 4px;
+  border-radius: var(--r-card);
+  background: var(--solid-bg);
+  color: var(--solid-fg);
+  font: inherit;
+  font-size: var(--t-label);
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-daygrid__booking span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--solid-fg-2);
+}
+.exq-daygrid__booking[data-status='completed'] {
+  background: var(--card);
+  color: var(--fg);
+  border-color: var(--ok);
+}
+.exq-daygrid__booking[data-status='completed'] span {
+  color: var(--fg-2);
+}
+.exq-daygrid__booking[data-status='noShow'] {
+  background: var(--accent-soft);
+  color: var(--fg);
+  border-color: var(--accent-text);
+}
+.exq-daygrid__booking[data-status='noShow'] span {
+  color: var(--fg-2);
+}
+.exq-daygrid__now {
+  position: absolute;
+  inset-inline: var(--time-w) 0;
+  z-index: 5;
+  height: 2px;
+  background: var(--red);
+  pointer-events: none;
+}
+.exq-daygrid__now::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+/* Schedule: week grid */
+.exq-weekgrid th[data-today='true'] {
+  color: var(--accent-text);
+}
+.exq-weekgrid__date {
+  display: block;
+  font-weight: 400;
+}
+.exq-weekgrid__cell {
+  min-width: 56px;
+  min-height: var(--hit);
+  padding: 0 var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.exq-weekgrid__cell[data-empty='true'] {
+  color: var(--fg-3);
+  font-weight: 400;
+}
+.exq-weekgrid__cell[data-status='off'],
+.exq-weekgrid__cell[data-status='closed'] {
+  background: var(--card-2);
+  color: var(--fg-3);
+  font-weight: 400;
+}
+.exq-weekgrid__cell:hover {
+  border-color: var(--fg);
+}
+
+.exq-customers__search {
+  position: relative;
+  width: min(100%, 420px);
+}
+.exq-customers__icon {
+  display: none;
+}
+.exq-activity__btn--wide {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+/* Switch */
+.exq-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--hit);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.exq-switch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.exq-switch__track {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 24px;
+  border: 2px solid var(--fg);
+  border-radius: var(--r-pill);
+  background: transparent;
+}
+.exq-switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--fg);
+}
+.exq-switch[data-state='on'] .exq-switch__track {
+  background: var(--solid-bg);
+}
+.exq-switch[data-state='on'] .exq-switch__thumb {
+  background: var(--solid-fg);
+  transform: translateX(20px);
+}
+
+/* Week hours editor */
+.exq-week {
+  display: grid;
+  gap: var(--s3);
+}
+.exq-week__day {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+.exq-week__day legend {
+  padding: 0 var(--s2);
+  font-weight: 700;
+}
+.exq-week__closed {
+  margin: 0;
+  color: var(--fg-3);
+}
+.exq-week__interval {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--s3);
+  align-items: end;
+}
+.exq-week__day .exq-btn {
+  justify-self: start;
+}
+
+/* Team */
+.exq-team__grid {
+  display: grid;
+  gap: var(--s4);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.exq-team__placeholder {
+  min-height: 180px;
+}
+.exq-teamcard {
+  display: grid;
+  gap: var(--s3);
+  align-content: start;
+  padding: var(--s4);
+}
+.exq-teamcard__top {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: var(--s3);
+  align-items: center;
+}
+.exq-teamcard__name {
+  font-weight: 700;
+  font-size: var(--t-h3);
+  text-decoration: none;
+}
+.exq-teamcard__title {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--t-label);
+}
+.exq-teamcard__next {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--t-label);
+}
+.exq-teamcard__next b {
+  color: var(--fg);
+}
+.exq-teamcard .exq-btn {
+  justify-self: start;
+}
+
+.exq-tabbody {
+  display: grid;
+  gap: var(--s5);
+  max-width: 720px;
+}
+.exq-teamdetail__back {
+  margin: 0 0 var(--s2);
+}
+.exq-danger {
+  padding-top: var(--s4);
+  border-top: 1px solid var(--border);
+}

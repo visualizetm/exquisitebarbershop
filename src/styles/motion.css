@@ -362,6 +362,12 @@
       color var(--d-fast) var(--ease-out),
       border-color var(--d-fast) var(--ease-out);
   }
+  .exq-switch__thumb,
+  .exq-switch__track {
+    transition:
+      transform var(--d-fast) var(--ease-out),
+      background-color var(--d-fast) var(--ease-out);
+  }
   [data-tip]::after {
     transition:
       opacity var(--d-fast) var(--ease-out),

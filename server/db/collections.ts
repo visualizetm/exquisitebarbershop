@@ -1,5 +1,6 @@
 import type { Collection, Document } from 'mongodb';
 import type { AlertDocument } from '../../shared/schemas/alert';
+import type { CustomerNoteDocument } from '../../shared/schemas/customerNote';
 import type { AuditLogDocument } from '../../shared/schemas/auditLog';
 import type { BookingDocument } from '../../shared/schemas/booking';
 import type { ClosureDocument } from '../../shared/schemas/closure';
@@ -43,6 +44,7 @@ export interface CollectionTypes {
   pendingUploads: PendingUploadDocument;
   systemState: SystemStateDocument;
   alerts: AlertDocument;
+  customerNotes: CustomerNoteDocument;
 }
 
 /** Typed access to a collection. Only repositories call this. */

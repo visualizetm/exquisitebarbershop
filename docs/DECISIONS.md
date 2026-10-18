@@ -655,3 +655,20 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D11-14 Announcement text is up to 90 characters and may have a last day (`endsOn`); the public API
   switches it off after that day. Social links are three optional https URLs checked against the network's
   own host (`social` in shop settings), seeded with Instagram only.
+- D11-15 Customers are keyed by normalized phone, grouped from bookings in the database (no customers
+  collection); "visits" counts completed bookings, "last visit" the latest completed one, "usual barber" the
+  chair with the most non-cancelled bookings. The owner's private note lives in `customerNotes` (unique on
+  phone) and is only reachable through owner routes; an emptied note is deleted.
+- D11-16 A removed barber's address answers `410 STAFF_REMOVED` (a name that never existed stays 404): the
+  profile page then redirects to `/book?barber=any` and a QR link to `/book?barber=<slug>` falls back to
+  "anyone available". A renamed slug keeps resolving to the current profile through the alias list.
+- D11-17 The public content routes (shop, services, staff, staff profile, gallery) revalidate on every
+  request instead of caching for 30 to 60 seconds, so Website and Team edits show right away. Availability
+  keeps its 10 to 30 second cache because it is per browser and has no owner edit to wait for.
+- D11-18 An alert is resolved through the same conflict flow as any schedule change: the first request without
+  choices answers 409 with the affected bookings and the chairs each could move to, the second applies all
+  choices and closes the alert in the same transaction. A time off request is approved by creating the time
+  off with those choices; declining just closes it.
+- D11-19 The schedule day grid is plain absolutely positioned blocks in a CSS grid (no library, no dragging).
+  Empty slots are clickable for a pointer, and each chair header has a New booking button for the keyboard.
+  The red now line only draws on today's grid and inside the shown hours.

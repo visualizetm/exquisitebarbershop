@@ -112,7 +112,7 @@ export const publicRoutes: RouteDefinition[] = [
     handler: async () => {
       const services = await servicesRepo.listPublicServices();
       const body = publicServicesResponseSchema.parse({ services: services.map(toPublicService) });
-      return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
+      return { body, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } };
     },
   },
   {
@@ -144,7 +144,7 @@ export const publicRoutes: RouteDefinition[] = [
       const body = publicStaffListResponseSchema.parse({
         staff: staff.map((s) => ({ ...toPublicStaff(s), photo: photos.get(s._id) ?? null })),
       });
-      return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
+      return { body, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } };
     },
   },
   {
@@ -155,8 +155,11 @@ export const publicRoutes: RouteDefinition[] = [
       const { slug } = parseParams(ctx, z.object({ slug: z.string().min(1).max(60) }));
       const requested = slug.toLowerCase();
       const staff = await staffRepo.findStaffBySlug(requested);
-      if (!staff || staff.deletedAt || !staff.showOnWebsite) {
-        throw new AppError('NOT_FOUND', 'That chair is no longer listed');
+      if (!staff) throw new AppError('NOT_FOUND', 'That chair is no longer listed');
+      // Printed cards and QR codes keep working after someone leaves: the address answers "removed"
+      // and the pages send the visitor to booking with anyone available.
+      if (staff.deletedAt || !staff.showOnWebsite) {
+        throw new AppError('STAFF_REMOVED', 'That chair is no longer listed');
       }
       const photos = await staffPhotoMap();
       const body = publicStaffResponseSchema.parse({
@@ -164,7 +167,7 @@ export const publicRoutes: RouteDefinition[] = [
         requestedSlug: requested,
         canonical: staff.slug === requested,
       });
-      return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
+      return { body, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } };
     },
   },
   {
@@ -175,7 +178,7 @@ export const publicRoutes: RouteDefinition[] = [
       const { slug } = parseParams(ctx, z.object({ slug: z.string().min(1).max(60) }));
       const { count } = parseQuery(ctx, staffOpeningsQuerySchema);
       const body = staffOpeningsResponseSchema.parse(await staffOpenings(slug, count, ctx.now));
-      return { body, headers: { 'Cache-Control': 'public, max-age=30' } };
+      return { body, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } };
     },
   },
   {
@@ -185,7 +188,7 @@ export const publicRoutes: RouteDefinition[] = [
     handler: async (ctx) => {
       const query = parseQuery(ctx, galleryQuerySchema);
       const body = galleryResponseSchema.parse(await galleryPage(query));
-      return { body, headers: { 'Cache-Control': 'public, max-age=60' } };
+      return { body, headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } };
     },
   },
 ];

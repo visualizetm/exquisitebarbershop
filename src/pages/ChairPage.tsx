@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams } from 'react-router';
 import { galleryResponseSchema } from '@shared/api/photos';
 import {
   publicServicesResponseSchema,
@@ -70,6 +70,10 @@ export function ChairPage() {
 
   if (result.status === 'loading') return <Status state="loading" />;
   if (result.status === 'error') {
+    // A removed barber's address still works: it opens booking with anyone available.
+    if (result.error instanceof ApiRequestError && result.error.code === 'STAFF_REMOVED') {
+      return <Navigate to="/book?barber=any" replace />;
+    }
     const notFound = result.error instanceof ApiRequestError && result.error.status === 404;
     return (
       <article className="exq-chair exq-wrap exq-section" data-state="error">

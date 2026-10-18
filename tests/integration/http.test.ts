@@ -86,7 +86,8 @@ describe('public routes', () => {
   it('hides soft-deleted staff from the slug route', async () => {
     const jay = await staffRepo.findStaffBySlug('jay');
     await staffRepo.softDeleteStaff(jay?._id ?? '', NOW);
-    expect((await get('/api/staff/jay')).status).toBe(404);
+    // A removed barber's address answers "removed" (410), so the pages can send visitors to booking.
+    expect((await get('/api/staff/jay')).status).toBe(410);
   });
 });
 

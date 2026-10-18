@@ -188,7 +188,8 @@ export function BookPage() {
         setParams(writeSelection({ ...selection, staff: result.staff.slug }), { replace: true });
       })
       .catch(() => {
-        setParams(writeSelection({ ...selection, staff: null }), { replace: true });
+        // A removed barber's card still works: book with anyone available.
+        setParams(writeSelection({ ...selection, staff: 'any' }), { replace: true });
       });
   }, [staff, selection, setParams]);
 

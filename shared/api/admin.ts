@@ -151,6 +151,24 @@ export const scheduleResponseSchema = z.object({
 });
 export type ScheduleResponse = z.infer<typeof scheduleResponseSchema>;
 
+/** The week at a glance: chairs as rows, days as columns, bookings counted per cell. */
+export const scheduleWeekResponseSchema = z.object({
+  days: z.array(z.object({ date: isoDateSchema, label: z.string(), today: z.boolean() })),
+  rows: z.array(
+    z.object({
+      staff: staffRefSchema,
+      cells: z.array(
+        z.object({
+          date: isoDateSchema,
+          count: z.int(),
+          status: z.enum(['working', 'off', 'closed']),
+        }),
+      ),
+    }),
+  ),
+});
+export type ScheduleWeekResponse = z.infer<typeof scheduleWeekResponseSchema>;
+
 export const whoIsInResponseSchema = z.object({
   date: isoDateSchema,
   entries: z.array(whoIsInEntrySchema),
@@ -288,6 +306,8 @@ export type ManualBookingResponse = z.infer<typeof manualBookingResponseSchema>;
 
 export const customerQuerySchema = z.object({ phone: z.string().min(7).max(32) });
 export const customerResponseSchema = z.object({
+  /** The number in E.164, the key of every customer route. */
+  phoneE164: z.string(),
   phone: z.string(),
   names: z.array(z.string()),
   emails: z.array(z.string()),
@@ -300,8 +320,44 @@ export const customerResponseSchema = z.object({
   }),
   completedSpendCents: z.int(),
   bookings: z.array(adminBookingViewSchema),
+  /** The owner's private note. Never shown to the customer or a barber. */
+  notes: z.string().nullable(),
+  usualBarber: staffRefSchema.nullable(),
 });
 export type CustomerResponse = z.infer<typeof customerResponseSchema>;
+
+export const customerSortKeySchema = z.enum(['name', 'visits', 'last', 'noShows']);
+export type CustomerSortKey = z.infer<typeof customerSortKeySchema>;
+export const CUSTOMER_PAGE_SIZE = 25;
+export const customerListQuerySchema = z.object({
+  q: z.string().trim().max(80).default(''),
+  sort: customerSortKeySchema.default('last'),
+  dir: z.enum(['asc', 'desc']).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+});
+export const customerRowSchema = z.object({
+  phoneE164: z.string(),
+  phone: z.string(),
+  name: z.string(),
+  bookings: z.int(),
+  visits: z.int(),
+  noShows: z.int(),
+  lastVisitAt: z.iso.datetime().nullable(),
+  usualBarber: z.string().nullable(),
+  hasNotes: z.boolean(),
+});
+export const customerListResponseSchema = z.object({
+  rows: z.array(customerRowSchema),
+  total: z.int(),
+  page: z.int(),
+  pageSize: z.int(),
+});
+export type CustomerListResponse = z.infer<typeof customerListResponseSchema>;
+export type CustomerListQuery = z.infer<typeof customerListQuerySchema>;
+export const customerNotesRequestSchema = z.object({
+  phone: z.string().min(7).max(32),
+  notes: z.string().trim().max(2000),
+});
 
 // ---------------------------------------------------------------------------
 // Time blocks and day status

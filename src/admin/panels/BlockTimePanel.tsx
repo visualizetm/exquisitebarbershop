@@ -29,13 +29,21 @@ interface Draft {
  * Blocks time on one chair, hiding it from booking. A block is a break; time off can span days.
  * If clients are already booked in that time nothing is saved and the resolver asks about each.
  */
-export function BlockTimePanel({ onDone }: { onDone: () => void }) {
+export function BlockTimePanel({
+  onDone,
+  staffId,
+  initialKind = 'block',
+}: {
+  onDone: () => void;
+  staffId?: string;
+  initialKind?: 'block' | 'timeOff';
+}) {
   const quick = useQuick();
   const toast = useToast();
   const staff = useApi('/api/admin/staff', staffListResponseSchema);
   const [draft, setDraft] = useState<Draft>({
-    staffId: '',
-    kind: 'block',
+    staffId: staffId ?? '',
+    kind: initialKind,
     date: todayInShop(),
     start: '12:00',
     endDate: '',

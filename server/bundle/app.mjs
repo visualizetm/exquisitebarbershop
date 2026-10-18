@@ -28304,7 +28304,8 @@ var COLLECTIONS = {
   photos: "photos",
   pendingUploads: "pendingUploads",
   systemState: "systemState",
-  alerts: "alerts"
+  alerts: "alerts",
+  customerNotes: "customerNotes"
 };
 var DAY_SECONDS = 24 * 60 * 60;
 var INDEXES = [
@@ -28392,6 +28393,13 @@ var INDEXES = [
     keys: { status: 1, createdAt: 1 },
     options: { name: "open_queue" },
     reason: "The overview lists open alerts, oldest first, without a collection scan."
+  },
+  // customerNotes
+  {
+    collection: "customerNotes",
+    keys: { phone: 1 },
+    options: { name: "uniq_phone", unique: true },
+    reason: "One private note per customer phone number."
   },
   // slotLocks
   {
@@ -28583,6 +28591,8 @@ var ERROR_CODES = {
   IDEMPOTENCY_IN_PROGRESS: 409,
   BOOKING_NOT_CANCELLABLE: 409,
   BOOKING_CANCELLED: 410,
+  /** A barber who was removed from the schedule: their address still works and sends people to booking. */
+  STAFF_REMOVED: 410,
   BOOKING_NOT_RESCHEDULABLE: 409,
   SHOP_CLOSED: 409,
   OUTSIDE_BOOKING_WINDOW: 409,
@@ -29213,6 +29223,7 @@ __export(bookingsRepo_exports, {
   countOpenBookingsForPhone: () => countOpenBookingsForPhone,
   countTable: () => countTable,
   countUnseenOnline: () => countUnseenOnline,
+  customerPage: () => customerPage,
   findBookingById: () => findBookingById,
   findBookingByReferenceCode: () => findBookingByReferenceCode,
   findBookingsByIds: () => findBookingsByIds,
@@ -29575,6 +29586,59 @@ async function moveBookingToStaff(id, staffId, now2, options) {
   if (!updated)
     throw new AppError("BOOKING_NOT_RESCHEDULABLE", "This booking can no longer be moved");
   return updated;
+}
+async function customerPage(match2, sort, skip, limit, options) {
+  const col = await collection("bookings");
+  const sortField = {
+    name: "nameKey",
+    visits: "visits",
+    last: "lastVisit",
+    noShows: "noShows"
+  };
+  const [result] = await col.aggregate(
+    [
+      ...match2 ? [{ $match: matchFilter(match2) }] : [],
+      { $sort: { startAt: -1 } },
+      {
+        $group: {
+          _id: "$customer.phone",
+          name: { $first: "$customer.name" },
+          nameKey: { $first: "$nameKey" },
+          bookings: { $sum: 1 },
+          visits: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          noShows: { $sum: { $cond: [{ $eq: ["$status", "noShow"] }, 1, 0] } },
+          lastVisit: { $max: { $cond: [{ $eq: ["$status", "completed"] }, "$startAt", null] } },
+          staff: { $push: { id: "$staffId", gone: { $eq: ["$status", "cancelled"] } } }
+        }
+      },
+      {
+        $facet: {
+          rows: [
+            { $sort: { [sortField[sort.key]]: sort.dir, _id: 1 } },
+            { $skip: skip },
+            { $limit: limit }
+          ],
+          total: [{ $count: "n" }]
+        }
+      }
+    ],
+    sessionOf(options)
+  ).toArray();
+  const rows = (result?.rows ?? []).map((r) => {
+    const counts = /* @__PURE__ */ new Map();
+    for (const s2 of r.staff) if (!s2.gone) counts.set(s2.id, (counts.get(s2.id) ?? 0) + 1);
+    const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      phone: r._id,
+      name: r.name,
+      bookings: r.bookings,
+      visits: r.visits,
+      noShows: r.noShows,
+      lastVisitAt: r.lastVisit,
+      usualStaffId: usual?.[0] ?? null
+    };
+  });
+  return { rows, total: result?.total[0]?.n ?? 0 };
 }
 
 // server/repos/slotLocksRepo.ts
@@ -30591,6 +30655,55 @@ async function closeAlert(id, status, userId, now2, options) {
     sessionOf(options)
   );
   return result.modifiedCount === 1;
+}
+
+// server/repos/customerNotesRepo.ts
+var customerNotesRepo_exports = {};
+__export(customerNotesRepo_exports, {
+  getNote: () => getNote,
+  listNotesFor: () => listNotesFor,
+  saveNote: () => saveNote
+});
+
+// shared/schemas/customerNote.ts
+var customerNoteDocumentSchema = external_exports.object({
+  _id: idSchema,
+  phone: phoneSchema,
+  notes: external_exports.string().trim().max(2e3)
+}).extend(timestampsSchema.shape);
+
+// server/repos/customerNotesRepo.ts
+async function getNote(phone, options) {
+  const col = await collection("customerNotes");
+  return col.findOne({ phone }, sessionOf(options));
+}
+async function listNotesFor(phones, options) {
+  if (phones.length === 0) return [];
+  const col = await collection("customerNotes");
+  return col.find({ phone: { $in: [...phones] } }, sessionOf(options)).toArray();
+}
+async function saveNote(phone, notes, now2, options) {
+  const col = await collection("customerNotes");
+  if (notes.trim() === "") {
+    await col.deleteOne({ phone }, sessionOf(options));
+    return null;
+  }
+  const doc = customerNoteDocumentSchema.parse({
+    _id: newId(),
+    phone,
+    notes,
+    createdAt: now2,
+    updatedAt: now2
+  });
+  await col.updateOne(
+    { phone },
+    {
+      $set: { notes: doc.notes, updatedAt: now2 },
+      $setOnInsert: { _id: doc._id, phone, createdAt: now2 }
+    },
+    { upsert: true, ...sessionOf(options) }
+  );
+  return await col.findOne({ phone }, sessionOf(options)) ?? doc;
 }
 
 // server/auth/cookies.ts
@@ -32821,6 +32934,21 @@ var scheduleResponseSchema = external_exports.object({
   date: isoDateSchema,
   chairs: external_exports.array(scheduleChairSchema)
 });
+var scheduleWeekResponseSchema = external_exports.object({
+  days: external_exports.array(external_exports.object({ date: isoDateSchema, label: external_exports.string(), today: external_exports.boolean() })),
+  rows: external_exports.array(
+    external_exports.object({
+      staff: staffRefSchema,
+      cells: external_exports.array(
+        external_exports.object({
+          date: isoDateSchema,
+          count: external_exports.int(),
+          status: external_exports.enum(["working", "off", "closed"])
+        })
+      )
+    })
+  )
+});
 var whoIsInResponseSchema = external_exports.object({
   date: isoDateSchema,
   entries: external_exports.array(whoIsInEntrySchema)
@@ -32930,6 +33058,8 @@ var manualBookingResponseSchema = external_exports.object({
 });
 var customerQuerySchema = external_exports.object({ phone: external_exports.string().min(7).max(32) });
 var customerResponseSchema = external_exports.object({
+  /** The number in E.164, the key of every customer route. */
+  phoneE164: external_exports.string(),
   phone: external_exports.string(),
   names: external_exports.array(external_exports.string()),
   emails: external_exports.array(external_exports.string()),
@@ -32941,7 +33071,39 @@ var customerResponseSchema = external_exports.object({
     cancelled: external_exports.int()
   }),
   completedSpendCents: external_exports.int(),
-  bookings: external_exports.array(adminBookingViewSchema)
+  bookings: external_exports.array(adminBookingViewSchema),
+  /** The owner's private note. Never shown to the customer or a barber. */
+  notes: external_exports.string().nullable(),
+  usualBarber: staffRefSchema.nullable()
+});
+var customerSortKeySchema = external_exports.enum(["name", "visits", "last", "noShows"]);
+var CUSTOMER_PAGE_SIZE = 25;
+var customerListQuerySchema = external_exports.object({
+  q: external_exports.string().trim().max(80).default(""),
+  sort: customerSortKeySchema.default("last"),
+  dir: external_exports.enum(["asc", "desc"]).optional(),
+  page: external_exports.coerce.number().int().min(1).max(1e4).default(1)
+});
+var customerRowSchema = external_exports.object({
+  phoneE164: external_exports.string(),
+  phone: external_exports.string(),
+  name: external_exports.string(),
+  bookings: external_exports.int(),
+  visits: external_exports.int(),
+  noShows: external_exports.int(),
+  lastVisitAt: external_exports.iso.datetime().nullable(),
+  usualBarber: external_exports.string().nullable(),
+  hasNotes: external_exports.boolean()
+});
+var customerListResponseSchema = external_exports.object({
+  rows: external_exports.array(customerRowSchema),
+  total: external_exports.int(),
+  page: external_exports.int(),
+  pageSize: external_exports.int()
+});
+var customerNotesRequestSchema = external_exports.object({
+  phone: external_exports.string().min(7).max(32),
+  notes: external_exports.string().trim().max(2e3)
 });
 var timeBlockCreateRequestSchema = external_exports.object({
   staffId: idSchema,
@@ -35601,6 +35763,40 @@ async function scheduleForDay(scope, input2, now2) {
     }))
   };
 }
+async function scheduleWeek(date5, now2) {
+  const today = shopDateOf(now2);
+  const monday = shopDayStart(date5 ?? today).startOf("week");
+  const dates = Array.from({ length: 7 }, (_, i) => monday.plus({ days: i }).toISODate() ?? today);
+  const first = dates[0] ?? today;
+  const last = dates[6] ?? today;
+  const [data, bookings] = await Promise.all([
+    loadScheduleData(first, last),
+    bookingsRepo_exports.listBookingsStartingBetween({
+      start: shopDayBounds(first).start,
+      end: shopDayBounds(last).end
+    })
+  ]);
+  return {
+    days: dates.map((d, i) => ({
+      date: d,
+      label: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i] ?? d,
+      today: d === today
+    })),
+    rows: activeStaff(data.staff).map((s2) => ({
+      staff: toStaffRef(s2),
+      cells: dates.map((d) => {
+        const who = whoIsInFor(s2, d, data.source);
+        return {
+          date: d,
+          count: bookings.filter(
+            (b) => b.staffId === s2._id && b.status !== "cancelled" && shopDateOf(b.startAt) === d
+          ).length,
+          status: who.status === "in" ? "working" : who.status === "closed" ? "closed" : "off"
+        };
+      })
+    }))
+  };
+}
 async function whoIsIn(date5, now2) {
   const day = date5 ?? shopDateOf(now2);
   const data = await loadScheduleData(day, day);
@@ -35935,12 +36131,20 @@ async function customerByPhone(rawPhone, now2) {
       details: [{ path: "phone", message: "Enter a valid US phone number" }]
     });
   }
-  const bookings = await bookingsRepo_exports.listBookingsForPhone(phone, 200);
-  const staffById = new Map(
-    (await staffRepo_exports.listStaff({ includeDeleted: true })).map((s2) => [s2._id, s2])
-  );
+  const [bookings, note, allStaff] = await Promise.all([
+    bookingsRepo_exports.listBookingsForPhone(phone, 200),
+    customerNotesRepo_exports.getNote(phone),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const staffById = new Map(allStaff.map((s2) => [s2._id, s2]));
   const by = (status) => bookings.filter((b) => b.status === status);
+  const counts = /* @__PURE__ */ new Map();
+  for (const b of bookings.filter((x) => x.status !== "cancelled"))
+    counts.set(b.staffId, (counts.get(b.staffId) ?? 0) + 1);
+  const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const usualStaff = usual ? staffById.get(usual[0]) : void 0;
   return {
+    phoneE164: phone,
     phone: formatUsPhone(phone),
     names: [...new Set(bookings.map((b) => b.customer.name))],
     emails: [...new Set(bookings.flatMap((b) => b.customer.email ? [b.customer.email] : []))],
@@ -35952,8 +36156,63 @@ async function customerByPhone(rawPhone, now2) {
       cancelled: by("cancelled").length
     },
     completedSpendCents: by("completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
-    bookings: bookings.map((b) => toAdminBookingView(b, staffName(staffById, b.staffId)))
+    bookings: bookings.map((b) => toAdminBookingView(b, staffName(staffById, b.staffId))),
+    notes: note?.notes ?? null,
+    usualBarber: usualStaff ? toStaffRef(usualStaff) : null
   };
+}
+async function customerList(query) {
+  const parsed = classifySearch(query.q);
+  const match2 = parsed.kind === "phone" ? { kind: "phone", digits: parsed.digits } : parsed.kind === "text" ? { kind: "name", key: parsed.key } : null;
+  const dir = query.dir ?? (query.sort === "name" ? "asc" : "desc");
+  const { rows, total } = await bookingsRepo_exports.customerPage(
+    match2,
+    { key: query.sort, dir: dir === "asc" ? 1 : -1 },
+    (query.page - 1) * CUSTOMER_PAGE_SIZE,
+    CUSTOMER_PAGE_SIZE
+  );
+  const [notes, staff] = await Promise.all([
+    customerNotesRepo_exports.listNotesFor(rows.map((r) => r.phone)),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const hasNote = new Set(notes.map((n2) => n2.phone));
+  const names = new Map(staff.map((s2) => [s2._id, s2.name]));
+  return {
+    rows: rows.map((r) => ({
+      phoneE164: r.phone,
+      phone: formatUsPhone(r.phone),
+      name: r.name,
+      bookings: r.bookings,
+      visits: r.visits,
+      noShows: r.noShows,
+      lastVisitAt: r.lastVisitAt ? r.lastVisitAt.toISOString() : null,
+      usualBarber: r.usualStaffId ? names.get(r.usualStaffId) ?? null : null,
+      hasNotes: hasNote.has(r.phone)
+    })),
+    total,
+    page: query.page,
+    pageSize: CUSTOMER_PAGE_SIZE
+  };
+}
+async function saveCustomerNotes(principal, rawPhone, notes, meta3) {
+  const phone = normalizeUsPhone(rawPhone);
+  if (!phone) throw new AppError("VALIDATION_ERROR", "Enter a valid US phone number");
+  const before = await customerNotesRepo_exports.getNote(phone);
+  const saved = await customerNotesRepo_exports.saveNote(phone, notes, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action: "customer.notes",
+      entityType: "customer",
+      entityId: phone,
+      before: null,
+      after: null,
+      meta: { hadNote: before !== null, hasNote: saved !== null },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+  return { notes: saved?.notes ?? null };
 }
 
 // server/services/scheduleChanges.ts
@@ -37064,6 +37323,63 @@ async function listAlertViews(now2) {
   }
   return views;
 }
+async function resolveAlert(principal, id, resolutions, meta3) {
+  ownerScope(principal);
+  const alert = await alertsRepo_exports.findAlertById(id);
+  if (!alert) throw new AppError("NOT_FOUND", "That alert was not found");
+  if (alert.status !== "open")
+    throw new AppError("CONFLICT", "That alert has already been dealt with");
+  if (alert.kind === "timeOffRequest") {
+    const done = await createTimeBlock(
+      principal,
+      { kind: "all" },
+      {
+        staffId: alert.staffId,
+        kind: "timeOff",
+        startAt: alert.startAt.toISOString(),
+        endAt: alert.endAt.toISOString(),
+        ...alert.reason ? { reason: alert.reason } : {},
+        ...resolutions ? { resolutions: [...resolutions] } : {}
+      },
+      meta3
+    );
+    await alertsRepo_exports.closeAlert(id, "resolved", principal.userId, meta3.now);
+    return {
+      body: {
+        ok: true,
+        kept: done.body.kept,
+        moved: done.body.moved,
+        cancelled: done.body.cancelled
+      },
+      outboxIds: done.outboxIds
+    };
+  }
+  const change = await applyScheduleChange({
+    actor: actorOf2(principal),
+    requestId: meta3.requestId,
+    now: meta3.now,
+    staffIds: [alert.staffId],
+    resolutions,
+    allowCancel: true,
+    audit: { action: "alert.resolve", entityType: "alert", entityId: () => alert._id },
+    apply: () => Promise.resolve(void 0),
+    alsoAffected: (upcoming) => upcoming.filter(
+      (b) => b.staffId === alert.staffId && b.startAt < alert.endAt && b.endAt > alert.startAt
+    ),
+    afterResolve: async (session) => {
+      await alertsRepo_exports.closeAlert(id, "resolved", principal.userId, meta3.now, { session });
+    }
+  });
+  return {
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
+    outboxIds: change.outboxIds
+  };
+}
+async function dismissAlert(principal, id, now2) {
+  ownerScope(principal);
+  const closed2 = await alertsRepo_exports.closeAlert(id, "dismissed", principal.userId, now2);
+  if (!closed2) throw new AppError("NOT_FOUND", "That alert was not found, or is already closed");
+}
 
 // server/services/adminDashboard.ts
 var DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -37341,6 +37657,14 @@ var adminRoutes = [
       headers: NO_STORE
     };
   }),
+  owner("GET", "/api/admin/schedule/week", async (ctx) => {
+    ctxScope(ctx);
+    const { date: date5 } = parseQuery(ctx, dateQuerySchema);
+    return {
+      body: scheduleWeekResponseSchema.parse(await scheduleWeek(date5, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
   owner("GET", "/api/admin/whos-in", async (ctx) => {
     ctxScope(ctx);
     const { date: date5 } = parseQuery(ctx, dateQuerySchema);
@@ -37447,6 +37771,19 @@ var adminRoutes = [
     };
   }),
   // Customers -------------------------------------------------------------
+  owner("GET", "/api/admin/customer-list", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, customerListQuerySchema);
+    return {
+      body: customerListResponseSchema.parse(await customerList(query)),
+      headers: NO_STORE
+    };
+  }),
+  owner("PUT", "/api/admin/customers/notes", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { phone, notes } = await parseBody(ctx, customerNotesRequestSchema);
+    return { body: await saveCustomerNotes(principal, phone, notes, metaOf(ctx)) };
+  }),
   owner("GET", "/api/admin/customers", async (ctx) => {
     ctxScope(ctx);
     const { phone } = parseQuery(ctx, customerQuerySchema);
@@ -37454,6 +37791,21 @@ var adminRoutes = [
       body: customerResponseSchema.parse(await customerByPhone(phone, ctx.now)),
       headers: NO_STORE
     };
+  }),
+  // Alerts ----------------------------------------------------------------
+  owner("POST", "/api/admin/alerts/:id/resolve", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await resolveAlert(principal, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner("POST", "/api/admin/alerts/:id/dismiss", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    await dismissAlert(principal, id, ctx.now);
+    return { body: { ok: true } };
   }),
   // Time blocks and day status -------------------------------------------
   owner("GET", "/api/admin/time-blocks", async (ctx) => {
@@ -37832,7 +38184,7 @@ var publicRoutes = [
     handler: async () => {
       const services = await servicesRepo_exports.listPublicServices();
       const body = publicServicesResponseSchema.parse({ services: services.map(toPublicService) });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -37868,7 +38220,7 @@ ${urls.join("\n")}
       const body = publicStaffListResponseSchema.parse({
         staff: staff.map((s2) => ({ ...toPublicStaff(s2), photo: photos.get(s2._id) ?? null }))
       });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -37879,8 +38231,9 @@ ${urls.join("\n")}
       const { slug } = parseParams(ctx, external_exports.object({ slug: external_exports.string().min(1).max(60) }));
       const requested = slug.toLowerCase();
       const staff = await staffRepo_exports.findStaffBySlug(requested);
-      if (!staff || staff.deletedAt || !staff.showOnWebsite) {
-        throw new AppError("NOT_FOUND", "That chair is no longer listed");
+      if (!staff) throw new AppError("NOT_FOUND", "That chair is no longer listed");
+      if (staff.deletedAt || !staff.showOnWebsite) {
+        throw new AppError("STAFF_REMOVED", "That chair is no longer listed");
       }
       const photos = await staffPhotoMap();
       const body = publicStaffResponseSchema.parse({
@@ -37888,7 +38241,7 @@ ${urls.join("\n")}
         requestedSlug: requested,
         canonical: staff.slug === requested
       });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -37899,7 +38252,7 @@ ${urls.join("\n")}
       const { slug } = parseParams(ctx, external_exports.object({ slug: external_exports.string().min(1).max(60) }));
       const { count } = parseQuery(ctx, staffOpeningsQuerySchema);
       const body = staffOpeningsResponseSchema.parse(await staffOpenings(slug, count, ctx.now));
-      return { body, headers: { "Cache-Control": "public, max-age=30" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -37909,7 +38262,7 @@ ${urls.join("\n")}
     handler: async (ctx) => {
       const query = parseQuery(ctx, galleryQuerySchema);
       const body = galleryResponseSchema.parse(await galleryPage(query));
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   }
 ];

@@ -14,6 +14,9 @@ import {
   closureResponseSchema,
   closureUpsertRequestSchema,
   conflictOnlyResponseSchema,
+  customerListQuerySchema,
+  customerListResponseSchema,
+  customerNotesRequestSchema,
   customerQuerySchema,
   customerResponseSchema,
   dateQuerySchema,
@@ -34,6 +37,7 @@ import {
   ownerRescheduleRequestSchema,
   resolutionsBodySchema,
   scheduleQuerySchema,
+  scheduleWeekResponseSchema,
   searchQuerySchema,
   searchResponseSchema,
   scheduleResponseSchema,
@@ -68,6 +72,9 @@ import {
   bookingDetail,
   changeBookingStatus,
   customerByPhone,
+  customerList,
+  saveCustomerNotes,
+  scheduleWeek,
   listBookings,
   ownerReschedule,
   resendConfirmation,
@@ -109,6 +116,7 @@ import {
 } from '../../services/adminSchedule';
 import { bookingTable, overview } from '../../services/adminDashboard';
 import { adminSearch } from '../../services/adminSearch';
+import { dismissAlert, resolveAlert } from '../../services/alerts';
 import { createManualBooking } from '../../services/bookingService';
 import { idempotencyKeyOf, metaOf, NO_STORE, principalOf } from '../context';
 import { scheduleDelivery } from '../delivery';
@@ -150,6 +158,14 @@ export const adminRoutes: RouteDefinition[] = [
     const query = parseQuery(ctx, scheduleQuerySchema);
     return {
       body: scheduleResponseSchema.parse(await scheduleForDay(scope, query, ctx.now)),
+      headers: NO_STORE,
+    };
+  }),
+  owner('GET', '/api/admin/schedule/week', async (ctx) => {
+    ctxScope(ctx);
+    const { date } = parseQuery(ctx, dateQuerySchema);
+    return {
+      body: scheduleWeekResponseSchema.parse(await scheduleWeek(date, ctx.now)),
       headers: NO_STORE,
     };
   }),
@@ -265,6 +281,19 @@ export const adminRoutes: RouteDefinition[] = [
   }),
 
   // Customers -------------------------------------------------------------
+  owner('GET', '/api/admin/customer-list', async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, customerListQuerySchema);
+    return {
+      body: customerListResponseSchema.parse(await customerList(query)),
+      headers: NO_STORE,
+    };
+  }),
+  owner('PUT', '/api/admin/customers/notes', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { phone, notes } = await parseBody(ctx, customerNotesRequestSchema);
+    return { body: await saveCustomerNotes(principal, phone, notes, metaOf(ctx)) };
+  }),
   owner('GET', '/api/admin/customers', async (ctx) => {
     ctxScope(ctx);
     const { phone } = parseQuery(ctx, customerQuerySchema);
@@ -272,6 +301,22 @@ export const adminRoutes: RouteDefinition[] = [
       body: customerResponseSchema.parse(await customerByPhone(phone, ctx.now)),
       headers: NO_STORE,
     };
+  }),
+
+  // Alerts ----------------------------------------------------------------
+  owner('POST', '/api/admin/alerts/:id/resolve', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await resolveAlert(principal, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner('POST', '/api/admin/alerts/:id/dismiss', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    await dismissAlert(principal, id, ctx.now);
+    return { body: { ok: true } };
   }),
 
   // Time blocks and day status -------------------------------------------
