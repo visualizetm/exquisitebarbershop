@@ -1,21 +1,35 @@
 import { useState } from 'react';
 import { staffListResponseSchema } from '@shared/api/admin';
-import { Chip, Chips, Select } from '@/components/ui';
+import { Chip, Chips, EmptyState, Select } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { PhotoManager } from '../components/PhotoManager';
+import { useMe } from '../useSession';
 
 type Tab = 'hero' | 'staff' | 'gallery';
 
 /** Hero, chair portraits and gallery photos, each managed with the same uploader. */
 export function PhotosPage() {
   usePageTitle('Photos');
-  const staff = useApi('/api/admin/staff', staffListResponseSchema);
+  const me = useMe();
+  // Without photo storage (STORAGE_DRIVER=none) nothing is listed; the staff list is not needed.
+  const staff = useApi(me.features.photos ? '/api/admin/staff' : null, staffListResponseSchema);
   const [tab, setTab] = useState<Tab>('hero');
   const [chair, setChair] = useState('');
   const chairs = staff.status === 'ready' ? staff.data.staff.filter((s) => !s.deletedAt) : [];
   const chairId = chair !== '' ? chair : (chairs[0]?.id ?? '');
+
+  if (!me.features.photos) {
+    return (
+      <article className="exq-adm-photos-page" data-state="disabled">
+        <h1>Photos</h1>
+        <EmptyState title="Photo storage isn't set up yet.">
+          Photos can be added once it's connected.
+        </EmptyState>
+      </article>
+    );
+  }
 
   return (
     <article className="exq-adm-photos-page" data-state={tab}>

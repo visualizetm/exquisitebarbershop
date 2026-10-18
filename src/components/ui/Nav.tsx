@@ -35,7 +35,13 @@ export function Nav() {
           className="exq-nav__brand exq-site-header__brand"
           aria-label="Exquisite Barber & Beauty Lounge, home"
         >
-          <Mark name="primary" className="exq-nav__logo" width={200} height={81} />
+          {/* The wordmark from 1024px; the stacked mark below, where the full name would not be readable. */}
+          <span className="exq-nav__logo-wide">
+            <Mark name="wordmark" className="exq-nav__logo" width={157} height={40} />
+          </span>
+          <span className="exq-nav__logo-narrow">
+            <Mark name="stacked" className="exq-nav__logo" width={114} height={48} />
+          </span>
         </NavLink>
         <nav id="exq-primary-nav" className="exq-nav__links exq-primary-nav" aria-label="Primary">
           {NAV_ITEMS.map((item) => (

@@ -18,7 +18,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['server/**', 'shared/**', 'seed/**'],
-      exclude: ['server/http/dev-adapter.ts'],
+      // The bundle is generated from the code above; scripts/test-vercel-function.mjs runs it.
+      exclude: ['server/http/dev-adapter.ts', 'server/bundle/**'],
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: 'coverage',
       thresholds: {

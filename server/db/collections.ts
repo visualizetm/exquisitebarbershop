@@ -14,7 +14,7 @@ import type { SessionDocument } from '../../shared/schemas/session';
 import type { ShopSettingsDocument } from '../../shared/schemas/shopSettings';
 import type { SlotLockDocument } from '../../shared/schemas/slotLock';
 import type { StaffDocument } from '../../shared/schemas/staff';
-import type { BootstrapRecord } from '../../shared/schemas/systemState';
+import type { SystemStateDocument } from '../../shared/schemas/systemState';
 import type { TimeBlockDocument } from '../../shared/schemas/timeBlock';
 import type { UserDocument } from '../../shared/schemas/user';
 import type { WeeklyHoursDocument } from '../../shared/schemas/weeklyHours';
@@ -40,7 +40,7 @@ export interface CollectionTypes {
   scheduleGuards: ScheduleGuardDocument;
   photos: PhotoDocument;
   pendingUploads: PendingUploadDocument;
-  systemState: BootstrapRecord;
+  systemState: SystemStateDocument;
 }
 
 /** Typed access to a collection. Only repositories call this. */

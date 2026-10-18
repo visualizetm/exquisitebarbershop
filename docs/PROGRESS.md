@@ -213,3 +213,61 @@ commit, and what is still open.
 - `docs/OWNER-GUIDE.md` and `.pdf`, `docs/BARBER-GUIDE.md` with phone
   screenshots in `docs/guide/`; the living docs; the pull request;
   `docs/reports/06-final.md`.
+
+## Prompt 7
+
+### Live without R2, visible failures, three UI fixes, a production-like run
+
+- Shipped: STORAGE_DRIVER=none with STORAGE_DISABLED_ACK in production (upload
+  routes answer 503 STORAGE_DISABLED, every photo read is empty so the pages
+  show their placeholders, the Photos screen shows one empty state, the daily
+  job skips the storage steps and says so, the doctor warns with the R2 fix);
+  `/api/health` answers `{ ok: false, missing: [...] }` while the gate refuses
+  to serve, and does so even when MONGODB_URI itself is missing; `/setup` loads
+  in that state; the nav shows the wordmark from 1024px and the stacked mark
+  below, the admin side nav the stacked mark; the API-down body reads "Call the
+  shop and we'll get you in."; route changes focus the page H1 without a ring;
+  `npm run test:e2e:prod` builds and serves the production bundle over https
+  with the Vercel headers and the launch variable set, plus a twin without
+  MONGODB_URI; `docs/screens/p7/` with one combined montage; DEPLOY.md with the
+  no-R2 table, the order of clicks and the R2-later section.
+- Also fixed on the way: a missing shop settings document answered 500 (now the
+  same 503 CONFIG_ERROR as the gate); short admin pages on phones sat below the
+  fold; the active nav underline never showed; the sign-in page probed the
+  session without a cookie and logged a 401.
+- Open: Rob sets the variables, redeploys, runs /setup, removes the setup
+  variables and redeploys; R2 and Resend later.
+
+## Prompt 8
+
+### Showcase demo
+
+- Shipped: `DEMO_MODE=true` (auto setup on the first request with a lock document, reusing
+  `bootstrap()`; owner, five barbers, services, hours and eleven sample bookings and walk-ins
+  with fictional names and 555-01XX phones); the "Enter demo dashboard" button and the demo
+  banner; Settings, Demo data, Reset demo data; `STORAGE_DRIVER=mongo` (GridFS) with
+  `GET` and `PUT /api/media/:id`, a 3 MB cap and the browser fallback resize; noindex in the
+  build, at runtime and as an API header; the manage link on the done screen; the Details
+  disclosure on the down screen; Clear demo data on /setup and `npm run demo:clear`; DEPLOY.md
+  section 11; the showcase production-like run (`npm run test:e2e:demo`) and `docs/screens/p8/`.
+- Also fixed: the Home hero overlapped its own logo on phones; the admin sign-in page had no
+  logo; the hero logo had the wrong aspect ratio.
+- Open: Rob sets DEMO_MODE=true and STORAGE_DRIVER=mongo, merges, redeploys. Before real
+  customers: leave demo mode (DEPLOY.md section 11), real contact details, hours, prices,
+  R2 and email.
+
+## Prompt 9
+
+### The function never loaded on Vercel
+
+- Root cause: Vercel runs the compiled function with plain Node ESM, where the extensionless
+  relative imports of `api/[...path].ts` do not resolve (ERR_MODULE_NOT_FOUND), so the API had
+  never run in production.
+- Shipped: the API as one committed esbuild bundle (`server/bundle/app.mjs`, built by
+  `npm run build:api` and by `npm run build`) behind a plain-JS `api/index.js` that answers JSON
+  `FUNCTION_LOAD_FAILED` if the bundle cannot load; a catch-all in the bundle entry; the function
+  moved to `api/index.js` with a `/api/(.*)` rewrite because Vercel routed `[...path]` as one
+  segment; `npm run test:vercel-function` (plain node, nft trace, `vercel build` output, routing
+  replay, the demo flow end to end) as a required CI step with a bundle freshness check; the
+  production-like e2e servers load the real function file; DEPLOY.md, SITE-REPORT, CLAUDE.md.
+- Open: merge, let Vercel deploy, open `/api/health`: JSON, not an error page.

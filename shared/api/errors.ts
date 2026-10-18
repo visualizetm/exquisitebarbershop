@@ -45,6 +45,10 @@ export const ERROR_CODES = {
   CONFIG_ERROR: 503,
   /** MAINTENANCE_MODE is on; the admin and the health check still answer. */
   MAINTENANCE: 503,
+  /** The function file could not load its bundle (a native add-on, a bad deploy). Never from the router. */
+  FUNCTION_LOAD_FAILED: 503,
+  /** STORAGE_DRIVER is none: photos cannot be uploaded until R2 is connected. */
+  STORAGE_DISABLED: 503,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

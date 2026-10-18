@@ -18,6 +18,8 @@ export const meResponseSchema = z.object({
   user: meUserSchema,
   staff: publicStaffSchema.nullable(),
   permissions: z.object({ barbersCanBlockTime: z.boolean() }),
+  /** What this deployment can do at all, whatever the role: photos need storage, demo is the showcase mode. */
+  features: z.object({ photos: z.boolean(), demo: z.boolean() }),
 });
 export type MeResponse = z.infer<typeof meResponseSchema>;
 

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { Status } from '@/components/Status';
+import { DemoBanner } from '@/components/site/DemoBanner';
 import '@/styles/admin.css';
 import { AdminNav } from './components/AdminNav';
 import { AccountPage } from './pages/AccountPage';
@@ -71,7 +72,10 @@ function Gate() {
   return (
     <div className="exq-adm" data-state={isOwner ? 'owner' : 'barber'}>
       <AdminNav />
-      <div className="exq-adm__content">{isOwner ? <OwnerRoutes /> : <BarberRoutes />}</div>
+      <div className="exq-adm__content">
+        {state.me.features.demo ? <DemoBanner /> : null}
+        {isOwner ? <OwnerRoutes /> : <BarberRoutes />}
+      </div>
     </div>
   );
 }

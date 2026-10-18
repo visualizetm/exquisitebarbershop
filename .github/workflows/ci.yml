@@ -43,6 +43,19 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
 
+      # The function ships as one committed bundle. The build above rewrites it; a difference
+      # means someone changed server code without committing the new bundle.
+      - name: The committed API bundle is up to date
+        run: git diff --exit-code -- server/bundle
+
+      # Runs the function the way Vercel does: plain node, only the files Vercel would ship,
+      # Vercel's own `vercel build` output and routing table. No tsx, Vite or Vitest.
+      - name: Vercel function runs under plain node
+        run: npm run test:vercel-function
+        env:
+          MONGOMS_DOWNLOAD_DIR: ~/.cache/mongodb-binaries
+          REQUIRE_VERCEL_BUILD: '1'
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4

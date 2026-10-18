@@ -12,7 +12,6 @@ import type {
 import { idSchema } from '../../shared/schemas/common';
 import {
   PHOTO_CONTENT_TYPES,
-  PHOTO_MAX_BYTES,
   photoKindSchema,
   type PhotoDocument,
   type PhotoKind,
@@ -29,7 +28,13 @@ import {
   shopSettingsRepo,
   staffRepo,
 } from '../repos';
-import { getStorage, keyPrefix } from '../storage';
+import {
+  assertStorageEnabled,
+  getStorage,
+  keyPrefix,
+  maxUploadBytes,
+  storageEnabled,
+} from '../storage';
 import { actorOf } from './access';
 import type { ServiceMeta } from './adminBookings';
 import { cursors } from './adminBookings';
@@ -127,6 +132,13 @@ export async function issueUploadUrl(
   input: UploadUrlRequest,
   meta: ServiceMeta,
 ): Promise<UploadUrlResponse> {
+  assertStorageEnabled();
+  if (input.size > maxUploadBytes()) {
+    throw new AppError(
+      'PAYLOAD_TOO_LARGE',
+      `Photos can be up to ${String(Math.floor(maxUploadBytes() / (1024 * 1024)))} MB after the resize`,
+    );
+  }
   const staffId = input.kind === 'hero' ? null : (input.staffId ?? null);
   if (input.kind === 'staff' && !staffId) {
     throw new AppError('VALIDATION_ERROR', 'A staff photo needs a staffId', {
@@ -174,6 +186,7 @@ export async function confirmUpload(
   input: ConfirmUploadRequest,
   meta: ServiceMeta,
 ): Promise<AdminPhotoView> {
+  assertStorageEnabled();
   const issued = verifyPayload(
     getEnv().MANAGE_LINK_SECRET,
     TICKET_PREFIX,
@@ -189,7 +202,7 @@ export async function confirmUpload(
   if (
     stored.size !== issued.n ||
     stored.contentType !== issued.ct ||
-    stored.size > PHOTO_MAX_BYTES
+    stored.size > maxUploadBytes()
   ) {
     // The object stays nowhere: a mismatch is removed before the caller hears about it.
     await getStorage().delete(issued.k);
@@ -278,6 +291,7 @@ export async function deletePhoto(
 
 /** Removes the objects of deleted photos from storage. Safe to run repeatedly. */
 export async function purgeDeletedPhotos(now: Date, limit = 50): Promise<number> {
+  if (!storageEnabled()) return 0;
   const pending = await photosRepo.listUnpurged(limit);
   let purged = 0;
   for (const photo of pending) {
@@ -290,6 +304,7 @@ export async function purgeDeletedPhotos(now: Date, limit = 50): Promise<number>
 
 /** Removes objects behind upload URLs that were issued over an hour ago and never confirmed. */
 export async function sweepAbandonedUploads(now: Date, limit = 50): Promise<number> {
+  if (!storageEnabled()) return 0;
   const cutoff = new Date(now.getTime() - ABANDONED_UPLOAD_MS);
   const stale = await pendingUploadsRepo.listPendingUploadsBefore(cutoff, limit);
   for (const upload of stale) {
@@ -310,6 +325,7 @@ export async function listManagedPhotos(
           ...(query.staffId ? { staffId: query.staffId } : {}),
         }
       : { kind: 'staff', staffId: principal.staffId ?? '' };
+  if (!storageEnabled()) return [];
   return (await photosRepo.listPhotos(filter)).map(toAdminPhotoView);
 }
 
@@ -319,8 +335,10 @@ export async function listManagedPhotos(
 
 /** The first live staff photo per chair, keyed by staffId. */
 export async function staffPhotoMap(): Promise<Map<string, PhotoView>> {
-  const photos = await photosRepo.listPhotos({ kind: 'staff' });
   const map = new Map<string, PhotoView>();
+  // Without storage there is no public address to read a photo from, so every page shows its placeholder.
+  if (!storageEnabled()) return map;
+  const photos = await photosRepo.listPhotos({ kind: 'staff' });
   for (const p of photos) {
     if (p.staffId && !map.has(p.staffId)) map.set(p.staffId, toPhotoView(p));
   }
@@ -328,6 +346,7 @@ export async function staffPhotoMap(): Promise<Map<string, PhotoView>> {
 }
 
 export async function heroPhoto(): Promise<PhotoView | null> {
+  if (!storageEnabled()) return null;
   const [first] = await photosRepo.listPhotos({ kind: 'hero' });
   return first ? toPhotoView(first) : null;
 }
@@ -348,9 +367,11 @@ export async function galleryPage(query: {
     if (!match) throw new AppError('NOT_FOUND', 'That chair was not found');
     only = match._id;
   }
-  const all = (await photosRepo.listPhotos({ kind: 'gallery' })).filter(
-    (p) => !p.staffId || byId.get(p.staffId)?.deletedAt === null,
-  );
+  const all = storageEnabled()
+    ? (await photosRepo.listPhotos({ kind: 'gallery' })).filter(
+        (p) => !p.staffId || byId.get(p.staffId)?.deletedAt === null,
+      )
+    : [];
   const counts = new Map<string, number>();
   for (const p of all) if (p.staffId) counts.set(p.staffId, (counts.get(p.staffId) ?? 0) + 1);
   const filtered = only ? all.filter((p) => p.staffId === only) : all;

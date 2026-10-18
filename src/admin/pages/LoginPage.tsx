@@ -2,7 +2,11 @@ import { useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { meResponseSchema } from '@shared/api/auth';
+import { publicShopSchema } from '@shared/api/public';
+import { DemoBanner } from '@/components/site/DemoBanner';
+import { Mark } from '@/components/ui/Mark';
 import { ApiRequestError, apiRequest } from '@/lib/api';
+import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { useSession } from '../useSession';
 
@@ -21,6 +25,27 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Public, cached for a minute; says whether this deployment is the showcase.
+  const shop = useApi('/api/shop', publicShopSchema);
+  const demo = shop.status === 'ready' && shop.data.demo === true;
+
+  async function enterDemo() {
+    setWorking(true);
+    setError(null);
+    try {
+      await apiRequest('/api/auth/demo-login', meResponseSchema, { method: 'POST', body: {} });
+      await refresh();
+      void navigate('/admin', { replace: true });
+    } catch (err) {
+      setError(
+        err instanceof ApiRequestError && err.code === 'RATE_LIMITED'
+          ? 'Too many attempts. Please wait a few minutes and try again.'
+          : 'Could not open the demo. Please try again.',
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
 
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
@@ -51,6 +76,10 @@ export function LoginPage() {
 
   return (
     <article className="exq-adm-login" data-state={working ? 'working' : error ? 'error' : 'idle'}>
+      <span className="exq-adm-login__mark">
+        <Mark name="stacked" alt="Exquisite" width={180} height={75} />
+      </span>
+      {demo ? <DemoBanner /> : null}
       <h1 className="exq-adm-login__title">Staff sign in</h1>
       <form className="exq-adm-login__form" onSubmit={(e) => void submit(e)}>
         <p className="exq-adm-login__field">
@@ -88,6 +117,19 @@ export function LoginPage() {
           {working ? 'Signing in' : 'Sign in'}
         </button>
       </form>
+      {demo ? (
+        <div className="exq-adm-login__demo">
+          <p>Looking around? Skip the password.</p>
+          <button
+            type="button"
+            className="exq-adm-login__submit exq-adm-login__demo-button"
+            disabled={working}
+            onClick={() => void enterDemo()}
+          >
+            Enter demo dashboard
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }

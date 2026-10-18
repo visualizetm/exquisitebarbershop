@@ -9,7 +9,7 @@ describe('shopSettingsRepo', () => {
   it('requires settings, creates them once, and never overwrites on a second create', async () => {
     expect(await shopSettingsRepo.getShopSettings()).toBeNull();
     await expect(shopSettingsRepo.requireShopSettings()).rejects.toMatchObject({
-      code: 'INTERNAL_ERROR',
+      code: 'CONFIG_ERROR',
     });
     expect(await shopSettingsRepo.createShopSettingsIfMissing(shopSettingsSeed, NOW)).toEqual({
       created: true,

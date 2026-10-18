@@ -41,6 +41,8 @@ export function usePageMeta({ title, description, noindex = false }: PageMeta): 
   const { pathname } = useLocation();
   const shop = useContext(ShopContext);
   const siteName = shop?.status === 'ready' ? shop.data.name : SITE_NAME;
+  // The showcase must not be indexed: every page says so while DEMO_MODE is on.
+  const hidden = noindex || (shop?.status === 'ready' && shop.data.demo === true);
   const text = description ?? SITE_DESCRIPTION;
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function usePageMeta({ title, description, noindex = false }: PageMeta): 
     const url = `${window.location.origin}${pathname}`;
     document.title = full;
     setMeta('name', 'description', text);
-    setMeta('name', 'robots', noindex ? 'noindex, nofollow' : null);
+    setMeta('name', 'robots', hidden ? 'noindex, nofollow' : null);
     setMeta('property', 'og:title', full);
     setMeta('property', 'og:description', text);
     setMeta('property', 'og:url', url);
@@ -57,7 +59,7 @@ export function usePageMeta({ title, description, noindex = false }: PageMeta): 
     return () => {
       document.title = siteName;
     };
-  }, [title, text, noindex, siteName, pathname]);
+  }, [title, text, hidden, siteName, pathname]);
 }
 
 /** The admin and other private screens: a distinct title, never indexed. */

@@ -42,9 +42,11 @@ describe('GET /api/health', () => {
     const { status, body, headers } = await get('/api/health');
     expect(status).toBe(200);
     const parsed = healthResponseSchema.parse(body);
+    expect(parsed.ok).toBe(true);
     expect(parsed.status).toBe('ok');
-    expect(parsed.db.ok).toBe(true);
-    expect(typeof parsed.db.latencyMs).toBe('number');
+    expect(parsed.missing).toBeUndefined();
+    expect(parsed.db?.ok).toBe(true);
+    expect(typeof parsed.db?.latencyMs).toBe('number');
     expect(headers.get('x-request-id')).toMatch(/^[0-9a-f]{16}$/);
     expect(headers.get('cache-control')).toBe('no-store');
   });

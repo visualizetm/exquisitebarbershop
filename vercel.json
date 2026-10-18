@@ -2,11 +2,32 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "rewrites": [
-    { "source": "/sitemap.xml", "destination": "/api/sitemap.xml" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ],
-  "crons": [{ "path": "/api/internal/cron/daily", "schedule": "0 13 * * *" }],
-  "functions": { "api/[...path].ts": { "maxDuration": 60 } },
+  "crons": [
+    {
+      "path": "/api/internal/cron/daily",
+      "schedule": "0 13 * * *"
+    }
+  ],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "server/bundle/**",
+      "excludeFiles": ".data/**"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
@@ -15,19 +36,36 @@
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; script-src 'self' 'sha256-gLm6LbSVgRfPvjo8GJZ0HX4xxUHYIWWCqBivt3BxC6k='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
         },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
         },
-        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" }
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
       ]
     },
     {
       "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 }

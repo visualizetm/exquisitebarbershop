@@ -24,8 +24,8 @@ Contents
 ## 1. Overview and principles
 
 - One Vite + React single page app served as static files from Vercel, with one
-  serverless function (`api/[...path].ts`) that routes every `/api/*` request
-  through `server/http`.
+  serverless function (`api/index.js`, loading the bundle `server/bundle/app.mjs`) that
+  routes every `/api/*` request through `server/http`. See DEPLOY.md section 12.
 - MongoDB (Atlas in production, mongodb-memory-server in tests) accessed through
   the official driver, one cached client per process, transactions for every
   multi-document write.
@@ -529,7 +529,7 @@ INTERNAL_ERROR 500, NOT_IMPLEMENTED 501, DATABASE_UNAVAILABLE 503.
 
 | Method    | Path                            | Auth                                                                     | Request                                                                                                               | Response and errors                                                                                                                                                                                                                                                                                       |
 | --------- | ------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET       | /api/health                     | public                                                                   | none                                                                                                                  | `healthResponseSchema` (200 ok, 503 degraded)                                                                                                                                                                                                                                                             |
+| GET       | /api/health                     | public                                                                   | none                                                                                                                  | `healthResponseSchema` (200 ok; 503 degraded; 503 config with `missing` variable names)                                                                                                                                                                                                                   |
 | GET       | /api/shop                       | public                                                                   | none                                                                                                                  | `publicShopSchema`, cached 60s                                                                                                                                                                                                                                                                            |
 | GET       | /api/services                   | public                                                                   | none                                                                                                                  | `{ services: PublicService[] }`, cached 60s                                                                                                                                                                                                                                                               |
 | GET       | /api/staff                      | public                                                                   | none                                                                                                                  | `{ staff: PublicStaff[] }`, cached 60s                                                                                                                                                                                                                                                                    |
@@ -602,12 +602,17 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 
 ### Prompt 5: setup, doctor and operations
 
-| Method    | Path                     | Auth                         | Notes                                                                                                                |
-| --------- | ------------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| GET       | /api/setup               | public                       | `{ enabled }`: whether BOOTSTRAP_SECRET is set, so the /setup page knows to exist                                    |
-| GET       | /api/internal/doctor     | internal (cron or bootstrap) | the checklist: settings, database, replica set, transactions, indexes, seed, storage, public URL, email, cron        |
-| GET, POST | /api/internal/cron/daily | internal                     | the one daily job: outbox backstop, photo purge, upload sweep, backup, prune; `vercel.json` cron at 13:00 UTC        |
-| POST      | /api/internal/bootstrap  | internal (cron or bootstrap) | indexes, seed, owner from SEED_OWNER_*; once, then 409 unless `{ force: true }`; 404 while BOOTSTRAP_SECRET is unset |
+| Method    | Path                     | Auth                         | Notes                                                                                                                                       |
+| --------- | ------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST      | /api/auth/demo-login     | public, demo mode only       | `{}`; `meResponseSchema` plus Set-Cookie: a normal owner session without a password. 404 when DEMO_MODE is off (the route is never matched) |
+| POST      | /api/admin/demo/reset    | owner, demo mode only        | `{}`; `{ ok }`. Wipes the shop, photos and sample bookings and runs the seed again; the owner stays signed in. 404 when DEMO_MODE is off    |
+| GET       | /api/media/:id           | public                       | the bytes of a photo stored in MongoDB (`<uuid>.webp`), one year of caching; 404 unless STORAGE_DRIVER=mongo                                |
+| PUT       | /api/media/:id           | public, signed query         | the browser upload for the mongo driver: `?k=<key>&exp=&sig=` signed for five minutes, octet-stream body up to 3 MB, magic bytes checked    |
+| POST      | /api/internal/demo/clear | internal (cron or bootstrap) | empties a database the demo seeded (and refuses any other); the /setup button and `npm run demo:clear` call it                              |
+| GET       | /api/setup               | public                       | `{ enabled }`: whether BOOTSTRAP_SECRET is set, so the /setup page knows to exist                                                           |
+| GET       | /api/internal/doctor     | internal (cron or bootstrap) | the checklist: settings, database, replica set, transactions, indexes, seed, storage, public URL, email, cron                               |
+| GET, POST | /api/internal/cron/daily | internal                     | the one daily job: outbox backstop, photo purge, upload sweep, backup, prune; `vercel.json` cron at 13:00 UTC                               |
+| POST      | /api/internal/bootstrap  | internal (cron or bootstrap) | indexes, seed, owner from SEED_OWNER_*; once, then 409 unless `{ force: true }`; 404 while BOOTSTRAP_SECRET is unset                        |
 
 Routes flagged `alwaysOn` (health, doctor, bootstrap, setup) answer while the
 environment is incomplete; every other route answers 503 CONFIG_ERROR until the
@@ -808,7 +813,14 @@ STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,
 presigned PUT URLs valid for five minutes, public reads through
 R2_PUBLIC_BASE_URL) and `local` (files under `.data/uploads`, a signed PUT URL
 and public reads at `/uploads/<key>` served by `serveLocalUploads` in the dev
-server; Vite proxies `/uploads` to the API).
+server; Vite proxies `/uploads` to the API). A third value, `none`, runs the
+site without storage (prompt 7): `storageEnabled()` is false, upload-url and
+confirm answer 503 STORAGE_DISABLED, every photo read returns nothing (the
+pages show their placeholders), `/api/auth/me` carries
+`features.photos: false` so the Photos screen shows one empty state, the daily
+job skips the purge, the sweep and the backup, and the doctor warns for Photo
+storage, Public photo URL and Backups. Production accepts `none` only with
+STORAGE_DISABLED_ACK=true, the same shape as EMAIL_DISABLED_ACK.
 
 Upload flow
 
@@ -833,6 +845,40 @@ Next opening: `server/services/nextOpening.ts` loads one availability context
 for the next 14 days (bounded by the booking window) with every active service,
 then runs the engine once per chair with that chair's shortest service, or
 `shopSettings.nextOpenServiceId` when set. No second engine.
+
+## 8c. Showcase demo (prompt 8)
+
+`DEMO_MODE=true` makes a fresh deployment usable on its own, for showing the
+site to the client. It is never for a real shop.
+
+- Auto setup: `assertServing` in the router calls `ensureDemo()` for every route
+  that is not `alwaysOn`. When the database has no shop settings it takes a lock
+  (`systemState` document `demoLock`, unique `_id`, stale after 60 seconds) and
+  runs the ordinary `bootstrap()` with force: indexes, the idempotent seed, an owner
+  login (the `SEED_OWNER_*` values, else a random password nobody needs) and the sample
+  bookings. Concurrent cold starts wait for the winner. Process memory trusts "ready" for a minute.
+- Sample data: eleven bookings and walk-ins placed through the real booking code
+  (`createBooking`, `createManualBooking`), so every one holds its slot locks. Fictional
+  names, phones `+1215555 01XX`, no email. A sample that cannot be placed (closed day) is skipped.
+- The marker `systemState._id = "demo"` says the database holds showcase data.
+  `clearDemoData()` wipes only a marked database. `bootstrap()` refuses a marked
+  database while DEMO_MODE is off, so real setup always goes through "Clear demo data".
+- Demo routes carry `demoOnly: true`: with the mode off the router skips them while
+  matching, so they answer the same 404 as an address that never existed.
+- Sign-in: `POST /api/auth/demo-login` starts a normal session for the owner
+  (rate limited per address). The admin login page shows "Enter demo dashboard" and the banner
+  "Demo mode. Sample data, resets anytime." when `/api/shop` says `demo: true`; the admin
+  shows the banner when `/api/auth/me` says `features.demo`.
+- Photos: STORAGE_DRIVER=mongo (`server/storage/mongo.ts`) keeps images in GridFS
+  (bucket `media`). `presignUpload` returns a same-site PUT address; `PUT /api/media/:id` checks the
+  signature, the 3 MB cap and the image magic bytes; `GET /api/media/:id` serves with
+  `Cache-Control: public, max-age=31536000, s-maxage=31536000, immutable`. The photos
+  service, screens and public pages are unchanged. Production accepts it only with DEMO_MODE=true.
+  The daily job skips the backup for it (GridFS lives in the database itself). Moving to R2 later
+  means changing STORAGE_DRIVER; photos in GridFS do not migrate.
+- Not indexed: `X-Robots-Tag: noindex, nofollow` on every API answer, the meta tag at runtime, and
+  (when DEMO_MODE is set at build time) in `index.html` plus a `Disallow: /` robots.txt. Vercel
+  serves static files without our code, so the header cannot cover the HTML shell.
 
 ## 9. Notifications: outbox and channels
 
@@ -945,26 +991,28 @@ SMS reminders
 
 Environments
 
-| Variable                                                                             | Needed          | Purpose                                                                  |
-| ------------------------------------------------------------------------------------ | --------------- | ------------------------------------------------------------------------ |
-| MONGODB_URI                                                                          | now             | replica set connection string                                            |
-| MONGODB_DB_NAME                                                                      | now             | database name per environment                                            |
-| APP_BASE_URL                                                                         | now             | manage links, allowed Origin                                             |
-| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links                                                |
-| EMAIL_PROVIDER                                                                       | later           | log or resend                                                            |
-| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                                                           |
-| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time                                         |
-| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email                                    |
-| CRON_SECRET                                                                          | later           | bearer token for internal routes                                         |
-| STORAGE_DRIVER                                                                       | now             | local or r2                                                              |
-| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                                              |
-| R2_KEY_PREFIX                                                                        | preview         | folder for every object key, e.g. preview/                               |
-| BOOTSTRAP_SECRET                                                                     | until setup ran | enables POST /api/internal/bootstrap and /setup; remove afterwards       |
-| EMAIL_DISABLED_ACK                                                                   | production      | "true" allows EMAIL_PROVIDER=log in production, on purpose               |
-| MAINTENANCE_MODE                                                                     | when needed     | "true" shows the maintenance message site-wide; admin and health stay up |
-| LOG_LEVEL                                                                            | optional        |                                                                          |
-| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                                                   |
-| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin                                   |
+| Variable                                                                             | Needed          | Purpose                                                                                |
+| ------------------------------------------------------------------------------------ | --------------- | -------------------------------------------------------------------------------------- |
+| MONGODB_URI                                                                          | now             | replica set connection string                                                          |
+| MONGODB_DB_NAME                                                                      | now             | database name per environment                                                          |
+| APP_BASE_URL                                                                         | now             | manage links, allowed Origin                                                           |
+| MANAGE_LINK_SECRET                                                                   | now             | HMAC key for manage links                                                              |
+| EMAIL_PROVIDER                                                                       | later           | log or resend                                                                          |
+| RESEND_API_KEY, EMAIL_FROM                                                           | later           | email delivery                                                                         |
+| SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time                                                       |
+| SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email                                                  |
+| CRON_SECRET                                                                          | later           | bearer token for internal routes                                                       |
+| STORAGE_DRIVER                                                                       | now             | local, r2, none (no photos and no backups until R2 exists) or mongo (demo only)        |
+| STORAGE_DISABLED_ACK                                                                 | production      | "true" allows STORAGE_DRIVER=none in production, on purpose                            |
+| DEMO_MODE                                                                            | showcase only   | "true": auto setup, demo sign-in, GridFS photos, noindex; waives both acknowledgements |
+| R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                                                            |
+| R2_KEY_PREFIX                                                                        | preview         | folder for every object key, e.g. preview/                                             |
+| BOOTSTRAP_SECRET                                                                     | until setup ran | enables POST /api/internal/bootstrap and /setup; remove afterwards                     |
+| EMAIL_DISABLED_ACK                                                                   | production      | "true" allows EMAIL_PROVIDER=log in production, on purpose                             |
+| MAINTENANCE_MODE                                                                     | when needed     | "true" shows the maintenance message site-wide; admin and health stay up               |
+| LOG_LEVEL                                                                            | optional        |                                                                                        |
+| MONGOMS_SYSTEM_BINARY                                                                | optional, tests | use an existing mongod                                                                 |
+| VERCEL_GIT_COMMIT_SHA, VERCEL_ENV, VERCEL_URL                                        | set by Vercel   | build sha, environment, preview origin                                                 |
 
 Deployment
 

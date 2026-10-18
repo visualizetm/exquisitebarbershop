@@ -281,3 +281,230 @@ win.
   server are recorded as a dev artifact (lazy chunk CSS injected after the
   first paint there) and not fixed: the production build loads the chunk's
   stylesheet first and the sign-in page measures 0 there.
+
+## Prompt 7: live without R2
+
+- D7-01 The branch is `claude/p7-live-without-r2`, started from `main` after
+  PR 1 merged, as the brief asks for a new branch and a new pull request.
+- D7-02 `STORAGE_DRIVER=none` is a third driver value, not a missing R2
+  variable treated leniently: the gate stays strict (`local` is still refused
+  on Vercel), and production needs STORAGE_DISABLED_ACK=true, the same shape
+  as EMAIL_DISABLED_ACK. Previews take `none` without an acknowledgement, as
+  they take `log` email. Nothing else the gate blocks is optional: the
+  database name, the https address and CRON_SECRET stay required.
+- D7-03 Without storage every photo read returns nothing (hero null, no
+  portraits, empty gallery, empty admin list) rather than records with no
+  usable URL, because there is no public address to serve a file from. The
+  records and objects stay, so switching R2 back on shows them again.
+- D7-04 Upload routes answer 503 STORAGE_DISABLED from the service
+  (`assertStorageEnabled` before any database write), not from the router, so
+  the authorization matrix is unchanged: the routes still exist and still
+  need a login.
+- D7-05 The Photos screen learns about storage from `features.photos` on
+  `/api/auth/me` rather than a new route or a public flag, because it is a
+  deployment capability the signed-in dashboard already asks about itself.
+- D7-06 The daily job skips the purge, the sweep, the backup and the prune as
+  one block and reports `skipped: [...]` plus a warn log line, instead of
+  letting each step fail with STORAGE_DISABLED: Vercel Cron only sees the
+  status code, and the log line is what a person reads.
+- D7-07 The doctor gets a Backups row (pass with storage, warn without) so the
+  three things R2 turns on are named side by side with the one fix sentence.
+- D7-08 `/api/health` answers 503 with `{ ok: false, status: "config",
+missing: [names] }` while the gate refuses; `db` is left out because nothing
+  is tried. To make that work with a missing MONGODB_URI, `describeEnv` and
+  `getPartialEnv` read the environment without throwing, and the secret check,
+  the setup status, the doctor and `currentEnvironment` use them. `getEnv`
+  keeps throwing for everything else.
+- D7-09 `/setup` no longer asks for `/api/shop` at all (the layout passes a null
+  path on that route), which is simpler than special-casing the down state,
+  and a missing shop settings document now answers 503 CONFIG_ERROR instead of
+  500, since it is the same "not set up yet" condition.
+- D7-10 Nav logo: two marks in the DOM with a width-based wrapper (wordmark at
+  40px tall from 1024px, stacked at 48px below), instead of one wordmark sized
+  for phones. The wrappers carry the display rule so the theme swap inside
+  `Mark` keeps working; a class on the images themselves lost to the theme
+  rule's specificity (seen in the first dark capture). The admin side nav uses
+  the stacked mark. The active nav underline was fixed on the way: the rule
+  targeted the anchor while the state lives on the span.
+- D7-11 Route-change focus: a hook in both layouts focuses the page H1 one tick
+  after the path changes, skips the first load (nothing is focused, so no
+  ring), and steps aside when the page already placed focus inside main (the
+  Book step headings). Headings with tabindex -1 never draw an outline; every
+  control keeps `:focus-visible`. The Book step heading showed a ring on first
+  paint before this, as the only programmatic focus before any interaction.
+- D7-12 The sign-in page no longer probes `/api/auth/me` on a browser that
+  never signed in: a localStorage hint set after a sign-in gates the probe,
+  and a 401 or sign-out clears it. The known "two 401s in the console" gap is
+  gone and the production-like run can assert zero console errors.
+- D7-13 The production-like run is its own Playwright config and server script
+  (`npm run test:e2e:prod`): it builds with vite, serves `dist` over https on
+  127.0.0.1 with a self-signed certificate from openssl, applies the headers
+  from vercel.json, sets exactly the DEPLOY.md variable list with NODE_ENV and
+  VERCEL_ENV production, and spawns a twin on the next port without
+  MONGODB_URI. https is needed because APP_BASE_URL must be https in production
+  and the Origin check compares against it. `npm run test:e2e` runs the dev
+  suite and then this one; CI keeps running Vitest only.
+- D7-14 Short admin pages on phones sat below the fold: the admin grid gave its
+  one `1fr` row to the empty header. Rows are now `auto 1fr` below 1024px.
+  Found in the p7 captures, fixed as a small safe change.
+- D7-15 The combined `docs/screens/p7/montage.png` is the four per-width
+  montages stacked at half size, so it stays under the size of the rest of the
+  folder.
+
+## Prompt 8: showcase demo
+
+- D8-01 The branch is `claude/p8-showcase-demo`, stacked on `claude/p7-live-without-r2`
+  because PR 2 was not merged when this started and everything here builds on
+  `STORAGE_DRIVER=none`, `/api/health` and the production-like run. The pull request
+  targets `main` and contains PR 2's two commits until PR 2 merges.
+- D8-02 Root cause of the down screen, reproduced from the code path with the variables
+  Rob set: on `main`, `STORAGE_DRIVER` accepts only `local` and `r2`, so the value `none` fails
+  the environment schema; `/api/shop` answers 500 INTERNAL_ERROR and `/api/health` answers
+  degraded, and the layout shows the down screen. With PR 2's code the next cause is the empty
+  database: no shop settings, so `/api/shop` answers 503 CONFIG_ERROR ("not set up yet") until
+  setup runs. Demo mode removes that second cause; merging removes the first.
+- D8-03 `DEMO_MODE` waives EMAIL_DISABLED_ACK and STORAGE_DISABLED_ACK in production: the
+  switch already says "this is a showcase, no email and no real storage on purpose", and the
+  brief wants the showcase to work with the six variables. It waives nothing else:
+  MONGODB_DB_NAME, https APP_BASE_URL and CRON_SECRET stay required, and `local` is
+  still refused on Vercel. `STORAGE_DRIVER=mongo` is accepted in production only with
+  DEMO_MODE=true; previews may use it freely (they hold no real data).
+- D8-04 Auto setup lives in the router (`assertServing`), not in a page or a cron: any route
+  that is not `alwaysOn` triggers `ensureDemo()` before it answers, so the first request of any
+  kind (a page's `/api/shop`, a direct API call) sets the shop up. It calls the existing
+  `bootstrap()` with force; there is no second seeder. The lock is a `systemState` document
+  with a unique `_id`: the insert is the atomic step, a lock older than 60 seconds is taken
+  over by compare and swap, and losers poll until the settings exist (25 second limit, then
+  CONFIG_ERROR). Process memory trusts "ready" for 60 seconds so a warm instance does not ask
+  the database on every request.
+- D8-05 In demo mode `bootstrap()` creates the owner with SEED_OWNER_PASSWORD when set, else a
+  random password nobody needs: the demo sign-in button starts a normal session for the owner
+  without one, so there is no shared default password to leak. The endpoint is rate limited
+  per address (30 per 15 minutes) and audited like any sign-in.
+- D8-06 Demo routes are flagged `demoOnly` and skipped by the router while matching when the
+  mode is off, instead of throwing 404 from the handler: the answer is then byte for byte the
+  one for an address that was never built. The handlers also assert the mode (defense in
+  depth). The authorization matrix expects 404 for every role with the mode off and has a
+  second pass with the mode on (owner last, because a reset deletes the other logins).
+- D8-07 Sample bookings go through the real booking code (`createBooking` for online, the
+  manual booking service for phone and walk-in), so every sample holds its slot locks and
+  follows availability. Each sample picks the Nth day its chair is open (the seed hours close
+  two days a week) and the first slot at or after its hour; availability is reloaded for each
+  sample so earlier ones are in the way. A sample that cannot be placed is skipped with a log
+  line, never fatal. Walk-ins are placed only while the chair is working, so Today never shows
+  a walk-in at 3am. Names are obviously fictional and phones are +1215555 01XX.
+- D8-08 "Reset demo data" wipes every business collection and the photo objects, deletes the
+  non-owner logins and their sessions, clears the demo marker (which is what makes setup load the
+  sample bookings again), runs `bootstrap()` and restores the run count. The owner login and the
+  owner's session stay, so the person who pressed the button is not signed out. The page does a
+  full load afterwards because every screen holds data that no longer exists.
+- D8-09 Leaving the showcase is a deliberate, guarded step. `clearDemoData()` empties the whole
+  database but only when the `demo` marker exists; `bootstrap()` refuses a marked database while
+  DEMO_MODE is off. Both the /setup button (behind a checkbox and the setup secret) and
+  `npm run demo:clear` call it. A real shop's data cannot be cleared by this route.
+- D8-10 The `mongo` storage driver keeps images in GridFS (bucket `media`). The public id is
+  the uuid inside the key (`<uuid>.webp`), so `/api/media/:id` needs no lookup table and the
+  admin, the photos service and every public page are unchanged. Uploads PUT to the same site
+  with a signed query string (the local driver's HMAC over key and expiry, five minutes), as
+  `application/octet-stream` so Vercel hands the function the raw bytes; the route checks
+  the signature, a 3 MB cap and the image magic bytes (the stored type comes from the bytes,
+  never from the header). Confirm compares size and type exactly as for R2. Reads carry
+  `max-age` and `s-maxage` of a year with `immutable`, because an id never changes.
+- D8-11 The 3 MB limit is enforced by the server for `mongo` (413 at issue and at PUT) and the
+  browser tries 2000px at three qualities, then 1600px and 1200px, until the WebP fits, so a
+  large phone photo is shrunk instead of refused. That loop runs for every driver; only the
+  limit differs.
+- D8-12 Backups skip GridFS: with the mongo driver the daily job still purges deleted photos and
+  sweeps abandoned uploads, logs that the backup was skipped and reports `skipped`. A backup
+  written into the database it is backing up would back up nothing. The doctor shows Backups
+  as Check and Public photo URL as OK (the site serves its own photos).
+- D8-13 Not indexed, in four places, because Vercel serves the static HTML without running our
+  code: an `X-Robots-Tag` header on every API answer; the robots meta tag set at runtime from
+  `shop.demo`; and, when DEMO_MODE is set in the build environment, the same meta tag in the
+  static `index.html` and a `Disallow: /` robots.txt. The header cannot cover the HTML shell
+  without routing middleware, which cannot be tested here and could take the whole site down
+  if wrong; DEPLOY.md says DEMO_MODE must be set before the build.
+- D8-14 The booking done screen shows the manage link in demo mode (`shop.demo`), as a visible
+  address, because no email goes out. Without demo mode nothing changed.
+- D8-15 The down screen shows a Details disclosure with the error code only. `errorCodeOf`
+  maps an API answer to its code, a non-JSON answer to INVALID_RESPONSE, a failed fetch to
+  NETWORK_ERROR and a schema mismatch to UNEXPECTED_RESPONSE: kinds of failure, never values,
+  messages or stacks. A test asserts the screen text carries no connection string or secret.
+- D8-16 `docs/brand/BRAND.md` still does not exist (D6-02). The real marks are
+  `public/brand/*.svg` from Rob's upload; every logo slot was checked against them: nav
+  (wordmark from 1024px, stacked below), admin side nav (stacked), footer seal and hero primary
+  and booking card wordmark (white, inside ink bands), and the admin sign-in page, which had
+  no logo and now carries the stacked mark. The hero logo's width and height attributes had
+  the wrong ratio and were corrected.
+- D8-17 The hero was broken on phones and the earlier captures missed it: the 4:5 box was
+  shorter than its words, so the title overflowed upward over the absolutely placed logo.
+  The logo now sits in the flow above the words, in the page column, and the box has a floor
+  (`min-height`) but no ceiling, with the same floor in the ink and photo states so the page
+  still does not jump when the photo arrives (Home CLS 0, mobile performance 97).
+- D8-18 The showcase has its own production-like run: `playwright.demo.config.ts` and
+  `--profile=demo` on the same server script, which builds with DEMO_MODE, serves https on 4176
+  and sets exactly MONGODB_URI, MONGODB_DB_NAME, APP_BASE_URL, MANAGE_LINK_SECRET, CRON_SECRET,
+  DEMO_MODE and STORAGE_DRIVER=mongo on an empty database. The launch run (4174) proves the
+  opposite with the mode off: not seeded, no demo button, 404s, no media route.
+
+## Prompt 9: the function never loaded on Vercel
+
+- D9-01 PR 3 (prompt 8) was not merged, so this branch is `claude/p9-vercel-function-fix`
+  from `claude/p8-showcase-demo`. The pull request contains PR 2 and PR 3 until they merge.
+- D9-02 The real root cause, reproduced exactly: Vercel compiles `api/[...path].ts` file by file
+  and runs it with plain Node ESM, where `import '../server/http/app'` has no extension, so the
+  function died with ERR_MODULE_NOT_FOUND before any of our code ran. Every earlier "root cause"
+  (reports 05 to 08: missing R2 variables, STORAGE_DRIVER=none, an empty database) was a guess
+  about code that never executed in production. They were reproduced under tsx, which resolves
+  extensionless imports, so the reproductions proved nothing about Vercel.
+- D9-03 Option A, one esbuild bundle. Option B (`.js` on every relative import in about 230
+  files, NodeNext resolution, a lint rule) changes every file, fights the bundler-style
+  resolution the app and tests use, and depends on Vercel compiling and tracing every file the
+  way I hope it does. With a bundle there are no relative imports left to resolve, and the exact
+  file that ships is the file the test runs.
+- D9-04 The bundle is committed (`server/bundle/app.mjs`, 1.4 MB) behind a tiny hand-written
+  `api/index.js`. Vercel finds functions from the repository's files and traces what they
+  import; a file only the build command writes might not exist then. Committing it makes the
+  shipped file independent of build order. `npm run build` regenerates it (so a stale copy
+  cannot hide) and CI fails when the committed copy differs from a fresh build.
+- D9-05 `api/index.js` is plain JavaScript with no imports of ours. It loads the bundle with a
+  dynamic import inside the handler, so a load failure (a native add-on, a bad deploy) becomes
+  JSON `FUNCTION_LOAD_FAILED` (503) instead of Vercel's FUNCTION_INVOCATION_FAILED page. A last
+  catch in the bundle's own entry (`server/vercel-entry.ts`) answers JSON INTERNAL_ERROR for
+  anything thrown outside the router. Neither answer carries the underlying message, which can
+  hold paths or connection strings; both are logged with connection strings redacted. The code
+  joined the shared error list so the down screen's Details shows it.
+- D9-06 External packages: `mongodb` and `@node-rs/argon2` (native add-ons), resolved from
+  node_modules by Vercel's tracer. Everything else is plain JavaScript and is bundled. `ws` is
+  an optional peer that `@vercel/functions` imports lazily in `upgradeWebSocket`, which nothing
+  calls. The build fails if a dev-only package (vite, vitest, tsx, mongodb-memory-server,
+  esbuild, playwright) ends up in the bundle. The argon2 Linux x64 binary ships (verified in
+  Vercel's own build output).
+- D9-07 Second production bug, found by running Vercel's own `vercel build` and reading the
+  routing table it generates: `api/[...path]` is routed as `^/api/([^/]+)$`, ONE path segment.
+  `/api/health` and `/api/shop` would have worked; `/api/auth/login`, `/api/staff/marcus`,
+  `/api/admin/*` and the cron path would have answered Vercel's 404. Fix: the function is
+  `api/index.js` (the standard single-function layout) with the rewrite `/api/(.*)` to `/api`,
+  which Vercel turns into `^/api(?:/(.*))$`. The router reads the original request path; the test
+  also proves it ignores a query Vercel might add. `/sitemap.xml` still rewrites to
+  `/api/sitemap.xml`, which the same rule then sends to the function.
+- D9-08 Vercel's tracer packed `.data/uploads` (a developer's local uploads) into the function
+  because the local storage driver wrote `resolve('.data', 'uploads')` as a literal. The path is
+  now built at run time and `vercel.json` excludes `.data/**`; the test fails if either ships.
+- D9-09 `npm run test:vercel-function` builds the bundle, then ships it two ways into temp
+  directories holding nothing else (the files `@vercel/nft` traces from `api/index.js`, and the
+  output of Vercel's own `vercel build`, which needs no token) and runs each with plain `node`
+  through a bare HTTP server: no env gives JSON `{ ok: false, missing }`; the showcase env on an
+  empty in-memory database gives auto setup, health, the shop, the demo sign-in, a GridFS upload
+  and its public address; a deleted bundle gives JSON FUNCTION_LOAD_FAILED. It then replays
+  Vercel's generated routing table for API and page paths of every depth. The Vercel CLI is run
+  with `npx vercel@64.5.0`, not installed, to keep installs light; a stub `.vercel/project.json`
+  (git-ignored) stands in for a linked project. CI sets REQUIRE_VERCEL_BUILD=1 so the step cannot
+  quietly skip; locally it skips with a note if the CLI cannot be fetched.
+- D9-10 The production-like e2e servers (launch and showcase) now load `api/index.js` and the
+  bundle instead of the TypeScript router, so those 12 tests exercise the shipped function too.
+- D9-11 Limits: nothing here can call Vercel itself, and the Vercel API refused this session
+  (403), so the failed deployment's files could not be inspected; the fix rests on running the
+  same builder and tracer locally. What is not proven: that Vercel's platform hands the
+  function the original request path after a rewrite (the documented Express-on-Vercel pattern
+  relies on it), which the first deploy's `/api/health` and `/api/staff/marcus` will confirm.

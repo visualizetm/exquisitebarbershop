@@ -8,16 +8,30 @@ Last commit: see the bottom of this file.
 ## Stack and hosting
 
 - Vite 7, React 19, TypeScript strict, React Router 7 (BrowserRouter, real paths).
-- One Vercel serverless function (`api/[...path].ts`) over `server/`, MongoDB
+- One Vercel serverless function (`api/index.js`, which loads the committed bundle
+  `server/bundle/app.mjs` built from `server/`), MongoDB
   (Atlas, replica set, transactions), zod schemas shared from `shared/`.
 - Luxon for time in America/New_York. Jost self-hosted from `@fontsource/jost`.
 - Hosting: Vercel (Vite preset). `vercel.json` rewrites every non-API path to
   `index.html`, sets CSP and the security headers, and runs the outbox cron.
 - Tests: Vitest with mongodb-memory-server, Playwright for end to end.
 - Operations: a daily cron at `/api/internal/cron/daily` (email backstop, photo
-  cleanup, backup to R2 with 30 days kept), `npm run doctor`, `npm run smoke`,
-  `npm run restore`; `/setup` for the first run; MAINTENANCE_MODE and an
-  API-down state in the public layout (`SiteDown`).
+  cleanup, backup to R2 with 30 days kept; with STORAGE_DRIVER=none only the
+  email step runs), `npm run doctor`, `npm run smoke`, `npm run restore`;
+  `/setup` for the first run (loads even while the API refuses to serve);
+  MAINTENANCE_MODE and an API-down state in the public layout (`SiteDown`);
+  `/api/health` lists the missing variable names while the deployment is
+  incomplete.
+- Showcase: `DEMO_MODE=true` with `STORAGE_DRIVER=mongo` is a complete site on six variables
+  (DEPLOY.md section 11). The first request sets the shop up with sample data; the admin login
+  has "Enter demo dashboard"; photos live in GridFS and are served at `/api/media/:id`; every page
+  is noindex; Settings, Demo data resets it; `/setup` can clear it for a real launch.
+- Production-like run: `npm run test:e2e:prod` builds the bundle and serves it
+  over https with the vercel.json headers, the API in production mode with the
+  launch variable set (no R2), and a twin without MONGODB_URI
+  (`scripts/prodlike-server.ts`, `tests/e2e/prod/`); the showcase has its own
+  (`npm run test:e2e:demo`, `tests/e2e/demo/`, an empty database and only the demo
+  variables); `npm run test:e2e` runs the dev suite and then both.
 - SEO: per-route meta from `usePageMeta`, JSON-LD BarberShop from `/api/shop`,
   `/sitemap.xml` from the API, `public/robots.txt`, `public/og.png` (1200x630),
   favicons, apple touch icon and `site.webmanifest`. Brand assets are rendered
@@ -78,9 +92,10 @@ read through public URLs.
 Env var names (values never written here): MONGODB_URI, MONGODB_DB_NAME,
 APP_BASE_URL, MANAGE_LINK_SECRET, CRON_SECRET, EMAIL_PROVIDER, RESEND_API_KEY,
 EMAIL_FROM, SEED_OWNER_PASSWORD, SEED_OWNER_EMAIL, LOG_LEVEL,
-OUTBOX_AFTER_RESPONSE, MONGOMS_SYSTEM_BINARY, STORAGE_DRIVER, R2_ACCOUNT_ID,
-R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL, R2_KEY_PREFIX,
-BOOTSTRAP_SECRET, EMAIL_DISABLED_ACK, MAINTENANCE_MODE.
+OUTBOX_AFTER_RESPONSE, MONGOMS_SYSTEM_BINARY, STORAGE_DRIVER (local, r2, none or mongo),
+STORAGE_DISABLED_ACK, DEMO_MODE, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+R2_BUCKET, R2_PUBLIC_BASE_URL, R2_KEY_PREFIX, BOOTSTRAP_SECRET, EMAIL_DISABLED_ACK,
+MAINTENANCE_MODE.
 
 ## Forms
 
@@ -107,12 +122,36 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
 - Photos are stored at one size (up to 2000px) and shown at 290 to 780 device
   pixels; responsive variants would cut gallery weight by about two thirds
   (audit finding, not done: two uploads per photo and an additive `thumbKey`).
-- The admin sign-in page logs two expected 401s in the console (the session
-  probe before signing in).
+- A showcase deployment has no backup and keeps photos in the database; its sample data is
+  disposable. Real launch: DEPLOY.md section 11 ("Leaving the showcase").
+- The security headers are static, so the HTML shell cannot carry `X-Robots-Tag` in demo
+  mode; the build adds the meta tag and a closed robots.txt instead.
+- Photos and daily backups are off until Cloudflare R2 is set up
+  (STORAGE_DRIVER=none at launch; DEPLOY.md section 10 switches them on).
+- The MongoDB Atlas free tier keeps no snapshots, so until R2 is on there is no
+  backup of the bookings at all.
 - Handoff docs: `docs/OWNER-GUIDE.md` (and `.pdf`), `docs/BARBER-GUIDE.md`,
   screenshots in `docs/guide/` from `tests/e2e/guide.ts`; audit tooling in
   `tests/e2e/audit.ts` and `docs/screens/audit/`.
 
+## Known history
+
+- Through prompt 8 the API never ran in production. Vercel runs the compiled function with
+  plain Node ESM; `api/[...path].ts` imported `../server/http/app` without an extension, so every
+  `/api/*` request answered Vercel's own 500 FUNCTION_INVOCATION_FAILED (ERR_MODULE_NOT_FOUND)
+  before any of our code ran. Every earlier explanation of the down screen (missing R2 variables,
+  STORAGE_DRIVER, an empty database) was a guess about code that had never executed there.
+  Fixed in prompt 9 (bundle, `api/index.js`, JSON error answers); CI had been green because
+  Vitest, Playwright and the production-like run all load the server through tsx or Vite.
+- Vercel routed `api/[...path]` as a single path segment, which would have 404'd every nested
+  API path; fixed with the `/api/(.*)` rewrite (prompt 9).
+- Proof it stays fixed: `npm run test:vercel-function`, a required CI step (DEPLOY.md section 12).
+
 ## Last commit
 
-Prompt 6 milestone 4, 2026-10-17; see `docs/reports/06-final.md` for the hashes.
+Prompt 9, 2026-10-18: the function runs under plain Node on Vercel (bundle, `api/index.js`, rewrite),
+with `npm run test:vercel-function` in CI. Before it, prompt 8, 2026-10-18: the showcase demo (auto setup, demo sign-in, GridFS photos, noindex,
+down-screen details), the hero and sign-in logo fixes, the showcase production-like run and
+`docs/screens/p8/`. Before it, prompt 7, 2026-10-17: the launch without R2, visible configuration failures,
+the nav logo, the API-down copy, route-change focus, the production-like e2e
+run and `docs/screens/p7/`.

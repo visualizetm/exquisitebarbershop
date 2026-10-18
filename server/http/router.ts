@@ -1,9 +1,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import { currentEnvProblems, getEnv } from '../env';
+import { currentEnvProblems, getEnv, getPartialEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { randomRequestId } from '../lib/ids';
 import { logger } from '../lib/logger';
+import { ensureDemo } from '../services/bootstrap';
+import { demoEnabled } from '../services/demo';
 import { assertAllowedOrigin } from './origin';
 import { sendError, sendJson } from './respond';
 import type { HttpMethod, Principal, RequestContext, RouteDefinition } from './types';
@@ -61,7 +63,8 @@ function sameSecret(provided: string, secret: string | undefined): boolean {
  * Bootstrap routes also take BOOTSTRAP_SECRET, and do not exist while it is unset.
  */
 function assertInternalSecret(req: IncomingMessage, route: RouteDefinition): void {
-  const env = getEnv();
+  // The partial environment, so the doctor can be called while a variable is missing.
+  const env = getPartialEnv();
   const provided = bearerOf(req);
   if (sameSecret(provided, env.CRON_SECRET)) return;
   if (route.bootstrap === true && provided !== '') {
@@ -78,7 +81,7 @@ let configWarned = false;
  * check and the setup routes, which say what is missing. In maintenance mode
  * the public routes answer 503 too, while the staff area keeps working.
  */
-function assertServing(route: RouteDefinition, pathname: string): void {
+async function assertServing(route: RouteDefinition, pathname: string, now: Date): Promise<void> {
   if (route.alwaysOn === true) return;
   const problems = currentEnvProblems();
   if (problems.length > 0) {
@@ -88,6 +91,8 @@ function assertServing(route: RouteDefinition, pathname: string): void {
     }
     throw new AppError('CONFIG_ERROR', 'The site is not set up yet. Run the doctor at /setup.');
   }
+  // Showcase mode sets a fresh database up on the first request that needs it.
+  await ensureDemo(now);
   if (getEnv().MAINTENANCE_MODE === 'true' && route.auth === 'public') {
     if (pathname === '/api/shop' || pathname.startsWith('/api/auth/')) return;
     throw new AppError('MAINTENANCE', 'Online booking is having a moment. Please call the shop.');
@@ -114,6 +119,8 @@ export function createRouter(
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const requestId = randomRequestId();
     res.setHeader('X-Request-Id', requestId);
+    // The sample shop must not be indexed. API answers carry the header; the pages carry the meta tag.
+    if (demoEnabled()) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
     const started = Date.now();
     const url = new URL(req.url ?? '/', 'http://localhost');
     const methodRaw = (req.method ?? 'GET').toUpperCase();
@@ -131,6 +138,8 @@ export function createRouter(
       let route: CompiledRoute | null = null;
       let params: Record<string, string> = {};
       for (const candidate of compiled) {
+        // A demo-only route does not exist while the mode is off: no match, so a plain 404.
+        if (candidate.demoOnly === true && !demoEnabled()) continue;
         const m = matchSegments(candidate.segments, actual);
         if (!m) continue;
         matchedPath = true;
@@ -156,7 +165,7 @@ export function createRouter(
         now: new Date(),
       };
 
-      assertServing(route, url.pathname);
+      await assertServing(route, url.pathname, ctx.now);
       switch (route.auth) {
         case 'public':
           break;

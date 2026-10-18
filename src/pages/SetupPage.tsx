@@ -21,6 +21,7 @@ const doctorSchema = z.object({
   checkedAt: z.string(),
   checks: z.array(checkSchema),
 });
+const clearedSchema = z.object({ cleared: z.literal(true) });
 const bootstrapSchema = z.object({
   firstRun: z.boolean(),
   runs: z.number(),
@@ -38,6 +39,8 @@ const CREATED_LABEL: Record<string, string> = {
   staffHoursCreated: 'Chair hours',
   ownerLogin: 'Owner login',
   indexes: 'Database indexes',
+  sampleBookings: 'Sample bookings',
+  demo: 'Demo data',
 };
 
 /**
@@ -48,7 +51,9 @@ export function SetupPage() {
   usePageMeta({ title: 'Setup', noindex: true });
   const status = useApi('/api/setup', setupStatusSchema);
   const [secret, setSecret] = useState('');
-  const [working, setWorking] = useState<'doctor' | 'setup' | null>(null);
+  const [working, setWorking] = useState<'doctor' | 'setup' | 'clear' | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [cleared, setCleared] = useState(false);
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [result, setResult] = useState<Bootstrap | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,11 +63,21 @@ export function SetupPage() {
   if (status.status === 'error' || !status.data.enabled) return <NotFoundPage />;
 
   const headers = { Authorization: `Bearer ${secret}` };
-  const run = async (what: 'doctor' | 'setup') => {
+  const run = async (what: 'doctor' | 'setup' | 'clear') => {
     setWorking(what);
     setError(null);
     try {
-      if (what === 'doctor') {
+      if (what === 'clear') {
+        await apiRequest('/api/internal/demo/clear', clearedSchema, {
+          method: 'POST',
+          body: {},
+          headers,
+        });
+        setCleared(true);
+        setConfirmClear(false);
+        setResult(null);
+        setDoctor(null);
+      } else if (what === 'doctor') {
         setDoctor(await apiRequest('/api/internal/doctor', doctorSchema, { headers, fresh: true }));
       } else {
         setResult(
@@ -133,6 +148,39 @@ export function SetupPage() {
           Run setup again even though it already ran (adds nothing that exists)
         </label>
       </form>
+      <section className="exq-setup__demo" aria-labelledby="exq-setup-demo">
+        <h2 id="exq-setup-demo">Leaving the showcase</h2>
+        <p className="exq-muted">
+          Turn DEMO_MODE off in Vercel and redeploy, then clear the sample shop here and run setup
+          again with the real owner login. Clearing only works on a database the demo filled, and it
+          removes everything in it: bookings, photos, logins and settings.
+        </p>
+        <label className="exq-setup__force">
+          <input
+            type="checkbox"
+            checked={confirmClear}
+            onChange={(e) => {
+              setConfirmClear(e.target.checked);
+            }}
+          />{' '}
+          I understand this deletes the whole demo shop
+        </label>
+        <p className="exq-setup__actions">
+          <Button
+            variant="secondary"
+            loading={working === 'clear'}
+            disabled={secret.length === 0 || !confirmClear || working !== null}
+            onClick={() => void run('clear')}
+          >
+            Clear demo data
+          </Button>
+        </p>
+        {cleared ? (
+          <p className="exq-setup__notice" role="status">
+            Demo data cleared. Run setup now to create the real shop and owner login.
+          </p>
+        ) : null}
+      </section>
       {error ? (
         <p className="exq-setup__error" role="alert">
           {error}

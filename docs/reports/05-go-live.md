@@ -1,3 +1,4 @@
+CORRECTION (prompt 9): the API never ran on Vercel until prompt 9 (ERR_MODULE_NOT_FOUND on an extensionless import), so statements here about production behavior (the env gate, setup, health, demo mode, a root cause of the down screen) were never observed there; they were checked under tsx, Vite or a local build. See docs/reports/09-vercel-function.md.
 REPORT 05: THEMES, DESKTOP BOOKING, PRODUCTION READINESS AND GO LIVE
 Commits (all 2026-10-17): e21f08e M1, 6df1050 M2, de131b5 M3, d8da5a2 M4, 4af5c2c M5, e06a90a M6, plus this report commit. Rob's brand upload 4054fe1 is included.
 PR: https://github.com/visualizetm/exquisitebarbershop/pull/1 into main, not merged. CI (typecheck, lint, format, Vitest with coverage, build) is green on every milestone commit; the run for the report commit is the last one to check on the PR page.

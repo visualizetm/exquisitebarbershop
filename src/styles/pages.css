@@ -4,10 +4,11 @@
 .exq-hero {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  min-height: 420px;
-  max-height: 72vh;
-  overflow: hidden;
+  flex-direction: column;
+  justify-content: flex-end;
+  /* The box has a floor, never a ceiling: if the words need more room (a phone), it grows. The
+     same floor in the ink and photo states keeps the page from jumping when the photo arrives. */
+  min-height: min(125vw, 72vh);
   background: var(--ink);
   color: var(--paper);
 }
@@ -31,17 +32,23 @@
     rgba(17, 17, 17, 0.05) 100%
   );
 }
+/* The brand mark in the ink hero: in the flow above the words, in the page column, so the two
+   can never overlap. The auto bottom margin keeps it at the top while the words sit at the bottom
+   of a tall hero. */
+.exq-hero__brand {
+  position: relative;
+  padding-top: var(--s6);
+  margin-bottom: auto;
+}
 .exq-hero__logo {
-  position: absolute;
-  top: var(--s6);
-  left: var(--s4);
-  width: min(70vw, 360px);
+  display: block;
+  width: min(56vw, 280px);
   height: auto;
   opacity: 0.9;
 }
 .exq-hero__content {
   position: relative;
-  padding-block: var(--s9) var(--s6);
+  padding-block: var(--s5) var(--s6);
   display: flex;
   flex-direction: column;
   gap: var(--s4);
@@ -62,22 +69,13 @@
 }
 @media (min-width: 768px) {
   .exq-hero {
-    aspect-ratio: 16 / 9;
-    min-height: 480px;
-    max-height: 640px;
+    min-height: clamp(480px, 56.25vw, 640px);
   }
   .exq-hero__content {
-    padding-block: var(--s9) var(--s8);
+    padding-block: var(--s6) var(--s8);
   }
   .exq-hero__logo {
-    left: var(--s6);
-  }
-}
-@media (max-width: 767px) {
-  /* Both states share the ratio, so the hero does not grow when the photo arrives. */
-  .exq-hero {
-    aspect-ratio: 4 / 5;
-    max-height: 72vh;
+    width: min(30vw, 360px);
   }
 }
 

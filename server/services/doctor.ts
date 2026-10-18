@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDb, getMongoClient } from '../db/client';
 import { COLLECTIONS, INDEXES } from '../db/indexes';
-import { currentEnvironment, envProblems, getEnv } from '../env';
+import { currentEnvironment, describeEnv, getPartialEnv } from '../env';
 import { shopSettingsRepo, usersRepo } from '../repos';
 import { getStorage, keyPrefix } from '../storage';
 
@@ -31,29 +31,17 @@ function describe(error: unknown): string {
 }
 
 function checkEnv(): DoctorCheck[] {
-  try {
-    const problems = envProblems(getEnv());
-    if (problems.length === 0) {
-      return [{ id: 'env', label: 'Settings', status: 'pass', detail: 'Every variable is set.' }];
-    }
-    return problems.map((p) => ({
-      id: `env:${p.name}`,
-      label: `Setting ${p.name}`,
-      status: 'fail' as const,
-      detail: p.message,
-      fix: p.fix,
-    }));
-  } catch (error) {
-    return [
-      {
-        id: 'env',
-        label: 'Settings',
-        status: 'fail',
-        detail: describe(error),
-        fix: 'Fix the variable named in the message in Vercel, then redeploy.',
-      },
-    ];
+  const { problems } = describeEnv();
+  if (problems.length === 0) {
+    return [{ id: 'env', label: 'Settings', status: 'pass', detail: 'Every variable is set.' }];
   }
+  return problems.map((p) => ({
+    id: `env:${p.name}`,
+    label: `Setting ${p.name}`,
+    status: 'fail' as const,
+    detail: p.message,
+    fix: p.fix,
+  }));
 }
 
 async function checkDatabase(): Promise<DoctorCheck[]> {
@@ -220,8 +208,31 @@ async function checkDatabase(): Promise<DoctorCheck[]> {
   return checks;
 }
 
+const STORAGE_OFF_FIX = 'Set up Cloudflare R2 (see DEPLOY.md) to turn on photos and daily backups.';
+
+/** Photo storage, its public address and the daily backups that go to the same bucket. */
 async function checkStorage(): Promise<DoctorCheck[]> {
   const checks: DoctorCheck[] = [];
+  if (getPartialEnv().STORAGE_DRIVER === 'none') {
+    const detail = 'STORAGE_DRIVER is none: the site runs without photos for now.';
+    return [
+      { id: 'storage', label: 'Photo storage', status: 'warn', detail, fix: STORAGE_OFF_FIX },
+      {
+        id: 'storage-public',
+        label: 'Public photo URL',
+        status: 'warn',
+        detail,
+        fix: STORAGE_OFF_FIX,
+      },
+      {
+        id: 'backups',
+        label: 'Backups',
+        status: 'warn',
+        detail: 'Daily backups are off because there is no bucket to write them to.',
+        fix: STORAGE_OFF_FIX,
+      },
+    ];
+  }
   const key = `${keyPrefix()}_doctor/${randomUUID()}.txt`;
   const body = new TextEncoder().encode('exquisite doctor');
   let storage;
@@ -244,6 +255,26 @@ async function checkStorage(): Promise<DoctorCheck[]> {
       detail: describe(error),
       fix: 'Check the R2 account id, bucket name and API token (it needs Object Read and Write on this bucket).',
     });
+    return checks;
+  }
+  if (storage.name === 'mongo') {
+    // Photos are served by the site itself, so there is no separate public address to test.
+    await storage.delete(key).catch(() => undefined);
+    checks.push(
+      {
+        id: 'storage-public',
+        label: 'Public photo URL',
+        status: 'pass',
+        detail: 'Photos are served by the site itself at /api/media (showcase storage in MongoDB).',
+      },
+      {
+        id: 'backups',
+        label: 'Backups',
+        status: 'warn',
+        detail: 'Showcase storage keeps photos in the database, so the daily backup is skipped.',
+        fix: STORAGE_OFF_FIX,
+      },
+    );
     return checks;
   }
   try {
@@ -276,11 +307,18 @@ async function checkStorage(): Promise<DoctorCheck[]> {
   } finally {
     await storage.delete(key).catch(() => undefined);
   }
+  checks.push({
+    id: 'backups',
+    label: 'Backups',
+    status: 'pass',
+    detail:
+      'The daily job writes every collection to the photo bucket under _backups/, 30 days kept.',
+  });
   return checks;
 }
 
 async function checkEmail(fetchImpl: typeof fetch): Promise<DoctorCheck[]> {
-  const env = getEnv();
+  const env = getPartialEnv();
   if (env.EMAIL_PROVIDER !== 'resend') {
     return [
       {
@@ -351,7 +389,7 @@ async function checkEmail(fetchImpl: typeof fetch): Promise<DoctorCheck[]> {
 }
 
 function checkCron(): DoctorCheck {
-  return getEnv().CRON_SECRET
+  return getPartialEnv().CRON_SECRET
     ? { id: 'cron', label: 'Daily job', status: 'pass', detail: 'CRON_SECRET is set.' }
     : {
         id: 'cron',

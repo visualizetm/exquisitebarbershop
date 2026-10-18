@@ -9,3 +9,12 @@ export const E2E_BARBER = {
   password: 'e2e-barber-long-phrase-correct-73',
   staffKey: 'marcus',
 };
+
+/**
+ * The owner the production-like run creates through /setup, from
+ * SEED_OWNER_EMAIL and SEED_OWNER_PASSWORD. Test-only values.
+ */
+export const PRODLIKE_OWNER = {
+  email: 'owner.prodlike@example.com',
+  password: 'prodlike-owner-long-phrase-correct-91',
+};

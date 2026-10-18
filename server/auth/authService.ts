@@ -187,6 +187,39 @@ export async function login(
   return { user, sessionId: session._id };
 }
 
+/** Demo sign-ins per address: enough to show the dashboard on a phone and a laptop, not to spray sessions. */
+export const DEMO_LOGIN_LIMIT = { limit: 30, windowMs: 15 * 60_000 };
+
+/**
+ * Demo mode only: a normal session for the seeded owner without a password, so the
+ * showcase opens in one click. The caller (the demo-only route) has already checked the mode.
+ */
+export async function loginAsDemoOwner(
+  res: ServerResponse,
+  meta: RequestMeta,
+): Promise<LoginResult> {
+  const hit = await rateLimitsRepo.hitRateLimit(
+    `demo-login:ip:${meta.ip}`,
+    DEMO_LOGIN_LIMIT,
+    meta.now,
+  );
+  if (!hit.allowed) {
+    throw new AppError('RATE_LIMITED', 'Too many attempts. Please wait and try again.', {
+      retryAfterSeconds: hit.retryAfterSeconds,
+    });
+  }
+  const owner = await usersRepo.findOwnerUser();
+  if (!owner?.isActive) throw new AppError('NOT_FOUND', 'No such endpoint');
+  await usersRepo.recordSuccessfulLogin(owner._id, meta.now, ipHashOf(meta.ip));
+  const session = await startSession(res, owner, {
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+    now: meta.now,
+  });
+  await auditLogin('success', { email: owner.email, userId: owner._id, reason: 'demo' }, meta);
+  return { user: owner, sessionId: session._id };
+}
+
 function weakPasswordError(problems: string[], path: string): AppError {
   return new AppError('VALIDATION_ERROR', 'Please choose a stronger password', {
     details: problems.map((message) => ({ path, message })),

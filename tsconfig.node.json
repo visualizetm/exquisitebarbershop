@@ -15,7 +15,9 @@
     "vite.config.ts",
     "vitest.config.ts",
     "eslint.config.js",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.prod.config.ts",
+    "playwright.demo.config.ts"
   ],
   "exclude": ["tests/e2e", "scripts/brand-assets.ts", "scripts/guide-pdf.ts"]
 }

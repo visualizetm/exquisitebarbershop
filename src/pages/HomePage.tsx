@@ -49,13 +49,15 @@ export function HomePage() {
             <span className="exq-hero__scrim" aria-hidden="true" />
           </>
         ) : (
-          <img
-            className="exq-hero__logo"
-            src="/brand/exq-primary-white.svg"
-            alt=""
-            width="500"
-            height="80"
-          />
+          <div className="exq-wrap exq-hero__brand">
+            <img
+              className="exq-hero__logo"
+              src="/brand/exq-primary-white.svg"
+              alt=""
+              width="500"
+              height="204"
+            />
+          </div>
         )}
         <div className="exq-wrap exq-hero__content exq-dark">
           <h1 className="exq-home__title exq-hero__title">Fresh cuts. Gifted hands.</h1>

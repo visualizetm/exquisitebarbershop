@@ -65,3 +65,15 @@ export async function apiRequest<T>(
   }
   return schema.parse(json);
 }
+
+/**
+ * A short, safe code for any failed request, for the "Details" line of the down screen: the
+ * API's own error code when it answered, otherwise what kind of failure it was. Never a value.
+ */
+export function errorCodeOf(error: unknown): string {
+  if (error instanceof ApiRequestError) return error.code;
+  if (error instanceof SyntaxError) return 'INVALID_RESPONSE';
+  if (error instanceof TypeError) return 'NETWORK_ERROR';
+  if (error instanceof Error && error.name === 'ZodError') return 'UNEXPECTED_RESPONSE';
+  return 'UNKNOWN_ERROR';
+}

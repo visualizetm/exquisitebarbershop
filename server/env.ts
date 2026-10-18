@@ -37,8 +37,19 @@ const envSchema = z.object({
   /** "off" lets tests drive outbox delivery by hand instead of right after the response. */
   OUTBOX_AFTER_RESPONSE: z.enum(['on', 'off']).default('on'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  /** Where photos live: Cloudflare R2 in production, the local disk in dev and tests. */
-  STORAGE_DRIVER: z.enum(['local', 'r2']).default('local'),
+  /**
+   * Where photos live: Cloudflare R2 in production, the local disk in dev and tests,
+   * "none" to run without photos until R2 exists, or "mongo" (MongoDB GridFS, demo mode only).
+   */
+  STORAGE_DRIVER: z.enum(['local', 'r2', 'none', 'mongo']).default('local'),
+  /**
+   * Showcase mode: the first request sets the shop up with sample data, the admin login
+   * offers a one-click demo sign-in, photos can live in MongoDB (STORAGE_DRIVER=mongo),
+   * and the site tells search engines not to index it. Never for a real launch.
+   */
+  DEMO_MODE: z.enum(['true', 'false']).default('false'),
+  /** Lets production launch with STORAGE_DRIVER=none on purpose, before R2 is set up. */
+  STORAGE_DISABLED_ACK: z.enum(['true', 'false']).default('false'),
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
@@ -105,9 +116,27 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
     );
     need(
       'STORAGE_DRIVER',
-      env.STORAGE_DRIVER === 'r2',
-      'STORAGE_DRIVER must be r2 on Vercel',
-      'Set STORAGE_DRIVER to r2. Vercel functions have no disk to keep photos on.',
+      env.STORAGE_DRIVER !== 'local',
+      'STORAGE_DRIVER must be r2, none or mongo on Vercel',
+      'Set STORAGE_DRIVER to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on.',
+    );
+  }
+  const demo = env.DEMO_MODE === 'true';
+  if (env.STORAGE_DRIVER === 'mongo' && environment === 'production') {
+    need(
+      'STORAGE_DRIVER',
+      demo,
+      'STORAGE_DRIVER is mongo without DEMO_MODE',
+      'Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md) for a real launch.',
+    );
+  }
+  // Demo mode says "no photos or email on purpose" by itself; the acknowledgements are for real launches.
+  if (env.STORAGE_DRIVER === 'none' && environment === 'production' && !demo) {
+    need(
+      'STORAGE_DISABLED_ACK',
+      env.STORAGE_DISABLED_ACK === 'true',
+      'STORAGE_DRIVER is none, so photos and daily backups are off',
+      'Either set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md), or set STORAGE_DISABLED_ACK=true to launch without photos and backups on purpose.',
     );
   }
   if (env.STORAGE_DRIVER === 'r2') {
@@ -126,7 +155,7 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
       );
     }
   }
-  if (environment === 'preview') {
+  if (environment === 'preview' && env.STORAGE_DRIVER === 'r2') {
     need(
       'R2_KEY_PREFIX',
       Boolean(env.R2_KEY_PREFIX),
@@ -147,7 +176,7 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
       'EMAIL_FROM is not set',
       'Set EMAIL_FROM to the sender, for example "Exquisite Barber & Beauty Lounge <bookings@yourdomain.com>", on a domain verified in Resend.',
     );
-  } else if (environment === 'production') {
+  } else if (environment === 'production' && !demo) {
     need(
       'EMAIL_DISABLED_ACK',
       env.EMAIL_DISABLED_ACK === 'true',
@@ -169,14 +198,58 @@ export function getEnv(): Env {
   return cached;
 }
 
-/** The deployment this process runs in. */
+/**
+ * The environment as far as it parses: every variable that is valid on its own,
+ * with the missing or wrong ones left out. For the few places that must work
+ * while the deployment is incomplete (the health check, the setup secret).
+ */
+export function getPartialEnv(): Partial<Env> {
+  if (cached) return cached;
+  const partial: Record<string, unknown> = {};
+  for (const [name, field] of Object.entries(envSchema.shape)) {
+    const value = field.safeParse(process.env[name]);
+    if (value.success) partial[name] = value.data;
+  }
+  return partial;
+}
+
+/**
+ * The environment and everything wrong with it, without throwing. A variable
+ * the schema rejects (missing MONGODB_URI, a short secret) is listed as a
+ * problem by name, so the health check and the doctor can say what to set.
+ */
+export function describeEnv(): { env: Env | null; problems: EnvProblem[] } {
+  const parsed = envSchema.safeParse(process.env);
+  if (!parsed.success) {
+    const seen = new Set<string>();
+    const problems: EnvProblem[] = [];
+    for (const issue of parsed.error.issues) {
+      const name = String(issue.path[0] ?? 'environment');
+      if (seen.has(name)) continue;
+      seen.add(name);
+      problems.push({
+        name,
+        message: issue.message,
+        fix: `Set ${name} in Vercel (Settings, Environment Variables; see DEPLOY.md), then redeploy.`,
+      });
+    }
+    return { env: null, problems };
+  }
+  return { env: parsed.data, problems: envProblems(parsed.data) };
+}
+
+/** The deployment this process runs in. Works while other variables are still missing. */
 export function currentEnvironment(): Environment {
-  return environmentOf(getEnv());
+  const env = getPartialEnv();
+  return environmentOf({
+    NODE_ENV: env.NODE_ENV ?? 'development',
+    ...(env.VERCEL_ENV ? { VERCEL_ENV: env.VERCEL_ENV } : {}),
+  });
 }
 
 /** The problems with this process's environment; the router refuses to serve while there are any. */
 export function currentEnvProblems(): EnvProblem[] {
-  return envProblems(getEnv());
+  return cached ? envProblems(cached) : describeEnv().problems;
 }
 
 /** Throws with every problem listed. Scripts call it before touching anything. */

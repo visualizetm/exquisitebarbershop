@@ -37,7 +37,10 @@ code structure must let these be added without a rewrite.
 - Vite + React + React Router with `BrowserRouter`. Real paths, never hash routes.
 - Vercel serverless functions in `/api`. Handlers are thin. Business logic lives in
   `/server`. All API traffic goes through one catch-all function
-  (`api/[...path].ts`) and the router in `server/http`.
+  (`api/[...path].js`, plain JavaScript that loads the committed bundle
+  `server/bundle/app.mjs`, built from `server/vercel-entry.ts` by `npm run build:api`) and the
+  router in `server/http`. Vercel runs the function with plain Node ESM, so nothing under
+  `server/` ships as loose files; `npm run test:vercel-function` proves the bundle runs that way.
 - MongoDB with the official driver. The client is cached on `globalThis`.
   Multi-document writes use transactions through `withTransaction`.
 - zod for every request, response and document schema, shared between client and

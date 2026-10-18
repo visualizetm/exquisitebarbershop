@@ -122,6 +122,13 @@ a:hover {
   outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
+/* Headings take focus after a route change or a step change so assistive tech lands on
+   them; they are not operable, so they never draw a ring. Controls keep theirs. */
+h1[tabindex='-1']:focus,
+h2[tabindex='-1']:focus,
+.exq-main:focus {
+  outline: none;
+}
 
 .exq-skip-link {
   position: absolute;
