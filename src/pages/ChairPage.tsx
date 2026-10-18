@@ -8,7 +8,14 @@ import {
 } from '@shared/api/public';
 import { priceLabel } from '@shared/lib/money';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
-import { ButtonLink, Chips, ErrorState, PhotoArch, StickyCTA, TimeChipLink } from '@/components/ui';
+import {
+  ButtonLink,
+  Chips,
+  ErrorState,
+  PhotoFrame,
+  StickyCTA,
+  TimeChipLink,
+} from '@/components/ui';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
@@ -48,7 +55,7 @@ export function ChairPage() {
         <ErrorState
           title={notFound ? 'That chair is no longer listed' : undefined}
           action={
-            <ButtonLink to="/chairs" variant="secondary">
+            <ButtonLink to="/chairs" variant="outline">
               See all chairs
             </ButtonLink>
           }
@@ -70,7 +77,7 @@ export function ChairPage() {
     <article className="exq-chair exq-wrap exq-section" data-state="ready">
       <div className="exq-chair__top">
         <div className="exq-chair__photo">
-          <PhotoArch
+          <PhotoFrame
             photo={staff.photo ?? null}
             name={staff.name}
             priority

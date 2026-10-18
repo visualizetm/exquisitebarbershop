@@ -221,7 +221,7 @@ export function PhotoManager({
               />
               <p className="exq-adm-photos__actions">
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   aria-label={`Move ${photo.alt} up`}
                   disabled={index === 0}
@@ -231,7 +231,7 @@ export function PhotoManager({
                   Up
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   aria-label={`Move ${photo.alt} down`}
                   disabled={index === photos.length - 1}
@@ -241,7 +241,7 @@ export function PhotoManager({
                   Down
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   aria-label={`Remove ${photo.alt}`}
                   icon={<Trash01 aria-hidden="true" />}
@@ -273,7 +273,7 @@ export function PhotoManager({
             Remove it
           </Button>
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => {
               setRemoving(null);
             }}
@@ -305,7 +305,7 @@ function AltEditor({ photo, onSave }: { photo: AdminPhotoView; onSave: (alt: str
           setValue(e.target.value);
         }}
       />
-      <Button type="submit" variant="secondary" size="sm" disabled={value.trim() === photo.alt}>
+      <Button type="submit" variant="outline" size="sm" disabled={value.trim() === photo.alt}>
         Save
       </Button>
     </form>

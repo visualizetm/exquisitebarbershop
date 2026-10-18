@@ -1,6 +1,6 @@
 /*
- * Global type and layout. Colors come from the semantic tokens in tokens.css,
- * which also carry the dark theme; nothing here names a color.
+ * Global type and layout. Colors come from the semantic tokens in tokens.css, which
+ * also carry the dark theme; nothing here names a color or a duration.
  */
 
 /* Brand marks follow the theme without JavaScript: one file per theme, the other hidden. */
@@ -13,6 +13,12 @@
 [data-theme='dark'] .exq-mark--dark {
   display: inline-block;
 }
+[data-theme='light'] .exq-mark--light {
+  display: inline-block;
+}
+[data-theme='light'] .exq-mark--dark {
+  display: none;
+}
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .exq-mark--light {
     display: none;
@@ -21,29 +27,26 @@
     display: inline-block;
   }
 }
-
-/* A short color fade only while the theme switches, never under reduced motion. */
-@media (prefers-reduced-motion: no-preference) {
-  html[data-theme-switching],
-  html[data-theme-switching] * {
-    transition:
-      background-color 150ms,
-      color 150ms,
-      border-color 150ms !important;
-  }
+/* A mark inside an ink band is always the white one, in either theme. */
+.exq-dark .exq-mark--light {
+  display: none;
+}
+.exq-dark .exq-mark--dark {
+  display: inline-block;
 }
 
 html {
   font-family: var(--font);
-  font-size: var(--fs-2);
-  line-height: var(--lh-body);
+  font-size: var(--t-body);
+  line-height: 1.55;
   color: var(--fg);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+  scroll-padding-top: calc(var(--s9) + var(--s2));
 }
-
 body {
   font-family: var(--font);
+  font-size: var(--t-body);
   color: var(--fg);
   background: var(--bg);
 }
@@ -51,11 +54,13 @@ body {
 .exq-app {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   flex-direction: column;
   background: var(--bg);
   color: var(--fg);
+  /* The phone bottom bar never covers the end of a page. */
+  padding-bottom: var(--bar-h);
 }
-
 .exq-main {
   flex: 1 0 auto;
   /* Keeps the footer below the first screen while a page loads, so nothing jumps. */
@@ -64,39 +69,48 @@ body {
   outline: none;
 }
 
+/* Headings are caps and heavy. */
 h1,
 h2,
 h3,
 h4,
 .exq-h {
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: -0.01em;
-  line-height: var(--lh-tight);
+  letter-spacing: -0.015em;
+  line-height: 1;
+  text-wrap: balance;
 }
 h1,
-.exq-h1 {
-  font-size: var(--fs-6);
-}
 h2,
 .exq-h2 {
-  font-size: var(--fs-5);
+  font-size: var(--t-h2);
 }
 h3,
-.exq-h3 {
-  font-size: var(--fs-4);
-}
 h4,
-.exq-h4 {
-  font-size: var(--fs-3);
+.exq-h3 {
+  font-size: var(--t-h3);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+}
+.exq-display {
+  font-size: var(--t-display);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
 }
 
-/* Section labels sit above a heading and never above the hero H1. */
+/* The red caps label that sits above a heading. */
 .exq-label {
-  font-size: var(--fs-1);
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.3;
   text-transform: uppercase;
+  color: var(--accent-text);
+}
+.exq-label--quiet {
   color: var(--fg-3);
 }
 
@@ -104,15 +118,23 @@ h4,
 .exq-num {
   font-variant-numeric: tabular-nums;
 }
-
+.exq-price {
+  font-size: var(--t-price);
+  font-weight: 700;
+  line-height: 1.1;
+}
 .exq-muted {
   color: var(--fg-2);
+}
+.exq-small {
+  font-size: var(--t-label);
+  line-height: 1.4;
 }
 
 a {
   color: inherit;
   text-decoration-thickness: 1px;
-  text-underline-offset: 0.15em;
+  text-underline-offset: 0.18em;
 }
 a:hover {
   color: var(--accent-text);
@@ -133,28 +155,21 @@ h2[tabindex='-1']:focus,
 .exq-skip-link {
   position: absolute;
   left: var(--s4);
-  top: -100px;
+  top: calc(var(--s9) * -2);
   z-index: 100;
   padding: var(--s2) var(--s4);
-  background: var(--selected-bg);
-  color: var(--selected-fg);
+  background: var(--solid-bg);
+  color: var(--solid-fg);
   border-radius: var(--r-pill);
 }
 .exq-skip-link:focus {
   top: var(--s4);
 }
 
-/* A full-bleed surface that takes its colors from the current scope (ink when .exq-dark). */
-.exq-band {
-  background: var(--bg);
-  color: var(--fg);
-  border-top: 1px solid var(--band-border);
-}
-
 /* Page width and gutters. */
 .exq-wrap {
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--wrap);
   margin-inline: auto;
   padding-inline: var(--s4);
 }
@@ -163,80 +178,138 @@ h2[tabindex='-1']:focus,
     padding-inline: var(--s6);
   }
 }
-
 .exq-section {
   padding-block: var(--s7);
 }
 @media (min-width: 1024px) {
   .exq-section {
-    padding-block: var(--s8);
+    padding-block: var(--s9);
   }
 }
 
-/* Transitions only on state changes, short, and off when motion is reduced. */
-.exq-t {
-  transition:
-    background-color 150ms,
-    border-color 150ms,
-    color 150ms,
-    filter 150ms,
-    transform 150ms,
-    opacity 150ms;
-}
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition: none !important;
-    animation: none !important;
-  }
+/* A full-bleed surface that takes its colors from the current scope (ink when .exq-dark). */
+.exq-band {
+  background: var(--bg);
+  color: var(--fg);
+  border-top: 1px solid var(--band-line);
 }
 
-/* Loading placeholders. */
+/* Loading placeholders: still blocks, nothing loops. */
 .exq-skeleton {
   background: var(--card-2);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-card);
   color: transparent;
+  user-select: none;
 }
 
-/* The existing unstyled status line. */
+/* The status line used while a page loads or fails. */
 .exq-status {
-  padding: var(--s4);
+  padding: var(--s5) var(--s4);
   color: var(--fg-2);
 }
 .exq-status[data-state='error'] {
-  color: var(--danger);
+  color: var(--accent-text);
 }
 
-/* Legacy public buttons and links from prompts 1 and 2 pick up the kit look. */
-.exq-button {
+/* Lists the page controls itself. */
+.exq-bare {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A sideways strip on phones that becomes a grid from 768px. */
+.exq-strip {
+  display: flex;
+  gap: var(--s4);
+  margin-inline: calc(var(--s4) * -1);
+  padding-inline: var(--s4);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--s4);
+  scrollbar-width: none;
+  padding-bottom: var(--s2);
+}
+.exq-strip::-webkit-scrollbar {
+  display: none;
+}
+.exq-strip > * {
+  flex: 0 0 68%;
+  max-width: 280px;
+  scroll-snap-align: start;
+}
+@media (min-width: 768px) {
+  .exq-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+    gap: var(--s5);
+  }
+  .exq-strip > * {
+    flex: none;
+    max-width: none;
+  }
+}
+@media (min-width: 1024px) {
+  .exq-strip[data-lg='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .exq-strip[data-lg='6'] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+/* Equal columns. data-cols on phones, data-md from 768px, data-lg from 1024px. */
+.exq-grid {
+  display: grid;
+  gap: var(--s4);
+  grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr));
+}
+.exq-grid[data-cols='2'] {
+  --cols: 2;
+}
+.exq-grid[data-md='2'] {
+  --cols-md: 2;
+}
+.exq-grid[data-md='3'] {
+  --cols-md: 3;
+}
+.exq-grid[data-lg='2'] {
+  --cols-lg: 2;
+}
+.exq-grid[data-lg='3'] {
+  --cols-lg: 3;
+}
+.exq-grid[data-lg='4'] {
+  --cols-lg: 4;
+}
+@media (min-width: 768px) {
+  .exq-grid {
+    gap: var(--s5);
+    grid-template-columns: repeat(var(--cols-md, var(--cols, 1)), minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .exq-grid {
+    grid-template-columns: repeat(var(--cols-lg, var(--cols-md, var(--cols, 1))), minmax(0, 1fr));
+  }
+}
+
+/* "Back to the top" and similar quiet inline links. */
+.exq-link-row {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: var(--s2);
-  min-height: 44px;
-  padding: var(--s2) var(--s5);
-  border: 1px solid var(--fg);
-  border-radius: var(--r-pill);
-  background: transparent;
-  color: var(--fg);
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
+  min-height: var(--hit);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: var(--t-label);
 }
-.exq-button--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--paper);
-}
-.exq-button:hover {
-  filter: brightness(1.1);
-  color: inherit;
-}
-.exq-button--primary:hover {
-  color: var(--paper);
-}
-.exq-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+
+/* Something that only matters when scripts or styles fail to load. */
+noscript .exq-noscript {
+  padding: var(--s5) var(--s4);
 }

@@ -50,7 +50,7 @@ export function VisitPage() {
                 </ButtonAnchor>
                 <ButtonAnchor
                   href={`tel:${result.data.phone}`}
-                  variant="secondary"
+                  variant="outline"
                   icon={<Phone aria-hidden="true" />}
                 >
                   Call

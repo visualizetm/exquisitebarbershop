@@ -60,7 +60,7 @@ export function GalleryPage() {
           action={
             <ButtonAnchor
               href="https://instagram.com/exquisitebarberbeauty"
-              variant="secondary"
+              variant="outline"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -74,7 +74,7 @@ export function GalleryPage() {
       {list.rows.length > 0 ? <PhotoGrid photos={list.rows} firstPriority /> : null}
       {list.hasMore ? (
         <p className="exq-gallery__more">
-          <Button variant="secondary" onClick={() => void list.loadMore()}>
+          <Button variant="outline" onClick={() => void list.loadMore()}>
             Load more
           </Button>
         </p>

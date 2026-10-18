@@ -271,3 +271,21 @@ commit, and what is still open.
   replay, the demo flow end to end) as a required CI step with a bundle freshness check; the
   production-like e2e servers load the real function file; DEPLOY.md, SITE-REPORT, CLAUDE.md.
 - Open: merge, let Vercel deploy, open `/api/health`: JSON, not an error page.
+
+## Prompt 10
+
+### M1: tokens, kit and /kit
+
+- Shipped: `src/styles/tokens.css` rewritten (one variables file, the Shop Sign palette, the six
+  type sizes, motion tokens, dark values per the brief); `@fontsource-variable/jost` replaces the
+  three static weights; `base.css`, `kit.css`, `frame.css`, `motion.css` split by job; the kit
+  rebuilt (Button variants primary, accent, outline, ghost, onink; OptionCard, Label,
+  SectionHead, PriceRow, PhotoFrame, ChairCard, StepBar with numbers, Ticket with a drawn check,
+  Toast with pause on hover, Dialog under Sheet, Modal and Lightbox, Reveal and Lines, TopStrip,
+  Header, MobileMenu, BottomBar); `/kit` shows every component in every state in both themes;
+  `docs/DESIGN-SYSTEM.md` and `docs/brand/DESIGN-DIRECTION-V2.md`; `announcement` in shop settings
+  and the public shop response (the editor is prompt 11's).
+- Transitional: `src/styles/legacy.css` aliases the old token names for the pages not yet rebuilt
+  (removed in M4); the old Nav, Footer and StickyCTA still run until M2.
+- Tests: `tests/unit/motionCss.test.ts` (durations from tokens, allowed animated properties, no
+  loops but the spinner, no literal colors or font sizes in the kit stylesheets).

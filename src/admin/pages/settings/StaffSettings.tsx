@@ -223,7 +223,7 @@ function StaffRow({
       </span>
       {deleted ? null : (
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           onClick={() => {
             setOpen(true);

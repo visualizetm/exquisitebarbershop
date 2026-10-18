@@ -508,3 +508,36 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   same builder and tracer locally. What is not proven: that Vercel's platform hands the
   function the original request path after a rewrite (the documented Express-on-Vercel pattern
   relies on it), which the first deploy's `/api/health` and `/api/staff/marcus` will confirm.
+
+## Prompt 10: redesign, motion, phone bar, Cloudinary
+
+- D10-01 Branch from main after PR 4 merged (main = 17fa43d), branch `claude/p10-shop-sign-redesign`.
+- D10-02 The mockup board (`docs/brand/website/exq_site_mobile_board.png`) and `docs/brand/BRAND.md`
+  are not in the repository, so the written brief is the source; it is saved as
+  `docs/brand/DESIGN-DIRECTION-V2.md`.
+- D10-03 Tokens follow the brief exactly, with three additions the brief did not list but needs:
+  `--mute-on-dark` (#A8A8A8, 7.6:1 on ink, for gray text on ink because `--text-3` is only 3.5:1 on
+  #111), `--hit` (44px tap target) and `--rule` (2px). `--t-display` uses `clamp(40px, 13.4vw, 52px)` so
+  it is 52px from 385px wide and EXQUISITE (9 heavy caps) never clips on a 360px phone.
+- D10-04 In dark, `--card-2` is `--ink-2`, not `--ink-3`: red text (#FF5470) on #333 is 4.1:1 and failed
+  axe. Borders stay #333.
+- D10-05 Button text is label size (13px, 600, caps, +14% tracking) everywhere, including the bottom
+  bar: it is the only size in the scale that fits "CONFIRM BOOKING" in half of a 390px screen.
+- D10-06 The dark theme keeps explicit values in two blocks (the attribute and the media query)
+  instead of `light-dark()`, which iOS before 17.5 ignores; a missing declaration there would drop all
+  colors on an older iPhone.
+- D10-07 Every `transition` and `animation` lives in `motion.css`, inside
+  `prefers-reduced-motion: no-preference`, so reduced motion is one switch and the rules are testable.
+  The check mark draws with `stroke-dashoffset`, the one property besides transform, opacity and
+  clip-path (the brief asks for it by name).
+- D10-08 No animation library. Sheet drag-to-close is not built (a tap on the backdrop, the X and
+  Escape close it); the lightbox swipes with CSS scroll snap, so nothing needed a library.
+- D10-09 Toasts leave after 4s; a toast with an Undo action stays 7s so the action is usable (hover and
+  focus pause both).
+- D10-10 Dialogs are the native `<dialog>` with `@starting-style` and `allow-discrete` transitions.
+  Browsers without them open and close instantly; content stays mounted for `--d-fast` so the exit
+  does not show an empty box.
+- D10-11 The announcement is stored as `{ enabled, text, linkLabel, linkUrl }` in shop settings
+  (default "Walk ins welcome" with a "Book online" link to `/book`). Older settings documents get
+  the default on read, so nothing needs a migration. The strip is an empty ink bar while shop data
+  loads so the page does not shift.

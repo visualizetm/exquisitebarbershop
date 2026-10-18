@@ -90,7 +90,7 @@ export function SchedulePage() {
           ))}
         </select>{' '}
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           onClick={() => {
             setBlocking(true);

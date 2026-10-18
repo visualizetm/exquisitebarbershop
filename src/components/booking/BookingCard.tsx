@@ -75,7 +75,7 @@ export function BookingCard({
         </strong>
       </p>
       <Button
-        variant="emphasis"
+        variant="accent"
         size="lg"
         block
         disabled={!canConfirm}

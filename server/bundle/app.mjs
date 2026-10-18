@@ -27786,6 +27786,30 @@ var featureFlagsSchema = external_exports.object({
   rewards: external_exports.boolean().default(false),
   smsReminders: external_exports.boolean().default(false)
 });
+var announcementLinkSchema = external_exports.string().trim().max(200).refine(
+  (v) => v === "" || v.startsWith("/") && !v.startsWith("//") || v.startsWith("https://"),
+  {
+    message: "Use a path such as /book or an https address"
+  }
+);
+var announcementSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  text: external_exports.string().trim().max(80),
+  linkLabel: external_exports.string().trim().max(30),
+  linkUrl: announcementLinkSchema
+}).refine((a) => !a.enabled || a.text.length > 0, {
+  path: ["text"],
+  message: "Add the announcement text, or switch it off"
+}).refine((a) => a.linkLabel === "" === (a.linkUrl === ""), {
+  path: ["linkUrl"],
+  message: "Give the link both a label and an address, or leave both empty"
+});
+var DEFAULT_ANNOUNCEMENT = {
+  enabled: true,
+  text: "Walk ins welcome",
+  linkLabel: "Book online",
+  linkUrl: "/book"
+};
 var shopSettingsDocumentSchema = external_exports.object({
   _id: external_exports.literal(SHOP_SETTINGS_ID),
   name: nonEmptyText(120),
@@ -27800,6 +27824,7 @@ var shopSettingsDocumentSchema = external_exports.object({
   notifications: notificationSettingsSchema,
   features: featureFlagsSchema,
   permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
+  announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
   nextOpenServiceId: idSchema.nullable().default(null)
 }).extend(timestampsSchema.shape);
@@ -28574,7 +28599,8 @@ function fill(doc) {
   return {
     ...doc,
     permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
-    nextOpenServiceId: stored.nextOpenServiceId ?? null
+    nextOpenServiceId: stored.nextOpenServiceId ?? null,
+    announcement: stored.announcement ?? DEFAULT_ANNOUNCEMENT
   };
 }
 function withDefaults(doc) {
@@ -30509,6 +30535,13 @@ var shopSettingsSeed = {
     giftCards: false,
     rewards: false,
     smsReminders: false
+  },
+  // PLACEHOLDER the owner edits this in prompt 11; until then the strip says this
+  announcement: {
+    enabled: true,
+    text: "Walk ins welcome",
+    linkLabel: "Book online",
+    linkUrl: "/book"
   }
 };
 var ownerLoginSeed = {
@@ -32166,6 +32199,8 @@ var publicShopSchema = external_exports.object({
     /** Customers may cancel or move online until this many minutes before the start. */
     cancelCutoffMinutes: external_exports.int()
   }),
+  /** The line in the strip above the header. Absent from older responses; the client then shows none. */
+  announcement: announcementSchema.optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
@@ -36803,6 +36838,7 @@ var publicRoutes = [
           requireEmail: settings.booking.requireEmail,
           cancelCutoffMinutes: settings.booking.cancelCutoffMinutes
         },
+        announcement: settings.announcement,
         heroPhoto: hero,
         maintenance: getEnv2().MAINTENANCE_MODE === "true",
         demo: demoEnabled()

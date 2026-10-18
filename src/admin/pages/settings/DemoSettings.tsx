@@ -36,7 +36,7 @@ export function DemoSettings() {
       </p>
       <ErrorNote error={error} />
       <Button
-        variant="secondary"
+        variant="outline"
         onClick={() => {
           setConfirming(true);
         }}
@@ -56,7 +56,7 @@ export function DemoSettings() {
             Reset it
           </Button>
           <Button
-            variant="secondary"
+            variant="outline"
             onClick={() => {
               setConfirming(false);
             }}

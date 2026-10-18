@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { idSchema, slugSchema, weekHoursSchema } from '../schemas/common';
 import { serviceGroupSchema } from '../schemas/service';
-import { addressSchema } from '../schemas/shopSettings';
+import { addressSchema, announcementSchema } from '../schemas/shopSettings';
 import { staffRoleSchema } from '../schemas/staff';
 import { photoViewSchema } from './photos';
 
@@ -25,6 +25,8 @@ export const publicShopSchema = z.object({
     /** Customers may cancel or move online until this many minutes before the start. */
     cancelCutoffMinutes: z.int(),
   }),
+  /** The line in the strip above the header. Absent from older responses; the client then shows none. */
+  announcement: announcementSchema.optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */

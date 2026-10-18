@@ -211,7 +211,7 @@
   accent-color: var(--accent);
 }
 .exq-adm
-  button:not(.exq-btn):not(.exq-chip):not(.exq-seg__btn):not(.exq-sheet__close):not(
+  button:not(.exq-btn):not(.exq-chip):not(.exq-seg__btn):not(.exq-dialog__close):not(
     .exq-toast__action
   ):not(.exq-adm-tabs__tab):not(.exq-stepbar__button) {
   display: inline-flex;

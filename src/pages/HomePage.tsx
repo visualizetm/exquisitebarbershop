@@ -71,7 +71,7 @@ export function HomePage() {
             </ButtonLink>
             <ButtonAnchor
               href={phone ? `tel:${phone}` : '/visit'}
-              variant="inverse"
+              variant="onink"
               size="lg"
               icon={<Phone aria-hidden="true" />}
             >
@@ -128,7 +128,7 @@ export function HomePage() {
               <p className="exq-visit__actions">
                 <ButtonAnchor
                   href={directionsUrl(shop.data.address)}
-                  variant="secondary"
+                  variant="outline"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -136,7 +136,7 @@ export function HomePage() {
                 </ButtonAnchor>
                 <ButtonAnchor
                   href={`tel:${shop.data.phone}`}
-                  variant="secondary"
+                  variant="outline"
                   icon={<Phone aria-hidden="true" />}
                 >
                   {formatUsPhone(shop.data.phone)}
@@ -151,7 +151,7 @@ export function HomePage() {
         <div className="exq-wrap exq-section">
           <h2 id="exq-home-cta">Your chair is ready.</h2>
           <p>
-            <ButtonLink to="/book" variant="inverse" size="lg">
+            <ButtonLink to="/book" variant="onink" size="lg">
               Book a chair
             </ButtonLink>
           </p>

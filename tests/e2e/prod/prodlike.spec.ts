@@ -152,7 +152,7 @@ test('every public page loads fully with placeholders and no console errors', as
   await page.goto('/chairs/marcus');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
-  await expect(page.locator('.exq-chair .exq-arch[data-state="placeholder"]')).toBeVisible();
+  await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await expect(page.locator('.exq-chair__work')).toHaveCount(0);
 
   await page.goto('/gallery');

@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from 'react';
 
-/** A bordered surface. Dark mode drops the shadow. */
+/** A bordered surface. States: static, interactive (lifts on hover, desktop only). */
 export function Card({
   pad = 'md',
   interactive = false,

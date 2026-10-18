@@ -215,7 +215,7 @@ export function ManagePage() {
               Reschedule
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               disabled={!data.canCancel}
               onClick={() => {
                 setMode('cancel');
@@ -257,7 +257,7 @@ export function ManagePage() {
               {working ? 'Cancelling' : 'Yes, cancel it'}
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               disabled={working}
               onClick={() => {
                 setMode('view');
@@ -348,7 +348,7 @@ export function ManagePage() {
               {working ? 'Moving' : newSlot ? `Move to ${slotLabel(newSlot)}` : 'Choose a time'}
             </Button>
             <Button
-              variant="secondary"
+              variant="outline"
               disabled={working}
               onClick={() => {
                 setMode('view');
@@ -369,7 +369,7 @@ export function ManagePage() {
           {ticket}
           <p>
             <Button
-              variant="secondary"
+              variant="outline"
               onClick={() => {
                 setMode('view');
               }}

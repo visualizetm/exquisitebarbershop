@@ -354,7 +354,7 @@ export function BookPage() {
                 ) : (
                   <p>
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       onClick={() => {
                         goTo('day');
                       }}
@@ -382,7 +382,7 @@ export function BookPage() {
             </StickyCTA>
             <p className="exq-book-confirm__actions">
               <Button
-                variant="secondary"
+                variant="outline"
                 disabled={submitting}
                 onClick={() => {
                   goTo('details');
@@ -426,7 +426,7 @@ export function BookPage() {
                   <IcsDownload booking={booked} shop={shop.data} manageUrl={manageUrl} />
                   <Link
                     className="exq-btn"
-                    data-variant="secondary"
+                    data-variant="outline"
                     data-size="md"
                     to={confirmation.managePath}
                   >
