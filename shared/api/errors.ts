@@ -27,6 +27,8 @@ export const ERROR_CODES = {
   IDEMPOTENCY_IN_PROGRESS: 409,
   BOOKING_NOT_CANCELLABLE: 409,
   BOOKING_CANCELLED: 410,
+  /** A barber who was removed from the schedule: their address still works and sends people to booking. */
+  STAFF_REMOVED: 410,
   BOOKING_NOT_RESCHEDULABLE: 409,
   SHOP_CLOSED: 409,
   OUTSIDE_BOOKING_WINDOW: 409,
@@ -81,6 +83,8 @@ export const apiErrorSchema = z.object({
           customerName: z.string(),
           services: z.array(z.string()),
           hasEmail: z.boolean(),
+          /** Chairs that do every service of this booking and are free for all of it: where it can move. */
+          moveOptions: z.array(z.object({ staffId: z.string(), staffName: z.string() })).optional(),
         }),
       )
       .optional(),

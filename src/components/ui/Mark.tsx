@@ -9,7 +9,16 @@ export function Mark({
   width,
   height,
 }: {
-  name: 'primary' | 'wordmark' | 'stacked' | 'q-icon' | 'seal' | 'pole' | 'pill';
+  name:
+    | 'primary'
+    | 'wordmark'
+    | 'stacked'
+    | 'q-icon'
+    | 'seal'
+    | 'crest'
+    | 'disc'
+    | 'arched'
+    | 'lockup-vertical';
   alt?: string;
   className?: string;
   width: number;

@@ -4,7 +4,7 @@ import { getDb } from '../db/client';
 import { getEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { auditLogRepo, systemStateRepo } from '../repos';
-import { ensureDemoReady, resetDemoData, seedSampleBookings } from './demo';
+import { ensureDemoReady, resetDemoData, seedDemoPins, seedSampleBookings } from './demo';
 import { runSeed } from './seedService';
 
 const SYSTEM: Actor = { type: 'system', userId: null, staffId: null };
@@ -60,6 +60,7 @@ export async function bootstrap(
   const created: Record<string, boolean | number | string> = { ...summary, indexes: true };
   if (demo && !demoRecord) {
     created.sampleBookings = await seedSampleBookings(now);
+    created.demoPins = await seedDemoPins(now);
     await systemStateRepo.recordDemoSeed(now);
     created.demo = true;
   }

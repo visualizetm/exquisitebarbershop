@@ -2,23 +2,20 @@ import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { Status } from '@/components/Status';
 import { DemoBanner } from '@/components/site/DemoBanner';
 import '@/styles/admin.css';
-import { AdminNav } from './components/AdminNav';
-import { AccountPage } from './pages/AccountPage';
+import '@/styles/dashboard.css';
 import { AuditPage } from './pages/AuditPage';
-import { BlockTimePage } from './pages/BlockTimePage';
-import { BookingDetailPage } from './pages/BookingDetailPage';
-import { BookingsPage } from './pages/BookingsPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
-import { CustomersPage } from './pages/CustomersPage';
+import { CustomersPage } from './customers/CustomersPage';
 import { LoginPage } from './pages/LoginPage';
-import { MySchedulePage } from './pages/MySchedulePage';
-import { NewBookingPage } from './pages/NewBookingPage';
 import { OutboxPage } from './pages/OutboxPage';
-import { PhotosPage } from './pages/PhotosPage';
-import { SchedulePage } from './pages/SchedulePage';
-import { TodayPage } from './pages/TodayPage';
-import { WhosInPage } from './pages/WhosInPage';
-import { SettingsPage } from './pages/settings/SettingsPage';
+import { SchedulePage } from './schedule/SchedulePage';
+import { SettingsPage } from './settings/SettingsPage';
+import { WebsitePage } from './website/WebsitePage';
+import { BookingsPage } from './bookings/BookingsPage';
+import { OverviewPage } from './overview/OverviewPage';
+import { TeamDetailPage } from './team/TeamDetailPage';
+import { TeamPage } from './team/TeamPage';
+import { AdminShell } from './shell/AdminShell';
 import { SessionProvider } from './session';
 import { useSession } from './useSession';
 
@@ -68,14 +65,21 @@ function Gate() {
   }
   if (onLogin) return <Navigate to="/admin" replace />;
 
-  const isOwner = state.me.user.role === 'owner';
-  return (
-    <div className="exq-adm" data-state={isOwner ? 'owner' : 'barber'}>
-      <AdminNav />
-      <div className="exq-adm__content">
+  if (state.me.user.role === 'owner') {
+    return (
+      <AdminShell>
         {state.me.features.demo ? <DemoBanner /> : null}
-        {isOwner ? <OwnerRoutes /> : <BarberRoutes />}
-      </div>
+        <OwnerRoutes />
+      </AdminShell>
+    );
+  }
+  // Barbers sign in with a PIN at /team. A barber login cannot open a session here at all, so this
+  // is only reached by a session that predates the PIN portal.
+  return (
+    <div className="exq-adm" data-state="barber">
+      <p>
+        Barbers sign in at <a href="/team">/team</a> with a PIN.
+      </p>
     </div>
   );
 }
@@ -83,32 +87,22 @@ function Gate() {
 function OwnerRoutes() {
   return (
     <Routes>
-      <Route index element={<TodayPage />} />
+      <Route index element={<OverviewPage />} />
       <Route path="schedule" element={<SchedulePage />} />
       <Route path="bookings" element={<BookingsPage />} />
-      <Route path="bookings/new" element={<NewBookingPage />} />
-      <Route path="bookings/:id" element={<BookingDetailPage />} />
-      <Route path="block" element={<BlockTimePage />} />
-      <Route path="whos-in" element={<WhosInPage />} />
+      <Route path="bookings/:id" element={<BookingsPage />} />
+      <Route path="team" element={<TeamPage />} />
+      <Route path="team/:id" element={<TeamDetailPage />} />
+      <Route path="website" element={<WebsitePage />} />
       <Route path="customers" element={<CustomersPage />} />
-      <Route path="photos" element={<PhotosPage />} />
-      <Route path="settings/*" element={<SettingsPage />} />
+      <Route path="customers/:phone" element={<CustomersPage />} />
+      <Route path="photos" element={<Navigate to="/admin/website?tab=gallery" replace />} />
+      <Route path="settings" element={<SettingsPage />} />
+      <Route path="settings/*" element={<Navigate to="/admin/settings" replace />} />
       <Route path="audit" element={<AuditPage />} />
       <Route path="outbox" element={<OutboxPage />} />
-      <Route path="account" element={<AccountPage />} />
+      <Route path="account" element={<Navigate to="/admin/settings?tab=account" replace />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />
-    </Routes>
-  );
-}
-
-function BarberRoutes() {
-  return (
-    <Routes>
-      <Route index element={<Navigate to="/admin/me" replace />} />
-      <Route path="me" element={<MySchedulePage />} />
-      <Route path="me/bookings/:id" element={<BookingDetailPage mine />} />
-      <Route path="account" element={<AccountPage />} />
-      <Route path="*" element={<Navigate to="/admin/me" replace />} />
     </Routes>
   );
 }

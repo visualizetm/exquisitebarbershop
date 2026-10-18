@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link } from './Link';
 
 interface Common {
   label: string;

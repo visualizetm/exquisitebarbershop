@@ -144,7 +144,7 @@ async function main(): Promise<void> {
   }
 
   // Staff routes need a session.
-  for (const path of ['/api/admin/today', '/api/me/schedule', '/api/admin/photos']) {
+  for (const path of ['/api/admin/today', '/api/team/today', '/api/admin/photos']) {
     try {
       const res = await get(path);
       record(`Signed out ${path}`, res.status === 401, `${res.status}`);

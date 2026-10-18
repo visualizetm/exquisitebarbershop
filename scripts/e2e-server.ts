@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { E2E_BARBER, E2E_OWNER } from './e2e-accounts';
+import { E2E_BARBER_PIN, E2E_OWNER } from './e2e-accounts';
 
 /**
  * Everything the end to end tests need, in one process tree: an in-memory
@@ -29,24 +29,18 @@ async function main(): Promise<void> {
   const { getDb, closeMongoClient } = await import('../server/db/client');
   const { runSeed } = await import('../server/services/seedService');
   const { createDevServer } = await import('../server/http/dev-adapter');
-  const { hashPassword } = await import('../server/auth/password');
-  const { usersRepo } = await import('../server/repos');
-  const { staffSeedId } = await import('../seed/shop');
+  const { hashPin } = await import('../server/auth/pin');
+  const { staffPinsRepo } = await import('../server/repos');
+  const { staffSeed, staffSeedId } = await import('../seed/shop');
   await runSeed(await getDb(), new Date(), {
     ownerEmail: E2E_OWNER.email,
     ownerPassword: E2E_OWNER.password,
   });
-  // A barber login that already chose its password, so the tests sign straight in.
-  await usersRepo.insertUser(
-    {
-      email: E2E_BARBER.email,
-      passwordHash: await hashPassword(E2E_BARBER.password),
-      role: 'barber',
-      staffId: staffSeedId(E2E_BARBER.staffKey),
-      mustChangePassword: false,
-    },
-    new Date(),
-  );
+  // Every barber has already chosen a PIN, so the tests sign straight in at /team.
+  for (const member of staffSeed) {
+    const id = staffSeedId(member.key);
+    await staffPinsRepo.upsertPin(id, await hashPin(id, E2E_BARBER_PIN), new Date());
+  }
 
   // Playwright calls this once per run, so reruns never share rate-limit windows or lockouts.
   // Test-only: it lives in this script, never in the API, and production limits are untouched.

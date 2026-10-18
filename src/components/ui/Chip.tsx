@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
-import { Link } from 'react-router';
+import { Link } from './Link';
 
 interface ChipBase {
   selected?: boolean | undefined;

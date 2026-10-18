@@ -170,6 +170,27 @@ export async function setUserPasswordHash(
   if (result.matchedCount === 0) throw new AppError('NOT_FOUND', 'User was not found');
 }
 
+/** Changes the sign in address. The unique index on email refuses one that is taken. */
+export async function setUserEmail(
+  id: string,
+  email: string,
+  now: Date,
+  options?: RepoOptions,
+): Promise<void> {
+  const col = await collection('users');
+  try {
+    const result = await col.updateOne(
+      { _id: id },
+      { $set: { email, updatedAt: now } },
+      sessionOf(options),
+    );
+    if (result.matchedCount === 0) throw new AppError('NOT_FOUND', 'User was not found');
+  } catch (error) {
+    if (isDuplicateKeyError(error)) throw new AppError('CONFLICT', 'That email is already in use');
+    throw error;
+  }
+}
+
 export async function setUserActive(
   id: string,
   isActive: boolean,

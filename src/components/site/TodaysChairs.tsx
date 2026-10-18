@@ -1,37 +1,34 @@
-import { Link } from 'react-router';
 import { nextOpeningsResponseSchema } from '@shared/api/availability';
 import type { PublicStaff } from '@shared/api/public';
-import { ChairCard, ChairCardSkeleton } from '@/components/ui';
+import { ChairCard, ChairCardSkeleton, Link, Reveal } from '@/components/ui';
 import { chairStatusOf, inChairOrder } from '@/lib/chairStatus';
 import { useApi } from '@/lib/useApi';
 
 /**
- * The signature strip: one ChairCard per chair with today's status and next
- * open time. Each card links to /book for that chair. Sideways on phones, a
- * grid from 768px.
+ * The signature strip: one ChairCard per chair with today's status and next open time. Sideways on
+ * phones, a grid from 768px; each card rises in once as it scrolls into view.
  */
 export function TodaysChairs({
   staff,
   linkTo = 'book',
-  layout = 'strip',
+  columns = 6,
 }: {
   staff: PublicStaff[] | null;
   /** Cards link to booking (home) or to the profile (the chairs page). */
   linkTo?: 'book' | 'profile';
-  layout?: 'strip' | 'grid';
+  /** Columns from 1024px: 6 on the home page, 3 on the chairs page. */
+  columns?: 3 | 6;
 }) {
   const next = useApi('/api/availability/next', nextOpeningsResponseSchema);
-  const className = layout === 'strip' ? 'exq-strip' : 'exq-grid';
   if (!staff || next.status === 'loading') {
     return (
       <ul
-        className={`${className} exq-chairs__list`}
+        className="exq-strip exq-bare exq-chairs__list"
         data-state="loading"
         aria-busy="true"
-        data-cols="2"
-        data-lg="3"
+        data-lg={columns}
       >
-        {Array.from({ length: 6 }, (_, i) => (
+        {Array.from({ length: columns === 3 ? 3 : 6 }, (_, i) => (
           <li key={i}>
             <ChairCardSkeleton />
           </li>
@@ -42,11 +39,12 @@ export function TodaysChairs({
   const rows = next.status === 'ready' ? next.data.chairs : [];
   return (
     <>
-      <ul className={`${className} exq-chairs__list`} data-state="ready" data-cols="2" data-lg="3">
+      <ul className="exq-strip exq-bare exq-chairs__list" data-state="ready" data-lg={columns}>
         {inChairOrder(staff).map((member, i) => {
           const { status, label } = chairStatusOf(rows.find((r) => r.staff.id === member.id));
           return (
-            <li
+            <Reveal
+              as="li"
               key={member.id}
               className="exq-chair-card"
               data-state={member.acceptsOnlineBooking ? 'bookable' : 'walk-in'}
@@ -65,7 +63,7 @@ export function TodaysChairs({
                     : `/chairs/${encodeURIComponent(member.slug)}`
                 }
               />
-            </li>
+            </Reveal>
           );
         })}
       </ul>

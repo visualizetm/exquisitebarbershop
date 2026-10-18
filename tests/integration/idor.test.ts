@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newId } from '../../server/lib/ids';
-import { shopSettingsRepo, timeBlocksRepo } from '../../server/repos';
+import { timeBlocksRepo } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
-import { shopSettingsSeed, serviceSeedId, staffSeedId } from '../../seed/shop';
-import { myScheduleResponseSchema } from '../../shared/api/admin';
+import { serviceSeedId, staffSeedId } from '../../seed/shop';
 import { apiErrorSchema } from '../../shared/api/errors';
-import { createLogin, sessionCookie } from '../helpers/auth';
+import { teamDayResponseSchema, teamWeekResponseSchema } from '../../shared/api/team';
+import { teamCookie } from '../helpers/auth';
 import {
   bookPublic,
   call,
@@ -23,27 +23,28 @@ let marcusCookie: string;
 let deeBooking: { id: string; token: string };
 let marcusBooking: { id: string };
 let deeBlockId: string;
+const DEE_PHONE = '+12155550177';
+const MARCUS_PHONE = '+12155550178';
 const WED = nextDate(3, 3);
 const cutId = serviceSeedId('classic-cut');
 
 beforeAll(async () => {
   await runSeed(db(), NOW);
-  await shopSettingsRepo.updateShopSettings(
-    { ...shopSettingsSeed, permissions: { barbersCanBlockTime: true } },
-    new Date(),
-  );
   server = await startTestServer();
-  const marcus = await createLogin({ role: 'barber', staffId: staffSeedId('marcus') });
-  marcusCookie = await sessionCookie(marcus._id);
+  marcusCookie = await teamCookie(staffSeedId('marcus'));
   deeBooking = await bookPublic(server.baseUrl, {
     staff: 'dee',
     serviceIds: [cutId],
     startAt: slotAt(WED, '10:00'),
+    phone: DEE_PHONE,
+    email: 'dee.client@example.com',
   });
   marcusBooking = await bookPublic(server.baseUrl, {
     staff: 'marcus',
     serviceIds: [cutId],
     startAt: slotAt(WED, '11:00'),
+    phone: MARCUS_PHONE,
+    email: 'marcus.client@example.com',
   });
   const block = await timeBlocksRepo.insertTimeBlock(
     {
@@ -70,47 +71,54 @@ const asMarcus = (method: string, path: string, body?: unknown) =>
 
 describe('a barber cannot reach another chair', () => {
   it("another barber's booking reads as not found, exactly like a made-up id", async () => {
-    const other = await asMarcus('GET', `/api/me/bookings/${deeBooking.id}`);
-    const madeUp = await asMarcus('GET', `/api/me/bookings/${newId()}`);
+    const other = await asMarcus('POST', `/api/team/bookings/${deeBooking.id}/status`, {
+      status: 'completed',
+    });
+    const madeUp = await asMarcus('POST', `/api/team/bookings/${newId()}/status`, {
+      status: 'completed',
+    });
     expect(other.status).toBe(404);
     expect(madeUp.status).toBe(404);
     expect(apiErrorSchema.parse(other.body).error.message).toBe(
       apiErrorSchema.parse(madeUp.body).error.message,
     );
-    expect((await asMarcus('GET', `/api/me/bookings/${marcusBooking.id}`)).status).toBe(200);
-  });
-
-  it("cannot change the status of another barber's booking", async () => {
-    const res = await asMarcus('POST', `/api/me/bookings/${deeBooking.id}/status`, {
-      status: 'completed',
-    });
-    expect(res.status).toBe(404);
     const stored = await db()
       .collection<{ _id: string; status: string }>('bookings')
       .findOne({ _id: deeBooking.id });
     expect(stored?.status).toBe('confirmed');
   });
 
-  it('cannot cancel even its own bookings through the barber API', async () => {
-    const res = await asMarcus('POST', `/api/me/bookings/${marcusBooking.id}/status`, {
+  it("cannot add a note to another barber's booking", async () => {
+    const res = await asMarcus('POST', `/api/team/bookings/${deeBooking.id}/note`, {
+      notes: 'not mine',
+    });
+    expect(res.status).toBe(404);
+    const stored = await db()
+      .collection<{ _id: string; notes: string | null }>('bookings')
+      .findOne({ _id: deeBooking.id });
+    expect(stored?.notes).toBeNull();
+  });
+
+  it('cannot cancel, even its own booking: the barber API has no such status', async () => {
+    const res = await asMarcus('POST', `/api/team/bookings/${marcusBooking.id}/status`, {
       status: 'cancelled',
     });
-    expect(res.status).toBe(409);
-    expect(apiErrorSchema.parse(res.body).error.code).toBe('INVALID_TRANSITION');
+    expect(res.status).toBe(400);
+    expect(apiErrorSchema.parse(res.body).error.code).toBe('VALIDATION_ERROR');
   });
 
   it("cannot delete another barber's time block", async () => {
-    const res = await asMarcus('DELETE', `/api/me/time-blocks/${deeBlockId}`, {});
+    const res = await asMarcus('DELETE', `/api/team/time-blocks/${deeBlockId}`);
     expect(res.status).toBe(404);
     expect(await timeBlocksRepo.findTimeBlockById(deeBlockId)).not.toBeNull();
   });
 
   it('a staffId smuggled into a block request is ignored: the block lands on the own chair', async () => {
-    const res = await asMarcus('POST', '/api/me/time-blocks', {
+    const res = await asMarcus('POST', '/api/team/time-blocks', {
       staffId: staffSeedId('dee'),
-      kind: 'block',
-      startAt: slotAt(WED, '13:00'),
-      endAt: slotAt(WED, '13:30'),
+      date: WED,
+      start: '13:00',
+      end: '13:30',
     });
     expect(res.status).toBe(201);
     expect((res.body as { timeBlock: { staffId: string } }).timeBlock.staffId).toBe(
@@ -118,50 +126,52 @@ describe('a barber cannot reach another chair', () => {
     );
   });
 
-  it('the own schedule never contains another chair, whatever the query says', async () => {
-    const res = await asMarcus('GET', `/api/me/schedule?date=${WED}&staffId=${staffSeedId('dee')}`);
-    const parsed = myScheduleResponseSchema.parse(res.body);
-    expect(parsed.staff.id).toBe(staffSeedId('marcus'));
-    const all = parsed.days.flatMap((d) => [
-      ...d.bookings.map((b) => b.staff.id),
-      ...d.blocks.map((b) => b.staffId),
+  it('a block over a booked client asks, and the barber API can only keep, never cancel', async () => {
+    const conflict = await asMarcus('POST', '/api/team/time-blocks', {
+      date: WED,
+      start: '11:00',
+      end: '11:30',
+    });
+    expect(conflict.status).toBe(409);
+    expect(apiErrorSchema.parse(conflict.body).error.code).toBe('SCHEDULE_CONFLICT');
+    expect(apiErrorSchema.parse(conflict.body).error.affected?.map((a) => a.bookingId)).toEqual([
+      marcusBooking.id,
     ]);
-    expect(all.every((id) => id === staffSeedId('marcus'))).toBe(true);
-    expect(parsed.days[0]?.bookings.map((b) => b.id)).toContain(marcusBooking.id);
+    // Nothing was saved: the booking is intact.
+    const stored = await db()
+      .collection<{ _id: string; status: string }>('bookings')
+      .findOne({ _id: marcusBooking.id });
+    expect(stored?.status).toBe('confirmed');
   });
 
-  it('owner routes refuse a barber with 403, including by id', async () => {
+  it('the own week never contains another chair, and no client phone or email', async () => {
+    const res = await asMarcus('GET', '/api/team/week');
+    const parsed = teamWeekResponseSchema.parse(res.body);
+    expect(parsed.days).toHaveLength(7);
+    const text = JSON.stringify(res.body);
+    for (const secret of [DEE_PHONE, MARCUS_PHONE, 'dee.client', 'marcus.client', '2155550177']) {
+      expect(text).not.toContain(secret);
+    }
+    expect(text).not.toContain(deeBooking.id);
+    expect(text).not.toContain(staffSeedId('dee'));
+    const today = teamDayResponseSchema.parse((await asMarcus('GET', '/api/team/today')).body);
+    expect(JSON.stringify(today)).not.toContain(MARCUS_PHONE);
+  });
+
+  it('owner routes refuse a barber session, including by id', async () => {
     for (const path of [
       `/api/admin/bookings/${deeBooking.id}`,
       `/api/admin/schedule?date=${WED}&staffId=${staffSeedId('dee')}`,
-      `/api/admin/customers?phone=2155550100`,
+      `/api/admin/customer-list`,
+      `/api/admin/search?q=test`,
     ]) {
       const res = await asMarcus('GET', path);
-      expect(res.status, path).toBe(403);
+      expect(res.status, path).toBe(401);
     }
     const cancel = await asMarcus('POST', `/api/admin/bookings/${deeBooking.id}/cancel`, {
       notify: false,
     });
-    expect(cancel.status).toBe(403);
-  });
-
-  it('a barber may keep but never cancel a customer booking through a conflict', async () => {
-    const keepOnly = await asMarcus('POST', '/api/me/time-blocks', {
-      kind: 'timeOff',
-      startAt: slotAt(WED, '11:00'),
-      endAt: slotAt(WED, '11:30'),
-      resolutions: [{ bookingId: marcusBooking.id, action: 'cancel' }],
-    });
-    expect(keepOnly.status).toBe(403);
-    const conflict = await asMarcus('POST', '/api/me/time-blocks', {
-      kind: 'timeOff',
-      startAt: slotAt(WED, '11:00'),
-      endAt: slotAt(WED, '11:30'),
-    });
-    expect(conflict.status).toBe(409);
-    expect(apiErrorSchema.parse(conflict.body).error.affected?.map((a) => a.bookingId)).toEqual([
-      marcusBooking.id,
-    ]);
+    expect(cancel.status).toBe(401);
   });
 });
 
@@ -171,13 +181,14 @@ describe('a manage token is not a session', () => {
     for (const headers of [
       { authorization: `Bearer ${token}` },
       { cookie: `__Host-exq_session=${token}` },
+      { cookie: `__Host-exq_team=${token}` },
       { cookie: `token=${token}` },
     ]) {
       expect(
         (await call(server.baseUrl, 'GET', `/api/admin/bookings/${deeBooking.id}`, { headers }))
           .status,
       ).toBe(401);
-      expect((await call(server.baseUrl, 'GET', '/api/me/schedule', { headers })).status).toBe(401);
+      expect((await call(server.baseUrl, 'GET', '/api/team/today', { headers })).status).toBe(401);
     }
     expect(
       (
@@ -195,22 +206,5 @@ describe('a manage token is not a session', () => {
         })
       ).status,
     ).toBe(401);
-  });
-});
-
-describe('barber block permission', () => {
-  it('is refused while the owner setting is off', async () => {
-    await shopSettingsRepo.updateShopSettings(
-      { ...shopSettingsSeed, permissions: { barbersCanBlockTime: false } },
-      new Date(),
-    );
-    const res = await asMarcus('POST', '/api/me/time-blocks', {
-      kind: 'block',
-      startAt: slotAt(WED, '16:00'),
-      endAt: slotAt(WED, '16:30'),
-    });
-    expect(res.status).toBe(403);
-    const days = await asMarcus('GET', `/api/me/schedule?date=${WED}`);
-    expect(myScheduleResponseSchema.parse(days.body).canBlockTime).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import type { ClientSession } from 'mongodb';
 import type { ConflictOutcome, ConflictResolution } from '../../shared/api/admin';
+import { addMinutes } from '../../shared/lib/time';
 import { shopDateOf, shopDayStart } from '../../shared/lib/time';
 import type { BookingDocument } from '../../shared/schemas/booking';
 import type { WeekHours } from '../../shared/schemas/common';
@@ -13,6 +14,7 @@ import {
   closuresRepo,
   scheduleGuardsRepo,
   shopSettingsRepo,
+  slotLocksRepo,
   staffRepo,
   timeBlocksRepo,
   weeklyHoursRepo,
@@ -20,6 +22,7 @@ import {
 import { isWithinWorkingTime, type ScheduleSource } from './availability';
 import { cancelInTransaction } from './bookingService';
 import { unknownStaff } from './bookingView';
+import { relockBlocks } from './locks';
 
 /**
  * The conflict rule. A change to when chairs work (hours, closures, time off,
@@ -126,12 +129,46 @@ function summarize(booking: BookingDocument, staffById: Map<string, StaffDocumen
   };
 }
 
+/** The span a booking holds: its time plus the buffer after it. */
+function heldSpan(booking: BookingDocument) {
+  return { start: booking.startAt, end: addMinutes(booking.endAt, booking.bufferMinutes) };
+}
+
+/** Whether a chair does every service of a booking and works all of its time. */
+function canTake(snapshot: Snapshot, booking: BookingDocument, staff: StaffDocument): boolean {
+  if (staff.deletedAt !== null) return false;
+  if (!booking.services.every((s) => staff.serviceIds.includes(s.serviceId))) return false;
+  return isWithinWorkingTime({ ...booking, staffId: staff._id }, staff, snapshot.source);
+}
+
+/**
+ * Chairs a booking could move to at the same time: they do all its services, work the whole
+ * duration, and hold no booking or block over it. Re-checked by the lock insert when the move
+ * is applied, so a stale list can never double book.
+ */
+async function moveOptionsFor(
+  snapshot: Snapshot,
+  booking: BookingDocument,
+  session: ClientSession,
+): Promise<{ staffId: string; staffName: string }[]> {
+  const options: { staffId: string; staffName: string }[] = [];
+  const sorted = [...snapshot.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const staff of sorted) {
+    if (staff._id === booking.staffId || !canTake(snapshot, booking, staff)) continue;
+    const locks = await slotLocksRepo.listSlotLocksForStaff(staff._id, heldSpan(booking), {
+      session,
+    });
+    if (locks.length === 0) options.push({ staffId: staff._id, staffName: staff.name });
+  }
+  return options;
+}
+
 export async function applyScheduleChange<T>(
   change: ScheduleChange<T>,
 ): Promise<ScheduleChangeResult<T>> {
-  const choices = new Map((change.resolutions ?? []).map((r) => [r.bookingId, r.action]));
-  if (!change.allowCancel && [...choices.values()].some((a) => a !== 'keep')) {
-    throw new AppError('FORBIDDEN', 'Only the owner can cancel bookings');
+  const choices = new Map((change.resolutions ?? []).map((r) => [r.bookingId, r]));
+  if (!change.allowCancel && [...choices.values()].some((r) => r.action !== 'keep')) {
+    throw new AppError('FORBIDDEN', 'Only the owner can cancel or move bookings');
   }
   return withTransaction(async (session) => {
     const scope = change.staffIds === 'all' ? null : [...change.staffIds];
@@ -159,17 +196,66 @@ export async function applyScheduleChange<T>(
         unresolved.length === 1
           ? 'One upcoming booking would fall outside working time. Choose what to do with it.'
           : `${unresolved.length} upcoming bookings would fall outside working time. Choose what to do with each.`,
-        { extra: { affected: [...affected.values()].map((b) => summarize(b, after.staffById)) } },
+        {
+          extra: {
+            affected: await Promise.all(
+              [...affected.values()].map(async (b) => ({
+                ...summarize(b, after.staffById),
+                moveOptions: await moveOptionsFor(after, b, session),
+              })),
+            ),
+          },
+        },
       );
     }
 
     const kept: string[] = [];
+    const moved: string[] = [];
     const cancelled: string[] = [];
     const outboxIds: string[] = [];
     const settings =
       affected.size > 0 ? await shopSettingsRepo.requireShopSettings({ session }) : null;
     for (const booking of affected.values()) {
-      const action = choices.get(booking._id);
+      const choice = choices.get(booking._id);
+      const action = choice?.action;
+      if (choice?.action === 'move' && choice.toStaffId) {
+        const target = after.staffById.get(choice.toStaffId);
+        if (!target || !canTake(after, booking, target)) {
+          throw new AppError(
+            'SLOT_TAKEN',
+            `${target?.name ?? 'That chair'} can not take this booking`,
+          );
+        }
+        await scheduleGuardsRepo.bumpScheduleGuards([target._id], change.now, { session });
+        // Release first, then take the same time on the new chair: a lock held by anyone else
+        // (a booking made a moment ago) fails the insert and undoes the whole change.
+        await slotLocksRepo.releaseSlotLocks(booking._id, { session });
+        await slotLocksRepo.acquireSlotLocks(
+          target._id,
+          heldSpan(booking),
+          { holderType: 'booking', holderId: booking._id },
+          change.now,
+          { session },
+        );
+        await relockBlocks(booking.staffId, heldSpan(booking), change.now, session);
+        await bookingsRepo.moveBookingToStaff(booking._id, target._id, change.now, { session });
+        await auditLogRepo.appendAuditEntry(
+          {
+            actor: change.actor,
+            action: 'booking.move',
+            entityType: 'booking',
+            entityId: booking._id,
+            before: { staffId: booking.staffId },
+            after: { staffId: target._id },
+            meta: { change: change.audit.action },
+            requestId: change.requestId,
+          },
+          change.now,
+          { session },
+        );
+        moved.push(booking._id);
+        continue;
+      }
       if (action === 'keep' || !settings) {
         kept.push(booking._id);
         await auditLogRepo.appendAuditEntry(
@@ -215,12 +301,12 @@ export async function applyScheduleChange<T>(
         entityId: change.audit.entityId(result),
         before: null,
         after: null,
-        meta: { ...change.audit.meta, kept, cancelled },
+        meta: { ...change.audit.meta, kept, moved, cancelled },
         requestId: change.requestId,
       },
       change.now,
       { session },
     );
-    return { result, kept, cancelled, outboxIds };
+    return { result, kept, moved, cancelled, outboxIds };
   });
 }

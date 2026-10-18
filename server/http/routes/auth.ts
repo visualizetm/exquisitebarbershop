@@ -1,4 +1,6 @@
+import { getEnv } from '../../env';
 import {
+  changeEmailRequestSchema,
   changePasswordRequestSchema,
   loginRequestSchema,
   logoutAllResponseSchema,
@@ -6,7 +8,7 @@ import {
   okResponseSchema,
   type MeResponse,
 } from '../../../shared/api/auth';
-import { changeOwnPassword, login, loginAsDemoOwner } from '../../auth/authService';
+import { changeOwnEmail, changeOwnPassword, login, loginAsDemoOwner } from '../../auth/authService';
 import { assertDemoEnabled, demoEnabled } from '../../services/demo';
 import { endAllSessions, endSession } from '../../auth/sessions';
 import { shopSettingsRepo, staffRepo, usersRepo } from '../../repos';
@@ -36,7 +38,11 @@ async function meFor(userId: string): Promise<MeResponse> {
     },
     staff: staff && !staff.deletedAt ? toPublicStaff(staff) : null,
     permissions: { barbersCanBlockTime: settings.permissions.barbersCanBlockTime },
-    features: { photos: storageEnabled(), demo: demoEnabled() },
+    features: {
+      photos: storageEnabled(),
+      demo: demoEnabled(),
+      email: getEnv().EMAIL_PROVIDER === 'resend',
+    },
   });
 }
 
@@ -66,7 +72,7 @@ export const authRoutes: RouteDefinition[] = [
   {
     method: 'POST',
     path: '/api/auth/logout',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       await endSession(ctx.res, principalOf(ctx), ctx.now);
@@ -76,7 +82,7 @@ export const authRoutes: RouteDefinition[] = [
   {
     method: 'POST',
     path: '/api/auth/logout-all',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const sessionsEnded = await endAllSessions(ctx.res, principalOf(ctx), ctx.now);
@@ -89,14 +95,24 @@ export const authRoutes: RouteDefinition[] = [
   {
     method: 'GET',
     path: '/api/auth/me',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => ({ body: await meFor(principalOf(ctx).userId), headers: NO_STORE }),
   },
   {
     method: 'POST',
+    path: '/api/me/email',
+    auth: 'owner',
+    handler: async (ctx) => {
+      const input = await parseBody(ctx, changeEmailRequestSchema);
+      await changeOwnEmail(principalOf(ctx), input, metaOf(ctx));
+      return { body: await meFor(principalOf(ctx).userId), headers: NO_STORE };
+    },
+  },
+  {
+    method: 'POST',
     path: '/api/me/password',
-    auth: 'barber',
+    auth: 'owner',
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const input = await parseBody(ctx, changePasswordRequestSchema);

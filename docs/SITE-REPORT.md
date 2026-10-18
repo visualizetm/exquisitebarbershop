@@ -11,7 +11,8 @@ Last commit: see the bottom of this file.
 - One Vercel serverless function (`api/index.js`, which loads the committed bundle
   `server/bundle/app.mjs` built from `server/`), MongoDB
   (Atlas, replica set, transactions), zod schemas shared from `shared/`.
-- Luxon for time in America/New_York. Jost self-hosted from `@fontsource/jost`.
+- Luxon for time in America/New_York. Jost Variable self-hosted from `@fontsource-variable/jost`
+  (weights 400 to 900, one latin file preloaded).
 - Hosting: Vercel (Vite preset). `vercel.json` rewrites every non-API path to
   `index.html`, sets CSP and the security headers, and runs the outbox cron.
 - Tests: Vitest with mongodb-memory-server, Playwright for end to end.
@@ -39,20 +40,20 @@ Last commit: see the bottom of this file.
 
 ## Routes and sections
 
-| Route         | Sections                                                                                                                   | Status                                      |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| /             | hero, today's chairs, services preview, the work, visit, ink band, footer                                                  | milestones 3 and 5                          |
-| /services     | heading, group chips, service rows with Book links                                                                         | milestone 3                                 |
-| /chairs       | heading, chair card grid                                                                                                   | milestone 3                                 |
-| /chairs/:slug | photo arch, badge, name, role, specialty, next openings, services, work strip, IG, sticky Book                             | milestone 3                                 |
-| /gallery      | heading, barber filter chips, photo grid, lightbox                                                                         | milestone 3                                 |
-| /visit        | heading, hours table, address, directions, call, policies, parking                                                         | milestone 3                                 |
-| /book         | step bar, services, chair, day, time, details, confirm, ticket                                                             | logic from prompt 2; restyle in milestone 4 |
-| /manage       | ticket, reschedule, cancel sheet                                                                                           | milestone 4                                 |
-| /admin/\*     | sign in, today, schedule, bookings, new booking, block time, who's in, customers, settings, photos, audit, outbox, account | prompt 3; restyle in milestone 4            |
-| /kit          | every kit component in every state                                                                                         | development builds only                     |
-| /sitemap.xml  | public routes plus one entry per listed chair, from the API                                                                | milestone 5                                 |
-| /setup        | setup secret field, Run doctor, Run setup, checklist; exists only while BOOTSTRAP_SECRET is set; noindex                   | prompt 5                                    |
+| Route         | Sections                                                                                                                     | Status                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| /             | hero text and info row, hero photo (only if uploaded), today's chairs, the menu (ink), the work, visit, ink CTA band, footer | prompt 10                                   |
+| /services     | ink page: label, heading, group chips with counts, price rows with Book links                                                | prompt 10                                   |
+| /chairs       | "Pick your chair": chair cards with CHAIR number, name, specialty, next open                                                 | prompt 10                                   |
+| /chairs/:slug | portrait, name, specialty, next 3 openings, services with prices, work strip, Instagram, BOOK [NAME] in the phone bar        | prompt 10                                   |
+| /gallery      | heading, barber filter chips, 2 and 3 column grid, swipeable lightbox                                                        | prompt 10                                   |
+| /visit        | hours with today marked, address, directions, call, policies, parking                                                        | prompt 10                                   |
+| /book         | four part step bar, numbered steps, option cards, day strip, times by part of day, details, confirm, ticket                  | prompt 10                                   |
+| /manage       | ticket, reschedule, cancel sheet                                                                                             | prompt 10                                   |
+| /admin/\*     | sign in, today, schedule, bookings, new booking, block time, who's in, customers, settings, photos, audit, outbox, account   | prompt 3; new tokens and scale in prompt 10 |
+| /kit          | every kit component in every state                                                                                           | development builds only                     |
+| /sitemap.xml  | public routes plus one entry per listed chair, from the API                                                                  | milestone 5                                 |
+| /setup        | setup secret field, Run doctor, Run setup, checklist; exists only while BOOTSTRAP_SECRET is set; noindex                     | prompt 5                                    |
 
 ## Component inventory
 
@@ -75,7 +76,27 @@ Older components still in use:
 
 ## Tokens
 
-`src/styles/tokens.css`. Semantic surfaces and type rules in `src/styles/base.css`.
+`src/styles/tokens.css` (the one variables file: palette, six type sizes, motion tokens, dark values).
+Global type and layout in `base.css`, components in `kit.css`, the frame in `frame.css`, everything that
+moves in `motion.css`, pages in `pages.css` and `booking.css`. Brief: `docs/brand/DESIGN-DIRECTION-V2.md`;
+reference: `docs/DESIGN-SYSTEM.md`.
+
+## Prompt 10 additions
+
+- Frame: announcement strip (shop settings `announcement`: enabled, text, link label, link address;
+  editor in prompt 11), sticky header, full-screen ink phone menu, the phone bottom bar (CALL and BOOK NOW,
+  BOOK [NAME] on a profile, BACK and CONTINUE then CONFIRM BOOKING in booking), a footer with no build stamp
+  and no staff link. `/admin` is reachable by address only.
+- Motion: CSS, IntersectionObserver and view transitions; no library. Rules and the list of animations in
+  DESIGN-SYSTEM.md; held by `tests/unit/motionCss.test.ts` and `tests/e2e/motion.spec.ts`.
+- Photos: `STORAGE_DRIVER=cloudinary` (DEPLOY.md section 10b): signed browser uploads, verification,
+  destroy on delete, the 24 hour orphan sweep, four widths cropped per frame, `npm run photos:migrate`.
+  New variables: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_FOLDER.
+- Checks: Lighthouse mobile on the production-like build (compressed like Vercel): Home 95, Services 96,
+  Book 97 performance; accessibility 100; CLS 0 (SEO 69 on the showcase build, which is noindex on purpose).
+  Axe (WCAG 2 A and AA) finds nothing on any public page or booking step in light or dark at 390 and 1280
+  (`tests/e2e/rules.spec.ts`). Screenshots: `docs/screens/p10/`; recordings:
+  `docs/screens/p10/motion/`.
 
 ## Data sources and APIs
 
@@ -119,15 +140,18 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
   time; set it in Vercel before the first production build.
 - The owner's own password can only be reset from a shell (`npm run user:reset`)
   when nobody can sign in; see docs/OPERATIONS.md.
-- Photos are stored at one size (up to 2000px) and shown at 290 to 780 device
-  pixels; responsive variants would cut gallery weight by about two thirds
-  (audit finding, not done: two uploads per photo and an additive `thumbKey`).
+- Responsive photo sizes exist only on Cloudinary (four widths per frame); photos on the local, R2 or
+  GridFS drivers are one size up to 2000px.
+- Cloudinary keeps no data backup: with it on, turn on MongoDB Atlas snapshots (the daily job writes no
+  export for this driver).
+- The phone bar hides while a text field has focus, so the last field of a form is finished with the
+  keyboard's own Go key or by closing the keyboard. Needs a real iPhone check.
 - A showcase deployment has no backup and keeps photos in the database; its sample data is
   disposable. Real launch: DEPLOY.md section 11 ("Leaving the showcase").
 - The security headers are static, so the HTML shell cannot carry `X-Robots-Tag` in demo
   mode; the build adds the meta tag and a closed robots.txt instead.
-- Photos and daily backups are off until Cloudflare R2 is set up
-  (STORAGE_DRIVER=none at launch; DEPLOY.md section 10 switches them on).
+- Photos and daily backups are off until photo storage is set up (STORAGE_DRIVER=none at launch;
+  DEPLOY.md section 10b switches photos on with Cloudinary, section 10 with R2).
 - The MongoDB Atlas free tier keeps no snapshots, so until R2 is on there is no
   backup of the bookings at all.
 - Handoff docs: `docs/OWNER-GUIDE.md` (and `.pdf`), `docs/BARBER-GUIDE.md`,
@@ -147,9 +171,20 @@ None. Directions use a Google Maps search URL as a plain link. Instagram is a li
   API path; fixed with the `/api/(.*)` rewrite (prompt 9).
 - Proof it stays fixed: `npm run test:vercel-function`, a required CI step (DEPLOY.md section 12).
 
+## Prompt 11 additions
+
+- Owner dashboard at `/admin`: Overview, Bookings, Schedule, Customers, Team, Website, Settings, with global
+  search (`/`), quick actions, alerts and the decision resolver (Keep, Move, Cancel, Cancel and notify).
+- Barber PIN portal at `/team` (one shared link, name then 6 digit PIN, 12 hour session), one time setup links
+  at `/team/setup/:token`; barbers can no longer sign in at `/admin`.
+- Demo notice on demo builds, icons, footer social links (shown only when set in Settings), outage fallback for
+  public pages, 170 by 40 phone logo.
+- Docs: `OWNER-GUIDE.md`, `BARBER-GUIDE.md` with screens in `docs/screens/p11/guide/`.
+
 ## Last commit
 
-Prompt 9, 2026-10-18: the function runs under plain Node on Vercel (bundle, `api/index.js`, rewrite),
+Prompt 11, 2026-10-18: the owner dashboard, the barber PIN portal, the demo notice, icons and social links. Before it, prompt 10, 2026-10-18: the Shop Sign redesign (tokens, kit and /kit, frame, pages, booking, admin), the
+motion system, the phone bottom bar and Cloudinary photos. Before it, prompt 9, 2026-10-18: the function runs under plain Node on Vercel (bundle, `api/index.js`, rewrite),
 with `npm run test:vercel-function` in CI. Before it, prompt 8, 2026-10-18: the showcase demo (auto setup, demo sign-in, GridFS photos, noindex,
 down-screen details), the hero and sign-in logo fixes, the showcase production-like run and
 `docs/screens/p8/`. Before it, prompt 7, 2026-10-17: the launch without R2, visible configuration failures,

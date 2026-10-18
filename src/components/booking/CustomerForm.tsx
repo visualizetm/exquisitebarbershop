@@ -1,7 +1,7 @@
 import { useState, type SyntheticEvent } from 'react';
 import { normalizeUsPhone } from '@shared/lib/phone';
 import type { CustomerDetails } from '@/lib/booking/state';
-import { Button } from '@/components/ui';
+import { Button, Input, Textarea } from '@/components/ui';
 
 export interface CustomerFormProps {
   initial: CustomerDetails;
@@ -41,6 +41,7 @@ export function CustomerForm({ initial, requireEmail, onSubmit }: CustomerFormPr
   const errorCount = Object.keys(errors).length;
   return (
     <form
+      id="exq-details-form"
       className="exq-customer-form"
       data-state={errorCount > 0 ? 'invalid' : 'idle'}
       onSubmit={handleSubmit}
@@ -51,86 +52,42 @@ export function CustomerForm({ initial, requireEmail, onSubmit }: CustomerFormPr
           Please fix the highlighted fields.
         </p>
       ) : null}
-      <div className="exq-field" data-state={errors.name ? 'invalid' : 'valid'}>
-        <label className="exq-field__label" htmlFor="exq-name">
-          Name
-        </label>
-        <input
-          id="exq-name"
-          className="exq-field__input"
-          type="text"
-          autoComplete="name"
-          value={details.name}
-          onChange={update('name')}
-          aria-invalid={Boolean(errors.name)}
-          aria-describedby={errors.name ? 'exq-name-error' : undefined}
-          required
-        />
-        {errors.name ? (
-          <p id="exq-name-error" className="exq-field__error" role="alert">
-            {errors.name}
-          </p>
-        ) : null}
-      </div>
-      <div className="exq-field" data-state={errors.phone ? 'invalid' : 'valid'}>
-        <label className="exq-field__label" htmlFor="exq-phone">
-          Mobile phone
-        </label>
-        <input
-          id="exq-phone"
-          className="exq-field__input"
-          type="tel"
-          autoComplete="tel"
-          inputMode="tel"
-          value={details.phone}
-          onChange={update('phone')}
-          aria-invalid={Boolean(errors.phone)}
-          aria-describedby={errors.phone ? 'exq-phone-error' : 'exq-phone-hint'}
-          required
-        />
-        <p id="exq-phone-hint" className="exq-field__hint">
-          US numbers only. We use it to reach you about this appointment.
-        </p>
-        {errors.phone ? (
-          <p id="exq-phone-error" className="exq-field__error" role="alert">
-            {errors.phone}
-          </p>
-        ) : null}
-      </div>
-      <div className="exq-field" data-state={errors.email ? 'invalid' : 'valid'}>
-        <label className="exq-field__label" htmlFor="exq-email">
-          Email {requireEmail ? '' : '(optional, for your confirmation)'}
-        </label>
-        <input
-          id="exq-email"
-          className="exq-field__input"
-          type="email"
-          autoComplete="email"
-          value={details.email}
-          onChange={update('email')}
-          aria-invalid={Boolean(errors.email)}
-          aria-describedby={errors.email ? 'exq-email-error' : undefined}
-          required={requireEmail}
-        />
-        {errors.email ? (
-          <p id="exq-email-error" className="exq-field__error" role="alert">
-            {errors.email}
-          </p>
-        ) : null}
-      </div>
-      <div className="exq-field" data-state="valid">
-        <label className="exq-field__label" htmlFor="exq-notes">
-          Notes (optional)
-        </label>
-        <textarea
-          id="exq-notes"
-          className="exq-field__input"
-          rows={3}
-          maxLength={500}
-          value={details.notes}
-          onChange={update('notes')}
-        />
-      </div>
+      <Input
+        label="Name"
+        type="text"
+        autoComplete="name"
+        value={details.name}
+        onChange={update('name')}
+        error={errors.name}
+        required
+      />
+      <Input
+        label="Mobile phone"
+        type="tel"
+        autoComplete="tel"
+        inputMode="tel"
+        value={details.phone}
+        onChange={update('phone')}
+        hint="US numbers only. We use it to reach you about this appointment."
+        error={errors.phone}
+        required
+      />
+      <Input
+        label={`Email ${requireEmail ? '' : '(optional, for your confirmation)'}`}
+        type="email"
+        autoComplete="email"
+        value={details.email}
+        onChange={update('email')}
+        error={errors.email}
+        required={requireEmail}
+      />
+      <Textarea
+        label="Notes (optional)"
+        rows={3}
+        maxLength={500}
+        value={details.notes}
+        onChange={update('notes')}
+      />
       <div className="exq-field exq-field--trap" aria-hidden="true">
         <label htmlFor="exq-website">Website</label>
         <input
@@ -145,7 +102,9 @@ export function CustomerForm({ initial, requireEmail, onSubmit }: CustomerFormPr
           }}
         />
       </div>
-      <Button type="submit">Review booking</Button>
+      <p className="exq-book__inline-action">
+        <Button type="submit">Review booking</Button>
+      </p>
     </form>
   );
 }

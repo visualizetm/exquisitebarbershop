@@ -508,3 +508,257 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   same builder and tracer locally. What is not proven: that Vercel's platform hands the
   function the original request path after a rewrite (the documented Express-on-Vercel pattern
   relies on it), which the first deploy's `/api/health` and `/api/staff/marcus` will confirm.
+
+## Prompt 10: redesign, motion, phone bar, Cloudinary
+
+- D10-01 Branch from main after PR 4 merged (main = 17fa43d), branch `claude/p10-shop-sign-redesign`.
+- D10-02 The mockup board (`docs/brand/website/exq_site_mobile_board.png`) and `docs/brand/BRAND.md`
+  are not in the repository, so the written brief is the source; it is saved as
+  `docs/brand/DESIGN-DIRECTION-V2.md`.
+- D10-03 Tokens follow the brief exactly, with three additions the brief did not list but needs:
+  `--mute-on-dark` (#A8A8A8, 7.6:1 on ink, for gray text on ink because `--text-3` is only 3.5:1 on
+  #111), `--hit` (44px tap target) and `--rule` (2px). `--t-display` uses `clamp(40px, 13.4vw, 52px)` so
+  it is 52px from 385px wide and EXQUISITE (9 heavy caps) never clips on a 360px phone.
+- D10-04 In dark, `--card-2` is `--ink-2`, not `--ink-3`: red text (#FF5470) on #333 is 4.1:1 and failed
+  axe. Borders stay #333.
+- D10-05 Button text is label size (13px, 600, caps, +14% tracking) everywhere, including the bottom
+  bar: it is the only size in the scale that fits "CONFIRM BOOKING" in half of a 390px screen.
+- D10-06 The dark theme keeps explicit values in two blocks (the attribute and the media query)
+  instead of `light-dark()`, which iOS before 17.5 ignores; a missing declaration there would drop all
+  colors on an older iPhone.
+- D10-07 Every `transition` and `animation` lives in `motion.css`, inside
+  `prefers-reduced-motion: no-preference`, so reduced motion is one switch and the rules are testable.
+  The check mark draws with `stroke-dashoffset`, the one property besides transform, opacity and
+  clip-path (the brief asks for it by name).
+- D10-08 No animation library. Sheet drag-to-close is not built (a tap on the backdrop, the X and
+  Escape close it); the lightbox swipes with CSS scroll snap, so nothing needed a library.
+- D10-09 Toasts leave after 4s; a toast with an Undo action stays 7s so the action is usable (hover and
+  focus pause both).
+- D10-10 Dialogs are the native `<dialog>` with `@starting-style` and `allow-discrete` transitions.
+  Browsers without them open and close instantly; content stays mounted for `--d-fast` so the exit
+  does not show an empty box.
+- D10-11 The announcement is stored as `{ enabled, text, linkLabel, linkUrl }` in shop settings
+  (default "Walk ins welcome" with a "Book online" link to `/book`). Older settings documents get
+  the default on read, so nothing needs a migration. The strip is an empty ink bar while shop data
+  loads so the page does not shift.
+- D10-12 The bar hides when a text field has focus or the visual viewport has shrunk by more than
+  150px. Focus alone is what a desktop browser at phone width can show (the tests), and the viewport
+  check is what iOS and Android report; together they cover both. The cost: with the keyboard up
+  the bar is out of reach, so the last field is finished with the keyboard's own Go key (the form
+  submits) or by closing the keyboard.
+- D10-13 On the first booking step BACK links to the home page; on later steps it goes one step back
+  with the choices kept. On the details step CONTINUE submits the form (the `form` attribute), so
+  validation messages appear as before.
+- D10-14 The bar's routes: hidden under `/admin`, `/setup`, `/kit` and `/portal`. Prompt 11's barber
+  portal is not built yet; it should live under `/portal`, or add its prefix to `NO_BAR_PREFIXES`.
+- D10-15 With JavaScript off nothing in a single page app can render, so `index.html` carries a
+  `<noscript>` block: the name, the phone (from the seed, the same value the down screen uses) and
+  the address. Every reveal is already visible by default, so a page that loses its script mid way is
+  never left hidden.
+- D10-16 Header is sticky on every width (the strip scrolls away), because the phone bar carries only
+  Call and Book and the menu must stay reachable. The announcement strip is 40px, not thinner, so its
+  link is a real tap target.
+- D10-17 View transitions: the app uses the declarative BrowserRouter, whose `viewTransition` prop does
+  nothing (only data routers honor it). Rather than change the router, the kit `Link` and `NavLink`
+  take the click and run the navigation inside `document.startViewTransition` with `flushSync`. It is
+  skipped for modified clicks, new-tab links, reduced motion and browsers without the API, so there is
+  no fallback animation.
+- D10-18 Reveals hide an element only after measuring it (below the fold, motion ready) and do it
+  without a transition, so nothing fades out after first paint. A photo wipe clips the child, not the
+  element the observer watches, because an element clipped away entirely never counts as on screen.
+- D10-19 Home's right half stays empty on desktop when there is no hero photo. The text column keeps the
+  same width either way, so a photo arriving after the shop data does not move the text (CLS).
+- D10-20 The Menu on Home shows each service's description and duration (the mockup shows one line);
+  on Services the group name sits over a 2px rule, as in the mockup.
+- D10-21 The booking flow keeps its six URL steps (services, barber, day, time, details, confirm); the
+  progress bar shows four parts and the bar's "time" part opens the times directly when a day is
+  already chosen. Auto advance after picking a day or a time is unchanged, so CONTINUE is disabled on
+  those steps until something is chosen.
+- D10-22 The step slide is derived while rendering (travel direction from the previous step index) and
+  the step is remounted by key, so the heading takes focus on every step as before.
+- D10-23 Admin headings below the page title are sentence case, not caps, and the admin scale is 13, 15,
+  18 and 22px: a dense working screen reads better that way. Everything else (tokens, the kit, the
+  states) is shared with the public site.
+- D10-24 Cloudinary is a driver behind the existing storage port. The port's `PresignedUpload` became a
+  union (PUT for R2, local and GridFS; signed POST for Cloudinary), `uploadUrlResponse` gained
+  `method: 'POST'` and `fields`, and confirm gained an optional `cloudinary: { publicId, version, bytes }`
+  that is required, and checked against the Admin API, when the driver is Cloudinary.
+- D10-25 A Cloudinary photo key is its public id, `<CLOUDINARY_FOLDER>/<uuid>`, the same uuid the old
+  keys carried, so the migration is idempotent (the destination of a photo never changes) and a half
+  finished copy is adopted on the next run. The old GridFS objects are left in place.
+- D10-26 Backups: Cloudinary holds images, not the NDJSON export, so with this driver the daily job
+  writes no backup (it logs that, like the GridFS case) and the doctor says to turn on Atlas backups.
+  R2 stays available for anyone who wants bucket backups.
+- D10-27 The CSP no longer allows any `https:` image: images from the site itself, data and
+  `res.cloudinary.com`; connections to the site and `api.cloudinary.com`. An R2 deployment would need
+  its public host added to `img-src`.
+- D10-28 The doctor's Cloudinary check is a signed Admin API ping (nothing written), then reports
+  delivery as OK without a network call. The 10 MB limit is enforced on issue and again on confirm.
+- D10-29 The fake Cloudinary in the tests wraps `fetch` and checks the same signature and credentials
+  the real service does, so a wrong signing rule fails the test instead of passing quietly.
+- D10-30 Performance is measured on a build served with brotli, because Vercel compresses text and a
+  plain Node server does not (73 to 76 uncompressed, 95 to 97 compressed). `scripts/prodlike-server.ts` now
+  compresses so the local run matches what visitors get.
+- D10-31 Screenshots and recordings were captured once, in the last milestone, from the dev e2e server
+  with sample photos; earlier milestones were checked by eye with throwaway captures. Full page
+  captures show the fixed phone bar mid page; that is the capture, not the layout.
+- D10-32 `milestone 1` through `5` commits each passed typecheck, lint, format, unit tests, the three
+  end to end suites, `test:vercel-function` and the build, except milestone 3, whose first commit
+  carried two lint errors in the reveal hook and a test that were fixed in the next commit.
+
+## Prompt 11: owner dashboard, barber PIN portal, demo notice, icons, social links
+
+- D11-01 Branch base: PR 5 (brand v2) and PR 6 (prompt 10) were both still open, so this branch starts
+  from the prompt 10 branch and merges the brand v2 branch (`brand/v2-final`, assets and docs only) so the
+  new marks (`crest`, `disc`, `arched`, `lockup-vertical`) exist for the `Mark` fix. Merging either PR
+  first only shrinks this diff.
+- D11-02 Decisions given with the prompt: a barber's "I'm out today" never cancels anything, it creates
+  an alert and the owner chooses per booking (Move, Keep, Cancel, Cancel and notify); barbers use one
+  shared link, `/team`, a name then a six digit PIN; the owner stays on email and password at `/admin`
+  and barbers can no longer sign in there.
+- D11-03 Search is one endpoint, `GET /api/admin/search?q=`. A stored `nameKey` on each booking (the name
+  without case and accents) with the index `{ nameKey: 1, startAt: -1 }` makes name prefix search use an
+  index. Bookings written before the field existed are backfilled once per process on the first search.
+  Phone search matches an exact number when ten digits are given and the end of the number otherwise;
+  the end-of-number regex scans the `customer.phone` index only, which is fine at a shop's volume, so no
+  extra field was added for it. A booking code matches exactly.
+- D11-04 The shell puts the old `.exq-adm` element styles on the content area only, never on the sidebar,
+  top bar or tab bar, so the old raw element styles (every `button`, `input`) cannot leak into the new kit.
+  The old pages and forms keep them until each is rebuilt from the kit in a later milestone.
+- D11-05 The bar chart is hand drawn SVG with a real table next to it for screen readers. The bars are
+  not focusable (an `aria-hidden` focusable element fails axe); hover shows the values and the table is
+  the keyboard and screen reader path.
+- D11-06 `/kit` (development builds only) gained a Dashboard section with the new parts, and its test
+  lists it.
+- D11-07 The resolver gained Move on the server (it was listed for milestone 3 but milestone 2's quick
+  actions already needed it). `moveOptions` on each affected booking lists chairs that do every service,
+  work the whole duration and hold no lock over it. Applying a move releases the old locks and takes the
+  same time on the new chair inside the change's transaction, so a booking made a moment earlier makes the
+  lock insert fail and the whole change (time off included) is undone with SLOT_TAKEN. A test runs two
+  changes racing for the same chair.
+- D11-08 A move is silent: the time does not change, so the customer's manage link stays valid (no token
+  version bump) and no email goes out. The owner can still choose Cancel and notify, or Resend confirmation
+  from the booking panel. The alternative, an email on every move, would also have invalidated the
+  customer's link.
+- D11-09 Alerts are a collection (`alerts`, index `{ status, createdAt }`) with a repository and a count of
+  still-affected bookings computed when the overview loads. A barber-out alert whose bookings have all been
+  moved or cancelled closes itself on the next load. Alerts are created by the barber portal (milestone 5).
+- D11-10 `GET /api/shop` is no longer cached for 60 seconds (`max-age=0, must-revalidate`) because Website
+  changes must show right away. It is one small document read.
+- D11-11 The booking panel opens from the address only on the bookings pages (`/admin/bookings/:id` over the
+  list, back button closes it). From the overview, the schedule and the search it is plain state, so those
+  pages keep their own address.
+- D11-12 Booking status chips say Confirmed, Done, No show and Cancelled (the API value stays `completed`).
+- D11-13 The legacy element rules in `admin.css` (every `button`, `ul`) now apply only to unclassed
+  elements and `exq-adm-*` classes, so kit parts inside the dashboard are never restyled by them. They go
+  when the last old page is rebuilt.
+- D11-14 Announcement text is up to 90 characters and may have a last day (`endsOn`); the public API
+  switches it off after that day. Social links are three optional https URLs checked against the network's
+  own host (`social` in shop settings), seeded with Instagram only.
+- D11-15 Customers are keyed by normalized phone, grouped from bookings in the database (no customers
+  collection); "visits" counts completed bookings, "last visit" the latest completed one, "usual barber" the
+  chair with the most non-cancelled bookings. The owner's private note lives in `customerNotes` (unique on
+  phone) and is only reachable through owner routes; an emptied note is deleted.
+- D11-16 A removed barber's address answers `410 STAFF_REMOVED` (a name that never existed stays 404): the
+  profile page then redirects to `/book?barber=any` and a QR link to `/book?barber=<slug>` falls back to
+  "anyone available". A renamed slug keeps resolving to the current profile through the alias list.
+- D11-17 The public content routes (shop, services, staff, staff profile, gallery) revalidate on every
+  request instead of caching for 30 to 60 seconds, so Website and Team edits show right away. Availability
+  keeps its 10 to 30 second cache because it is per browser and has no owner edit to wait for.
+- D11-18 An alert is resolved through the same conflict flow as any schedule change: the first request without
+  choices answers 409 with the affected bookings and the chairs each could move to, the second applies all
+  choices and closes the alert in the same transaction. A time off request is approved by creating the time
+  off with those choices; declining just closes it.
+- D11-19 The schedule day grid is plain absolutely positioned blocks in a CSS grid (no library, no dragging).
+  Empty slots are clickable for a pointer, and each chair header has a New booking button for the keyboard.
+  The red now line only draws on today's grid and inside the shown hours.
+- D11-20 Settings saves the whole settings document, so a field with no control on the new Settings page
+  (the per-phone booking limit, cleanup minutes, start time step, most services per booking, the barber
+  permissions) keeps the value it has. Rob can still change them through the API; the owner guide only
+  promises what the page shows. Less to build and verify, and none of them was in the prompt 11 list.
+- D11-21 One "cancel or reschedule until N hours before" control writes both cutoff minutes. If the value is
+  not touched on save, each keeps what it had, so saving other rules never flattens a split setting.
+- D11-22 Replacing the home photo uploads the new one first and only then removes the old ones, so a failed
+  upload never leaves the home page without a photo. Gallery uploads go one by one so one bad file does not
+  stop the rest; a failed one stays in the list with the reason.
+- D11-23 "View on site" is one link in the Website page header that follows the open tab (Hours opens Visit,
+  Services opens Services, Gallery opens Gallery, Announcement and Home photo open Home), always in a new
+  tab. The Overview quick action sheet keeps its own button.
+- D11-24 The sign-in email is changed with the current password and a new `POST /api/me/email`; it keeps
+  every session (the owner is the one asking) and is audited. A duplicate email answers 409.
+- D11-25 Removed pages: Settings (Services, Staff, Hours, Closures, Shop settings, Demo data) and the Photos
+  page. `/admin/photos` redirects to Website, Gallery; `/admin/account` to Settings, Account; the old
+  `/admin/settings/*` addresses to Settings. Barber logins (`settings/logins`) stay until the PIN portal
+  replaces them.
+- D11-26 A toast that appears under a resting pointer was being dismissed at once (the pointer entered it
+  before its clock started, which set the time left to zero). The pause now only acts on a running clock.
+  The e2e booking helper clears the test server's rate-limit windows before each booking, because a full
+  run books more than ten times from one address, which the real limit refuses by design.
+- D11-27 A barber has no login record. Identity is the staff record plus a PIN, in three new collections:
+  `staffPins` (one per barber, unique on `staffId`), `setupTokens` (hash only, TTL on `expiresAt`) and
+  `teamSessions` (hash only, TTL on `expiresAt`, 12 hours absolute). The barber cookie is `__Host-exq_team`,
+  separate from the owner's, and the router has a new auth level `team` next to `owner`. The two never stand
+  in for each other: an owner route reads only the owner cookie and answers 401 to a barber session, and
+  the other way round. The old barber email login is refused at `/admin` with a pointer to `/team` (only
+  after the right password, so it reveals nothing), a barber login record can no longer authenticate, and
+  the barber routes under `/api/me/*`, the `/api/admin/users*` routes and their screens are gone.
+- D11-28 The PIN is stored as argon2id of an HMAC-SHA256 of the PIN keyed with `MANAGE_LINK_SECRET` and the
+  staff id. Six digits are only a million guesses, so the hash alone would fall to an offline attack in
+  minutes if the database leaked; the keyed digest means the database alone is not enough. Security wins
+  over convenience here (decision rule), and it needs no new variable.
+- D11-29 The five-tries lock reuses `loginThrottle` under a hashed `pin:<staffId>` key with one 15 minute
+  level, and the thirty-per-address limit reuses `rateLimits`. Only failures count and a success clears the
+  barber's count. Wrong PIN, no PIN yet, hidden barber and unknown id all answer the same `INVALID_CREDENTIALS`
+  after the same hashing work; an unknown id only counts against the address, never against a barber. The
+  one place the answer differs is the lock itself (`ACCOUNT_LOCKED`), because a real barber has to know to
+  wait; that costs nothing the roster does not already show.
+- D11-30 A setup link and "Reset PIN" are one operation: issuing a link deletes the PIN, ends every session
+  of that barber, retires earlier links and clears a lock, so "a new link or reset invalidates the old PIN"
+  holds by construction. "Copy setup link" is the same call without a confirmation; "Reset PIN" asks first.
+  Using a link also signs the barber in, since holding the link is proof enough and typing the PIN twice is
+  the only step left.
+- D11-31 `barbersCanBlockTime` and `barbersCanUploadPhotos` no longer gate anything. Every barber can block
+  their own time and ask for days off, which the portal needs to work out of the box, and photos stay with the
+  owner (the Me tab says to ask). The flags remain in the stored settings document, unused, with no control.
+- D11-32 "I'm out today" sets the day off, keeps every booked client exactly where they are and raises one
+  `barberOut` alert when anyone was booked; pressing it twice changes nothing and raises nothing more. Days off
+  ahead apply at once when those days are empty and otherwise become a `timeOffRequest` alert. A short block
+  over a booked client is refused with the usual conflict answer, and the screen tells the barber to call the
+  shop, because a barber may keep but never cancel or move a client.
+- D11-33 What a barber sees of a booking is the first and last name as booked, the services, the time, the
+  status and notes. Never a phone number or an email (a test asserts neither appears in any portal payload);
+  "Call shop" replaces them. The walk-in form takes a phone number as input only, because a booking needs
+  one for the owner's customer list.
+- D11-34 In demo mode every seeded barber gets PIN 246810 when the shop is first set up, and a demo seeded
+  before PINs existed gets them once, only while no PIN and no setup link exist at all. The sign-in screen
+  prints "Demo PIN: 246810" only when the public shop says it is a demo, and e2e proves it is absent in the
+  normal build.
+- D11-35 Admin type stays 13 to 22px: PIN keys and stat values are now `--t-h3`. The portal page uses
+  `--card-2` rather than `--surface-2`, because `--surface-2` is a light-only value and white text on it
+  failed contrast in dark.
+- D11-36 The demo notice is a blocking modal shown once per browser session on the public site, `/admin` and
+  `/team` of a demo build only. The flag lives in `sessionStorage` behind try/catch; when storage is
+  unavailable the notice shows every time rather than never. It traps focus, makes the page behind it inert
+  and closes on Escape and on "Enter the demo". Afterwards a quiet "Demo by Visualize Studio" line sits in the
+  footer. A real shop never mounts it (e2e proves no dialog on any page of the normal build).
+- D11-37 `SocialIcon` is the one logged exception to "icons only from Untitled UI": Untitled UI has no brand
+  glyphs, and a text link reading "Instagram" is not the recognizable control a customer looks for. It is
+  three small line drawings in `currentColor`, aria-hidden, inside a link that carries the accessible name
+  ("Exquisite on Instagram"), a 44px target and `rel="noopener"`. A network shows only when its URL is set in
+  Settings. Nothing else outside Untitled UI is allowed.
+- D11-38 Icon rules: never on a heading, at most one per button, always aria-hidden next to a text label; an
+  icon-only button gets an `aria-label` and the desktop tooltip. Step bar ticks add "(done)" to the hidden
+  text so the tick is not the only signal.
+- D11-39 When the API is down, a public page keeps its words, bottom bar and footer and shows an inline
+  notice with the shop's phone number; each data section says what did not load ("The menu did not load")
+  instead of an empty block. Only `/book` and `/manage` (which cannot work without the database) and
+  maintenance mode still replace the page with the full down screen.
+- D11-40 The confirmation ticket splits the old "When" row into Day and Time, each with its own icon, so a
+  screen reader reads two short facts and the time can be scanned at a glance.
+- D11-41 The phone header logo is 170 by 40px: it filled the row at 360 and 390 before, pushing the menu
+  button to the edge. A test asserts the box and that nothing scrolls sideways at both widths.
+- D11-42 `Mark` variants: the footer uses `crest` (a seal reads as a stamp on dark), the `/team` sign-in uses
+  `disc`. The lockups stay in the header only.
+- D11-43 The capture script resets the demo data (the demo reset route) before every run, because the demo
+  database outlives a server restart and earlier runs leave all-day hours behind that would show on the public
+  pages.

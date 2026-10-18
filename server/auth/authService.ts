@@ -160,6 +160,13 @@ export async function login(
     user?.passwordHash ?? (await getDummyHash()),
     input.password,
   );
+  // Barbers sign in with a PIN at /team. Said only after the right password, so it reveals nothing.
+  if (user && passwordOk && user.role === 'barber') {
+    await auditLogin('failure', { email, userId: user._id, reason: 'barberUsesTeam' }, meta);
+    throw new AppError('FORBIDDEN', 'Barbers sign in with a PIN at /team', {
+      extra: { signInAt: '/team' },
+    });
+  }
   const usable = user !== null && passwordOk && (await loginIsUsable(user));
   if (!user || !usable) {
     await rateLimitsRepo.hitRateLimit(ipKey, LOGIN_IP_LIMIT, meta.now);
@@ -272,113 +279,43 @@ export async function changeOwnPassword(
   );
 }
 
-export interface IssuedPassword {
-  user: UserDocument;
-  /** Shown once to the owner, never stored. */
-  temporaryPassword: string;
-}
-
-/** Owner creates a barber login for a staff record, with a temporary password. */
-export async function createStaffLogin(
+/** Changes the signed-in login's email. Asks for the current password, like a password change. */
+export async function changeOwnEmail(
   principal: Principal,
-  input: { email: string; staffId: string },
+  input: { currentPassword: string; newEmail: string },
   meta: RequestMeta,
-): Promise<IssuedPassword> {
-  const staff = await staffRepo.findStaffById(input.staffId);
-  if (!staff || staff.deletedAt) throw new AppError('NOT_FOUND', 'Staff member was not found');
-  if (await usersRepo.findUserByStaffId(staff._id)) {
-    throw new AppError('CONFLICT', `${staff.name} already has a login`);
+): Promise<void> {
+  const hit = await rateLimitsRepo.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta.now,
+  );
+  if (!hit.allowed) {
+    throw new AppError('RATE_LIMITED', 'Too many attempts. Please wait and try again.', {
+      retryAfterSeconds: hit.retryAfterSeconds,
+    });
   }
-  const temporaryPassword = generateTemporaryPassword();
-  const user = await usersRepo.insertUser(
-    {
-      email: normalizeEmail(input.email),
-      passwordHash: await hashPassword(temporaryPassword),
-      role: 'barber',
-      staffId: staff._id,
-      mustChangePassword: true,
-    },
-    meta.now,
-  );
-  await auditLogRepo.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: 'user.create',
-      entityType: 'user',
-      entityId: user._id,
-      before: null,
-      after: { email: user.email, role: user.role, staffId: user.staffId },
-      meta: null,
-      requestId: meta.requestId,
-    },
-    meta.now,
-  );
-  return { user, temporaryPassword };
-}
-
-async function requireOtherUser(principal: Principal, userId: string): Promise<UserDocument> {
-  const user = await usersRepo.findUserById(userId);
-  if (!user) throw new AppError('NOT_FOUND', 'Login was not found');
-  if (user._id === principal.userId) {
-    throw new AppError('BAD_REQUEST', 'Use your own account page to change your own login');
+  const user = await usersRepo.findUserById(principal.userId);
+  if (!user) throw new AppError('AUTH_REQUIRED', 'Please sign in');
+  if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    throw new AppError('INVALID_CREDENTIALS', 'Your current password is incorrect');
   }
-  return user;
-}
-
-/** Owner resets another login: new temporary password, every session ended, lockout cleared. */
-export async function resetLoginPassword(
-  principal: Principal,
-  userId: string,
-  meta: RequestMeta,
-): Promise<IssuedPassword> {
-  const user = await requireOtherUser(principal, userId);
-  const temporaryPassword = generateTemporaryPassword();
-  await usersRepo.setUserPasswordHash(user._id, await hashPassword(temporaryPassword), meta.now, {
-    mustChangePassword: true,
-  });
-  await sessionsRepo.revokeAllSessionsForUser(user._id, meta.now);
-  await loginThrottleRepo.clearLoginThrottle(emailKey(user.email));
+  if (input.newEmail === user.email)
+    throw new AppError('BAD_REQUEST', 'That is already your email');
+  await usersRepo.setUserEmail(user._id, input.newEmail, meta.now);
   await auditLogRepo.appendAuditEntry(
     {
       actor: actorOf(principal),
-      action: 'user.password.reset',
+      action: 'user.email.change',
       entityType: 'user',
       entityId: user._id,
-      before: null,
-      after: null,
+      before: { email: user.email },
+      after: { email: input.newEmail },
       meta: null,
       requestId: meta.requestId,
     },
     meta.now,
   );
-  const updated = await usersRepo.findUserById(user._id);
-  return { user: updated ?? user, temporaryPassword };
-}
-
-/** Owner disables or re-enables another login. Disabling ends its sessions at once. */
-export async function setLoginActive(
-  principal: Principal,
-  userId: string,
-  isActive: boolean,
-  meta: RequestMeta,
-): Promise<UserDocument> {
-  const user = await requireOtherUser(principal, userId);
-  await usersRepo.setUserActive(user._id, isActive, meta.now);
-  if (!isActive) await sessionsRepo.revokeAllSessionsForUser(user._id, meta.now);
-  await auditLogRepo.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: isActive ? 'user.enable' : 'user.disable',
-      entityType: 'user',
-      entityId: user._id,
-      before: { isActive: user.isActive },
-      after: { isActive },
-      meta: null,
-      requestId: meta.requestId,
-    },
-    meta.now,
-  );
-  return (await usersRepo.findUserById(user._id)) ?? user;
 }
 
 /**

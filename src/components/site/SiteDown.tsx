@@ -43,3 +43,19 @@ export function SiteDown({
     </section>
   );
 }
+
+/**
+ * A short inline notice for a page that can still show its own words while the API is down:
+ * the data sections say so where they would be, and this line says what to do about it.
+ */
+export function OutageNotice({ phone }: { phone: string }) {
+  const tel = phone.replace(/[^\d+]/g, '');
+  return (
+    <aside className="exq-outage exq-wrap" data-state="down" role="status">
+      <p>
+        Some of this page could not load. The shop is still open: call{' '}
+        <a href={`tel:${tel}`}>{formatUsPhone(phone)}</a> to book.
+      </p>
+    </aside>
+  );
+}

@@ -3,7 +3,7 @@ import { DAY_KEYS } from '@shared/lib/time';
 import { hoursLabel } from '@/lib/hours';
 import { DAY_NAMES, todayKey } from '@/lib/shop';
 
-/** The week's hours with today highlighted. Keeps the exq-hours classes from the first build. */
+/** The week's hours with today marked and set heavier. Keeps the exq-hours classes. */
 export function HoursTable({ hours }: { hours: WeekHours }) {
   const today = todayKey();
   return (
@@ -19,7 +19,7 @@ export function HoursTable({ hours }: { hours: WeekHours }) {
           >
             <dt className="exq-hours__day">
               {DAY_NAMES[day]}
-              {day === today ? <span className="exq-hours__today"> Today</span> : null}
+              {day === today ? <span className="exq-hours__today">Today</span> : null}
             </dt>
             <dd className="exq-hours__times exq-num">{hoursLabel(intervals)}</dd>
           </div>

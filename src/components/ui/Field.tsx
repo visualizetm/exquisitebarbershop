@@ -46,6 +46,7 @@ function frame(
   );
 }
 
+/** Text input. States: default, focus (CSS), error, warning, disabled. */
 export function Input({
   label,
   hint,
@@ -110,4 +111,60 @@ export function Textarea({
       aria-describedby={describedBy}
     />
   ));
+}
+
+/** A checkbox with its label, 44px tall so a thumb can hit it. */
+export function Checkbox({
+  label,
+  hint,
+  className,
+  ...rest
+}: { label: ReactNode; hint?: ReactNode } & Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  return (
+    <label
+      className={`exq-check ${className ?? ''}`.trim()}
+      data-state={rest.disabled ? 'disabled' : 'default'}
+    >
+      <input {...rest} type="checkbox" />
+      <span>
+        {label}
+        {hint ? <span className="exq-check__hint">{hint}</span> : null}
+      </span>
+    </label>
+  );
+}
+
+/** An on/off switch. The visible label says what it is now; it is a button with role switch. */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+  busy = false,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: ReactNode;
+  disabled?: boolean;
+  busy?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      className="exq-switch"
+      data-state={checked ? 'on' : 'off'}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      onClick={() => {
+        onChange(!checked);
+      }}
+    >
+      <span className="exq-switch__track" aria-hidden="true">
+        <span className="exq-switch__thumb" />
+      </span>
+      <span className="exq-switch__label">{label}</span>
+    </button>
+  );
 }

@@ -1,37 +1,25 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { emailOutboxRepo, sessionsRepo, usersRepo } from '../../server/repos';
-
-async function liveSessions(userId: string): Promise<number> {
-  const now = new Date();
-  return (await sessionsRepo.listSessionsForUser(userId)).filter(
-    (s) => s.revokedAt === null && s.expiresAt > now,
-  ).length;
-}
+import { emailOutboxRepo } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
-import { serviceSeedId, servicesSeed, shopSettingsSeed, staffSeedId } from '../../seed/shop';
+import { serviceSeedId, servicesSeed, staffSeedId } from '../../seed/shop';
 import {
   auditListResponseSchema,
   bookingDetailResponseSchema,
   bookingListResponseSchema,
   bookingResponseSchema,
   customerResponseSchema,
-  issuedPasswordResponseSchema,
-  loginListResponseSchema,
-  loginResponseSchema,
-  myScheduleResponseSchema,
   outboxListResponseSchema,
   scheduleResponseSchema,
   serviceListResponseSchema,
   serviceResponseSchema,
-  settingsResponseSchema,
-  staffListResponseSchema,
   staffResponseSchema,
   todayResponseSchema,
   whoIsInResponseSchema,
 } from '../../shared/api/admin';
 import { availabilityResponseSchema } from '../../shared/api/availability';
 import { apiErrorSchema } from '../../shared/api/errors';
-import { createLogin, sessionCookie } from '../helpers/auth';
+import { teamStatusResponseSchema } from '../../shared/api/team';
+import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
 import {
   bookPublic,
   call,
@@ -73,8 +61,7 @@ beforeAll(async () => {
   server = await startTestServer();
   const ownerLogin = await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') });
   ownerCookie = await sessionCookie(ownerLogin._id);
-  const marcusLogin = await createLogin({ role: 'barber', staffId: marcus });
-  marcusCookie = await sessionCookie(marcusLogin._id);
+  marcusCookie = await teamCookie(marcus);
 });
 afterAll(async () => {
   await server.close();
@@ -169,20 +156,21 @@ describe('status changes', () => {
       serviceIds: [cut],
       startAt: slotAt(WED, '14:00'),
     });
-    const noShow = await barber('POST', `/api/me/bookings/${b.id}/status`, { status: 'noShow' });
-    expect(bookingResponseSchema.parse(noShow.body).booking.status).toBe('noShow');
-    const undo = await barber('POST', `/api/me/bookings/${b.id}/status`, { status: 'confirmed' });
+    const noShow = await barber('POST', `/api/team/bookings/${b.id}/status`, { status: 'noShow' });
+    expect(teamStatusResponseSchema.parse(noShow.body).booking.status).toBe('noShow');
+    const undo = await barber('POST', `/api/team/bookings/${b.id}/status`, { status: 'confirmed' });
     expect(undo.status).toBe(200);
-    const cancel = await barber('POST', `/api/me/bookings/${b.id}/status`, { status: 'cancelled' });
-    expect(cancel.status).toBe(409);
-    expect(codeOf(cancel.body)).toBe('INVALID_TRANSITION');
+    const cancel = await barber('POST', `/api/team/bookings/${b.id}/status`, {
+      status: 'cancelled',
+    });
+    expect(cancel.status).toBe(400);
+    expect(codeOf(cancel.body)).toBe('VALIDATION_ERROR');
+    // Nothing a barber does shows up as the owner's cancellation.
     const detail = bookingDetailResponseSchema.parse(
-      (await barber('GET', `/api/me/bookings/${b.id}`)).body,
+      (await owner('GET', `/api/admin/bookings/${b.id}`)).body,
     );
-    expect(detail.transitions).toEqual(['completed', 'noShow']);
-    // The barber view never carries the audit trail or email history.
-    expect(detail.audit).toEqual([]);
-    expect(detail.outbox).toEqual([]);
+    expect(detail.booking.status).toBe('confirmed');
+    expect(detail.audit.map((a) => a.action)).toContain('booking.status');
   });
 });
 
@@ -340,7 +328,7 @@ describe('bookings list and detail', () => {
       serviceIds: [cut],
       startAt: slotAt(FRI, '16:00'),
     });
-    await barber('GET', `/api/me/bookings/${mine.id}`);
+    await barber('POST', `/api/team/bookings/${mine.id}/note`, { notes: 'Likes it short' });
     const stillNew = bookingListResponseSchema.parse(
       (await owner('GET', `/api/admin/bookings?q=${mine.referenceCode}`)).body,
     );
@@ -404,76 +392,19 @@ describe('catalog and settings', () => {
     expect(staff.slug).toBe('dee-styles');
     expect(staff.slugAliases).toContain('dee');
     expect((await call(server.baseUrl, 'GET', '/api/staff/dee')).status).toBe(200);
-    const list = staffListResponseSchema.parse((await owner('GET', '/api/admin/staff')).body);
-    expect(list.staff.find((s) => s.id === marcus)?.hasLogin).toBe(true);
   });
 
-  it('turns on barber time blocking through the shop settings', async () => {
-    const own = { kind: 'block', startAt: slotAt(FRI, '18:00'), endAt: slotAt(FRI, '18:30') };
-    const refused = await barber('POST', '/api/me/time-blocks', own);
-    expect(refused.status).toBe(403);
-    const settings = settingsResponseSchema.parse((await owner('GET', '/api/admin/settings')).body);
-    expect(settings.settings.permissions.barbersCanBlockTime).toBe(false);
-    const put = await owner('PUT', '/api/admin/settings', {
-      ...shopSettingsSeed,
-      permissions: { barbersCanBlockTime: true },
+  it('a barber blocks their own time through the team API, with no owner setting needed', async () => {
+    const res = await barber('POST', '/api/team/time-blocks', {
+      date: FRI,
+      start: '18:00',
+      end: '18:30',
     });
-    expect(put.status).toBe(200);
-    const allowed = await barber('POST', '/api/me/time-blocks', own);
-    expect(allowed.status).toBe(201);
-    const week = myScheduleResponseSchema.parse(
-      (await barber('GET', `/api/me/schedule?date=${WED}&days=7`)).body,
-    );
-    expect(week.canBlockTime).toBe(true);
-    expect(week.days).toHaveLength(7);
-    expect(week.days.every((d) => d.bookings.every((b) => b.staff.id === marcus))).toBe(true);
-    expect(week.days.flatMap((d) => d.blocks).map((b) => b.startAt)).toContain(own.startAt);
-  });
-});
-
-describe('logins', () => {
-  it('issues a temporary password, resets it, disables and enables the login', async () => {
-    const tre = staffSeedId('tre');
-    const created = await owner('POST', '/api/admin/users', {
-      email: 'tre.login@example.com',
-      staffId: tre,
+    expect(res.status).toBe(201);
+    expect((res.body as { timeBlock: { staffId: string; kind: string } }).timeBlock).toMatchObject({
+      staffId: marcus,
+      kind: 'block',
     });
-    expect(created.status).toBe(201);
-    const issued = issuedPasswordResponseSchema.parse(created.body);
-    expect(issued.user.mustChangePassword).toBe(true);
-    expect(issued.temporaryPassword).toMatch(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/);
-    const dup = await owner('POST', '/api/admin/users', {
-      email: 'other@example.com',
-      staffId: tre,
-    });
-    expect(dup.status).toBe(409);
-
-    const login = await call(server.baseUrl, 'POST', '/api/auth/login', {
-      body: { email: 'tre.login@example.com', password: issued.temporaryPassword },
-    });
-    expect(login.status).toBe(200);
-    const userId = issued.user._id;
-    expect(await liveSessions(userId)).toBe(1);
-
-    const reset = issuedPasswordResponseSchema.parse(
-      (await owner('POST', `/api/admin/users/${userId}/reset-password`)).body,
-    );
-    expect(reset.temporaryPassword).not.toBe(issued.temporaryPassword);
-    expect(await liveSessions(userId)).toBe(0);
-
-    const disabled = loginResponseSchema.parse(
-      (await owner('POST', `/api/admin/users/${userId}/disable`)).body,
-    );
-    expect(disabled.user.isActive).toBe(false);
-    const refused = await call(server.baseUrl, 'POST', '/api/auth/login', {
-      body: { email: 'tre.login@example.com', password: reset.temporaryPassword },
-    });
-    expect(refused.status).toBe(401);
-    await owner('POST', `/api/admin/users/${userId}/enable`);
-    expect((await usersRepo.findUserById(userId))?.isActive).toBe(true);
-    const list = loginListResponseSchema.parse((await owner('GET', '/api/admin/users')).body);
-    expect(list.users.find((u) => u._id === userId)?.staffName).toBeTruthy();
-    expect(JSON.stringify(list)).not.toContain('passwordHash');
   });
 });
 

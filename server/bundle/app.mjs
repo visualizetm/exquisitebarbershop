@@ -2822,12 +2822,12 @@ function $constructor(name, initializer3, proto, params) {
     inst._zod.traits.add(name);
     initializer3(inst, def);
     if (initialized) {
-      const own3 = Object.getPrototypeOf(inst);
+      const own2 = Object.getPrototypeOf(inst);
       const ctorProto = inst._zod.constr.prototype;
-      let up = own3;
+      let up = own2;
       while (up && up !== ctorProto)
         up = Object.getPrototypeOf(up);
-      const target = up ?? own3;
+      const target = up ?? own2;
       if (!initialized.has(target)) {
         initialized.add(target);
         members(target, protoMembers);
@@ -6185,20 +6185,20 @@ function leafPattern(schema) {
     return "(?!)";
   if (minimum !== void 0 || maximum !== void 0)
     return string({ minimum, maximum }).source;
-  const own3 = schema._zod.pattern;
-  return (isInt && own3 === number ? integer : own3)?.source;
+  const own2 = schema._zod.pattern;
+  return (isInt && own2 === number ? integer : own2)?.source;
 }
 function partPattern(schema) {
   const def = schema._zod.def;
-  const own3 = schema._zod.pattern?.source;
+  const own2 = schema._zod.pattern?.source;
   const inner = def.innerType ?? schema._zod.innerType;
   if (inner) {
     const before = inner._zod.pattern?.source;
     const after = partPattern(inner);
-    if (own3 && before && after && after !== before) {
-      return own3.replace(cleanRegex(before), () => cleanRegex(after));
+    if (own2 && before && after && after !== before) {
+      return own2.replace(cleanRegex(before), () => cleanRegex(after));
     }
-    return own3;
+    return own2;
   }
   if (def.options) {
     const sources = def.options.map(partPattern);
@@ -24138,17 +24138,17 @@ var Duration = class _Duration {
     for (const k of orderedUnits$1) {
       if (units.indexOf(k) >= 0) {
         lastUnit = k;
-        let own3 = 0;
+        let own2 = 0;
         for (const ak in accumulated) {
-          own3 += this.matrix[ak][k] * accumulated[ak];
+          own2 += this.matrix[ak][k] * accumulated[ak];
           accumulated[ak] = 0;
         }
         if (isNumber(vals[k])) {
-          own3 += vals[k];
+          own2 += vals[k];
         }
-        const i = Math.trunc(own3);
+        const i = Math.trunc(own2);
         built[k] = i;
-        accumulated[k] = (own3 * 1e3 - i * 1e3) / 1e3;
+        accumulated[k] = (own2 * 1e3 - i * 1e3) / 1e3;
       } else if (isNumber(vals[k])) {
         accumulated[k] = vals[k];
       }
@@ -27786,6 +27786,60 @@ var featureFlagsSchema = external_exports.object({
   rewards: external_exports.boolean().default(false),
   smsReminders: external_exports.boolean().default(false)
 });
+var announcementLinkSchema = external_exports.string().trim().max(200).refine(
+  (v) => v === "" || v.startsWith("/") && !v.startsWith("//") || v.startsWith("https://"),
+  {
+    message: "Use a path such as /book or an https address"
+  }
+);
+var announcementSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  text: external_exports.string().trim().max(90),
+  linkLabel: external_exports.string().trim().max(30),
+  linkUrl: announcementLinkSchema,
+  /** The last day the strip shows (shop date), or empty to keep it until it is switched off. */
+  endsOn: external_exports.union([external_exports.literal(""), isoDateSchema]).default("")
+}).refine((a) => !a.enabled || a.text.length > 0, {
+  path: ["text"],
+  message: "Add the announcement text, or switch it off"
+}).refine((a) => a.linkLabel === "" === (a.linkUrl === ""), {
+  path: ["linkUrl"],
+  message: "Give the link both a label and an address, or leave both empty"
+});
+var DEFAULT_ANNOUNCEMENT = {
+  enabled: true,
+  text: "Walk ins welcome",
+  linkLabel: "Book online",
+  linkUrl: "/book",
+  endsOn: ""
+};
+function announcementIsLive(a, today) {
+  return a.enabled && (a.endsOn === "" || today <= a.endsOn);
+}
+function socialUrl(domain2, label) {
+  return external_exports.string().trim().max(200).refine(
+    (v) => {
+      if (v === "") return true;
+      try {
+        const url2 = new URL(v);
+        return url2.protocol === "https:" && (url2.hostname === domain2 || url2.hostname.endsWith(`.${domain2}`));
+      } catch {
+        return false;
+      }
+    },
+    { message: `Use the full https address of the ${label} page, or leave it empty` }
+  );
+}
+var socialLinksSchema = external_exports.object({
+  instagramUrl: socialUrl("instagram.com", "Instagram"),
+  tiktokUrl: socialUrl("tiktok.com", "TikTok"),
+  facebookUrl: socialUrl("facebook.com", "Facebook")
+});
+var DEFAULT_SOCIAL_LINKS = {
+  instagramUrl: "",
+  tiktokUrl: "",
+  facebookUrl: ""
+};
 var shopSettingsDocumentSchema = external_exports.object({
   _id: external_exports.literal(SHOP_SETTINGS_ID),
   name: nonEmptyText(120),
@@ -27800,6 +27854,8 @@ var shopSettingsDocumentSchema = external_exports.object({
   notifications: notificationSettingsSchema,
   features: featureFlagsSchema,
   permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
+  announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
+  social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
   nextOpenServiceId: idSchema.nullable().default(null)
 }).extend(timestampsSchema.shape);
@@ -27838,9 +27894,13 @@ var photoKindSchema = external_exports.enum(["staff", "gallery", "hero"]);
 var PHOTO_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"];
 var PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 var KEY_PREFIX_PATTERN = /^[a-z0-9][a-z0-9-]*\/$/;
-var photoKeySchema = external_exports.string().regex(
-  /^(?:[a-z0-9][a-z0-9-]*\/)?(?:staff\/[0-9a-f]{24}|gallery|hero)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/
+var CLOUDINARY_FOLDER_PATTERN = /^[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/;
+var UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+var FILE_KEY = new RegExp(
+  `^(?:[a-z0-9][a-z0-9-]*/)?(?:staff/[0-9a-f]{24}|gallery|hero)/${UUID_PATTERN}\\.webp$`
 );
+var CLOUDINARY_KEY = new RegExp(`^(?:[a-z0-9][a-z0-9_-]*/)+${UUID_PATTERN}$`);
+var photoKeySchema = external_exports.string().refine((key) => FILE_KEY.test(key) || CLOUDINARY_KEY.test(key), "Not a photo key");
 var photoDocumentSchema = external_exports.object({
   _id: idSchema,
   kind: photoKindSchema,
@@ -27887,9 +27947,10 @@ var envSchema = external_exports.object({
   LOG_LEVEL: external_exports.enum(["debug", "info", "warn", "error"]).default("info"),
   /**
    * Where photos live: Cloudflare R2 in production, the local disk in dev and tests,
-   * "none" to run without photos until R2 exists, or "mongo" (MongoDB GridFS, demo mode only).
+   * "cloudinary" (photos on Cloudinary, signed uploads from the browser), "none" to run
+   * without photos, or "mongo" (MongoDB GridFS, demo mode only).
    */
-  STORAGE_DRIVER: external_exports.enum(["local", "r2", "none", "mongo"]).default("local"),
+  STORAGE_DRIVER: external_exports.enum(["local", "r2", "cloudinary", "none", "mongo"]).default("local"),
   /**
    * Showcase mode: the first request sets the shop up with sample data, the admin login
    * offers a one-click demo sign-in, photos can live in MongoDB (STORAGE_DRIVER=mongo),
@@ -27898,6 +27959,15 @@ var envSchema = external_exports.object({
   DEMO_MODE: external_exports.enum(["true", "false"]).default("false"),
   /** Lets production launch with STORAGE_DRIVER=none on purpose, before R2 is set up. */
   STORAGE_DISABLED_ACK: external_exports.enum(["true", "false"]).default("false"),
+  /** Cloudinary (STORAGE_DRIVER=cloudinary). The secret never leaves the server. */
+  CLOUDINARY_CLOUD_NAME: external_exports.string().optional(),
+  CLOUDINARY_API_KEY: external_exports.string().optional(),
+  CLOUDINARY_API_SECRET: external_exports.string().optional(),
+  /** The folder every upload goes into: exquisite/production, or exquisite/preview for Preview. */
+  CLOUDINARY_FOLDER: external_exports.string().regex(
+    CLOUDINARY_FOLDER_PATTERN,
+    "CLOUDINARY_FOLDER must be lowercase letters, digits, hyphens or underscores, with slashes between folders"
+  ).optional(),
   R2_ACCOUNT_ID: external_exports.string().optional(),
   R2_ACCESS_KEY_ID: external_exports.string().optional(),
   R2_SECRET_ACCESS_KEY: external_exports.string().optional(),
@@ -27944,8 +28014,8 @@ function envProblems(env, environment = environmentOf(env)) {
     need(
       "STORAGE_DRIVER",
       env.STORAGE_DRIVER !== "local",
-      "STORAGE_DRIVER must be r2, none or mongo on Vercel",
-      "Set STORAGE_DRIVER to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on."
+      "STORAGE_DRIVER must be cloudinary, r2, none or mongo on Vercel",
+      "Set STORAGE_DRIVER to cloudinary with the four CLOUDINARY variables (see DEPLOY.md), to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on."
     );
   }
   const demo = env.DEMO_MODE === "true";
@@ -27954,7 +28024,7 @@ function envProblems(env, environment = environmentOf(env)) {
       "STORAGE_DRIVER",
       demo,
       "STORAGE_DRIVER is mongo without DEMO_MODE",
-      "Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md) for a real launch."
+      "Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=cloudinary with the CLOUDINARY variables (see DEPLOY.md) for a real launch."
     );
   }
   if (env.STORAGE_DRIVER === "none" && environment === "production" && !demo) {
@@ -27962,7 +28032,7 @@ function envProblems(env, environment = environmentOf(env)) {
       "STORAGE_DISABLED_ACK",
       env.STORAGE_DISABLED_ACK === "true",
       "STORAGE_DRIVER is none, so photos and daily backups are off",
-      "Either set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md), or set STORAGE_DISABLED_ACK=true to launch without photos and backups on purpose."
+      "Either set STORAGE_DRIVER=cloudinary with the CLOUDINARY variables (see DEPLOY.md), or set STORAGE_DISABLED_ACK=true to launch without photos and backups on purpose."
     );
   }
   if (env.STORAGE_DRIVER === "r2") {
@@ -27978,6 +28048,29 @@ function envProblems(env, environment = environmentOf(env)) {
         Boolean(env[name]),
         `${name} is not set`,
         `Set ${name} from the Cloudflare R2 bucket (R2, the bucket, Settings for the public URL; Manage R2 API Tokens for the keys).`
+      );
+    }
+  }
+  if (env.STORAGE_DRIVER === "cloudinary") {
+    for (const name of [
+      "CLOUDINARY_CLOUD_NAME",
+      "CLOUDINARY_API_KEY",
+      "CLOUDINARY_API_SECRET",
+      "CLOUDINARY_FOLDER"
+    ]) {
+      need(
+        name,
+        Boolean(env[name]),
+        `${name} is not set`,
+        name === "CLOUDINARY_FOLDER" ? "Set CLOUDINARY_FOLDER to exquisite/production in Production and exquisite/preview in Preview, so previews never touch live photos." : `Set ${name} from the Cloudinary dashboard (Settings, API Keys). The API secret is server side only.`
+      );
+    }
+    if (environment === "preview" && env.CLOUDINARY_FOLDER) {
+      need(
+        "CLOUDINARY_FOLDER",
+        env.CLOUDINARY_FOLDER.includes("preview"),
+        "CLOUDINARY_FOLDER does not say preview for a preview deployment",
+        "Set CLOUDINARY_FOLDER to exquisite/preview in the Preview environment only, so preview uploads never touch production photos."
       );
     }
   }
@@ -28210,7 +28303,12 @@ var COLLECTIONS = {
   scheduleGuards: "scheduleGuards",
   photos: "photos",
   pendingUploads: "pendingUploads",
-  systemState: "systemState"
+  systemState: "systemState",
+  alerts: "alerts",
+  customerNotes: "customerNotes",
+  staffPins: "staffPins",
+  setupTokens: "setupTokens",
+  teamSessions: "teamSessions"
 };
 var DAY_SECONDS = 24 * 60 * 60;
 var INDEXES = [
@@ -28285,6 +28383,71 @@ var INDEXES = [
     keys: { "customer.phone": 1, startAt: -1 },
     options: { name: "customer_phone" },
     reason: "Open-bookings-per-phone guard and owner lookup of a customer history."
+  },
+  {
+    collection: "bookings",
+    keys: { nameKey: 1, startAt: -1 },
+    options: { name: "by_name_key" },
+    reason: "The owner's search finds a customer by the start of the name, any case or accent."
+  },
+  // alerts
+  {
+    collection: "alerts",
+    keys: { status: 1, createdAt: 1 },
+    options: { name: "open_queue" },
+    reason: "The overview lists open alerts, oldest first, without a collection scan."
+  },
+  // customerNotes
+  {
+    collection: "customerNotes",
+    keys: { phone: 1 },
+    options: { name: "uniq_phone", unique: true },
+    reason: "One private note per customer phone number."
+  },
+  // staffPins
+  {
+    collection: "staffPins",
+    keys: { staffId: 1 },
+    options: { name: "uniq_staff", unique: true },
+    reason: "At most one PIN per barber; sign-in looks it up by staff id."
+  },
+  // setupTokens
+  {
+    collection: "setupTokens",
+    keys: { tokenHash: 1 },
+    options: { name: "uniq_tokenHash", unique: true },
+    reason: "A setup link is found by the hash of its token."
+  },
+  {
+    collection: "setupTokens",
+    keys: { expiresAt: 1 },
+    options: { name: "ttl_expiresAt", expireAfterSeconds: 0 },
+    reason: "MongoDB removes expired setup links on its own."
+  },
+  {
+    collection: "setupTokens",
+    keys: { staffId: 1 },
+    options: { name: "by_staff" },
+    reason: "A new link retires the barber's earlier ones."
+  },
+  // teamSessions
+  {
+    collection: "teamSessions",
+    keys: { tokenHash: 1 },
+    options: { name: "uniq_tokenHash", unique: true },
+    reason: "Barber session lookup on every portal request."
+  },
+  {
+    collection: "teamSessions",
+    keys: { expiresAt: 1 },
+    options: { name: "ttl_expiresAt", expireAfterSeconds: 0 },
+    reason: "MongoDB removes expired barber sessions on its own."
+  },
+  {
+    collection: "teamSessions",
+    keys: { staffId: 1 },
+    options: { name: "by_staff" },
+    reason: "A new PIN or a reset ends every session of one barber."
   },
   // slotLocks
   {
@@ -28476,6 +28639,8 @@ var ERROR_CODES = {
   IDEMPOTENCY_IN_PROGRESS: 409,
   BOOKING_NOT_CANCELLABLE: 409,
   BOOKING_CANCELLED: 410,
+  /** A barber who was removed from the schedule: their address still works and sends people to booking. */
+  STAFF_REMOVED: 410,
   BOOKING_NOT_RESCHEDULABLE: 409,
   SHOP_CLOSED: 409,
   OUTSIDE_BOOKING_WINDOW: 409,
@@ -28523,7 +28688,9 @@ var apiErrorSchema = external_exports.object({
         endAt: external_exports.iso.datetime(),
         customerName: external_exports.string(),
         services: external_exports.array(external_exports.string()),
-        hasEmail: external_exports.boolean()
+        hasEmail: external_exports.boolean(),
+        /** Chairs that do every service of this booking and are free for all of it: where it can move. */
+        moveOptions: external_exports.array(external_exports.object({ staffId: external_exports.string(), staffName: external_exports.string() })).optional()
       })
     ).optional(),
     /** For SLOT_TAKEN: the next open times so the UI can offer them right away. */
@@ -28559,6 +28726,9 @@ var AppError = class _AppError extends Error {
     return new _AppError("VALIDATION_ERROR", message, { details });
   }
 };
+function isAppError(value) {
+  return value instanceof AppError;
+}
 function isDuplicateKeyError(error62) {
   return typeof error62 === "object" && error62 !== null && "code" in error62 && error62.code === 11e3;
 }
@@ -28574,7 +28744,13 @@ function fill(doc) {
   return {
     ...doc,
     permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
-    nextOpenServiceId: stored.nextOpenServiceId ?? null
+    nextOpenServiceId: stored.nextOpenServiceId ?? null,
+    announcement: { ...DEFAULT_ANNOUNCEMENT, ...stored.announcement },
+    // Shops set up before the social links existed keep their Instagram link from the handle.
+    social: stored.social ?? {
+      ...DEFAULT_SOCIAL_LINKS,
+      instagramUrl: `https://instagram.com/${doc.instagramHandle}`
+    }
   };
 }
 function withDefaults(doc) {
@@ -29093,20 +29269,29 @@ async function listTimeBlocksEndingAfter(instant, staffIds, options) {
 var bookingsRepo_exports = {};
 __export(bookingsRepo_exports, {
   ReferenceCodeCollision: () => ReferenceCodeCollision,
+  backfillNameKeys: () => backfillNameKeys,
   cancelBooking: () => cancelBooking,
   countOpenBookingsForPhone: () => countOpenBookingsForPhone,
+  countTable: () => countTable,
   countUnseenOnline: () => countUnseenOnline,
+  customerPage: () => customerPage,
   findBookingById: () => findBookingById,
   findBookingByReferenceCode: () => findBookingByReferenceCode,
+  findBookingsByIds: () => findBookingsByIds,
   insertBooking: () => insertBooking,
   listBookingsBetween: () => listBookingsBetween,
   listBookingsForPhone: () => listBookingsForPhone,
   listBookingsPage: () => listBookingsPage,
+  listBookingsStartingBetween: () => listBookingsStartingBetween,
   listUpcomingConfirmed: () => listUpcomingConfirmed,
   markOwnerSeen: () => markOwnerSeen,
+  moveBookingToStaff: () => moveBookingToStaff,
   rescheduleBooking: () => rescheduleBooking,
   restoreBooking: () => restoreBooking,
+  searchBookings: () => searchBookings,
+  searchCustomers: () => searchCustomers,
   setBookingStatus: () => setBookingStatus,
+  tablePage: () => tablePage,
   transitionBookingStatus: () => transitionBookingStatus,
   updateBookingNotes: () => updateBookingNotes
 });
@@ -29154,10 +29339,28 @@ var bookingDocumentSchema = external_exports.object({
   /** Bumped on reschedule or cancel; manage links embed it so old links stop working. */
   manageTokenVersion: external_exports.int().min(1),
   /** When the owner first opened it. Online bookings without it show as new. */
-  ownerSeenAt: external_exports.date().nullable().optional()
+  ownerSeenAt: external_exports.date().nullable().optional(),
+  /** The customer name without accents or case, for the owner's search. Set on insert. */
+  nameKey: external_exports.string().max(200).optional()
 }).extend(timestampsSchema.shape).refine((v) => v.endAt.getTime() > v.startAt.getTime(), {
   message: "endAt must be after startAt"
 });
+
+// shared/lib/search.ts
+function nameKeyOf(name) {
+  return name.normalize("NFD").replace(new RegExp("\\p{Diacritic}", "gu"), "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
+}
+function classifySearch(input2) {
+  const trimmed = input2.trim();
+  if (trimmed === "") return { kind: "empty" };
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length >= 4 && /^[\d\s()+.-]+$/.test(trimmed)) {
+    const national = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+    return { kind: "phone", digits: national.slice(0, 10) };
+  }
+  const key = nameKeyOf(trimmed);
+  return key === "" ? { kind: "empty" } : { kind: "text", key };
+}
 
 // server/repos/bookingsRepo.ts
 var ReferenceCodeCollision = class extends Error {
@@ -29170,6 +29373,7 @@ async function insertBooking(input2, now2, options) {
   const doc = bookingDocumentSchema.parse({
     _id: options?.id ?? newId(),
     ...input2,
+    nameKey: nameKeyOf(input2.customer.name),
     createdAt: now2,
     updatedAt: now2
   });
@@ -29335,6 +29539,158 @@ async function listBookingsPage(filter, after, limit, options) {
   const query = and.length > 0 ? { $and: and } : {};
   return col.find(query, sessionOf(options)).sort({ startAt: 1, _id: 1 }).limit(limit).toArray();
 }
+function matchFilter(match2) {
+  if (match2.kind === "name") return { nameKey: { $regex: `^${escapeRegex2(match2.key)}` } };
+  return match2.digits.length === 10 ? { "customer.phone": `+1${match2.digits}` } : { "customer.phone": { $regex: `${escapeRegex2(match2.digits)}$` } };
+}
+async function searchBookings(match2, limit, options) {
+  const col = await collection("bookings");
+  return col.find(matchFilter(match2), sessionOf(options)).sort({ startAt: -1 }).limit(limit).toArray();
+}
+async function searchCustomers(match2, limit, options) {
+  return customerSummaries(matchFilter(match2), limit, options);
+}
+async function customerSummaries(filter, limit, options, skip = 0) {
+  const col = await collection("bookings");
+  const rows = await col.aggregate(
+    [
+      { $match: filter },
+      { $sort: { startAt: -1 } },
+      {
+        $group: {
+          _id: "$customer.phone",
+          name: { $first: "$customer.name" },
+          visits: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          last: { $max: "$startAt" }
+        }
+      },
+      { $sort: { last: -1, _id: 1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ],
+    sessionOf(options)
+  ).toArray();
+  return rows.map((r) => ({ phone: r._id, name: r.name, visits: r.visits, lastVisitAt: r.last }));
+}
+async function backfillNameKeys() {
+  const col = await collection("bookings");
+  let total = 0;
+  for (; ; ) {
+    const batch = await col.find({ nameKey: { $exists: false } }).limit(500).toArray();
+    if (batch.length === 0) return total;
+    await col.bulkWrite(
+      batch.map((b) => ({
+        updateOne: {
+          filter: { _id: b._id },
+          update: { $set: { nameKey: nameKeyOf(b.customer.name) } }
+        }
+      }))
+    );
+    total += batch.length;
+  }
+}
+function tableQuery(filter) {
+  const query = {};
+  if (filter.from || filter.to) {
+    query.startAt = {
+      ...filter.from ? { $gte: filter.from } : {},
+      ...filter.to ? { $lt: filter.to } : {}
+    };
+  }
+  if (filter.staffId) query.staffId = filter.staffId;
+  if (filter.status) query.status = filter.status;
+  return query;
+}
+async function tablePage(filter, sort, skip, limit, options) {
+  const col = await collection("bookings");
+  const first = {
+    when: "startAt",
+    client: "nameKey",
+    status: "status",
+    source: "source"
+  };
+  const order = { [first[sort.key]]: sort.dir };
+  if (sort.key !== "when") order.startAt = -1;
+  order._id = 1;
+  return col.find(tableQuery(filter), sessionOf(options)).sort(order).skip(skip).limit(limit).toArray();
+}
+async function countTable(filter, options) {
+  const col = await collection("bookings");
+  return col.countDocuments(tableQuery(filter), sessionOf(options));
+}
+async function findBookingsByIds(ids, options) {
+  if (ids.length === 0) return [];
+  const col = await collection("bookings");
+  return col.find({ _id: { $in: [...ids] } }, sessionOf(options)).toArray();
+}
+async function listBookingsStartingBetween(range, options) {
+  const col = await collection("bookings");
+  return col.find({ startAt: { $gte: range.start, $lt: range.end } }, sessionOf(options)).sort({ startAt: 1 }).toArray();
+}
+async function moveBookingToStaff(id, staffId, now2, options) {
+  const col = await collection("bookings");
+  const updated = await col.findOneAndUpdate(
+    { _id: id, status: "confirmed" },
+    { $set: { staffId, staffRequested: true, updatedAt: now2 } },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
+  if (!updated)
+    throw new AppError("BOOKING_NOT_RESCHEDULABLE", "This booking can no longer be moved");
+  return updated;
+}
+async function customerPage(match2, sort, skip, limit, options) {
+  const col = await collection("bookings");
+  const sortField = {
+    name: "nameKey",
+    visits: "visits",
+    last: "lastVisit",
+    noShows: "noShows"
+  };
+  const [result] = await col.aggregate(
+    [
+      ...match2 ? [{ $match: matchFilter(match2) }] : [],
+      { $sort: { startAt: -1 } },
+      {
+        $group: {
+          _id: "$customer.phone",
+          name: { $first: "$customer.name" },
+          nameKey: { $first: "$nameKey" },
+          bookings: { $sum: 1 },
+          visits: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          noShows: { $sum: { $cond: [{ $eq: ["$status", "noShow"] }, 1, 0] } },
+          lastVisit: { $max: { $cond: [{ $eq: ["$status", "completed"] }, "$startAt", null] } },
+          staff: { $push: { id: "$staffId", gone: { $eq: ["$status", "cancelled"] } } }
+        }
+      },
+      {
+        $facet: {
+          rows: [
+            { $sort: { [sortField[sort.key]]: sort.dir, _id: 1 } },
+            { $skip: skip },
+            { $limit: limit }
+          ],
+          total: [{ $count: "n" }]
+        }
+      }
+    ],
+    sessionOf(options)
+  ).toArray();
+  const rows = (result?.rows ?? []).map((r) => {
+    const counts = /* @__PURE__ */ new Map();
+    for (const s2 of r.staff) if (!s2.gone) counts.set(s2.id, (counts.get(s2.id) ?? 0) + 1);
+    const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      phone: r._id,
+      name: r.name,
+      bookings: r.bookings,
+      visits: r.visits,
+      noShows: r.noShows,
+      lastVisitAt: r.lastVisit,
+      usualStaffId: usual?.[0] ?? null
+    };
+  });
+  return { rows, total: result?.total[0]?.n ?? 0 };
+}
 
 // server/repos/slotLocksRepo.ts
 var slotLocksRepo_exports = {};
@@ -29438,6 +29794,7 @@ __export(usersRepo_exports, {
   listUsers: () => listUsers,
   recordSuccessfulLogin: () => recordSuccessfulLogin,
   setUserActive: () => setUserActive,
+  setUserEmail: () => setUserEmail,
   setUserPasswordHash: () => setUserPasswordHash
 });
 
@@ -29588,6 +29945,20 @@ async function setUserPasswordHash(id, passwordHash, now2, options) {
     sessionOf(options)
   );
   if (result.matchedCount === 0) throw new AppError("NOT_FOUND", "User was not found");
+}
+async function setUserEmail(id, email3, now2, options) {
+  const col = await collection("users");
+  try {
+    const result = await col.updateOne(
+      { _id: id },
+      { $set: { email: email3, updatedAt: now2 } },
+      sessionOf(options)
+    );
+    if (result.matchedCount === 0) throw new AppError("NOT_FOUND", "User was not found");
+  } catch (error62) {
+    if (isDuplicateKeyError(error62)) throw new AppError("CONFLICT", "That email is already in use");
+    throw error62;
+  }
 }
 async function setUserActive(id, isActive, now2, options) {
   const col = await collection("users");
@@ -30080,10 +30451,13 @@ var photosRepo_exports = {};
 __export(photosRepo_exports, {
   findPhotoById: () => findPhotoById,
   insertPhoto: () => insertPhoto,
+  listAllKeys: () => listAllKeys,
+  listLiveForMigration: () => listLiveForMigration,
   listPhotos: () => listPhotos,
   listUnpurged: () => listUnpurged,
   markPurged: () => markPurged,
   nextSortOrder: () => nextSortOrder,
+  rekeyPhoto: () => rekeyPhoto,
   softDeletePhoto: () => softDeletePhoto,
   updatePhoto: () => updatePhoto
 });
@@ -30123,6 +30497,7 @@ async function updatePhoto(id, patch, options) {
   const $set = {};
   if (patch.alt !== void 0) $set.alt = patch.alt;
   if (patch.sortOrder !== void 0) $set.sortOrder = patch.sortOrder;
+  if (patch.staffId !== void 0) $set.staffId = patch.staffId;
   return col.findOneAndUpdate(
     { _id: id, deletedAt: null },
     { $set },
@@ -30144,6 +30519,24 @@ async function listUnpurged(limit, options) {
 async function markPurged(id, now2, options) {
   const col = await collection("photos");
   await col.updateOne({ _id: id }, { $set: { purgedAt: now2 } }, sessionOf(options));
+}
+async function listAllKeys(options) {
+  const col = await collection("photos");
+  const docs = await col.find({}, { projection: { key: 1 }, ...sessionOf(options) }).toArray();
+  return docs.map((d) => d.key);
+}
+async function rekeyPhoto(id, from, to, options) {
+  const col = await collection("photos");
+  const result = await col.updateOne(
+    { _id: id, key: from },
+    { $set: { key: to } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+async function listLiveForMigration(options) {
+  const col = await collection("photos");
+  return col.find({ deletedAt: null, purgedAt: null }, sessionOf(options)).sort({ createdAt: 1 }).toArray();
 }
 
 // server/repos/pendingUploadsRepo.ts
@@ -30271,21 +30664,316 @@ async function releaseDemoLock(holder) {
   await col.deleteOne({ _id: "demoLock", holder });
 }
 
+// server/repos/alertsRepo.ts
+var alertsRepo_exports = {};
+__export(alertsRepo_exports, {
+  closeAlert: () => closeAlert,
+  findAlertById: () => findAlertById,
+  insertAlert: () => insertAlert,
+  listOpenAlerts: () => listOpenAlerts
+});
+
+// shared/schemas/alert.ts
+var alertKindSchema = external_exports.enum(["barberOut", "timeOffRequest"]);
+var alertDocumentSchema = external_exports.object({
+  _id: idSchema,
+  kind: alertKindSchema,
+  staffId: idSchema,
+  /** Shop dates covered, first and last day inclusive. */
+  fromDate: isoDateSchema,
+  toDate: isoDateSchema,
+  /** The same range as UTC instants: what the time off covers. */
+  startAt: external_exports.date(),
+  endAt: external_exports.date(),
+  reason: external_exports.string().trim().max(200).nullable(),
+  status: external_exports.enum(["open", "resolved", "dismissed"]),
+  resolvedAt: external_exports.date().nullable(),
+  resolvedByUserId: idSchema.nullable()
+}).extend(timestampsSchema.shape);
+
+// server/repos/alertsRepo.ts
+async function insertAlert(input2, now2, options) {
+  const doc = alertDocumentSchema.parse({
+    _id: newId(),
+    ...input2,
+    status: "open",
+    resolvedAt: null,
+    resolvedByUserId: null,
+    createdAt: now2,
+    updatedAt: now2
+  });
+  const col = await collection("alerts");
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findAlertById(id, options) {
+  const col = await collection("alerts");
+  return col.findOne({ _id: id }, sessionOf(options));
+}
+async function listOpenAlerts(options) {
+  const col = await collection("alerts");
+  return col.find({ status: "open" }, sessionOf(options)).sort({ createdAt: 1 }).toArray();
+}
+async function closeAlert(id, status, userId, now2, options) {
+  const col = await collection("alerts");
+  const result = await col.updateOne(
+    { _id: id, status: "open" },
+    { $set: { status, resolvedAt: now2, resolvedByUserId: userId, updatedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+
+// server/repos/customerNotesRepo.ts
+var customerNotesRepo_exports = {};
+__export(customerNotesRepo_exports, {
+  getNote: () => getNote,
+  listNotesFor: () => listNotesFor,
+  saveNote: () => saveNote
+});
+
+// shared/schemas/customerNote.ts
+var customerNoteDocumentSchema = external_exports.object({
+  _id: idSchema,
+  phone: phoneSchema,
+  notes: external_exports.string().trim().max(2e3)
+}).extend(timestampsSchema.shape);
+
+// server/repos/customerNotesRepo.ts
+async function getNote(phone, options) {
+  const col = await collection("customerNotes");
+  return col.findOne({ phone }, sessionOf(options));
+}
+async function listNotesFor(phones, options) {
+  if (phones.length === 0) return [];
+  const col = await collection("customerNotes");
+  return col.find({ phone: { $in: [...phones] } }, sessionOf(options)).toArray();
+}
+async function saveNote(phone, notes, now2, options) {
+  const col = await collection("customerNotes");
+  if (notes.trim() === "") {
+    await col.deleteOne({ phone }, sessionOf(options));
+    return null;
+  }
+  const doc = customerNoteDocumentSchema.parse({
+    _id: newId(),
+    phone,
+    notes,
+    createdAt: now2,
+    updatedAt: now2
+  });
+  await col.updateOne(
+    { phone },
+    {
+      $set: { notes: doc.notes, updatedAt: now2 },
+      $setOnInsert: { _id: doc._id, phone, createdAt: now2 }
+    },
+    { upsert: true, ...sessionOf(options) }
+  );
+  return await col.findOne({ phone }, sessionOf(options)) ?? doc;
+}
+
+// server/repos/staffPinsRepo.ts
+var staffPinsRepo_exports = {};
+__export(staffPinsRepo_exports, {
+  countPins: () => countPins,
+  deletePin: () => deletePin,
+  findPinByStaff: () => findPinByStaff,
+  recordSignIn: () => recordSignIn,
+  upsertPin: () => upsertPin
+});
+
+// shared/schemas/staffPin.ts
+var staffPinDocumentSchema = external_exports.object({
+  _id: idSchema,
+  staffId: idSchema,
+  /** argon2id PHC string of a keyed digest of the PIN. Never returned by the API. */
+  pinHash: external_exports.string().min(1),
+  pinSetAt: external_exports.date(),
+  lastSignInAt: external_exports.date().nullable()
+}).extend(timestampsSchema.shape);
+var setupTokenDocumentSchema = external_exports.object({
+  _id: idSchema,
+  staffId: idSchema,
+  tokenHash: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  /** The owner who made the link. */
+  createdByUserId: idSchema,
+  createdAt: external_exports.date(),
+  /** TTL index removes the document after this instant. */
+  expiresAt: external_exports.date(),
+  usedAt: external_exports.date().nullable()
+});
+var teamSessionDocumentSchema = external_exports.object({
+  _id: idSchema,
+  tokenHash: external_exports.string().regex(/^[0-9a-f]{64}$/),
+  staffId: idSchema,
+  createdAt: external_exports.date(),
+  expiresAt: external_exports.date(),
+  ip: external_exports.string().max(64).nullable(),
+  userAgent: external_exports.string().max(512).nullable(),
+  revokedAt: external_exports.date().nullable()
+});
+
+// server/repos/staffPinsRepo.ts
+async function findPinByStaff(staffId, options) {
+  const col = await collection("staffPins");
+  return col.findOne({ staffId }, sessionOf(options));
+}
+async function countPins(options) {
+  const col = await collection("staffPins");
+  return col.countDocuments({}, sessionOf(options));
+}
+async function upsertPin(staffId, pinHash, now2, options) {
+  const col = await collection("staffPins");
+  const after = await col.findOneAndUpdate(
+    { staffId },
+    {
+      $set: { pinHash, pinSetAt: now2, lastSignInAt: null, updatedAt: now2 },
+      $setOnInsert: { _id: newId(), staffId, createdAt: now2 }
+    },
+    { upsert: true, returnDocument: "after", ...sessionOf(options) }
+  );
+  if (!after) throw new Error("upsert returned no document");
+  return staffPinDocumentSchema.parse(after);
+}
+async function deletePin(staffId, options) {
+  const col = await collection("staffPins");
+  const result = await col.deleteOne({ staffId }, sessionOf(options));
+  return result.deletedCount === 1;
+}
+async function recordSignIn(staffId, now2, options) {
+  const col = await collection("staffPins");
+  await col.updateOne({ staffId }, { $set: { lastSignInAt: now2 } }, sessionOf(options));
+}
+
+// server/repos/setupTokensRepo.ts
+var setupTokensRepo_exports = {};
+__export(setupTokensRepo_exports, {
+  consumeToken: () => consumeToken,
+  countTokens: () => countTokens,
+  findUsableToken: () => findUsableToken,
+  hasUsableTokenForStaff: () => hasUsableTokenForStaff,
+  insertSetupToken: () => insertSetupToken,
+  retireTokensForStaff: () => retireTokensForStaff
+});
+async function insertSetupToken(input2, now2, options) {
+  const doc = setupTokenDocumentSchema.parse({
+    _id: newId(),
+    ...input2,
+    createdAt: now2,
+    usedAt: null
+  });
+  const col = await collection("setupTokens");
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findUsableToken(tokenHash, now2, options) {
+  const col = await collection("setupTokens");
+  return col.findOne({ tokenHash, usedAt: null, expiresAt: { $gt: now2 } }, sessionOf(options));
+}
+async function consumeToken(id, now2, options) {
+  const col = await collection("setupTokens");
+  const result = await col.updateOne(
+    { _id: id, usedAt: null },
+    { $set: { usedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+async function retireTokensForStaff(staffId, now2, options) {
+  const col = await collection("setupTokens");
+  const result = await col.updateMany(
+    { staffId, usedAt: null },
+    { $set: { usedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount;
+}
+async function hasUsableTokenForStaff(staffId, now2, options) {
+  const col = await collection("setupTokens");
+  return await col.countDocuments(
+    { staffId, usedAt: null, expiresAt: { $gt: now2 } },
+    { limit: 1, ...sessionOf(options) }
+  ) > 0;
+}
+async function countTokens(options) {
+  const col = await collection("setupTokens");
+  return col.countDocuments({}, sessionOf(options));
+}
+
+// server/repos/teamSessionsRepo.ts
+var teamSessionsRepo_exports = {};
+__export(teamSessionsRepo_exports, {
+  findActiveTeamSession: () => findActiveTeamSession,
+  findTeamSessionById: () => findTeamSessionById,
+  insertTeamSession: () => insertTeamSession,
+  revokeTeamSession: () => revokeTeamSession,
+  revokeTeamSessionsForStaff: () => revokeTeamSessionsForStaff
+});
+async function insertTeamSession(input2, now2, options) {
+  const doc = teamSessionDocumentSchema.parse({
+    _id: newId(),
+    ...input2,
+    createdAt: now2,
+    revokedAt: null
+  });
+  const col = await collection("teamSessions");
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findActiveTeamSession(tokenHash, now2, options) {
+  const col = await collection("teamSessions");
+  return col.findOne({ tokenHash, revokedAt: null, expiresAt: { $gt: now2 } }, sessionOf(options));
+}
+async function findTeamSessionById(id, options) {
+  const col = await collection("teamSessions");
+  return col.findOne({ _id: id }, sessionOf(options));
+}
+async function revokeTeamSession(id, now2, options) {
+  const col = await collection("teamSessions");
+  const result = await col.updateOne(
+    { _id: id, revokedAt: null },
+    { $set: { revokedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount === 1;
+}
+async function revokeTeamSessionsForStaff(staffId, now2, options) {
+  const col = await collection("teamSessions");
+  const result = await col.updateMany(
+    {
+      staffId,
+      revokedAt: null,
+      ...options?.exceptId ? { _id: { $ne: options.exceptId } } : {}
+    },
+    { $set: { revokedAt: now2 } },
+    sessionOf(options)
+  );
+  return result.modifiedCount;
+}
+
 // server/auth/cookies.ts
 var SESSION_COOKIE = "__Host-exq_session";
+var TEAM_COOKIE = "__Host-exq_team";
 var TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-function readSessionCookie(req) {
+function readCookie(req, wanted) {
   const header = req.headers.cookie;
   if (!header) return null;
   for (const part of header.split(";")) {
     const index = part.indexOf("=");
     if (index === -1) continue;
     const name = part.slice(0, index).trim();
-    if (name !== SESSION_COOKIE) continue;
+    if (name !== wanted) continue;
     const value = part.slice(index + 1).trim();
     return TOKEN_PATTERN.test(value) ? value : null;
   }
   return null;
+}
+function readSessionCookie(req) {
+  return readCookie(req, SESSION_COOKIE);
+}
+function readTeamCookie(req) {
+  return readCookie(req, TEAM_COOKIE);
 }
 function appendSetCookie(res, cookie) {
   const existing = res.getHeader("Set-Cookie");
@@ -30300,6 +30988,15 @@ function setSessionCookie(res, token, maxAgeSeconds2) {
 }
 function clearSessionCookie(res) {
   appendSetCookie(res, `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
+}
+function setTeamCookie(res, token, maxAgeSeconds2) {
+  appendSetCookie(
+    res,
+    `${TEAM_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${Math.max(0, Math.floor(maxAgeSeconds2))}`
+  );
+}
+function clearTeamCookie(res) {
+  appendSetCookie(res, `${TEAM_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
 }
 
 // server/auth/sessions.ts
@@ -30343,7 +31040,7 @@ async function authenticateFromCookie(ctx) {
     return null;
   }
   const user = await usersRepo_exports.findUserById(session.userId);
-  if (!user?.isActive) {
+  if (!user?.isActive || user.role !== "owner") {
     clearSessionCookie(ctx.res);
     return null;
   }
@@ -30371,8 +31068,26 @@ async function endAllSessions(res, principal, now2) {
   return count;
 }
 
-// server/http/router.ts
-import { timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+// shared/lib/pin.ts
+var PIN_LENGTH = 6;
+var PIN_PATTERN = /^\d{6}$/;
+var DEMO_PIN = "246810";
+var REJECTED = "Pick a PIN that is harder to guess. Avoid repeats and runs like 123456.";
+function pinProblem(pin) {
+  if (!PIN_PATTERN.test(pin)) return `Use exactly ${String(PIN_LENGTH)} digits.`;
+  const digits = Array.from(pin, Number);
+  const step = (a, b) => (b - a + 10) % 10;
+  const steps = digits.slice(1).map((d, i) => step(digits[i] ?? 0, d));
+  if (steps.every((s2) => s2 === 0)) return REJECTED;
+  if (steps.every((s2) => s2 === 1) || steps.every((s2) => s2 === 9)) return REJECTED;
+  for (const size of [2, 3]) {
+    if (pin === pin.slice(0, size).repeat(PIN_LENGTH / size)) return REJECTED;
+  }
+  return null;
+}
+
+// server/auth/pin.ts
+import { createHmac } from "node:crypto";
 
 // server/auth/password.ts
 import { hash as hash2, parseOptions, verify } from "@node-rs/argon2";
@@ -30454,6 +31169,561 @@ function generateTemporaryPassword() {
   }
 }
 
+// server/auth/pin.ts
+function keyed(staffId, pin) {
+  return createHmac("sha256", getEnv2().MANAGE_LINK_SECRET).update(`pin:${staffId}:${pin}`).digest("hex");
+}
+function hashPin(staffId, pin) {
+  return hashPassword(keyed(staffId, pin));
+}
+function verifyPin(storedHash, staffId, pin) {
+  return verifyPassword(storedHash, keyed(staffId, pin));
+}
+function dummyPinHash() {
+  return getDummyHash();
+}
+
+// server/db/transaction.ts
+var DEFAULT_TX_OPTIONS = {
+  readConcern: { level: "snapshot" },
+  writeConcern: { w: "majority" },
+  readPreference: "primary"
+};
+function hasErrorLabel(error62, label) {
+  if (typeof error62 !== "object" || error62 === null || !("hasErrorLabel" in error62)) return false;
+  const candidate = error62.hasErrorLabel;
+  return typeof candidate === "function" && candidate.call(error62, label);
+}
+function isTransientTransactionError(error62) {
+  return hasErrorLabel(error62, "TransientTransactionError") || hasErrorLabel(error62, "UnknownTransactionCommitResult");
+}
+async function withTransaction(fn, options = {}) {
+  const client = await getMongoClient();
+  const maxRetries = options.maxRetries ?? 3;
+  const txOptions = { ...DEFAULT_TX_OPTIONS, ...options.transaction };
+  let attempt = 0;
+  for (; ; ) {
+    attempt += 1;
+    const session = client.startSession();
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        result = await fn(session);
+      }, txOptions);
+      return result;
+    } catch (error62) {
+      if (isTransientTransactionError(error62) && attempt < maxRetries) {
+        logger.warn("transient transaction error, retrying", { attempt });
+        await new Promise((r) => setTimeout(r, 25 * attempt));
+        continue;
+      }
+      throw error62;
+    } finally {
+      await session.endSession();
+    }
+  }
+}
+
+// server/auth/authService.ts
+var LOGIN_IP_LIMIT = { limit: 20, windowMs: 15 * 6e4 };
+var LOGIN_ACCOUNT_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
+var LOCKOUT_RULE = { threshold: 5, lockMinutes: [5, 15, 60, 240] };
+var PASSWORD_CHANGE_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
+var GENERIC_FAILURE = "Email or password is incorrect";
+function normalizeEmail(email3) {
+  return email3.trim().toLowerCase();
+}
+function emailKey(email3) {
+  return sha256Hex(`login:${normalizeEmail(email3)}`);
+}
+function retryAfter(windowMs, now2) {
+  const windowEnd = (Math.floor(now2.getTime() / windowMs) + 1) * windowMs;
+  return Math.max(1, Math.ceil((windowEnd - now2.getTime()) / 1e3));
+}
+function ipHashOf(ip) {
+  return sha256Hex(`ip:${ip}:${getEnv2().MANAGE_LINK_SECRET}`);
+}
+function actorOf(principal) {
+  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
+}
+var SYSTEM = { type: "system", userId: null, staffId: null };
+async function auditLogin(outcome2, input2, meta3) {
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: input2.userId ? { type: "system", userId: input2.userId, staffId: null } : SYSTEM,
+      action: outcome2 === "success" ? "auth.login.success" : "auth.login.failure",
+      entityType: "user",
+      entityId: input2.userId ?? "unknown",
+      before: null,
+      after: null,
+      meta: { email: normalizeEmail(input2.email).slice(0, 254), ip: meta3.ip, reason: input2.reason },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function loginIsUsable(user) {
+  if (!user.isActive) return false;
+  if (user.role === "owner") return true;
+  if (!user.staffId) return false;
+  const staff = await staffRepo_exports.findStaffById(user.staffId);
+  return staff !== null && staff.deletedAt === null;
+}
+async function login(res, input2, meta3) {
+  const email3 = normalizeEmail(input2.email);
+  const ipKey = `login:ip:${meta3.ip}`;
+  const ipCount = await rateLimitsRepo_exports.peekRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
+  if (ipCount >= LOGIN_IP_LIMIT.limit) {
+    await auditLogin("failure", { email: email3, userId: null, reason: "ipRateLimited" }, meta3);
+    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
+      retryAfterSeconds: retryAfter(LOGIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const key = emailKey(email3);
+  const accountKey = `login:account:${key}`;
+  const accountCount = await rateLimitsRepo_exports.peekRateLimit(
+    accountKey,
+    LOGIN_ACCOUNT_LIMIT,
+    meta3.now
+  );
+  if (accountCount >= LOGIN_ACCOUNT_LIMIT.limit) {
+    await auditLogin("failure", { email: email3, userId: null, reason: "accountRateLimited" }, meta3);
+    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
+      retryAfterSeconds: retryAfter(LOGIN_ACCOUNT_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const ipHash = ipHashOf(meta3.ip);
+  const throttle = await loginThrottleRepo_exports.getLoginThrottle(key);
+  const lockedUntil = throttle?.lockedUntil ?? null;
+  const locked = lockedUntil !== null && lockedUntil.getTime() > meta3.now.getTime();
+  const known = locked ? await usersRepo_exports.findUserByEmail(email3) : null;
+  const bypass = locked && known !== null && usersRepo_exports.hasRecentLoginIp(known, ipHash, meta3.now);
+  if (locked && !bypass) {
+    await auditLogin("failure", { email: email3, userId: null, reason: "locked" }, meta3);
+    throw new AppError(
+      "ACCOUNT_LOCKED",
+      "Too many failed attempts. Please wait before trying again.",
+      {
+        retryAfterSeconds: Math.ceil((lockedUntil.getTime() - meta3.now.getTime()) / 1e3)
+      }
+    );
+  }
+  const user = await usersRepo_exports.findUserByEmail(email3);
+  const passwordOk = await verifyPassword(
+    user?.passwordHash ?? await getDummyHash(),
+    input2.password
+  );
+  if (user && passwordOk && user.role === "barber") {
+    await auditLogin("failure", { email: email3, userId: user._id, reason: "barberUsesTeam" }, meta3);
+    throw new AppError("FORBIDDEN", "Barbers sign in with a PIN at /team", {
+      extra: { signInAt: "/team" }
+    });
+  }
+  const usable = user !== null && passwordOk && await loginIsUsable(user);
+  if (!user || !usable) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
+    await rateLimitsRepo_exports.hitRateLimit(accountKey, LOGIN_ACCOUNT_LIMIT, meta3.now);
+    await loginThrottleRepo_exports.recordLoginFailure(key, LOCKOUT_RULE, meta3.now);
+    const reason = !user ? "unknownEmail" : !passwordOk ? "badPassword" : "disabled";
+    await auditLogin("failure", { email: email3, userId: user?._id ?? null, reason }, meta3);
+    throw new AppError("INVALID_CREDENTIALS", GENERIC_FAILURE);
+  }
+  if (!bypass) await loginThrottleRepo_exports.clearLoginThrottle(key);
+  await usersRepo_exports.recordSuccessfulLogin(user._id, meta3.now, ipHash);
+  if (needsRehash(user.passwordHash)) {
+    await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.password), meta3.now, {
+      mustChangePassword: user.mustChangePassword
+    });
+  }
+  const session = await startSession(res, user, {
+    ip: meta3.ip,
+    userAgent: meta3.userAgent,
+    now: meta3.now
+  });
+  await auditLogin("success", { email: email3, userId: user._id, reason: null }, meta3);
+  return { user, sessionId: session._id };
+}
+var DEMO_LOGIN_LIMIT = { limit: 30, windowMs: 15 * 6e4 };
+async function loginAsDemoOwner(res, meta3) {
+  const hit = await rateLimitsRepo_exports.hitRateLimit(
+    `demo-login:ip:${meta3.ip}`,
+    DEMO_LOGIN_LIMIT,
+    meta3.now
+  );
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+  const owner2 = await usersRepo_exports.findOwnerUser();
+  if (!owner2?.isActive) throw new AppError("NOT_FOUND", "No such endpoint");
+  await usersRepo_exports.recordSuccessfulLogin(owner2._id, meta3.now, ipHashOf(meta3.ip));
+  const session = await startSession(res, owner2, {
+    ip: meta3.ip,
+    userAgent: meta3.userAgent,
+    now: meta3.now
+  });
+  await auditLogin("success", { email: owner2.email, userId: owner2._id, reason: "demo" }, meta3);
+  return { user: owner2, sessionId: session._id };
+}
+function weakPasswordError(problems, path) {
+  return new AppError("VALIDATION_ERROR", "Please choose a stronger password", {
+    details: problems.map((message) => ({ path, message }))
+  });
+}
+async function changeOwnPassword(principal, input2, meta3) {
+  const hit = await rateLimitsRepo_exports.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta3.now
+  );
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+  const user = await usersRepo_exports.findUserById(principal.userId);
+  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
+  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
+    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
+  }
+  if (input2.newPassword === input2.currentPassword) {
+    throw weakPasswordError(["Choose a password different from the current one."], "newPassword");
+  }
+  const problems = passwordProblems(input2.newPassword, { email: user.email });
+  if (problems.length > 0) throw weakPasswordError(problems, "newPassword");
+  await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.newPassword), meta3.now);
+  const ended = await sessionsRepo_exports.revokeOtherSessions(user._id, principal.sessionId, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: "user.password.change",
+      entityType: "user",
+      entityId: user._id,
+      before: null,
+      after: null,
+      meta: { otherSessionsEnded: ended, wasTemporary: user.mustChangePassword },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function changeOwnEmail(principal, input2, meta3) {
+  const hit = await rateLimitsRepo_exports.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta3.now
+  );
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+  const user = await usersRepo_exports.findUserById(principal.userId);
+  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
+  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
+    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
+  }
+  if (input2.newEmail === user.email)
+    throw new AppError("BAD_REQUEST", "That is already your email");
+  await usersRepo_exports.setUserEmail(user._id, input2.newEmail, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: "user.email.change",
+      entityType: "user",
+      entityId: user._id,
+      before: { email: user.email },
+      after: { email: input2.newEmail },
+      meta: null,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function ensureOwnerLogin(input2, now2) {
+  if (await usersRepo_exports.findOwnerUser()) return { created: false };
+  const problems = passwordProblems(input2.password, { email: input2.email });
+  if (problems.length > 0) {
+    throw new Error(`SEED_OWNER_PASSWORD is too weak: ${problems.join(" ")}`);
+  }
+  const user = await usersRepo_exports.insertUser(
+    {
+      email: normalizeEmail(input2.email),
+      passwordHash: await hashPassword(input2.password),
+      role: "owner",
+      staffId: input2.staffId
+    },
+    now2
+  );
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: SYSTEM,
+      action: "user.create",
+      entityType: "user",
+      entityId: user._id,
+      before: null,
+      after: { email: user.email, role: user.role },
+      meta: { source: "seed" },
+      requestId: null
+    },
+    now2
+  );
+  return { created: true };
+}
+
+// server/auth/teamAuth.ts
+var TEAM_SESSION_MS = 12 * 60 * 6e4;
+var SETUP_LINK_MS = 72 * 60 * 6e4;
+var PIN_LOCKOUT = { threshold: 5, lockMinutes: [15] };
+var PIN_IP_LIMIT = { limit: 30, windowMs: 15 * 6e4 };
+var GENERIC_FAILURE2 = "That PIN did not work";
+var SYSTEM2 = { type: "system", userId: null, staffId: null };
+function pinThrottleKey(staffId) {
+  return sha256Hex(`pin:${staffId}`);
+}
+function retryAfter2(windowMs, now2) {
+  const windowEnd = (Math.floor(now2.getTime() / windowMs) + 1) * windowMs;
+  return Math.max(1, Math.ceil((windowEnd - now2.getTime()) / 1e3));
+}
+async function audit(action, staffId, actor, meta3, extra = null) {
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor,
+      action,
+      entityType: "staff",
+      entityId: staffId,
+      before: null,
+      after: null,
+      meta: extra,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function usableStaff(staffId) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  return staff?.deletedAt === null && staff.showOnWebsite ? staff : null;
+}
+function principalFor(staff, sessionId) {
+  return {
+    userId: staff._id,
+    role: "barber",
+    staffId: staff._id,
+    sessionId,
+    email: "",
+    mustChangePassword: false
+  };
+}
+async function startTeamSession(res, staffId, meta3) {
+  const token = randomToken(32);
+  const session = await teamSessionsRepo_exports.insertTeamSession(
+    {
+      tokenHash: sha256Hex(token),
+      staffId,
+      expiresAt: new Date(meta3.now.getTime() + TEAM_SESSION_MS),
+      ip: meta3.ip.slice(0, 64),
+      userAgent: meta3.userAgent?.slice(0, 512) ?? null
+    },
+    meta3.now
+  );
+  setTeamCookie(res, token, TEAM_SESSION_MS / 1e3);
+  return session._id;
+}
+async function teamLogin(res, input2, meta3) {
+  const ipKey = `pin:ip:${meta3.ip}`;
+  const ipCount = await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+  if (ipCount >= PIN_IP_LIMIT.limit) {
+    throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
+      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const staff = await usableStaff(input2.staffId);
+  const throttleKey = staff ? pinThrottleKey(staff._id) : null;
+  if (throttleKey) {
+    const throttle = await loginThrottleRepo_exports.getLoginThrottle(throttleKey);
+    if (throttle?.lockedUntil && throttle.lockedUntil.getTime() > meta3.now.getTime()) {
+      throw new AppError(
+        "ACCOUNT_LOCKED",
+        "Too many wrong tries. Please wait before trying again.",
+        {
+          retryAfterSeconds: Math.ceil(
+            (throttle.lockedUntil.getTime() - meta3.now.getTime()) / 1e3
+          )
+        }
+      );
+    }
+  }
+  const pinDoc = staff ? await staffPinsRepo_exports.findPinByStaff(staff._id) : null;
+  const ok = await verifyPin(pinDoc?.pinHash ?? await dummyPinHash(), input2.staffId, input2.pin);
+  if (!staff || !pinDoc || !ok) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+    if (throttleKey) await loginThrottleRepo_exports.recordLoginFailure(throttleKey, PIN_LOCKOUT, meta3.now);
+    if (staff)
+      await audit("auth.pin.failure", staff._id, SYSTEM2, meta3, { ipHash: ipHashOf(meta3.ip) });
+    throw new AppError("INVALID_CREDENTIALS", GENERIC_FAILURE2);
+  }
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staff._id));
+  await staffPinsRepo_exports.recordSignIn(staff._id, meta3.now);
+  const sessionId = await startTeamSession(res, staff._id, meta3);
+  await audit(
+    "auth.pin.success",
+    staff._id,
+    { type: "barber", userId: null, staffId: staff._id },
+    meta3
+  );
+  return { sessionId, expiresAt: new Date(meta3.now.getTime() + TEAM_SESSION_MS) };
+}
+async function authenticateTeam(ctx) {
+  const token = readTeamCookie(ctx.req);
+  if (!token) return null;
+  const session = await teamSessionsRepo_exports.findActiveTeamSession(sha256Hex(token), ctx.now);
+  if (!session) {
+    clearTeamCookie(ctx.res);
+    return null;
+  }
+  const staff = await usableStaff(session.staffId);
+  if (!staff) {
+    clearTeamCookie(ctx.res);
+    return null;
+  }
+  return principalFor(staff, session._id);
+}
+async function endTeamSession(res, principal, now2) {
+  await teamSessionsRepo_exports.revokeTeamSession(principal.sessionId, now2);
+  clearTeamCookie(res);
+}
+function teamActor(principal) {
+  return { type: "barber", userId: null, staffId: principal.staffId };
+}
+function pinError(pin) {
+  const problem = pinProblem(pin);
+  return problem ? new AppError("VALIDATION_ERROR", "Please choose a different PIN", {
+    details: [{ path: "pin", message: problem }]
+  }) : null;
+}
+async function changePin(principal, input2, meta3) {
+  const staffId = principal.staffId ?? "";
+  const ipKey = `pin:ip:${meta3.ip}`;
+  if (await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now) >= PIN_IP_LIMIT.limit) {
+    throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
+      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const key = pinThrottleKey(staffId);
+  const throttle = await loginThrottleRepo_exports.getLoginThrottle(key);
+  if (throttle?.lockedUntil && throttle.lockedUntil.getTime() > meta3.now.getTime()) {
+    throw new AppError("ACCOUNT_LOCKED", "Too many wrong tries. Please wait before trying again.", {
+      retryAfterSeconds: Math.ceil((throttle.lockedUntil.getTime() - meta3.now.getTime()) / 1e3)
+    });
+  }
+  const doc = await staffPinsRepo_exports.findPinByStaff(staffId);
+  if (!doc || !await verifyPin(doc.pinHash, staffId, input2.currentPin)) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+    await loginThrottleRepo_exports.recordLoginFailure(key, PIN_LOCKOUT, meta3.now);
+    throw new AppError("INVALID_CREDENTIALS", "Your current PIN is not right");
+  }
+  const bad = pinError(input2.newPin);
+  if (bad) throw bad;
+  if (input2.newPin === input2.currentPin) {
+    throw new AppError("VALIDATION_ERROR", "Please choose a different PIN", {
+      details: [{ path: "newPin", message: "Choose a PIN different from the current one." }]
+    });
+  }
+  await loginThrottleRepo_exports.clearLoginThrottle(key);
+  await staffPinsRepo_exports.upsertPin(staffId, await hashPin(staffId, input2.newPin), meta3.now);
+  const ended = await teamSessionsRepo_exports.revokeTeamSessionsForStaff(staffId, meta3.now, {
+    exceptId: principal.sessionId
+  });
+  await audit("auth.pin.change", staffId, teamActor(principal), meta3, {
+    otherSessionsEnded: ended
+  });
+}
+async function issueSetupLink(ownerActor, ownerUserId, staffId, meta3) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
+  const token = randomToken(32);
+  const expiresAt = new Date(meta3.now.getTime() + SETUP_LINK_MS);
+  await withTransaction(async (session) => {
+    await staffPinsRepo_exports.deletePin(staffId, { session });
+    await teamSessionsRepo_exports.revokeTeamSessionsForStaff(staffId, meta3.now, { session });
+    await setupTokensRepo_exports.retireTokensForStaff(staffId, meta3.now, { session });
+    await setupTokensRepo_exports.insertSetupToken(
+      { staffId, tokenHash: sha256Hex(token), createdByUserId: ownerUserId, expiresAt },
+      meta3.now,
+      { session }
+    );
+  });
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staffId));
+  await audit("auth.pin.setupLink", staffId, ownerActor, meta3);
+  return { token, expiresAt };
+}
+async function setupLinkInfo(token, now2) {
+  const found = await setupTokensRepo_exports.findUsableToken(sha256Hex(token), now2);
+  const staff = found ? await usableStaff(found.staffId) : null;
+  if (!found || !staff)
+    throw new AppError("NOT_FOUND", "This link has expired or was already used");
+  return { staffName: staff.name };
+}
+async function completeSetup(res, token, pin, meta3) {
+  const ipKey = `pin:ip:${meta3.ip}`;
+  if (await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now) >= PIN_IP_LIMIT.limit) {
+    throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
+      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const found = await setupTokensRepo_exports.findUsableToken(sha256Hex(token), meta3.now);
+  const staff = found ? await usableStaff(found.staffId) : null;
+  if (!found || !staff) {
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
+    throw new AppError("NOT_FOUND", "This link has expired or was already used");
+  }
+  const bad = pinError(pin);
+  if (bad) throw bad;
+  const pinHash = await hashPin(staff._id, pin);
+  await withTransaction(async (session) => {
+    if (!await setupTokensRepo_exports.consumeToken(found._id, meta3.now, { session })) {
+      throw new AppError("NOT_FOUND", "This link has expired or was already used");
+    }
+    await staffPinsRepo_exports.upsertPin(staff._id, pinHash, meta3.now, { session });
+  });
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staff._id));
+  await staffPinsRepo_exports.recordSignIn(staff._id, meta3.now);
+  const sessionId = await startTeamSession(res, staff._id, meta3);
+  await audit(
+    "auth.pin.setup",
+    staff._id,
+    { type: "barber", userId: null, staffId: staff._id },
+    meta3
+  );
+  return { sessionId, expiresAt: new Date(meta3.now.getTime() + TEAM_SESSION_MS) };
+}
+async function staffAccess(staffId, now2) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff) throw new AppError("NOT_FOUND", "Staff member was not found");
+  const [pin, throttle, setupLinkActive] = await Promise.all([
+    staffPinsRepo_exports.findPinByStaff(staffId),
+    loginThrottleRepo_exports.getLoginThrottle(pinThrottleKey(staffId)),
+    setupTokensRepo_exports.hasUsableTokenForStaff(staffId, now2)
+  ]);
+  const lockedUntil = throttle?.lockedUntil && throttle.lockedUntil.getTime() > now2.getTime() ? throttle.lockedUntil : null;
+  return {
+    hasPin: pin !== null,
+    lastSignInAt: pin?.lastSignInAt ?? null,
+    lockedUntil,
+    setupLinkActive
+  };
+}
+async function unlockStaff(ownerActor, staffId, meta3) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff) throw new AppError("NOT_FOUND", "Staff member was not found");
+  await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staffId));
+  await audit("auth.pin.unlock", staffId, ownerActor, meta3);
+}
+
+// server/http/router.ts
+import { timingSafeEqual as timingSafeEqual3 } from "node:crypto";
+
 // server/services/demo.ts
 import { randomUUID } from "node:crypto";
 
@@ -30509,6 +31779,21 @@ var shopSettingsSeed = {
     giftCards: false,
     rewards: false,
     smsReminders: false
+  },
+  // PLACEHOLDER the owner edits this in Website, Announcement
+  announcement: {
+    enabled: true,
+    text: "Walk ins welcome",
+    linkLabel: "Book online",
+    linkUrl: "/book",
+    endsOn: ""
+  },
+  social: {
+    instagramUrl: "https://instagram.com/exquisitebarberbeauty",
+    tiktokUrl: "",
+    // PLACEHOLDER
+    facebookUrl: ""
+    // PLACEHOLDER
   }
 };
 var ownerLoginSeed = {
@@ -30884,7 +32169,7 @@ var staffSeed = [
 import { GridFSBucket } from "mongodb";
 
 // server/storage/local.ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac as createHmac2, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
@@ -30902,7 +32187,7 @@ var LOCAL_DATA_DIR = [".data", "uploads"].join("/");
 var LOCAL_UPLOADS_DIR = resolve(process.env.EXQ_LOCAL_UPLOADS_DIR ?? LOCAL_DATA_DIR);
 var LOCAL_UPLOAD_PATH = "/uploads";
 function signature(secret2, key, exp) {
-  return createHmac("sha256", secret2).update(`${key}:${exp}`).digest("base64url");
+  return createHmac2("sha256", secret2).update(`${key}:${exp}`).digest("base64url");
 }
 function signLocalUpload(secret2, key, exp) {
   return signature(secret2, key, exp);
@@ -31076,6 +32361,125 @@ function createMongoDriver(config2) {
     },
     publicUrl(key) {
       return `${base}/api/media/${mediaIdOf(key) ?? "unknown.webp"}`;
+    }
+  };
+}
+
+// server/storage/cloudinary.ts
+import { createHash as createHash2 } from "node:crypto";
+
+// shared/lib/cloudinary.ts
+function cloudinaryUrl(asset, width, ratio) {
+  const transform2 = ["f_auto", "q_auto"];
+  if (ratio) transform2.push("c_fill", "g_auto", `w_${width}`, `ar_${ratio}`);
+  else transform2.push("c_limit", `w_${width}`);
+  return `https://res.cloudinary.com/${asset.cloud}/image/upload/${transform2.join(",")}/${asset.publicId}`;
+}
+
+// server/storage/cloudinary.ts
+var CLOUDINARY_MAX_BYTES = 10 * 1024 * 1024;
+var ORPHAN_AGE_MS = 24 * 60 * 6e4;
+function signParams(params, apiSecret) {
+  const joined = Object.keys(params).filter((key) => !["file", "api_key", "cloud_name", "resource_type"].includes(key)).sort().map((key) => `${key}=${String(params[key])}`).join("&");
+  return createHash2("sha1").update(`${joined}${apiSecret}`).digest("hex");
+}
+function splitKey(key) {
+  const at = key.lastIndexOf("/");
+  return { folder: key.slice(0, at), publicId: key.slice(at + 1) };
+}
+var FORMAT_TYPES = {
+  webp: "image/webp",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png"
+};
+function createCloudinaryDriver(config2) {
+  const base = (config2.apiBase ?? "https://api.cloudinary.com").replace(/\/+$/, "");
+  const api = `${base}/v1_1/${config2.cloudName}`;
+  const basic = `Basic ${Buffer.from(`${config2.apiKey}:${config2.apiSecret}`).toString("base64")}`;
+  async function admin(path, init = {}) {
+    return fetch(`${api}${path}`, {
+      ...init,
+      headers: { authorization: basic, ...init.headers }
+    });
+  }
+  return {
+    name: "cloudinary",
+    presignUpload({ key, expiresInSeconds }) {
+      const { folder: folder2, publicId } = splitKey(key);
+      const timestamp = Math.floor(Date.now() / 1e3);
+      const signed = { folder: folder2, public_id: publicId, timestamp };
+      return Promise.resolve({
+        url: `${api}/image/upload`,
+        method: "POST",
+        fields: {
+          api_key: config2.apiKey,
+          timestamp: String(timestamp),
+          folder: folder2,
+          public_id: publicId,
+          signature: signParams(signed, config2.apiSecret)
+        },
+        expiresAt: new Date(Date.now() + expiresInSeconds * 1e3)
+      });
+    },
+    async head(key) {
+      const res = await admin(`/resources/image/upload/${encodeURI(key)}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`Cloudinary lookup failed with ${String(res.status)}`);
+      const asset = await res.json();
+      return {
+        size: asset.bytes,
+        contentType: FORMAT_TYPES[asset.format] ?? `image/${asset.format}`,
+        version: asset.version
+      };
+    },
+    async delete(key) {
+      const timestamp = Math.floor(Date.now() / 1e3);
+      const signed = { invalidate: "true", public_id: key, timestamp };
+      const body = new URLSearchParams({
+        api_key: config2.apiKey,
+        invalidate: "true",
+        public_id: key,
+        timestamp: String(timestamp),
+        signature: signParams(signed, config2.apiSecret)
+      });
+      const res = await fetch(`${api}/image/destroy`, { method: "POST", body });
+      if (!res.ok) throw new Error(`Cloudinary destroy failed with ${String(res.status)}`);
+    },
+    put() {
+      return Promise.reject(
+        new Error("Cloudinary holds photos only; backups and doctor files use another driver")
+      );
+    },
+    get() {
+      return Promise.reject(new Error("Cloudinary photos are read from their public address"));
+    },
+    publicUrl(key) {
+      return cloudinaryUrl({ cloud: config2.cloudName, publicId: key }, 1600, null);
+    },
+    delivery(key) {
+      return { cloud: config2.cloudName, publicId: key };
+    },
+    async ping() {
+      const res = await admin("/ping");
+      if (!res.ok) throw new Error(`Cloudinary ping failed with ${String(res.status)}`);
+    },
+    async listOlderThan(cutoff, limit) {
+      const found = [];
+      let cursor;
+      do {
+        const query = new URLSearchParams({ prefix: `${config2.folder}/`, max_results: "500" });
+        if (cursor) query.set("next_cursor", cursor);
+        const res = await admin(`/resources/image/upload?${query.toString()}`);
+        if (!res.ok) throw new Error(`Cloudinary list failed with ${String(res.status)}`);
+        const page = await res.json();
+        for (const asset of page.resources) {
+          const created = asset.created_at ? new Date(asset.created_at).getTime() : Infinity;
+          if (created < cutoff.getTime()) found.push(asset.public_id);
+        }
+        cursor = page.next_cursor;
+      } while (cursor && found.length < limit);
+      return found.slice(0, limit);
     }
   };
 }
@@ -31429,7 +32833,9 @@ function backupsEnabled() {
   return driver === "r2" || driver === "local";
 }
 function maxUploadBytes() {
-  return getEnv2().STORAGE_DRIVER === "mongo" ? MONGO_MAX_BYTES : PHOTO_MAX_BYTES;
+  const driver = getEnv2().STORAGE_DRIVER;
+  if (driver === "mongo") return MONGO_MAX_BYTES;
+  return driver === "cloudinary" ? CLOUDINARY_MAX_BYTES : PHOTO_MAX_BYTES;
 }
 function assertStorageEnabled() {
   if (!storageEnabled()) {
@@ -31451,6 +32857,13 @@ function getStorage() {
       bucket: env.R2_BUCKET ?? "",
       publicBaseUrl: env.R2_PUBLIC_BASE_URL ?? ""
     });
+  } else if (env.STORAGE_DRIVER === "cloudinary") {
+    cached3 = createCloudinaryDriver({
+      cloudName: env.CLOUDINARY_CLOUD_NAME ?? "",
+      apiKey: env.CLOUDINARY_API_KEY ?? "",
+      apiSecret: env.CLOUDINARY_API_SECRET ?? "",
+      folder: env.CLOUDINARY_FOLDER ?? ""
+    });
   } else if (env.STORAGE_DRIVER === "mongo") {
     cached3 = createMongoDriver({ baseUrl: env.APP_BASE_URL, secret: env.MANAGE_LINK_SECRET });
   } else {
@@ -31460,6 +32873,12 @@ function getStorage() {
 }
 function keyPrefix() {
   return getEnv2().R2_KEY_PREFIX ?? "";
+}
+function newPhotoKey(kind, staffId, uuid3) {
+  const env = getEnv2();
+  if (env.STORAGE_DRIVER === "cloudinary") return `${env.CLOUDINARY_FOLDER ?? ""}/${uuid3}`;
+  const tail = kind === "staff" ? `staff/${staffId ?? ""}/${uuid3}.webp` : `${kind}/${uuid3}.webp`;
+  return `${keyPrefix()}${tail}`;
 }
 
 // server/services/availability.ts
@@ -31798,49 +33217,8 @@ async function loadAvailabilityContext(input2, session) {
   };
 }
 
-// server/db/transaction.ts
-var DEFAULT_TX_OPTIONS = {
-  readConcern: { level: "snapshot" },
-  writeConcern: { w: "majority" },
-  readPreference: "primary"
-};
-function hasErrorLabel(error62, label) {
-  if (typeof error62 !== "object" || error62 === null || !("hasErrorLabel" in error62)) return false;
-  const candidate = error62.hasErrorLabel;
-  return typeof candidate === "function" && candidate.call(error62, label);
-}
-function isTransientTransactionError(error62) {
-  return hasErrorLabel(error62, "TransientTransactionError") || hasErrorLabel(error62, "UnknownTransactionCommitResult");
-}
-async function withTransaction(fn, options = {}) {
-  const client = await getMongoClient();
-  const maxRetries = options.maxRetries ?? 3;
-  const txOptions = { ...DEFAULT_TX_OPTIONS, ...options.transaction };
-  let attempt = 0;
-  for (; ; ) {
-    attempt += 1;
-    const session = client.startSession();
-    try {
-      let result;
-      await session.withTransaction(async () => {
-        result = await fn(session);
-      }, txOptions);
-      return result;
-    } catch (error62) {
-      if (isTransientTransactionError(error62) && attempt < maxRetries) {
-        logger.warn("transient transaction error, retrying", { attempt });
-        await new Promise((r) => setTimeout(r, 25 * attempt));
-        continue;
-      }
-      throw error62;
-    } finally {
-      await session.endSession();
-    }
-  }
-}
-
 // server/lib/manageToken.ts
-import { createHmac as createHmac2, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+import { createHmac as createHmac3, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
 var VERSION = "v1";
 var payloadSchema = external_exports.object({
   b: idSchema,
@@ -31848,7 +33226,7 @@ var payloadSchema = external_exports.object({
   exp: external_exports.int().min(0)
 });
 function sign(secret2, signedPart) {
-  return createHmac2("sha256", secret2).update(signedPart).digest();
+  return createHmac3("sha256", secret2).update(signedPart).digest();
 }
 function createManageToken(secret2, input2) {
   const payload = {
@@ -32085,7 +33463,9 @@ var photoViewSchema = external_exports.object({
   url: external_exports.url(),
   width: external_exports.int(),
   height: external_exports.int(),
-  alt: external_exports.string()
+  alt: external_exports.string(),
+  /** Set for Cloudinary photos: the browser asks for exact sizes (four widths, cropped to the frame). */
+  delivery: external_exports.object({ cloud: external_exports.string(), publicId: external_exports.string() }).nullable().optional()
 });
 var galleryPhotoSchema = photoViewSchema.extend({
   staff: external_exports.object({ id: idSchema, name: external_exports.string(), slug: external_exports.string() }).nullable()
@@ -32118,25 +33498,37 @@ var uploadUrlRequestSchema = external_exports.object({
   size: external_exports.int().min(1).max(PHOTO_MAX_BYTES)
 });
 var uploadUrlResponseSchema = external_exports.object({
-  /** PUT the bytes here, with the same Content-Type, within five minutes. */
+  /** PUT the bytes here (or POST the form, for Cloudinary) within five minutes. */
   uploadUrl: external_exports.url(),
-  method: external_exports.literal("PUT"),
+  method: external_exports.enum(["PUT", "POST"]),
+  /** For a PUT: the headers to send, including the Content-Type. */
   headers: external_exports.record(external_exports.string(), external_exports.string()),
+  /** For a POST: the signed form fields to send before the file. Cloudinary only. */
+  fields: external_exports.record(external_exports.string(), external_exports.string()).optional(),
   key: external_exports.string(),
   /** Hand it back to confirm. It binds the key to the kind, chair, type and size. */
   ticket: external_exports.string(),
   expiresAt: external_exports.iso.datetime()
 });
+var cloudinaryResultSchema = external_exports.object({
+  publicId: external_exports.string().min(1).max(300),
+  version: external_exports.int().min(0),
+  bytes: external_exports.int().min(1)
+});
 var confirmUploadRequestSchema = external_exports.object({
   ticket: external_exports.string().min(20).max(2e3),
+  /** Required when the photo went to Cloudinary. */
+  cloudinary: cloudinaryResultSchema.optional(),
   width: external_exports.int().min(1).max(1e4),
   height: external_exports.int().min(1).max(1e4),
   alt: external_exports.string().trim().min(1).max(200)
 });
 var photoPatchRequestSchema = external_exports.object({
   alt: external_exports.string().trim().min(1).max(200).optional(),
-  sortOrder: external_exports.int().min(0).optional()
-}).refine((v) => v.alt !== void 0 || v.sortOrder !== void 0, {
+  sortOrder: external_exports.int().min(0).optional(),
+  /** Gallery photos only, owner only: whose work it is. Null credits nobody in particular. */
+  staffId: idSchema.nullable().optional()
+}).refine((v) => v.alt !== void 0 || v.sortOrder !== void 0 || v.staffId !== void 0, {
   message: "Nothing to change"
 });
 var adminPhotoListQuerySchema = external_exports.object({
@@ -32146,115 +33538,22 @@ var adminPhotoListQuerySchema = external_exports.object({
 var adminPhotoListResponseSchema = external_exports.object({ photos: external_exports.array(adminPhotoViewSchema) });
 var adminPhotoResponseSchema = external_exports.object({ photo: adminPhotoViewSchema });
 
-// shared/api/public.ts
-var publicShopSchema = external_exports.object({
-  name: external_exports.string(),
-  tagline: external_exports.string(),
-  address: addressSchema,
-  phone: external_exports.string(),
-  email: external_exports.string(),
-  instagramHandle: external_exports.string(),
-  timezone: external_exports.string(),
-  hours: weekHoursSchema,
-  booking: external_exports.object({
-    slotStepMinutes: external_exports.int(),
-    leadTimeMinutes: external_exports.int(),
-    bookingWindowDays: external_exports.int(),
-    maxServicesPerBooking: external_exports.int(),
-    allowFirstAvailable: external_exports.boolean(),
-    requireEmail: external_exports.boolean(),
-    /** Customers may cancel or move online until this many minutes before the start. */
-    cancelCutoffMinutes: external_exports.int()
-  }),
-  /** The home page hero, when the owner has uploaded one. */
-  heroPhoto: photoViewSchema.nullable().optional(),
-  /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
-  maintenance: external_exports.boolean().optional(),
-  /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
-  demo: external_exports.boolean().optional()
-});
-var publicServiceSchema = external_exports.object({
-  id: idSchema,
-  name: external_exports.string(),
-  group: serviceGroupSchema,
-  description: external_exports.string(),
-  priceCents: external_exports.int(),
-  priceFrom: external_exports.boolean(),
-  durationMinutes: external_exports.int(),
-  sortOrder: external_exports.int()
-});
-var publicServicesResponseSchema = external_exports.object({ services: external_exports.array(publicServiceSchema) });
-var publicStaffSchema = external_exports.object({
-  id: idSchema,
-  slug: slugSchema,
-  name: external_exports.string(),
-  role: staffRoleSchema,
-  title: external_exports.string(),
-  specialty: external_exports.string(),
-  bio: external_exports.string(),
-  chairNumber: external_exports.int().nullable(),
-  serviceIds: external_exports.array(idSchema),
-  photoUrl: external_exports.string().nullable(),
-  instagramHandle: external_exports.string().nullable(),
-  acceptsOnlineBooking: external_exports.boolean(),
-  sortOrder: external_exports.int(),
-  /** The chair's portrait, when one has been uploaded. */
-  photo: photoViewSchema.nullable().optional()
-});
-var publicStaffListResponseSchema = external_exports.object({ staff: external_exports.array(publicStaffSchema) });
-var publicStaffResponseSchema = external_exports.object({
-  staff: publicStaffSchema,
-  requestedSlug: external_exports.string(),
-  canonical: external_exports.boolean()
-});
-var staffOpeningsQuerySchema = external_exports.object({
-  count: external_exports.coerce.number().int().min(1).max(10).default(3)
-});
-var openingSchema = external_exports.object({
-  startAt: external_exports.iso.datetime(),
-  endAt: external_exports.iso.datetime(),
-  /** Shop-local date, for the /book link. */
-  date: external_exports.string(),
-  /** "2:15 PM", "Tomorrow 10:00 AM" or "Thu 10:00 AM". */
-  label: external_exports.string()
-});
-var staffOpeningsResponseSchema = external_exports.object({
-  staff: external_exports.object({ id: idSchema, slug: slugSchema, name: external_exports.string() }),
-  /** The service the openings are for, or null when the chair offers nothing online. */
-  service: external_exports.object({ id: idSchema, name: external_exports.string(), durationMinutes: external_exports.int() }).nullable(),
-  openings: external_exports.array(openingSchema)
-});
-
-// shared/api/auth.ts
-var loginRequestSchema = external_exports.object({
-  email: external_exports.string().trim().min(3).max(254),
-  password: external_exports.string().min(1).max(256)
-});
-var meUserSchema = publicUserSchema.omit({ lastLoginAt: true }).extend({ lastLoginAt: external_exports.iso.datetime().nullable() });
-var meResponseSchema = external_exports.object({
-  user: meUserSchema,
-  staff: publicStaffSchema.nullable(),
-  permissions: external_exports.object({ barbersCanBlockTime: external_exports.boolean() }),
-  /** What this deployment can do at all, whatever the role: photos need storage, demo is the showcase mode. */
-  features: external_exports.object({ photos: external_exports.boolean(), demo: external_exports.boolean() })
-});
-var changePasswordRequestSchema = external_exports.object({
-  currentPassword: external_exports.string().min(1).max(256),
-  newPassword: external_exports.string().min(1).max(256)
-});
-var okResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
-var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
-
 // shared/api/admin.ts
-var conflictActionSchema = external_exports.enum(["keep", "cancel", "cancelAndNotify"]);
+var conflictActionSchema = external_exports.enum(["keep", "move", "cancel", "cancelAndNotify"]);
 var conflictResolutionSchema = external_exports.object({
   bookingId: idSchema,
-  action: conflictActionSchema
+  action: conflictActionSchema,
+  /** For "move": the chair that takes the booking at the same time. */
+  toStaffId: idSchema.optional()
+}).refine((v) => v.action === "move" === (v.toStaffId !== void 0), {
+  message: "Moving a booking needs a chair, and only a move has one",
+  path: ["toStaffId"]
 });
 var resolutionsSchema = external_exports.array(conflictResolutionSchema).max(500).optional();
 var conflictOutcomeSchema = external_exports.object({
   kept: external_exports.array(idSchema),
-  cancelled: external_exports.array(idSchema)
+  cancelled: external_exports.array(idSchema),
+  moved: external_exports.array(idSchema).default([])
 });
 var adminBookingViewSchema = bookingViewSchema.extend({
   /** An online booking the owner has not opened yet. */
@@ -32329,6 +33628,21 @@ var scheduleResponseSchema = external_exports.object({
   date: isoDateSchema,
   chairs: external_exports.array(scheduleChairSchema)
 });
+var scheduleWeekResponseSchema = external_exports.object({
+  days: external_exports.array(external_exports.object({ date: isoDateSchema, label: external_exports.string(), today: external_exports.boolean() })),
+  rows: external_exports.array(
+    external_exports.object({
+      staff: staffRefSchema,
+      cells: external_exports.array(
+        external_exports.object({
+          date: isoDateSchema,
+          count: external_exports.int(),
+          status: external_exports.enum(["working", "off", "closed"])
+        })
+      )
+    })
+  )
+});
 var whoIsInResponseSchema = external_exports.object({
   date: isoDateSchema,
   entries: external_exports.array(whoIsInEntrySchema)
@@ -32383,7 +33697,9 @@ var bookingDetailResponseSchema = external_exports.object({
   audit: external_exports.array(auditEntryViewSchema),
   outbox: external_exports.array(outboxMessageViewSchema),
   /** Allowed next statuses for the caller. */
-  transitions: external_exports.array(bookingStatusSchema)
+  transitions: external_exports.array(bookingStatusSchema),
+  /** The customer's manage link path (owner only), for "Copy manage link". Empty for barbers. */
+  managePath: external_exports.string().nullable().default(null)
 });
 var bookingResponseSchema = external_exports.object({ booking: adminBookingViewSchema });
 var statusChangeRequestSchema = external_exports.object({
@@ -32436,6 +33752,8 @@ var manualBookingResponseSchema = external_exports.object({
 });
 var customerQuerySchema = external_exports.object({ phone: external_exports.string().min(7).max(32) });
 var customerResponseSchema = external_exports.object({
+  /** The number in E.164, the key of every customer route. */
+  phoneE164: external_exports.string(),
   phone: external_exports.string(),
   names: external_exports.array(external_exports.string()),
   emails: external_exports.array(external_exports.string()),
@@ -32447,7 +33765,39 @@ var customerResponseSchema = external_exports.object({
     cancelled: external_exports.int()
   }),
   completedSpendCents: external_exports.int(),
-  bookings: external_exports.array(adminBookingViewSchema)
+  bookings: external_exports.array(adminBookingViewSchema),
+  /** The owner's private note. Never shown to the customer or a barber. */
+  notes: external_exports.string().nullable(),
+  usualBarber: staffRefSchema.nullable()
+});
+var customerSortKeySchema = external_exports.enum(["name", "visits", "last", "noShows"]);
+var CUSTOMER_PAGE_SIZE = 25;
+var customerListQuerySchema = external_exports.object({
+  q: external_exports.string().trim().max(80).default(""),
+  sort: customerSortKeySchema.default("last"),
+  dir: external_exports.enum(["asc", "desc"]).optional(),
+  page: external_exports.coerce.number().int().min(1).max(1e4).default(1)
+});
+var customerRowSchema = external_exports.object({
+  phoneE164: external_exports.string(),
+  phone: external_exports.string(),
+  name: external_exports.string(),
+  bookings: external_exports.int(),
+  visits: external_exports.int(),
+  noShows: external_exports.int(),
+  lastVisitAt: external_exports.iso.datetime().nullable(),
+  usualBarber: external_exports.string().nullable(),
+  hasNotes: external_exports.boolean()
+});
+var customerListResponseSchema = external_exports.object({
+  rows: external_exports.array(customerRowSchema),
+  total: external_exports.int(),
+  page: external_exports.int(),
+  pageSize: external_exports.int()
+});
+var customerNotesRequestSchema = external_exports.object({
+  phone: external_exports.string().min(7).max(32),
+  notes: external_exports.string().trim().max(2e3)
 });
 var timeBlockCreateRequestSchema = external_exports.object({
   staffId: idSchema,
@@ -32463,22 +33813,6 @@ var timeBlockCreateRequestSchema = external_exports.object({
   (v) => new Date(v.endAt).getTime() - new Date(v.startAt).getTime() <= 90 * 24 * 36e5,
   {
     message: "Blocks are limited to 90 days",
-    path: ["endAt"]
-  }
-);
-var ownTimeBlockRequestSchema = external_exports.object({
-  kind: external_exports.enum(["block", "timeOff"]),
-  startAt: external_exports.iso.datetime({ offset: true }),
-  endAt: external_exports.iso.datetime({ offset: true }),
-  reason: external_exports.string().trim().max(200).optional(),
-  resolutions: resolutionsSchema
-}).refine((v) => new Date(v.endAt).getTime() > new Date(v.startAt).getTime(), {
-  message: "The end must be after the start",
-  path: ["endAt"]
-}).refine(
-  (v) => new Date(v.endAt).getTime() - new Date(v.startAt).getTime() <= 30 * 24 * 36e5,
-  {
-    message: "Blocks are limited to 30 days",
     path: ["endAt"]
   }
 );
@@ -32542,8 +33876,7 @@ var adminStaffViewSchema = external_exports.object({
   sortOrder: external_exports.int(),
   acceptsOnlineBooking: external_exports.boolean(),
   showOnWebsite: external_exports.boolean(),
-  deletedAt: external_exports.iso.datetime().nullable(),
-  hasLogin: external_exports.boolean()
+  deletedAt: external_exports.iso.datetime().nullable()
 });
 var staffListResponseSchema = external_exports.object({ staff: external_exports.array(adminStaffViewSchema) });
 var staffResponseSchema = external_exports.object({ staff: adminStaffViewSchema });
@@ -32578,14 +33911,108 @@ var closureUpsertRequestSchema = external_exports.intersection(
 var closureResponseSchema = external_exports.object({ closure: closureViewSchema }).extend(conflictOutcomeSchema.shape);
 var settingsResponseSchema = external_exports.object({ settings: shopSettingsInputSchema });
 var settingsRequestSchema = shopSettingsInputSchema;
-var loginViewSchema = meUserSchema.extend({ staffName: external_exports.string().nullable() });
-var loginListResponseSchema = external_exports.object({ users: external_exports.array(loginViewSchema) });
-var loginCreateRequestSchema = external_exports.object({ email: emailSchema, staffId: idSchema });
-var issuedPasswordResponseSchema = external_exports.object({
-  user: loginViewSchema,
-  temporaryPassword: external_exports.string()
+var overviewStatSchema = external_exports.object({ value: external_exports.int(), compare: external_exports.int().nullable() });
+var activityKindSchema = external_exports.enum(["booked", "canceled", "rescheduled", "noShow", "walkIn"]);
+var activityEntrySchema = external_exports.object({
+  id: idSchema,
+  at: external_exports.iso.datetime(),
+  kind: activityKindSchema,
+  bookingId: idSchema,
+  clientName: external_exports.string(),
+  staffName: external_exports.string(),
+  status: bookingStatusSchema
 });
-var loginResponseSchema = external_exports.object({ user: loginViewSchema });
+var overviewChairSchema = external_exports.object({
+  staff: staffRefSchema,
+  photo: photoViewSchema.nullable(),
+  status: external_exports.enum(["in", "off", "closed"]),
+  current: adminBookingViewSchema.nullable(),
+  next: adminBookingViewSchema.nullable()
+});
+var alertViewSchema = external_exports.object({
+  id: idSchema,
+  kind: alertKindSchema,
+  staffId: idSchema,
+  staffName: external_exports.string(),
+  fromDate: isoDateSchema,
+  toDate: isoDateSchema,
+  startAt: external_exports.iso.datetime(),
+  endAt: external_exports.iso.datetime(),
+  reason: external_exports.string().nullable(),
+  createdAt: external_exports.iso.datetime(),
+  /** Confirmed bookings the owner still has to decide on, counted when the page loads. */
+  affectedCount: external_exports.int()
+});
+var overviewResponseSchema = external_exports.object({
+  date: isoDateSchema,
+  now: external_exports.iso.datetime(),
+  /** "Tuesday": the compare line says "vs last Tuesday". */
+  weekdayName: external_exports.string(),
+  stats: external_exports.object({
+    bookings: overviewStatSchema,
+    bookedValueCents: overviewStatSchema,
+    walkIns: overviewStatSchema,
+    noShowsWeek: overviewStatSchema
+  }),
+  /** Monday to Sunday: bookings this week against last week. */
+  week: external_exports.array(
+    external_exports.object({
+      date: isoDateSchema,
+      label: external_exports.string(),
+      thisWeek: external_exports.int(),
+      lastWeek: external_exports.int(),
+      today: external_exports.boolean()
+    })
+  ),
+  chairs: external_exports.array(overviewChairSchema),
+  activity: external_exports.array(activityEntrySchema),
+  alerts: external_exports.array(alertViewSchema)
+});
+var bookingRangeSchema = external_exports.enum(["today", "tomorrow", "week", "upcoming", "past", "all"]);
+var bookingSortKeySchema = external_exports.enum(["when", "client", "status", "source"]);
+var BOOKING_TABLE_PAGE_SIZE = 25;
+var bookingTableQuerySchema = external_exports.object({
+  range: bookingRangeSchema.default("upcoming"),
+  staffId: idSchema.optional(),
+  status: bookingStatusSchema.optional(),
+  sort: bookingSortKeySchema.default("when"),
+  dir: external_exports.enum(["asc", "desc"]).optional(),
+  page: external_exports.coerce.number().int().min(1).max(1e4).default(1)
+});
+var bookingTableResponseSchema = external_exports.object({
+  rows: external_exports.array(adminBookingViewSchema),
+  total: external_exports.int(),
+  page: external_exports.int(),
+  pageSize: external_exports.int(),
+  /** How many bookings each quick filter holds, with the barber and status filters applied. */
+  counts: external_exports.object({
+    today: external_exports.int(),
+    tomorrow: external_exports.int(),
+    week: external_exports.int(),
+    upcoming: external_exports.int(),
+    past: external_exports.int()
+  })
+});
+var searchQuerySchema = external_exports.object({ q: external_exports.string().trim().max(80).default("") });
+var searchBookingHitSchema = external_exports.object({
+  id: idSchema,
+  referenceCode: external_exports.string(),
+  customerName: external_exports.string(),
+  startAt: external_exports.iso.datetime(),
+  status: bookingStatusSchema,
+  staffName: external_exports.string(),
+  services: external_exports.string()
+});
+var searchCustomerHitSchema = external_exports.object({
+  phone: external_exports.string(),
+  name: external_exports.string(),
+  visits: external_exports.int(),
+  lastVisitAt: external_exports.iso.datetime()
+});
+var searchResponseSchema = external_exports.object({
+  bookings: external_exports.array(searchBookingHitSchema),
+  customers: external_exports.array(searchCustomerHitSchema)
+});
 var auditListQuerySchema = external_exports.object({
   entityType: external_exports.string().max(40).optional(),
   entityId: external_exports.string().max(64).optional(),
@@ -32609,22 +34036,6 @@ var outboxListQuerySchema = external_exports.object({
 var outboxListResponseSchema = external_exports.object({
   messages: external_exports.array(outboxMessageViewSchema),
   nextCursor: external_exports.string().nullable()
-});
-var myScheduleQuerySchema = external_exports.object({
-  date: isoDateSchema.optional(),
-  days: external_exports.coerce.number().int().min(1).max(7).default(1)
-});
-var myScheduleResponseSchema = external_exports.object({
-  staff: staffRefSchema,
-  days: external_exports.array(
-    external_exports.object({
-      date: isoDateSchema,
-      working: workingDaySchema,
-      bookings: external_exports.array(adminBookingViewSchema),
-      blocks: external_exports.array(timeBlockViewSchema)
-    })
-  ),
-  canBlockTime: external_exports.boolean()
 });
 
 // server/services/bookingView.ts
@@ -33485,7 +34896,7 @@ async function enforceManageRateLimit(ip, now2, limits) {
 }
 
 // server/services/demo.ts
-var SYSTEM = { type: "system", userId: null, staffId: null };
+var SYSTEM3 = { type: "system", userId: null, staffId: null };
 var DEMO_LOCK_STALE_MS = 6e4;
 var WAIT_FOR_SEED_MS = 25e3;
 var POLL_MS = 250;
@@ -33568,7 +34979,7 @@ async function seedSampleBookings(now2) {
       };
       if (plan.source === "walkIn") {
         if (!await workingNow(plan.chair, now2)) continue;
-        await createManualBooking({ ...base, source: "walkIn", override: false }, SYSTEM, meta3);
+        await createManualBooking({ ...base, source: "walkIn", override: false }, SYSTEM3, meta3);
       } else {
         const startAt = await openStart(plan, now2);
         if (!startAt) continue;
@@ -33583,7 +34994,7 @@ async function seedSampleBookings(now2) {
               override: false,
               notifyCustomer: false
             },
-            SYSTEM,
+            SYSTEM3,
             meta3
           );
         }
@@ -33597,6 +35008,19 @@ async function seedSampleBookings(now2) {
     }
   }
   return placed;
+}
+async function seedDemoPins(now2) {
+  let seeded = 0;
+  for (const staff of await staffRepo_exports.listStaff({})) {
+    if (await staffPinsRepo_exports.findPinByStaff(staff._id)) continue;
+    await staffPinsRepo_exports.upsertPin(staff._id, await hashPin(staff._id, DEMO_PIN), now2);
+    seeded += 1;
+  }
+  return seeded;
+}
+async function ensureDemoPins(now2) {
+  if (await staffPinsRepo_exports.countPins() > 0 || await setupTokensRepo_exports.countTokens() > 0) return;
+  await seedDemoPins(now2);
 }
 async function purgePhotoObjects() {
   if (getPartialEnv().STORAGE_DRIVER === "mongo") {
@@ -33649,6 +35073,7 @@ async function ensureDemoReady(setup, now2 = /* @__PURE__ */ new Date()) {
   if (!demoEnabled()) return;
   if (Date.now() < readyUntil) return;
   if (!await shopSettingsRepo_exports.getShopSettings()) await seedWithLock(setup, now2);
+  await ensureDemoPins(now2);
   readyUntil = Date.now() + READY_TTL_MS;
 }
 async function resetDemoData(setup, now2 = /* @__PURE__ */ new Date()) {
@@ -33671,298 +35096,6 @@ async function clearDemoData() {
   await db.collection(COLLECTIONS.systemState).deleteMany({});
   resetDemoReadyCache();
   return { cleared: true };
-}
-
-// server/auth/authService.ts
-var LOGIN_IP_LIMIT = { limit: 20, windowMs: 15 * 6e4 };
-var LOGIN_ACCOUNT_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
-var LOCKOUT_RULE = { threshold: 5, lockMinutes: [5, 15, 60, 240] };
-var PASSWORD_CHANGE_LIMIT = { limit: 10, windowMs: 15 * 6e4 };
-var GENERIC_FAILURE = "Email or password is incorrect";
-function normalizeEmail(email3) {
-  return email3.trim().toLowerCase();
-}
-function emailKey(email3) {
-  return sha256Hex(`login:${normalizeEmail(email3)}`);
-}
-function retryAfter(windowMs, now2) {
-  const windowEnd = (Math.floor(now2.getTime() / windowMs) + 1) * windowMs;
-  return Math.max(1, Math.ceil((windowEnd - now2.getTime()) / 1e3));
-}
-function ipHashOf(ip) {
-  return sha256Hex(`ip:${ip}:${getEnv2().MANAGE_LINK_SECRET}`);
-}
-function actorOf(principal) {
-  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
-}
-var SYSTEM2 = { type: "system", userId: null, staffId: null };
-async function auditLogin(outcome2, input2, meta3) {
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: input2.userId ? { type: "system", userId: input2.userId, staffId: null } : SYSTEM2,
-      action: outcome2 === "success" ? "auth.login.success" : "auth.login.failure",
-      entityType: "user",
-      entityId: input2.userId ?? "unknown",
-      before: null,
-      after: null,
-      meta: { email: normalizeEmail(input2.email).slice(0, 254), ip: meta3.ip, reason: input2.reason },
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-}
-async function loginIsUsable(user) {
-  if (!user.isActive) return false;
-  if (user.role === "owner") return true;
-  if (!user.staffId) return false;
-  const staff = await staffRepo_exports.findStaffById(user.staffId);
-  return staff !== null && staff.deletedAt === null;
-}
-async function login(res, input2, meta3) {
-  const email3 = normalizeEmail(input2.email);
-  const ipKey = `login:ip:${meta3.ip}`;
-  const ipCount = await rateLimitsRepo_exports.peekRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
-  if (ipCount >= LOGIN_IP_LIMIT.limit) {
-    await auditLogin("failure", { email: email3, userId: null, reason: "ipRateLimited" }, meta3);
-    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
-      retryAfterSeconds: retryAfter(LOGIN_IP_LIMIT.windowMs, meta3.now)
-    });
-  }
-  const key = emailKey(email3);
-  const accountKey = `login:account:${key}`;
-  const accountCount = await rateLimitsRepo_exports.peekRateLimit(
-    accountKey,
-    LOGIN_ACCOUNT_LIMIT,
-    meta3.now
-  );
-  if (accountCount >= LOGIN_ACCOUNT_LIMIT.limit) {
-    await auditLogin("failure", { email: email3, userId: null, reason: "accountRateLimited" }, meta3);
-    throw new AppError("RATE_LIMITED", "Too many sign-in attempts. Please wait and try again.", {
-      retryAfterSeconds: retryAfter(LOGIN_ACCOUNT_LIMIT.windowMs, meta3.now)
-    });
-  }
-  const ipHash = ipHashOf(meta3.ip);
-  const throttle = await loginThrottleRepo_exports.getLoginThrottle(key);
-  const lockedUntil = throttle?.lockedUntil ?? null;
-  const locked = lockedUntil !== null && lockedUntil.getTime() > meta3.now.getTime();
-  const known = locked ? await usersRepo_exports.findUserByEmail(email3) : null;
-  const bypass = locked && known !== null && usersRepo_exports.hasRecentLoginIp(known, ipHash, meta3.now);
-  if (locked && !bypass) {
-    await auditLogin("failure", { email: email3, userId: null, reason: "locked" }, meta3);
-    throw new AppError(
-      "ACCOUNT_LOCKED",
-      "Too many failed attempts. Please wait before trying again.",
-      {
-        retryAfterSeconds: Math.ceil((lockedUntil.getTime() - meta3.now.getTime()) / 1e3)
-      }
-    );
-  }
-  const user = await usersRepo_exports.findUserByEmail(email3);
-  const passwordOk = await verifyPassword(
-    user?.passwordHash ?? await getDummyHash(),
-    input2.password
-  );
-  const usable = user !== null && passwordOk && await loginIsUsable(user);
-  if (!user || !usable) {
-    await rateLimitsRepo_exports.hitRateLimit(ipKey, LOGIN_IP_LIMIT, meta3.now);
-    await rateLimitsRepo_exports.hitRateLimit(accountKey, LOGIN_ACCOUNT_LIMIT, meta3.now);
-    await loginThrottleRepo_exports.recordLoginFailure(key, LOCKOUT_RULE, meta3.now);
-    const reason = !user ? "unknownEmail" : !passwordOk ? "badPassword" : "disabled";
-    await auditLogin("failure", { email: email3, userId: user?._id ?? null, reason }, meta3);
-    throw new AppError("INVALID_CREDENTIALS", GENERIC_FAILURE);
-  }
-  if (!bypass) await loginThrottleRepo_exports.clearLoginThrottle(key);
-  await usersRepo_exports.recordSuccessfulLogin(user._id, meta3.now, ipHash);
-  if (needsRehash(user.passwordHash)) {
-    await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.password), meta3.now, {
-      mustChangePassword: user.mustChangePassword
-    });
-  }
-  const session = await startSession(res, user, {
-    ip: meta3.ip,
-    userAgent: meta3.userAgent,
-    now: meta3.now
-  });
-  await auditLogin("success", { email: email3, userId: user._id, reason: null }, meta3);
-  return { user, sessionId: session._id };
-}
-var DEMO_LOGIN_LIMIT = { limit: 30, windowMs: 15 * 6e4 };
-async function loginAsDemoOwner(res, meta3) {
-  const hit = await rateLimitsRepo_exports.hitRateLimit(
-    `demo-login:ip:${meta3.ip}`,
-    DEMO_LOGIN_LIMIT,
-    meta3.now
-  );
-  if (!hit.allowed) {
-    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
-      retryAfterSeconds: hit.retryAfterSeconds
-    });
-  }
-  const owner2 = await usersRepo_exports.findOwnerUser();
-  if (!owner2?.isActive) throw new AppError("NOT_FOUND", "No such endpoint");
-  await usersRepo_exports.recordSuccessfulLogin(owner2._id, meta3.now, ipHashOf(meta3.ip));
-  const session = await startSession(res, owner2, {
-    ip: meta3.ip,
-    userAgent: meta3.userAgent,
-    now: meta3.now
-  });
-  await auditLogin("success", { email: owner2.email, userId: owner2._id, reason: "demo" }, meta3);
-  return { user: owner2, sessionId: session._id };
-}
-function weakPasswordError(problems, path) {
-  return new AppError("VALIDATION_ERROR", "Please choose a stronger password", {
-    details: problems.map((message) => ({ path, message }))
-  });
-}
-async function changeOwnPassword(principal, input2, meta3) {
-  const hit = await rateLimitsRepo_exports.hitRateLimit(
-    `password:user:${principal.userId}`,
-    PASSWORD_CHANGE_LIMIT,
-    meta3.now
-  );
-  if (!hit.allowed) {
-    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
-      retryAfterSeconds: hit.retryAfterSeconds
-    });
-  }
-  const user = await usersRepo_exports.findUserById(principal.userId);
-  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
-  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
-    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
-  }
-  if (input2.newPassword === input2.currentPassword) {
-    throw weakPasswordError(["Choose a password different from the current one."], "newPassword");
-  }
-  const problems = passwordProblems(input2.newPassword, { email: user.email });
-  if (problems.length > 0) throw weakPasswordError(problems, "newPassword");
-  await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(input2.newPassword), meta3.now);
-  const ended = await sessionsRepo_exports.revokeOtherSessions(user._id, principal.sessionId, meta3.now);
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: "user.password.change",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: null,
-      meta: { otherSessionsEnded: ended, wasTemporary: user.mustChangePassword },
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-}
-async function createStaffLogin(principal, input2, meta3) {
-  const staff = await staffRepo_exports.findStaffById(input2.staffId);
-  if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
-  if (await usersRepo_exports.findUserByStaffId(staff._id)) {
-    throw new AppError("CONFLICT", `${staff.name} already has a login`);
-  }
-  const temporaryPassword = generateTemporaryPassword();
-  const user = await usersRepo_exports.insertUser(
-    {
-      email: normalizeEmail(input2.email),
-      passwordHash: await hashPassword(temporaryPassword),
-      role: "barber",
-      staffId: staff._id,
-      mustChangePassword: true
-    },
-    meta3.now
-  );
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: "user.create",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: { email: user.email, role: user.role, staffId: user.staffId },
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  return { user, temporaryPassword };
-}
-async function requireOtherUser(principal, userId) {
-  const user = await usersRepo_exports.findUserById(userId);
-  if (!user) throw new AppError("NOT_FOUND", "Login was not found");
-  if (user._id === principal.userId) {
-    throw new AppError("BAD_REQUEST", "Use your own account page to change your own login");
-  }
-  return user;
-}
-async function resetLoginPassword(principal, userId, meta3) {
-  const user = await requireOtherUser(principal, userId);
-  const temporaryPassword = generateTemporaryPassword();
-  await usersRepo_exports.setUserPasswordHash(user._id, await hashPassword(temporaryPassword), meta3.now, {
-    mustChangePassword: true
-  });
-  await sessionsRepo_exports.revokeAllSessionsForUser(user._id, meta3.now);
-  await loginThrottleRepo_exports.clearLoginThrottle(emailKey(user.email));
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: "user.password.reset",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: null,
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  const updated = await usersRepo_exports.findUserById(user._id);
-  return { user: updated ?? user, temporaryPassword };
-}
-async function setLoginActive(principal, userId, isActive, meta3) {
-  const user = await requireOtherUser(principal, userId);
-  await usersRepo_exports.setUserActive(user._id, isActive, meta3.now);
-  if (!isActive) await sessionsRepo_exports.revokeAllSessionsForUser(user._id, meta3.now);
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf(principal),
-      action: isActive ? "user.enable" : "user.disable",
-      entityType: "user",
-      entityId: user._id,
-      before: { isActive: user.isActive },
-      after: { isActive },
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  return await usersRepo_exports.findUserById(user._id) ?? user;
-}
-async function ensureOwnerLogin(input2, now2) {
-  if (await usersRepo_exports.findOwnerUser()) return { created: false };
-  const problems = passwordProblems(input2.password, { email: input2.email });
-  if (problems.length > 0) {
-    throw new Error(`SEED_OWNER_PASSWORD is too weak: ${problems.join(" ")}`);
-  }
-  const user = await usersRepo_exports.insertUser(
-    {
-      email: normalizeEmail(input2.email),
-      passwordHash: await hashPassword(input2.password),
-      role: "owner",
-      staffId: input2.staffId
-    },
-    now2
-  );
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: SYSTEM2,
-      action: "user.create",
-      entityType: "user",
-      entityId: user._id,
-      before: null,
-      after: { email: user.email, role: user.role },
-      meta: { source: "seed" },
-      requestId: null
-    },
-    now2
-  );
-  return { created: true };
 }
 
 // server/services/seedService.ts
@@ -34013,7 +35146,7 @@ async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
 }
 
 // server/services/bootstrap.ts
-var SYSTEM3 = { type: "system", userId: null, staffId: null };
+var SYSTEM4 = { type: "system", userId: null, staffId: null };
 async function bootstrap(input2, now2) {
   const env = getEnv2();
   const demo = env.DEMO_MODE === "true";
@@ -34045,13 +35178,14 @@ async function bootstrap(input2, now2) {
   const created = { ...summary, indexes: true };
   if (demo && !demoRecord) {
     created.sampleBookings = await seedSampleBookings(now2);
+    created.demoPins = await seedDemoPins(now2);
     await systemStateRepo_exports.recordDemoSeed(now2);
     created.demo = true;
   }
   const record2 = await systemStateRepo_exports.recordBootstrap(created, now2);
   await auditLogRepo_exports.appendAuditEntry(
     {
-      actor: SYSTEM3,
+      actor: SYSTEM4,
       action: "system.bootstrap",
       entityType: "system",
       entityId: "bootstrap",
@@ -34292,7 +35426,7 @@ async function assertServing(route, pathname, now2) {
     throw new AppError("MAINTENANCE", "Online booking is having a moment. Please call the shop.");
   }
 }
-var KNOWN_LEVELS = /* @__PURE__ */ new Set(["public", "barber", "owner", "internal"]);
+var KNOWN_LEVELS = /* @__PURE__ */ new Set(["public", "team", "owner", "internal"]);
 function createRouter(definitions, authenticate) {
   for (const d of definitions) {
     if (!KNOWN_LEVELS.has(d.auth)) {
@@ -34353,14 +35487,19 @@ function createRouter(definitions, authenticate) {
         case "internal":
           assertInternalSecret(req, route);
           break;
-        case "barber":
+        case "team": {
+          const principal = await authenticate(ctx, "team");
+          if (principal?.role !== "barber") throw new AppError("AUTH_REQUIRED", "Please sign in");
+          ctx.principal = principal;
+          break;
+        }
         case "owner": {
-          const principal = await authenticate(ctx);
+          const principal = await authenticate(ctx, "owner");
           if (!principal) throw new AppError("AUTH_REQUIRED", "Please sign in");
           if (principal.mustChangePassword && route.allowDuringPasswordChange !== true) {
             throw new AppError("PASSWORD_CHANGE_REQUIRED", "Please choose a new password first");
           }
-          if (route.auth === "owner" && principal.role !== "owner") {
+          if (principal.role !== "owner") {
             throw new AppError("FORBIDDEN", "Owner access is required");
           }
           ctx.principal = principal;
@@ -34384,6 +35523,128 @@ function createRouter(definitions, authenticate) {
   }
   return { handle, routes: definitions };
 }
+
+// shared/api/team.ts
+var pinSchema = external_exports.string().regex(PIN_PATTERN, "Use exactly 6 digits");
+var teamLoginRequestSchema = external_exports.object({ staffId: idSchema, pin: pinSchema });
+var teamSetupInfoResponseSchema = external_exports.object({ staffName: external_exports.string() });
+var teamSetupRequestSchema = external_exports.object({ pin: pinSchema, confirmPin: pinSchema }).refine((v) => v.pin === v.confirmPin, {
+  message: "The two PINs do not match",
+  path: ["confirmPin"]
+});
+var teamChangePinRequestSchema = external_exports.object({ currentPin: pinSchema, newPin: pinSchema, confirmPin: pinSchema }).refine((v) => v.newPin === v.confirmPin, {
+  message: "The two PINs do not match",
+  path: ["confirmPin"]
+});
+var teamMeResponseSchema = external_exports.object({
+  staff: external_exports.object({
+    id: idSchema,
+    name: external_exports.string(),
+    title: external_exports.string(),
+    photo: photoViewSchema.nullable()
+  }),
+  /** When this sign-in ends, whatever the barber does. */
+  expiresAt: external_exports.iso.datetime()
+});
+var teamBookingViewSchema = external_exports.object({
+  id: idSchema,
+  referenceCode: external_exports.string(),
+  status: bookingStatusSchema,
+  source: bookingSourceSchema,
+  startAt: external_exports.iso.datetime(),
+  endAt: external_exports.iso.datetime(),
+  customerName: external_exports.string(),
+  services: external_exports.array(external_exports.string()),
+  notes: external_exports.string().nullable()
+});
+var teamDayResponseSchema = external_exports.object({
+  date: isoDateSchema,
+  now: external_exports.iso.datetime(),
+  working: workingDaySchema,
+  /** The first confirmed booking that has not ended yet today. */
+  nextUp: teamBookingViewSchema.nullable(),
+  bookings: external_exports.array(teamBookingViewSchema),
+  blocks: external_exports.array(timeBlockViewSchema),
+  /** The barber marked themselves out for today. */
+  isOut: external_exports.boolean(),
+  counts: external_exports.object({ total: external_exports.int(), done: external_exports.int(), noShow: external_exports.int(), left: external_exports.int() })
+});
+var teamWeekResponseSchema = external_exports.object({
+  days: external_exports.array(
+    external_exports.object({
+      date: isoDateSchema,
+      working: workingDaySchema,
+      count: external_exports.int(),
+      bookings: external_exports.array(teamBookingViewSchema),
+      blocks: external_exports.array(timeBlockViewSchema)
+    })
+  )
+});
+var teamStatusRequestSchema = external_exports.object({
+  status: external_exports.enum(["completed", "noShow", "confirmed"])
+});
+var teamStatusResponseSchema = external_exports.object({ booking: teamBookingViewSchema });
+var teamNoteRequestSchema = external_exports.object({
+  notes: external_exports.string().trim().max(MAX_NOTE_LENGTH).nullable()
+});
+var teamWalkInRequestSchema = external_exports.object({
+  name: external_exports.string().trim().min(1).max(80),
+  phone: phoneSchema,
+  serviceIds: external_exports.array(idSchema).min(1).max(6)
+});
+var teamWalkInResponseSchema = external_exports.object({
+  booking: teamBookingViewSchema,
+  outsideWorkingTime: external_exports.boolean()
+});
+var teamTimeOffResponseSchema = external_exports.object({
+  isOutToday: external_exports.boolean(),
+  blocks: external_exports.array(timeBlockViewSchema),
+  requests: external_exports.array(
+    external_exports.object({
+      id: idSchema,
+      fromDate: isoDateSchema,
+      toDate: isoDateSchema,
+      reason: external_exports.string().nullable()
+    })
+  )
+});
+var teamBlockTimeRequestSchema = external_exports.object({
+  date: isoDateSchema,
+  start: hhmmSchema,
+  end: hhmmSchema,
+  reason: external_exports.string().trim().max(200).optional()
+}).refine((v) => v.end > v.start, { message: "The end must be after the start", path: ["end"] });
+var teamOutTodayResponseSchema = external_exports.object({
+  /** Confirmed clients today whose bookings stay in place until the owner decides. */
+  clients: external_exports.int()
+});
+var teamDaysOffRequestSchema = external_exports.object({
+  fromDate: isoDateSchema,
+  toDate: isoDateSchema,
+  reason: external_exports.string().trim().max(200).optional()
+}).refine((v) => v.toDate >= v.fromDate, {
+  message: "The last day cannot be before the first",
+  path: ["toDate"]
+});
+var teamDaysOffResponseSchema = external_exports.object({
+  /** True when the days were empty and the time off is already in place. */
+  applied: external_exports.boolean(),
+  /** Clients on those days when it became a request for the owner. */
+  clients: external_exports.int()
+});
+var staffAccessResponseSchema = external_exports.object({
+  hasPin: external_exports.boolean(),
+  lastSignInAt: external_exports.iso.datetime().nullable(),
+  /** Set while five wrong tries have locked the barber out. */
+  lockedUntil: external_exports.iso.datetime().nullable(),
+  /** A setup link was made and has neither been used nor expired. */
+  setupLinkActive: external_exports.boolean()
+});
+var setupLinkResponseSchema = external_exports.object({
+  /** The full address to send the barber. Shown once; only its hash is kept. */
+  url: external_exports.string(),
+  expiresAt: external_exports.iso.datetime()
+});
 
 // server/lib/afterResponse.ts
 var import_functions = __toESM(require_functions(), 1);
@@ -34840,7 +36101,11 @@ function assertInScope(scope, staffId, what = "Booking") {
   }
 }
 function actorOf2(principal) {
-  return { type: principal.role, userId: principal.userId, staffId: principal.staffId };
+  return {
+    type: principal.role,
+    userId: principal.role === "owner" ? principal.userId : null,
+    staffId: principal.staffId
+  };
 }
 
 // server/services/scheduleData.ts
@@ -34954,14 +36219,14 @@ async function todaySummary(date5, now2) {
     bookingsRepo_exports.listBookingsBetween(shopDayBounds(day)),
     bookingsRepo_exports.countUnseenOnline()
   ]);
-  const live = bookings.filter((b) => b.status !== "cancelled");
+  const live2 = bookings.filter((b) => b.status !== "cancelled");
   const count = (status) => bookings.filter((b) => b.status === status).length;
   const whoIsIn2 = activeStaff(data.staff).map((s2) => whoIsInFor(s2, day, data.source));
   const isToday = day === shopDateOf(now2);
   const nextUp = activeStaff(data.staff).filter(
-    (s2) => live.some((b) => b.staffId === s2._id) || whoIsIn2.some((w) => w.staff.id === s2._id && w.status === "in")
+    (s2) => live2.some((b) => b.staffId === s2._id) || whoIsIn2.some((w) => w.staff.id === s2._id && w.status === "in")
   ).map((s2) => {
-    const next2 = live.filter(
+    const next2 = live2.filter(
       (b) => b.staffId === s2._id && b.status === "confirmed" && (!isToday || b.endAt > now2)
     ).sort((a, b) => a.startAt.getTime() - b.startAt.getTime())[0];
     return { staff: toStaffRef(s2), booking: next2 ? toAdminBookingView(next2, s2) : null };
@@ -34977,10 +36242,10 @@ async function todaySummary(date5, now2) {
       cancelled: count("cancelled"),
       newOnline
     },
-    chairsBooked: new Set(live.map((b) => b.staffId)).size,
+    chairsBooked: new Set(live2.map((b) => b.staffId)).size,
     chairsWorking: whoIsIn2.filter((w) => w.status === "in").length,
-    expectedRevenueCents: live.filter((b) => b.status === "confirmed" || b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
-    completedRevenueCents: live.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
+    expectedRevenueCents: live2.filter((b) => b.status === "confirmed" || b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
+    completedRevenueCents: live2.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
     nextUp,
     whoIsIn: whoIsIn2
   };
@@ -35005,6 +36270,40 @@ async function scheduleForDay(scope, input2, now2) {
     }))
   };
 }
+async function scheduleWeek(date5, now2) {
+  const today = shopDateOf(now2);
+  const monday = shopDayStart(date5 ?? today).startOf("week");
+  const dates = Array.from({ length: 7 }, (_, i) => monday.plus({ days: i }).toISODate() ?? today);
+  const first = dates[0] ?? today;
+  const last = dates[6] ?? today;
+  const [data, bookings] = await Promise.all([
+    loadScheduleData(first, last),
+    bookingsRepo_exports.listBookingsStartingBetween({
+      start: shopDayBounds(first).start,
+      end: shopDayBounds(last).end
+    })
+  ]);
+  return {
+    days: dates.map((d, i) => ({
+      date: d,
+      label: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i] ?? d,
+      today: d === today
+    })),
+    rows: activeStaff(data.staff).map((s2) => ({
+      staff: toStaffRef(s2),
+      cells: dates.map((d) => {
+        const who = whoIsInFor(s2, d, data.source);
+        return {
+          date: d,
+          count: bookings.filter(
+            (b) => b.staffId === s2._id && b.status !== "cancelled" && shopDateOf(b.startAt) === d
+          ).length,
+          status: who.status === "in" ? "working" : who.status === "closed" ? "closed" : "off"
+        };
+      })
+    }))
+  };
+}
 async function whoIsIn(date5, now2) {
   const day = date5 ?? shopDateOf(now2);
   const data = await loadScheduleData(day, day);
@@ -35018,31 +36317,6 @@ async function whoIsInForStaff(staffId, date5) {
   const staff = data.staff.find((s2) => s2._id === staffId);
   if (!staff) throw new AppError("NOT_FOUND", "Staff member was not found");
   return whoIsInFor(staff, date5, data.source);
-}
-async function mySchedule(scope, input2, now2) {
-  const from = input2.date ?? shopDateOf(now2);
-  const to = shopDayStart(from).plus({ days: input2.days - 1 }).toISODate() ?? from;
-  const range = { start: shopDayBounds(from).start, end: shopDayBounds(to).end };
-  const [data, bookings, settings] = await Promise.all([
-    loadScheduleData(from, to),
-    bookingsRepo_exports.listBookingsBetween(range, { staffId: scope.staffId }),
-    shopSettingsRepo_exports.requireShopSettings()
-  ]);
-  const staff = data.staff.find((s2) => s2._id === scope.staffId);
-  if (!staff || staff.deletedAt)
-    throw new AppError("FORBIDDEN", "This login is not linked to a chair");
-  const days = [];
-  for (let d = shopDayStart(from); (d.toISODate() ?? "") <= to; d = d.plus({ days: 1 })) {
-    const date5 = d.toISODate() ?? from;
-    const bounds = shopDayBounds(date5);
-    days.push({
-      date: date5,
-      working: workingView(staff._id, date5, data.source),
-      bookings: bookings.filter((b) => b.startAt >= bounds.start && b.startAt < bounds.end).map((b) => toAdminBookingView(b, staff)),
-      blocks: data.source.timeBlocks.filter((b) => b.staffId === staff._id && b.startAt < bounds.end && b.endAt > bounds.start).map(toTimeBlockView)
-    });
-  }
-  return { staff: toStaffRef(staff), days, canBlockTime: settings.permissions.barbersCanBlockTime };
 }
 function encodeCursor(value) {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -35100,16 +36374,59 @@ async function bookingDetail(principal, scope, id, now2) {
   const booking = await loadBookingInScope(scope, id);
   if (scope.kind === "all") await bookingsRepo_exports.markOwnerSeen(booking._id, now2);
   const fresh = await bookingsRepo_exports.findBookingById(booking._id) ?? booking;
-  const [audit2, outbox] = scope.kind === "all" ? await Promise.all([
+  const [audit3, outbox] = scope.kind === "all" ? await Promise.all([
     auditLogRepo_exports.listAuditForEntity("booking", booking._id, 50),
     emailOutboxRepo_exports.listOutboxForBooking(booking._id)
   ]) : [[], []];
   return {
     booking: await viewOf(fresh),
-    audit: audit2.map(toAuditView),
+    audit: audit3.map(toAuditView),
     outbox: outbox.map(toOutboxView),
-    transitions: allowedTransitions(principal, scope, fresh.status)
+    transitions: allowedTransitions(principal, scope, fresh.status),
+    managePath: scope.kind === "all" ? manageLinkFor(fresh) : null
   };
+}
+async function resendConfirmation(principal, scope, id, meta3) {
+  const booking = await loadBookingInScope(scope, id);
+  const email3 = booking.customer.email;
+  if (!email3) throw new AppError("CONFLICT", "This booking has no email address to send to");
+  if (booking.status !== "confirmed")
+    throw new AppError("INVALID_TRANSITION", "Only a confirmed booking can be confirmed again");
+  const [settings, staff] = await Promise.all([
+    shopSettingsRepo_exports.requireShopSettings(),
+    staffRepo_exports.findStaffById(booking.staffId)
+  ]);
+  const row = await emailOutboxRepo_exports.enqueueOutboxMessage(
+    {
+      channel: "email",
+      to: email3,
+      template: "bookingConfirmed",
+      payload: {
+        booking: toBookingView(booking, staff ?? unknownStaff(booking.staffId)),
+        shop: shopSnapshot(settings),
+        previousStartAt: null,
+        cancelReason: null,
+        managePath: manageLinkFor(booking)
+      },
+      dedupeKey: `booking:${booking._id}:resend:${meta3.now.getTime()}`,
+      bookingId: booking._id
+    },
+    meta3.now
+  );
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action: "booking.resend",
+      entityType: "booking",
+      entityId: booking._id,
+      before: null,
+      after: null,
+      meta: null,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+  return { body: { ok: true }, outboxIds: row ? [row._id] : [] };
 }
 async function changeBookingStatus(principal, scope, id, input2, meta3) {
   const booking = await loadBookingInScope(scope, id);
@@ -35296,12 +36613,20 @@ async function customerByPhone(rawPhone, now2) {
       details: [{ path: "phone", message: "Enter a valid US phone number" }]
     });
   }
-  const bookings = await bookingsRepo_exports.listBookingsForPhone(phone, 200);
-  const staffById = new Map(
-    (await staffRepo_exports.listStaff({ includeDeleted: true })).map((s2) => [s2._id, s2])
-  );
+  const [bookings, note, allStaff] = await Promise.all([
+    bookingsRepo_exports.listBookingsForPhone(phone, 200),
+    customerNotesRepo_exports.getNote(phone),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const staffById = new Map(allStaff.map((s2) => [s2._id, s2]));
   const by = (status) => bookings.filter((b) => b.status === status);
+  const counts = /* @__PURE__ */ new Map();
+  for (const b of bookings.filter((x) => x.status !== "cancelled"))
+    counts.set(b.staffId, (counts.get(b.staffId) ?? 0) + 1);
+  const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const usualStaff = usual ? staffById.get(usual[0]) : void 0;
   return {
+    phoneE164: phone,
     phone: formatUsPhone(phone),
     names: [...new Set(bookings.map((b) => b.customer.name))],
     emails: [...new Set(bookings.flatMap((b) => b.customer.email ? [b.customer.email] : []))],
@@ -35313,8 +36638,63 @@ async function customerByPhone(rawPhone, now2) {
       cancelled: by("cancelled").length
     },
     completedSpendCents: by("completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
-    bookings: bookings.map((b) => toAdminBookingView(b, staffName(staffById, b.staffId)))
+    bookings: bookings.map((b) => toAdminBookingView(b, staffName(staffById, b.staffId))),
+    notes: note?.notes ?? null,
+    usualBarber: usualStaff ? toStaffRef(usualStaff) : null
   };
+}
+async function customerList(query) {
+  const parsed = classifySearch(query.q);
+  const match2 = parsed.kind === "phone" ? { kind: "phone", digits: parsed.digits } : parsed.kind === "text" ? { kind: "name", key: parsed.key } : null;
+  const dir = query.dir ?? (query.sort === "name" ? "asc" : "desc");
+  const { rows, total } = await bookingsRepo_exports.customerPage(
+    match2,
+    { key: query.sort, dir: dir === "asc" ? 1 : -1 },
+    (query.page - 1) * CUSTOMER_PAGE_SIZE,
+    CUSTOMER_PAGE_SIZE
+  );
+  const [notes, staff] = await Promise.all([
+    customerNotesRepo_exports.listNotesFor(rows.map((r) => r.phone)),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const hasNote = new Set(notes.map((n2) => n2.phone));
+  const names = new Map(staff.map((s2) => [s2._id, s2.name]));
+  return {
+    rows: rows.map((r) => ({
+      phoneE164: r.phone,
+      phone: formatUsPhone(r.phone),
+      name: r.name,
+      bookings: r.bookings,
+      visits: r.visits,
+      noShows: r.noShows,
+      lastVisitAt: r.lastVisitAt ? r.lastVisitAt.toISOString() : null,
+      usualBarber: r.usualStaffId ? names.get(r.usualStaffId) ?? null : null,
+      hasNotes: hasNote.has(r.phone)
+    })),
+    total,
+    page: query.page,
+    pageSize: CUSTOMER_PAGE_SIZE
+  };
+}
+async function saveCustomerNotes(principal, rawPhone, notes, meta3) {
+  const phone = normalizeUsPhone(rawPhone);
+  if (!phone) throw new AppError("VALIDATION_ERROR", "Enter a valid US phone number");
+  const before = await customerNotesRepo_exports.getNote(phone);
+  const saved = await customerNotesRepo_exports.saveNote(phone, notes, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action: "customer.notes",
+      entityType: "customer",
+      entityId: phone,
+      before: null,
+      after: null,
+      meta: { hadNote: before !== null, hasNote: saved !== null },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+  return { notes: saved?.notes ?? null };
 }
 
 // server/services/scheduleChanges.ts
@@ -35361,10 +36741,30 @@ function summarize(booking, staffById) {
     hasEmail: booking.customer.email !== null
   };
 }
+function heldSpan(booking) {
+  return { start: booking.startAt, end: addMinutes(booking.endAt, booking.bufferMinutes) };
+}
+function canTake(snapshot, booking, staff) {
+  if (staff.deletedAt !== null) return false;
+  if (!booking.services.every((s2) => staff.serviceIds.includes(s2.serviceId))) return false;
+  return isWithinWorkingTime({ ...booking, staffId: staff._id }, staff, snapshot.source);
+}
+async function moveOptionsFor(snapshot, booking, session) {
+  const options = [];
+  const sorted = [...snapshot.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+  for (const staff of sorted) {
+    if (staff._id === booking.staffId || !canTake(snapshot, booking, staff)) continue;
+    const locks = await slotLocksRepo_exports.listSlotLocksForStaff(staff._id, heldSpan(booking), {
+      session
+    });
+    if (locks.length === 0) options.push({ staffId: staff._id, staffName: staff.name });
+  }
+  return options;
+}
 async function applyScheduleChange(change) {
-  const choices = new Map((change.resolutions ?? []).map((r) => [r.bookingId, r.action]));
-  if (!change.allowCancel && [...choices.values()].some((a) => a !== "keep")) {
-    throw new AppError("FORBIDDEN", "Only the owner can cancel bookings");
+  const choices = new Map((change.resolutions ?? []).map((r) => [r.bookingId, r]));
+  if (!change.allowCancel && [...choices.values()].some((r) => r.action !== "keep")) {
+    throw new AppError("FORBIDDEN", "Only the owner can cancel or move bookings");
   }
   return withTransaction(async (session) => {
     const scope = change.staffIds === "all" ? null : [...change.staffIds];
@@ -35385,15 +36785,62 @@ async function applyScheduleChange(change) {
       throw new AppError(
         "SCHEDULE_CONFLICT",
         unresolved.length === 1 ? "One upcoming booking would fall outside working time. Choose what to do with it." : `${unresolved.length} upcoming bookings would fall outside working time. Choose what to do with each.`,
-        { extra: { affected: [...affected.values()].map((b) => summarize(b, after.staffById)) } }
+        {
+          extra: {
+            affected: await Promise.all(
+              [...affected.values()].map(async (b) => ({
+                ...summarize(b, after.staffById),
+                moveOptions: await moveOptionsFor(after, b, session)
+              }))
+            )
+          }
+        }
       );
     }
     const kept = [];
+    const moved = [];
     const cancelled = [];
     const outboxIds = [];
     const settings = affected.size > 0 ? await shopSettingsRepo_exports.requireShopSettings({ session }) : null;
     for (const booking of affected.values()) {
-      const action = choices.get(booking._id);
+      const choice = choices.get(booking._id);
+      const action = choice?.action;
+      if (choice?.action === "move" && choice.toStaffId) {
+        const target = after.staffById.get(choice.toStaffId);
+        if (!target || !canTake(after, booking, target)) {
+          throw new AppError(
+            "SLOT_TAKEN",
+            `${target?.name ?? "That chair"} can not take this booking`
+          );
+        }
+        await scheduleGuardsRepo_exports.bumpScheduleGuards([target._id], change.now, { session });
+        await slotLocksRepo_exports.releaseSlotLocks(booking._id, { session });
+        await slotLocksRepo_exports.acquireSlotLocks(
+          target._id,
+          heldSpan(booking),
+          { holderType: "booking", holderId: booking._id },
+          change.now,
+          { session }
+        );
+        await relockBlocks(booking.staffId, heldSpan(booking), change.now, session);
+        await bookingsRepo_exports.moveBookingToStaff(booking._id, target._id, change.now, { session });
+        await auditLogRepo_exports.appendAuditEntry(
+          {
+            actor: change.actor,
+            action: "booking.move",
+            entityType: "booking",
+            entityId: booking._id,
+            before: { staffId: booking.staffId },
+            after: { staffId: target._id },
+            meta: { change: change.audit.action },
+            requestId: change.requestId
+          },
+          change.now,
+          { session }
+        );
+        moved.push(booking._id);
+        continue;
+      }
       if (action === "keep" || !settings) {
         kept.push(booking._id);
         await auditLogRepo_exports.appendAuditEntry(
@@ -35438,18 +36885,18 @@ async function applyScheduleChange(change) {
         entityId: change.audit.entityId(result),
         before: null,
         after: null,
-        meta: { ...change.audit.meta, kept, cancelled },
+        meta: { ...change.audit.meta, kept, moved, cancelled },
         requestId: change.requestId
       },
       change.now,
       { session }
     );
-    return { result, kept, cancelled, outboxIds };
+    return { result, kept, moved, cancelled, outboxIds };
   });
 }
 
 // server/services/adminCatalog.ts
-async function audit(principal, entry, meta3) {
+async function audit2(principal, entry, meta3) {
   await auditLogRepo_exports.appendAuditEntry(
     {
       actor: actorOf2(principal),
@@ -35484,7 +36931,7 @@ async function listServices2() {
 }
 async function createService(principal, input2, meta3) {
   const service = await servicesRepo_exports.insertService(input2, meta3.now);
-  await audit(
+  await audit2(
     principal,
     { action: "service.create", entityType: "service", entityId: service._id, after: input2 },
     meta3
@@ -35495,7 +36942,7 @@ async function updateService2(principal, id, patch, meta3) {
   const before = await servicesRepo_exports.findServiceById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
   const service = await servicesRepo_exports.updateService(id, patch, meta3.now);
-  await audit(
+  await audit2(
     principal,
     {
       action: "service.update",
@@ -35525,11 +36972,11 @@ async function deleteService(principal, id, resolutions, meta3) {
     alsoAffected: (upcoming) => upcoming.filter((b) => b.services.some((s2) => s2.serviceId === id))
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds
   };
 }
-function toStaffView(s2, logins) {
+function toStaffView(s2) {
   return {
     id: s2._id,
     slug: s2.slug,
@@ -35546,25 +36993,20 @@ function toStaffView(s2, logins) {
     sortOrder: s2.sortOrder,
     acceptsOnlineBooking: s2.acceptsOnlineBooking,
     showOnWebsite: s2.showOnWebsite,
-    deletedAt: s2.deletedAt?.toISOString() ?? null,
-    hasLogin: logins.has(s2._id)
+    deletedAt: s2.deletedAt?.toISOString() ?? null
   };
 }
-async function loginStaffIds() {
-  return new Set((await usersRepo_exports.listUsers()).flatMap((u) => u.staffId ? [u.staffId] : []));
-}
 async function listStaff2() {
-  const [staff, logins] = await Promise.all([staffRepo_exports.listStaff(), loginStaffIds()]);
-  return { staff: staff.map((s2) => toStaffView(s2, logins)) };
+  return { staff: (await staffRepo_exports.listStaff()).map(toStaffView) };
 }
 async function createStaff(principal, input2, meta3) {
   const staff = await staffRepo_exports.insertStaff(input2, meta3.now);
-  await audit(
+  await audit2(
     principal,
     { action: "staff.create", entityType: "staff", entityId: staff._id, after: input2 },
     meta3
   );
-  return { staff: toStaffView(staff, /* @__PURE__ */ new Set()) };
+  return { staff: toStaffView(staff) };
 }
 async function updateStaff2(principal, id, input2, meta3) {
   const { resolutions, ...patch } = input2;
@@ -35591,8 +37033,9 @@ async function updateStaff2(principal, id, input2, meta3) {
   });
   return {
     body: {
-      staff: toStaffView(change.result, await loginStaffIds()),
+      staff: toStaffView(change.result),
       kept: change.kept,
+      moved: change.moved,
       cancelled: change.cancelled
     },
     outboxIds: change.outboxIds
@@ -35602,7 +37045,7 @@ async function renameStaffSlug2(principal, id, slug, meta3) {
   const before = await staffRepo_exports.findStaffById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
   const staff = await staffRepo_exports.renameStaffSlug(id, slug, meta3.now);
-  await audit(
+  await audit2(
     principal,
     {
       action: "staff.slug.rename",
@@ -35613,7 +37056,7 @@ async function renameStaffSlug2(principal, id, slug, meta3) {
     },
     meta3
   );
-  return { staff: toStaffView(staff, await loginStaffIds()) };
+  return { staff: toStaffView(staff) };
 }
 async function deleteStaff(principal, id, resolutions, meta3) {
   const staff = await staffRepo_exports.findStaffById(id);
@@ -35638,7 +37081,7 @@ async function deleteStaff(principal, id, resolutions, meta3) {
     }
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds
   };
 }
@@ -35656,7 +37099,7 @@ async function putSettings(principal, input2, meta3) {
   await withTransaction(async (session) => {
     await shopSettingsRepo_exports.updateShopSettings(input2, meta3.now, { session });
   });
-  await audit(
+  await audit2(
     principal,
     {
       action: "settings.update",
@@ -35668,25 +37111,6 @@ async function putSettings(principal, input2, meta3) {
     meta3
   );
   return getSettings();
-}
-function toLoginView(user, staffById) {
-  return {
-    _id: user._id,
-    email: user.email,
-    role: user.role,
-    staffId: user.staffId,
-    isActive: user.isActive,
-    mustChangePassword: user.mustChangePassword,
-    lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
-    staffName: user.staffId ? staffById.get(user.staffId)?.name ?? null : null
-  };
-}
-async function staffMap() {
-  return new Map((await staffRepo_exports.listStaff({ includeDeleted: true })).map((s2) => [s2._id, s2]));
-}
-async function listLogins() {
-  const [users, staffById] = await Promise.all([usersRepo_exports.listUsers(), staffMap()]);
-  return { users: users.map((u) => toLoginView(u, staffById)) };
 }
 async function listAudit(query) {
   const before = cursors.decode(query.cursor, cursors.isTimeCursor);
@@ -35729,29 +37153,21 @@ async function retryOutboxMessage(principal, id, meta3) {
   if (!await emailOutboxRepo_exports.requeueOutboxMessage(id, meta3.now)) {
     throw new AppError("CONFLICT", "Only failed messages can be retried");
   }
-  await audit(principal, { action: "outbox.retry", entityType: "emailOutbox", entityId: id }, meta3);
+  await audit2(principal, { action: "outbox.retry", entityType: "emailOutbox", entityId: id }, meta3);
   return id;
 }
 
 // server/services/adminSchedule.ts
 function outcome(r) {
-  return { kept: r.kept, cancelled: r.cancelled };
+  return { kept: r.kept, moved: r.moved, cancelled: r.cancelled };
 }
 async function requireLiveStaff(staffId) {
   const staff = await staffRepo_exports.findStaffById(staffId);
   if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
 }
-async function assertBarberMayBlock(principal, scope) {
-  if (principal.role === "owner" && scope.kind === "all") return;
-  const settings = await shopSettingsRepo_exports.requireShopSettings();
-  if (principal.role !== "owner" && !settings.permissions.barbersCanBlockTime) {
-    throw new AppError("FORBIDDEN", "The owner has not allowed barbers to block their own time");
-  }
-}
 async function createTimeBlock(principal, scope, input2, meta3) {
   const staffId = scope.kind === "chair" ? scope.staffId : input2.staffId;
   assertInScope(scope, staffId, "Staff member");
-  await assertBarberMayBlock(principal, scope);
   await requireLiveStaff(staffId);
   if (scope.kind === "chair" && input2.kind !== "block" && input2.kind !== "timeOff") {
     throw new AppError("FORBIDDEN", "Only the owner can set days off and extra hours");
@@ -35803,7 +37219,6 @@ async function deleteTimeBlock2(principal, scope, id, resolutions, meta3) {
   const block = await timeBlocksRepo_exports.findTimeBlockById(id);
   if (!block) throw new AppError("NOT_FOUND", "Time block was not found");
   assertInScope(scope, block.staffId, "Time block");
-  await assertBarberMayBlock(principal, scope);
   if (scope.kind === "chair" && block.kind !== "block" && block.kind !== "timeOff") {
     throw new AppError("FORBIDDEN", "Only the owner can change days off and extra hours");
   }
@@ -36007,6 +37422,642 @@ async function deleteClosure2(principal, id, resolutions, meta3) {
   return { body: { ok: true, ...outcome(change) }, outboxIds: change.outboxIds };
 }
 
+// server/services/photosService.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+
+// server/lib/signedPayload.ts
+import { createHmac as createHmac4, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
+function sign2(secret2, prefix, encoded) {
+  return createHmac4("sha256", secret2).update(`${prefix}.${encoded}`).digest("base64url");
+}
+function signPayload(secret2, prefix, payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${prefix}.${encoded}.${sign2(secret2, prefix, encoded)}`;
+}
+function verifyPayload(secret2, prefix, token, schema, now2 = /* @__PURE__ */ new Date()) {
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[0] !== prefix) return null;
+  const [, encoded = "", signature2 = ""] = parts;
+  const expected = sign2(secret2, prefix, encoded);
+  if (expected.length !== signature2.length || !timingSafeEqual4(Buffer.from(expected), Buffer.from(signature2))) {
+    return null;
+  }
+  let raw;
+  try {
+    raw = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) return null;
+  if (parsed.data.exp * 1e3 < now2.getTime()) return null;
+  return parsed.data;
+}
+
+// server/services/photosService.ts
+var UPLOAD_TTL_SECONDS = 5 * 60;
+var ABANDONED_UPLOAD_MS = 60 * 6e4;
+var TICKET_PREFIX = "u1";
+var ticketSchema = external_exports.object({
+  k: external_exports.string(),
+  kind: photoKindSchema,
+  s: idSchema.nullable(),
+  ct: external_exports.enum(PHOTO_CONTENT_TYPES),
+  n: external_exports.int().min(1),
+  exp: external_exports.int()
+});
+function toPhotoView(p) {
+  const storage = getStorage();
+  const delivery = storage.delivery?.(p.key);
+  return {
+    id: p._id,
+    url: storage.publicUrl(p.key),
+    width: p.width,
+    height: p.height,
+    alt: p.alt,
+    ...delivery ? { delivery } : {}
+  };
+}
+function toAdminPhotoView(p) {
+  return {
+    ...toPhotoView(p),
+    kind: p.kind,
+    staffId: p.staffId,
+    sortOrder: p.sortOrder,
+    createdAt: p.createdAt.toISOString()
+  };
+}
+async function assertCanManage(principal, kind, staffId) {
+  if (principal.role === "owner") return;
+  const settings = await shopSettingsRepo_exports.requireShopSettings();
+  if (!settings.permissions.barbersCanUploadPhotos || kind !== "staff" || !principal.staffId || staffId !== principal.staffId) {
+    throw new AppError("FORBIDDEN", "You can only manage photos of your own chair");
+  }
+}
+async function liveStaff(staffId) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
+  return staff;
+}
+async function loadManaged(principal, id) {
+  const photo = await photosRepo_exports.findPhotoById(id);
+  if (!photo || photo.deletedAt) throw new AppError("NOT_FOUND", "Photo was not found");
+  if (principal.role !== "owner" && (photo.kind !== "staff" || photo.staffId !== principal.staffId)) {
+    throw new AppError("NOT_FOUND", "Photo was not found");
+  }
+  await assertCanManage(principal, photo.kind, photo.staffId);
+  return photo;
+}
+async function issueUploadUrl(principal, input2, meta3) {
+  assertStorageEnabled();
+  if (input2.size > maxUploadBytes()) {
+    throw new AppError(
+      "PAYLOAD_TOO_LARGE",
+      `Photos can be up to ${String(Math.floor(maxUploadBytes() / (1024 * 1024)))} MB after the resize`
+    );
+  }
+  const staffId = input2.kind === "hero" ? null : input2.staffId ?? null;
+  if (input2.kind === "staff" && !staffId) {
+    throw new AppError("VALIDATION_ERROR", "A staff photo needs a staffId", {
+      details: [{ path: "staffId", message: "Required for staff photos" }]
+    });
+  }
+  await assertCanManage(principal, input2.kind, staffId);
+  if (staffId) await liveStaff(staffId);
+  const key = newPhotoKey(input2.kind, staffId, randomUUID2());
+  const upload = await getStorage().presignUpload({
+    key,
+    contentType: input2.contentType,
+    size: input2.size,
+    expiresInSeconds: UPLOAD_TTL_SECONDS
+  });
+  await pendingUploadsRepo_exports.insertPendingUpload(
+    { key, kind: input2.kind, staffId, contentType: input2.contentType, size: input2.size },
+    meta3.now
+  );
+  const exp = Math.floor(meta3.now.getTime() / 1e3) + UPLOAD_TTL_SECONDS;
+  const ticket = signPayload(getEnv2().MANAGE_LINK_SECRET, TICKET_PREFIX, {
+    k: key,
+    kind: input2.kind,
+    s: staffId,
+    ct: input2.contentType,
+    n: input2.size,
+    exp
+  });
+  return {
+    uploadUrl: upload.url,
+    method: upload.method,
+    headers: upload.method === "PUT" ? upload.headers : {},
+    ...upload.method === "POST" ? { fields: upload.fields } : {},
+    key,
+    ticket,
+    expiresAt: upload.expiresAt.toISOString()
+  };
+}
+async function confirmUpload(principal, input2, meta3) {
+  assertStorageEnabled();
+  const issued = verifyPayload(
+    getEnv2().MANAGE_LINK_SECRET,
+    TICKET_PREFIX,
+    input2.ticket,
+    ticketSchema,
+    meta3.now
+  );
+  if (!issued) throw new AppError("INVALID_TOKEN", "That upload is not valid or has expired");
+  await assertCanManage(principal, issued.kind, issued.s);
+  const storage = getStorage();
+  if (storage.name === "cloudinary" && input2.cloudinary?.publicId !== issued.k) {
+    throw new AppError("INVALID_TOKEN", "That upload is not the one this ticket was issued for");
+  }
+  const stored = await storage.head(issued.k);
+  if (!stored) throw new AppError("CONFLICT", "The file was not uploaded");
+  if (stored.size !== issued.n || stored.contentType !== issued.ct || stored.size > maxUploadBytes() || storage.name === "cloudinary" && (stored.version !== input2.cloudinary?.version || stored.size !== input2.cloudinary?.bytes)) {
+    await getStorage().delete(issued.k);
+    await pendingUploadsRepo_exports.deletePendingUploadByKey(issued.k);
+    throw new AppError("CONFLICT", "The uploaded file does not match what was declared");
+  }
+  await pendingUploadsRepo_exports.deletePendingUploadByKey(issued.k);
+  const sortOrder = await photosRepo_exports.nextSortOrder({ kind: issued.kind, staffId: issued.s });
+  const photo = await photosRepo_exports.insertPhoto(
+    {
+      kind: issued.kind,
+      staffId: issued.s,
+      key: issued.k,
+      width: input2.width,
+      height: input2.height,
+      alt: input2.alt,
+      sortOrder,
+      createdBy: actorOf2(principal)
+    },
+    meta3.now
+  );
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action: "photo.create",
+      entityType: "photo",
+      entityId: photo._id,
+      before: null,
+      after: { kind: photo.kind, staffId: photo.staffId, key: photo.key, alt: photo.alt },
+      meta: { size: stored.size, contentType: stored.contentType },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+  return toAdminPhotoView(photo);
+}
+async function updatePhoto2(principal, id, patch, meta3) {
+  const before = await loadManaged(principal, id);
+  if (patch.staffId !== void 0) {
+    if (principal.role !== "owner" || before.kind !== "gallery") {
+      throw new AppError("FORBIDDEN", "Only the owner can credit a gallery photo to a barber");
+    }
+    if (patch.staffId !== null) {
+      const credited = await staffRepo_exports.findStaffById(patch.staffId);
+      if (!credited || credited.deletedAt)
+        throw new AppError("NOT_FOUND", "Staff member was not found");
+    }
+  }
+  const updated = await photosRepo_exports.updatePhoto(id, patch);
+  if (!updated) throw new AppError("NOT_FOUND", "Photo was not found");
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action: "photo.update",
+      entityType: "photo",
+      entityId: id,
+      before: { alt: before.alt, sortOrder: before.sortOrder, staffId: before.staffId },
+      after: { alt: updated.alt, sortOrder: updated.sortOrder, staffId: updated.staffId },
+      meta: null,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+  return toAdminPhotoView(updated);
+}
+async function deletePhoto(principal, id, meta3) {
+  const photo = await loadManaged(principal, id);
+  await photosRepo_exports.softDeletePhoto(id, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action: "photo.delete",
+      entityType: "photo",
+      entityId: id,
+      before: { key: photo.key },
+      after: null,
+      meta: null,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function purgeDeletedPhotos(now2, limit = 50) {
+  if (!storageEnabled()) return 0;
+  const pending = await photosRepo_exports.listUnpurged(limit);
+  let purged = 0;
+  for (const photo of pending) {
+    await getStorage().delete(photo.key);
+    await photosRepo_exports.markPurged(photo._id, now2);
+    purged += 1;
+  }
+  return purged;
+}
+async function sweepStorageOrphans(now2, limit = 50) {
+  if (!storageEnabled()) return 0;
+  const storage = getStorage();
+  if (!storage.listOlderThan) return 0;
+  const candidates = await storage.listOlderThan(
+    new Date(now2.getTime() - ORPHAN_AGE_MS),
+    limit * 4
+  );
+  if (candidates.length === 0) return 0;
+  const known = new Set(await photosRepo_exports.listAllKeys());
+  let swept = 0;
+  for (const key of candidates) {
+    if (known.has(key) || swept >= limit) continue;
+    await storage.delete(key);
+    swept += 1;
+  }
+  return swept;
+}
+async function sweepAbandonedUploads(now2, limit = 50) {
+  if (!storageEnabled()) return 0;
+  const cutoff = new Date(now2.getTime() - ABANDONED_UPLOAD_MS);
+  const stale = await pendingUploadsRepo_exports.listPendingUploadsBefore(cutoff, limit);
+  for (const upload of stale) {
+    await getStorage().delete(upload.key);
+    await pendingUploadsRepo_exports.deletePendingUploadByKey(upload.key);
+  }
+  return stale.length;
+}
+async function listManagedPhotos(principal, query) {
+  const filter = principal.role === "owner" ? {
+    ...query.kind ? { kind: query.kind } : {},
+    ...query.staffId ? { staffId: query.staffId } : {}
+  } : { kind: "staff", staffId: principal.staffId ?? "" };
+  if (!storageEnabled()) return [];
+  return (await photosRepo_exports.listPhotos(filter)).map(toAdminPhotoView);
+}
+async function staffPhotoMap() {
+  const map2 = /* @__PURE__ */ new Map();
+  if (!storageEnabled()) return map2;
+  const photos = await photosRepo_exports.listPhotos({ kind: "staff" });
+  for (const p of photos) {
+    if (p.staffId && !map2.has(p.staffId)) map2.set(p.staffId, toPhotoView(p));
+  }
+  return map2;
+}
+async function heroPhoto() {
+  if (!storageEnabled()) return null;
+  const [first] = await photosRepo_exports.listPhotos({ kind: "hero" });
+  return first ? toPhotoView(first) : null;
+}
+async function galleryPage(query) {
+  const staff = await staffRepo_exports.listStaff({ includeDeleted: true });
+  const byId = new Map(staff.map((s2) => [s2._id, s2]));
+  let only = null;
+  if (query.staff) {
+    const wanted = query.staff.toLowerCase();
+    const match2 = staff.find(
+      (s2) => !s2.deletedAt && (s2.slug === wanted || s2.slugAliases.includes(wanted))
+    );
+    if (!match2) throw new AppError("NOT_FOUND", "That chair was not found");
+    only = match2._id;
+  }
+  const all = storageEnabled() ? (await photosRepo_exports.listPhotos({ kind: "gallery" })).filter(
+    (p) => !p.staffId || byId.get(p.staffId)?.deletedAt === null
+  ) : [];
+  const counts = /* @__PURE__ */ new Map();
+  for (const p of all) if (p.staffId) counts.set(p.staffId, (counts.get(p.staffId) ?? 0) + 1);
+  const filtered = only ? all.filter((p) => p.staffId === only) : all;
+  const after = cursors.decode(query.cursor, isOrderCursor);
+  const start = after ? filtered.findIndex((p) => p._id === after.i) + 1 : 0;
+  const page = filtered.slice(start, start + query.limit);
+  const last = page[page.length - 1];
+  const toGallery = (p) => {
+    const s2 = p.staffId ? byId.get(p.staffId) : void 0;
+    return { ...toPhotoView(p), staff: s2 ? { id: s2._id, name: s2.name, slug: s2.slug } : null };
+  };
+  return {
+    photos: page.map(toGallery),
+    nextCursor: last && start + query.limit < filtered.length ? cursors.encode({ s: last.sortOrder, i: last._id }) : null,
+    counts: staff.filter((s2) => !s2.deletedAt && s2.showOnWebsite && (counts.get(s2._id) ?? 0) > 0).map((s2) => ({ staffId: s2._id, slug: s2.slug, name: s2.name, count: counts.get(s2._id) ?? 0 })),
+    total: filtered.length
+  };
+}
+function isOrderCursor(v) {
+  return typeof v === "object" && v !== null && typeof v.s === "number" && typeof v.i === "string";
+}
+
+// server/services/alerts.ts
+async function listAlertViews(now2) {
+  const open2 = await alertsRepo_exports.listOpenAlerts();
+  if (open2.length === 0) return [];
+  const staff = await staffRepo_exports.listStaff({ includeDeleted: true });
+  const names = new Map(staff.map((s2) => [s2._id, s2.name]));
+  const views = [];
+  for (const alert of open2) {
+    const affected = await bookingsRepo_exports.listBookingsBetween(
+      { start: alert.startAt, end: alert.endAt },
+      { staffId: alert.staffId, statuses: ["confirmed"] }
+    );
+    if (affected.length === 0 && alert.kind === "barberOut") {
+      await alertsRepo_exports.closeAlert(alert._id, "resolved", null, now2);
+      continue;
+    }
+    views.push({
+      id: alert._id,
+      kind: alert.kind,
+      staffId: alert.staffId,
+      staffName: names.get(alert.staffId) ?? "Former staff",
+      fromDate: alert.fromDate,
+      toDate: alert.toDate,
+      startAt: alert.startAt.toISOString(),
+      endAt: alert.endAt.toISOString(),
+      reason: alert.reason,
+      createdAt: alert.createdAt.toISOString(),
+      affectedCount: affected.length
+    });
+  }
+  return views;
+}
+async function resolveAlert(principal, id, resolutions, meta3) {
+  ownerScope(principal);
+  const alert = await alertsRepo_exports.findAlertById(id);
+  if (!alert) throw new AppError("NOT_FOUND", "That alert was not found");
+  if (alert.status !== "open")
+    throw new AppError("CONFLICT", "That alert has already been dealt with");
+  if (alert.kind === "timeOffRequest") {
+    const done = await createTimeBlock(
+      principal,
+      { kind: "all" },
+      {
+        staffId: alert.staffId,
+        kind: "timeOff",
+        startAt: alert.startAt.toISOString(),
+        endAt: alert.endAt.toISOString(),
+        ...alert.reason ? { reason: alert.reason } : {},
+        ...resolutions ? { resolutions: [...resolutions] } : {}
+      },
+      meta3
+    );
+    await alertsRepo_exports.closeAlert(id, "resolved", principal.userId, meta3.now);
+    return {
+      body: {
+        ok: true,
+        kept: done.body.kept,
+        moved: done.body.moved,
+        cancelled: done.body.cancelled
+      },
+      outboxIds: done.outboxIds
+    };
+  }
+  const change = await applyScheduleChange({
+    actor: actorOf2(principal),
+    requestId: meta3.requestId,
+    now: meta3.now,
+    staffIds: [alert.staffId],
+    resolutions,
+    allowCancel: true,
+    audit: { action: "alert.resolve", entityType: "alert", entityId: () => alert._id },
+    apply: () => Promise.resolve(void 0),
+    alsoAffected: (upcoming) => upcoming.filter(
+      (b) => b.staffId === alert.staffId && b.startAt < alert.endAt && b.endAt > alert.startAt
+    ),
+    afterResolve: async (session) => {
+      await alertsRepo_exports.closeAlert(id, "resolved", principal.userId, meta3.now, { session });
+    }
+  });
+  return {
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
+    outboxIds: change.outboxIds
+  };
+}
+async function dismissAlert(principal, id, now2) {
+  ownerScope(principal);
+  const closed2 = await alertsRepo_exports.closeAlert(id, "dismissed", principal.userId, now2);
+  if (!closed2) throw new AppError("NOT_FOUND", "That alert was not found, or is already closed");
+}
+
+// server/services/adminDashboard.ts
+var DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+function weekStart(date5) {
+  return shopDayStart(date5).startOf("week");
+}
+var live = (b) => b.status !== "cancelled";
+var valueOf = (list) => list.filter(live).reduce((sum, b) => sum + b.totalPriceCents, 0);
+async function overview(now2) {
+  const today = shopDateOf(now2);
+  const monday = weekStart(today);
+  const lastMonday = monday.minus({ weeks: 1 });
+  const nextMonday = monday.plus({ weeks: 1 });
+  const todayStart = shopDayStart(today);
+  const sameDayLastWeek = todayStart.minus({ weeks: 1 }).toISODate() ?? today;
+  const [data, weekBookings, photos, alerts, audit3] = await Promise.all([
+    loadScheduleData(today, today),
+    bookingsRepo_exports.listBookingsStartingBetween({
+      start: lastMonday.toJSDate(),
+      end: nextMonday.toJSDate()
+    }),
+    staffPhotoMap(),
+    listAlertViews(now2),
+    auditLogRepo_exports.listAuditPage({ entityType: "booking", actionPrefix: "booking." }, null, 60)
+  ]);
+  const dateOf = (b) => shopDateOf(b.startAt);
+  const onDate = (date5) => weekBookings.filter((b) => dateOf(b) === date5);
+  const todays = onDate(today);
+  const lastSame = onDate(sameDayLastWeek);
+  const thisWeek = weekBookings.filter((b) => b.startAt >= monday.toJSDate());
+  const lastWeek = weekBookings.filter((b) => b.startAt < monday.toJSDate());
+  const compareDay = lastSame.filter(live).length > 0;
+  const compareWeek = lastWeek.filter(live).length > 0;
+  const walkIns = (list) => list.filter((b) => live(b) && b.source === "walkIn").length;
+  const noShows = (list) => list.filter((b) => b.status === "noShow").length;
+  const week = DAY_LABELS.map((label, i) => {
+    const date5 = monday.plus({ days: i }).toISODate() ?? today;
+    const lastDate = lastMonday.plus({ days: i }).toISODate() ?? today;
+    return {
+      date: date5,
+      label,
+      thisWeek: onDate(date5).filter(live).length,
+      lastWeek: onDate(lastDate).filter(live).length,
+      today: date5 === today
+    };
+  });
+  const chairs = activeStaff(data.staff).map((s2) => {
+    const who = whoIsInFor(s2, today, data.source);
+    const mine = todays.filter((b) => b.staffId === s2._id && b.status === "confirmed").sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+    const current = mine.find((b) => b.startAt <= now2 && b.endAt > now2) ?? null;
+    const next2 = mine.find((b) => b.startAt > now2) ?? null;
+    return {
+      staff: toStaffRef(s2),
+      photo: photos.get(s2._id) ?? null,
+      status: who.status === "in" ? "in" : who.status === "closed" ? "closed" : "off",
+      current: current ? toAdminBookingView(current, s2) : null,
+      next: next2 ? toAdminBookingView(next2, s2) : null
+    };
+  });
+  return {
+    date: today,
+    now: now2.toISOString(),
+    weekdayName: todayStart.toFormat("cccc"),
+    stats: {
+      bookings: {
+        value: todays.filter(live).length,
+        compare: compareDay ? lastSame.filter(live).length : null
+      },
+      bookedValueCents: { value: valueOf(todays), compare: compareDay ? valueOf(lastSame) : null },
+      walkIns: { value: walkIns(todays), compare: compareDay ? walkIns(lastSame) : null },
+      noShowsWeek: { value: noShows(thisWeek), compare: compareWeek ? noShows(lastWeek) : null }
+    },
+    week,
+    chairs,
+    activity: await activityFrom(audit3),
+    alerts
+  };
+}
+async function activityFrom(audit3) {
+  const picked = [];
+  for (const entry of audit3) {
+    const after = entry.after ?? {};
+    const meta3 = entry.meta ?? {};
+    if (entry.action === "booking.create")
+      picked.push({ entry, kind: meta3.source === "walkIn" ? "walkIn" : "booked" });
+    else if (entry.action === "booking.cancel") picked.push({ entry, kind: "canceled" });
+    else if (entry.action === "booking.reschedule") picked.push({ entry, kind: "rescheduled" });
+    else if (entry.action === "booking.status" && after.status === "noShow")
+      picked.push({ entry, kind: "noShow" });
+    if (picked.length === 8) break;
+  }
+  const [bookings, staff] = await Promise.all([
+    bookingsRepo_exports.findBookingsByIds(picked.map((p) => p.entry.entityId)),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const byId = new Map(bookings.map((b) => [b._id, b]));
+  const staffById = new Map(staff.map((s2) => [s2._id, s2.name]));
+  const out = [];
+  for (const { entry, kind } of picked) {
+    const b = byId.get(entry.entityId);
+    if (!b) continue;
+    out.push({
+      id: entry._id,
+      at: entry.at.toISOString(),
+      kind,
+      bookingId: b._id,
+      clientName: b.customer.name,
+      staffName: staffById.get(b.staffId) ?? "Former staff",
+      status: b.status
+    });
+  }
+  return out;
+}
+function rangeBounds(range, now2) {
+  const today = shopDateOf(now2);
+  const start = shopDayStart(today);
+  switch (range) {
+    case "today":
+      return { from: start.toJSDate(), to: start.plus({ days: 1 }).toJSDate() };
+    case "tomorrow":
+      return { from: start.plus({ days: 1 }).toJSDate(), to: start.plus({ days: 2 }).toJSDate() };
+    case "week": {
+      const monday = weekStart(today);
+      return { from: monday.toJSDate(), to: monday.plus({ weeks: 1 }).toJSDate() };
+    }
+    case "upcoming":
+      return { from: now2 };
+    case "past":
+      return { to: now2 };
+    default:
+      return {};
+  }
+}
+async function bookingTable(input2, now2) {
+  const query = bookingTableQuerySchema.parse(input2);
+  const base = {
+    ...query.staffId ? { staffId: query.staffId } : {},
+    ...query.status ? { status: query.status } : {}
+  };
+  const dir = query.dir ?? (query.range === "past" ? "desc" : "asc");
+  const filter = { ...base, ...rangeBounds(query.range, now2) };
+  const skip = (query.page - 1) * BOOKING_TABLE_PAGE_SIZE;
+  const ranges = ["today", "tomorrow", "week", "upcoming", "past"];
+  const [rows, total, staff, ...counts] = await Promise.all([
+    bookingsRepo_exports.tablePage(
+      filter,
+      { key: query.sort, dir: dir === "asc" ? 1 : -1 },
+      skip,
+      BOOKING_TABLE_PAGE_SIZE
+    ),
+    bookingsRepo_exports.countTable(filter),
+    staffRepo_exports.listStaff({ includeDeleted: true }),
+    ...ranges.map((r) => bookingsRepo_exports.countTable({ ...base, ...rangeBounds(r, now2) }))
+  ]);
+  const staffById = new Map(staff.map((s2) => [s2._id, s2]));
+  return {
+    rows: rows.map(
+      (b) => toAdminBookingView(
+        b,
+        staffById.get(b.staffId) ?? { _id: b.staffId, name: "Former staff", slug: "former-staff" }
+      )
+    ),
+    total,
+    page: query.page,
+    pageSize: BOOKING_TABLE_PAGE_SIZE,
+    counts: {
+      today: counts[0] ?? 0,
+      tomorrow: counts[1] ?? 0,
+      week: counts[2] ?? 0,
+      upcoming: counts[3] ?? 0,
+      past: counts[4] ?? 0
+    }
+  };
+}
+
+// server/services/adminSearch.ts
+var LIMIT = 5;
+var backfilled = null;
+function ensureNameKeys() {
+  backfilled ??= bookingsRepo_exports.backfillNameKeys().catch((error62) => {
+    backfilled = null;
+    throw error62;
+  });
+  return backfilled;
+}
+async function adminSearch(rawQuery) {
+  const query = classifySearch(rawQuery);
+  if (query.kind === "empty") return { bookings: [], customers: [] };
+  await ensureNameKeys();
+  const match2 = query.kind === "phone" ? { kind: "phone", digits: query.digits } : { kind: "name", key: query.key };
+  const code = query.kind === "text" ? normalizeReferenceCode(rawQuery) : null;
+  const [byCode, found, customers, staff] = await Promise.all([
+    code ? bookingsRepo_exports.findBookingByReferenceCode(code) : Promise.resolve(null),
+    bookingsRepo_exports.searchBookings(match2, LIMIT),
+    bookingsRepo_exports.searchCustomers(match2, LIMIT),
+    staffRepo_exports.listStaff({ includeDeleted: true })
+  ]);
+  const staffById = new Map(staff.map((s2) => [s2._id, s2]));
+  const unique = /* @__PURE__ */ new Map();
+  for (const b of [...byCode ? [byCode] : [], ...found]) unique.set(b._id, b);
+  return {
+    bookings: [...unique.values()].slice(0, LIMIT).map((b) => ({
+      id: b._id,
+      referenceCode: b.referenceCode,
+      customerName: b.customer.name,
+      startAt: b.startAt.toISOString(),
+      status: b.status,
+      staffName: staffById.get(b.staffId)?.name ?? "Unknown",
+      services: b.services.map((s2) => s2.name).join(", ")
+    })),
+    customers: customers.map((c) => ({
+      phone: formatUsPhone(c.phone),
+      name: c.name,
+      visits: c.visits,
+      lastVisitAt: c.lastVisitAt.toISOString()
+    }))
+  };
+}
+
 // server/http/context.ts
 function principalOf(ctx) {
   if (!ctx.principal) throw new AppError("AUTH_REQUIRED", "Please sign in");
@@ -36065,10 +38116,37 @@ var adminRoutes = [
       headers: NO_STORE
     };
   }),
+  owner("GET", "/api/admin/schedule/week", async (ctx) => {
+    ctxScope(ctx);
+    const { date: date5 } = parseQuery(ctx, dateQuerySchema);
+    return {
+      body: scheduleWeekResponseSchema.parse(await scheduleWeek(date5, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
   owner("GET", "/api/admin/whos-in", async (ctx) => {
     ctxScope(ctx);
     const { date: date5 } = parseQuery(ctx, dateQuerySchema);
     return { body: whoIsInResponseSchema.parse(await whoIsIn(date5, ctx.now)), headers: NO_STORE };
+  }),
+  // Overview and the bookings table -----------------------------------------
+  owner("GET", "/api/admin/overview", async (ctx) => {
+    ctxScope(ctx);
+    return { body: overviewResponseSchema.parse(await overview(ctx.now)), headers: NO_STORE };
+  }),
+  owner("GET", "/api/admin/booking-table", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, bookingTableQuerySchema);
+    return {
+      body: bookingTableResponseSchema.parse(await bookingTable(query, ctx.now)),
+      headers: NO_STORE
+    };
+  }),
+  // Search ----------------------------------------------------------------
+  owner("GET", "/api/admin/search", async (ctx) => {
+    ctxScope(ctx);
+    const { q } = parseQuery(ctx, searchQuerySchema);
+    return { body: searchResponseSchema.parse(await adminSearch(q)), headers: NO_STORE };
   }),
   // Bookings --------------------------------------------------------------
   owner("GET", "/api/admin/bookings", async (ctx) => {
@@ -36134,6 +38212,13 @@ var adminRoutes = [
     scheduleDelivery(done.outboxIds);
     return { body: bookingResponseSchema.parse(done.body) };
   }),
+  owner("POST", "/api/admin/bookings/:id/resend", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await resendConfirmation(principal, scope, id, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: { ok: true } };
+  }),
   owner("POST", "/api/admin/bookings/:id/reschedule", async (ctx) => {
     const { principal, scope } = ctxScope(ctx);
     const { id } = parseParams(ctx, idParams);
@@ -36145,6 +38230,19 @@ var adminRoutes = [
     };
   }),
   // Customers -------------------------------------------------------------
+  owner("GET", "/api/admin/customer-list", async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, customerListQuerySchema);
+    return {
+      body: customerListResponseSchema.parse(await customerList(query)),
+      headers: NO_STORE
+    };
+  }),
+  owner("PUT", "/api/admin/customers/notes", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { phone, notes } = await parseBody(ctx, customerNotesRequestSchema);
+    return { body: await saveCustomerNotes(principal, phone, notes, metaOf(ctx)) };
+  }),
   owner("GET", "/api/admin/customers", async (ctx) => {
     ctxScope(ctx);
     const { phone } = parseQuery(ctx, customerQuerySchema);
@@ -36152,6 +38250,21 @@ var adminRoutes = [
       body: customerResponseSchema.parse(await customerByPhone(phone, ctx.now)),
       headers: NO_STORE
     };
+  }),
+  // Alerts ----------------------------------------------------------------
+  owner("POST", "/api/admin/alerts/:id/resolve", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await resolveAlert(principal, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner("POST", "/api/admin/alerts/:id/dismiss", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    await dismissAlert(principal, id, ctx.now);
+    return { body: { ok: true } };
   }),
   // Time blocks and day status -------------------------------------------
   owner("GET", "/api/admin/time-blocks", async (ctx) => {
@@ -36303,47 +38416,40 @@ var adminRoutes = [
     const input2 = await parseBody(ctx, settingsRequestSchema);
     return { body: settingsResponseSchema.parse(await putSettings(principal, input2, metaOf(ctx))) };
   }),
-  // Logins ----------------------------------------------------------------
-  owner("GET", "/api/admin/users", async (ctx) => {
+  // A barber's PIN access ---------------------------------------------------
+  owner("GET", "/api/admin/staff/:id/access", async (ctx) => {
     ctxScope(ctx);
-    return { body: loginListResponseSchema.parse(await listLogins()), headers: NO_STORE };
+    const { id } = parseParams(ctx, idParams);
+    const access = await staffAccess(id, ctx.now);
+    return {
+      body: staffAccessResponseSchema.parse({
+        hasPin: access.hasPin,
+        lastSignInAt: access.lastSignInAt?.toISOString() ?? null,
+        lockedUntil: access.lockedUntil?.toISOString() ?? null,
+        setupLinkActive: access.setupLinkActive
+      }),
+      headers: NO_STORE
+    };
   }),
-  owner("POST", "/api/admin/users", async (ctx) => {
+  // Also how a PIN is reset: the old PIN stops working and the barber's sessions end.
+  owner("POST", "/api/admin/staff/:id/setup-link", async (ctx) => {
     const { principal } = ctxScope(ctx);
-    const input2 = await parseBody(ctx, loginCreateRequestSchema);
-    const issued = await createStaffLogin(principal, input2, metaOf(ctx));
+    const { id } = parseParams(ctx, idParams);
+    const issued = await issueSetupLink(actorOf2(principal), principal.userId, id, metaOf(ctx));
     return {
       status: 201,
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword
+      body: setupLinkResponseSchema.parse({
+        url: `${getEnv2().APP_BASE_URL}/team/setup/${issued.token}`,
+        expiresAt: issued.expiresAt.toISOString()
       }),
       headers: NO_STORE
     };
   }),
-  owner("POST", "/api/admin/users/:id/reset-password", async (ctx) => {
+  owner("POST", "/api/admin/staff/:id/unlock", async (ctx) => {
     const { principal } = ctxScope(ctx);
     const { id } = parseParams(ctx, idParams);
-    const issued = await resetLoginPassword(principal, id, metaOf(ctx));
-    return {
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword
-      }),
-      headers: NO_STORE
-    };
-  }),
-  owner("POST", "/api/admin/users/:id/disable", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, false, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
-  }),
-  owner("POST", "/api/admin/users/:id/enable", async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, true, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
+    await unlockStaff(actorOf2(principal), id, metaOf(ctx));
+    return { body: { ok: true }, headers: NO_STORE };
   }),
   // Audit and outbox ------------------------------------------------------
   owner("GET", "/api/admin/audit", async (ctx) => {
@@ -36364,6 +38470,112 @@ var adminRoutes = [
     return { body: { ok: true } };
   })
 ];
+
+// shared/api/public.ts
+var publicShopSchema = external_exports.object({
+  name: external_exports.string(),
+  tagline: external_exports.string(),
+  address: addressSchema,
+  phone: external_exports.string(),
+  email: external_exports.string(),
+  instagramHandle: external_exports.string(),
+  timezone: external_exports.string(),
+  hours: weekHoursSchema,
+  booking: external_exports.object({
+    slotStepMinutes: external_exports.int(),
+    leadTimeMinutes: external_exports.int(),
+    bookingWindowDays: external_exports.int(),
+    maxServicesPerBooking: external_exports.int(),
+    allowFirstAvailable: external_exports.boolean(),
+    requireEmail: external_exports.boolean(),
+    /** Customers may cancel or move online until this many minutes before the start. */
+    cancelCutoffMinutes: external_exports.int()
+  }),
+  /** The line in the strip above the header. Absent from older responses; the client then shows none. */
+  announcement: announcementSchema.optional(),
+  social: socialLinksSchema.optional(),
+  /** The home page hero, when the owner has uploaded one. */
+  heroPhoto: photoViewSchema.nullable().optional(),
+  /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
+  maintenance: external_exports.boolean().optional(),
+  /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
+  demo: external_exports.boolean().optional()
+});
+var publicServiceSchema = external_exports.object({
+  id: idSchema,
+  name: external_exports.string(),
+  group: serviceGroupSchema,
+  description: external_exports.string(),
+  priceCents: external_exports.int(),
+  priceFrom: external_exports.boolean(),
+  durationMinutes: external_exports.int(),
+  sortOrder: external_exports.int()
+});
+var publicServicesResponseSchema = external_exports.object({ services: external_exports.array(publicServiceSchema) });
+var publicStaffSchema = external_exports.object({
+  id: idSchema,
+  slug: slugSchema,
+  name: external_exports.string(),
+  role: staffRoleSchema,
+  title: external_exports.string(),
+  specialty: external_exports.string(),
+  bio: external_exports.string(),
+  chairNumber: external_exports.int().nullable(),
+  serviceIds: external_exports.array(idSchema),
+  photoUrl: external_exports.string().nullable(),
+  instagramHandle: external_exports.string().nullable(),
+  acceptsOnlineBooking: external_exports.boolean(),
+  sortOrder: external_exports.int(),
+  /** The chair's portrait, when one has been uploaded. */
+  photo: photoViewSchema.nullable().optional()
+});
+var publicStaffListResponseSchema = external_exports.object({ staff: external_exports.array(publicStaffSchema) });
+var publicStaffResponseSchema = external_exports.object({
+  staff: publicStaffSchema,
+  requestedSlug: external_exports.string(),
+  canonical: external_exports.boolean()
+});
+var staffOpeningsQuerySchema = external_exports.object({
+  count: external_exports.coerce.number().int().min(1).max(10).default(3)
+});
+var openingSchema = external_exports.object({
+  startAt: external_exports.iso.datetime(),
+  endAt: external_exports.iso.datetime(),
+  /** Shop-local date, for the /book link. */
+  date: external_exports.string(),
+  /** "2:15 PM", "Tomorrow 10:00 AM" or "Thu 10:00 AM". */
+  label: external_exports.string()
+});
+var staffOpeningsResponseSchema = external_exports.object({
+  staff: external_exports.object({ id: idSchema, slug: slugSchema, name: external_exports.string() }),
+  /** The service the openings are for, or null when the chair offers nothing online. */
+  service: external_exports.object({ id: idSchema, name: external_exports.string(), durationMinutes: external_exports.int() }).nullable(),
+  openings: external_exports.array(openingSchema)
+});
+
+// shared/api/auth.ts
+var loginRequestSchema = external_exports.object({
+  email: external_exports.string().trim().min(3).max(254),
+  password: external_exports.string().min(1).max(256)
+});
+var meUserSchema = publicUserSchema.omit({ lastLoginAt: true }).extend({ lastLoginAt: external_exports.iso.datetime().nullable() });
+var meResponseSchema = external_exports.object({
+  user: meUserSchema,
+  staff: publicStaffSchema.nullable(),
+  permissions: external_exports.object({ barbersCanBlockTime: external_exports.boolean() }),
+  /** What this deployment can do at all, whatever the role: photos need storage, demo is the showcase mode. */
+  features: external_exports.object({ photos: external_exports.boolean(), demo: external_exports.boolean(), email: external_exports.boolean() })
+});
+var changePasswordRequestSchema = external_exports.object({
+  currentPassword: external_exports.string().min(1).max(256),
+  newPassword: external_exports.string().min(1).max(256)
+});
+var changeEmailRequestSchema = external_exports.object({
+  currentPassword: external_exports.string().min(1).max(256),
+  newEmail: emailSchema
+});
+var okResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
+var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
 
 // server/services/nextOpening.ts
 var LOOKAHEAD_DAYS2 = 14;
@@ -36446,299 +38658,6 @@ async function staffOpenings(slug, count, now2) {
   };
 }
 
-// server/services/photosService.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-
-// server/lib/signedPayload.ts
-import { createHmac as createHmac3, timingSafeEqual as timingSafeEqual4 } from "node:crypto";
-function sign2(secret2, prefix, encoded) {
-  return createHmac3("sha256", secret2).update(`${prefix}.${encoded}`).digest("base64url");
-}
-function signPayload(secret2, prefix, payload) {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${prefix}.${encoded}.${sign2(secret2, prefix, encoded)}`;
-}
-function verifyPayload(secret2, prefix, token, schema, now2 = /* @__PURE__ */ new Date()) {
-  const parts = token.split(".");
-  if (parts.length !== 3 || parts[0] !== prefix) return null;
-  const [, encoded = "", signature2 = ""] = parts;
-  const expected = sign2(secret2, prefix, encoded);
-  if (expected.length !== signature2.length || !timingSafeEqual4(Buffer.from(expected), Buffer.from(signature2))) {
-    return null;
-  }
-  let raw;
-  try {
-    raw = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-  } catch {
-    return null;
-  }
-  const parsed = schema.safeParse(raw);
-  if (!parsed.success) return null;
-  if (parsed.data.exp * 1e3 < now2.getTime()) return null;
-  return parsed.data;
-}
-
-// server/services/photosService.ts
-var UPLOAD_TTL_SECONDS = 5 * 60;
-var ABANDONED_UPLOAD_MS = 60 * 6e4;
-var TICKET_PREFIX = "u1";
-var ticketSchema = external_exports.object({
-  k: external_exports.string(),
-  kind: photoKindSchema,
-  s: idSchema.nullable(),
-  ct: external_exports.enum(PHOTO_CONTENT_TYPES),
-  n: external_exports.int().min(1),
-  exp: external_exports.int()
-});
-function toPhotoView(p) {
-  return {
-    id: p._id,
-    url: getStorage().publicUrl(p.key),
-    width: p.width,
-    height: p.height,
-    alt: p.alt
-  };
-}
-function toAdminPhotoView(p) {
-  return {
-    ...toPhotoView(p),
-    kind: p.kind,
-    staffId: p.staffId,
-    sortOrder: p.sortOrder,
-    createdAt: p.createdAt.toISOString()
-  };
-}
-async function assertCanManage(principal, kind, staffId) {
-  if (principal.role === "owner") return;
-  const settings = await shopSettingsRepo_exports.requireShopSettings();
-  if (!settings.permissions.barbersCanUploadPhotos || kind !== "staff" || !principal.staffId || staffId !== principal.staffId) {
-    throw new AppError("FORBIDDEN", "You can only manage photos of your own chair");
-  }
-}
-async function liveStaff(staffId) {
-  const staff = await staffRepo_exports.findStaffById(staffId);
-  if (!staff || staff.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
-  return staff;
-}
-async function loadManaged(principal, id) {
-  const photo = await photosRepo_exports.findPhotoById(id);
-  if (!photo || photo.deletedAt) throw new AppError("NOT_FOUND", "Photo was not found");
-  if (principal.role !== "owner" && (photo.kind !== "staff" || photo.staffId !== principal.staffId)) {
-    throw new AppError("NOT_FOUND", "Photo was not found");
-  }
-  await assertCanManage(principal, photo.kind, photo.staffId);
-  return photo;
-}
-async function issueUploadUrl(principal, input2, meta3) {
-  assertStorageEnabled();
-  if (input2.size > maxUploadBytes()) {
-    throw new AppError(
-      "PAYLOAD_TOO_LARGE",
-      `Photos can be up to ${String(Math.floor(maxUploadBytes() / (1024 * 1024)))} MB after the resize`
-    );
-  }
-  const staffId = input2.kind === "hero" ? null : input2.staffId ?? null;
-  if (input2.kind === "staff" && !staffId) {
-    throw new AppError("VALIDATION_ERROR", "A staff photo needs a staffId", {
-      details: [{ path: "staffId", message: "Required for staff photos" }]
-    });
-  }
-  await assertCanManage(principal, input2.kind, staffId);
-  if (staffId) await liveStaff(staffId);
-  const uuid3 = randomUUID2();
-  const key = keyPrefix() + (input2.kind === "staff" ? `staff/${staffId ?? ""}/${uuid3}.webp` : `${input2.kind}/${uuid3}.webp`);
-  const upload = await getStorage().presignUpload({
-    key,
-    contentType: input2.contentType,
-    size: input2.size,
-    expiresInSeconds: UPLOAD_TTL_SECONDS
-  });
-  await pendingUploadsRepo_exports.insertPendingUpload(
-    { key, kind: input2.kind, staffId, contentType: input2.contentType, size: input2.size },
-    meta3.now
-  );
-  const exp = Math.floor(meta3.now.getTime() / 1e3) + UPLOAD_TTL_SECONDS;
-  const ticket = signPayload(getEnv2().MANAGE_LINK_SECRET, TICKET_PREFIX, {
-    k: key,
-    kind: input2.kind,
-    s: staffId,
-    ct: input2.contentType,
-    n: input2.size,
-    exp
-  });
-  return {
-    uploadUrl: upload.url,
-    method: "PUT",
-    headers: upload.headers,
-    key,
-    ticket,
-    expiresAt: upload.expiresAt.toISOString()
-  };
-}
-async function confirmUpload(principal, input2, meta3) {
-  assertStorageEnabled();
-  const issued = verifyPayload(
-    getEnv2().MANAGE_LINK_SECRET,
-    TICKET_PREFIX,
-    input2.ticket,
-    ticketSchema,
-    meta3.now
-  );
-  if (!issued) throw new AppError("INVALID_TOKEN", "That upload is not valid or has expired");
-  await assertCanManage(principal, issued.kind, issued.s);
-  const stored = await getStorage().head(issued.k);
-  if (!stored) throw new AppError("CONFLICT", "The file was not uploaded");
-  if (stored.size !== issued.n || stored.contentType !== issued.ct || stored.size > maxUploadBytes()) {
-    await getStorage().delete(issued.k);
-    await pendingUploadsRepo_exports.deletePendingUploadByKey(issued.k);
-    throw new AppError("CONFLICT", "The uploaded file does not match what was declared");
-  }
-  await pendingUploadsRepo_exports.deletePendingUploadByKey(issued.k);
-  const sortOrder = await photosRepo_exports.nextSortOrder({ kind: issued.kind, staffId: issued.s });
-  const photo = await photosRepo_exports.insertPhoto(
-    {
-      kind: issued.kind,
-      staffId: issued.s,
-      key: issued.k,
-      width: input2.width,
-      height: input2.height,
-      alt: input2.alt,
-      sortOrder,
-      createdBy: actorOf2(principal)
-    },
-    meta3.now
-  );
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf2(principal),
-      action: "photo.create",
-      entityType: "photo",
-      entityId: photo._id,
-      before: null,
-      after: { kind: photo.kind, staffId: photo.staffId, key: photo.key, alt: photo.alt },
-      meta: { size: stored.size, contentType: stored.contentType },
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  return toAdminPhotoView(photo);
-}
-async function updatePhoto2(principal, id, patch, meta3) {
-  const before = await loadManaged(principal, id);
-  const updated = await photosRepo_exports.updatePhoto(id, patch);
-  if (!updated) throw new AppError("NOT_FOUND", "Photo was not found");
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf2(principal),
-      action: "photo.update",
-      entityType: "photo",
-      entityId: id,
-      before: { alt: before.alt, sortOrder: before.sortOrder },
-      after: { alt: updated.alt, sortOrder: updated.sortOrder },
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-  return toAdminPhotoView(updated);
-}
-async function deletePhoto(principal, id, meta3) {
-  const photo = await loadManaged(principal, id);
-  await photosRepo_exports.softDeletePhoto(id, meta3.now);
-  await auditLogRepo_exports.appendAuditEntry(
-    {
-      actor: actorOf2(principal),
-      action: "photo.delete",
-      entityType: "photo",
-      entityId: id,
-      before: { key: photo.key },
-      after: null,
-      meta: null,
-      requestId: meta3.requestId
-    },
-    meta3.now
-  );
-}
-async function purgeDeletedPhotos(now2, limit = 50) {
-  if (!storageEnabled()) return 0;
-  const pending = await photosRepo_exports.listUnpurged(limit);
-  let purged = 0;
-  for (const photo of pending) {
-    await getStorage().delete(photo.key);
-    await photosRepo_exports.markPurged(photo._id, now2);
-    purged += 1;
-  }
-  return purged;
-}
-async function sweepAbandonedUploads(now2, limit = 50) {
-  if (!storageEnabled()) return 0;
-  const cutoff = new Date(now2.getTime() - ABANDONED_UPLOAD_MS);
-  const stale = await pendingUploadsRepo_exports.listPendingUploadsBefore(cutoff, limit);
-  for (const upload of stale) {
-    await getStorage().delete(upload.key);
-    await pendingUploadsRepo_exports.deletePendingUploadByKey(upload.key);
-  }
-  return stale.length;
-}
-async function listManagedPhotos(principal, query) {
-  const filter = principal.role === "owner" ? {
-    ...query.kind ? { kind: query.kind } : {},
-    ...query.staffId ? { staffId: query.staffId } : {}
-  } : { kind: "staff", staffId: principal.staffId ?? "" };
-  if (!storageEnabled()) return [];
-  return (await photosRepo_exports.listPhotos(filter)).map(toAdminPhotoView);
-}
-async function staffPhotoMap() {
-  const map2 = /* @__PURE__ */ new Map();
-  if (!storageEnabled()) return map2;
-  const photos = await photosRepo_exports.listPhotos({ kind: "staff" });
-  for (const p of photos) {
-    if (p.staffId && !map2.has(p.staffId)) map2.set(p.staffId, toPhotoView(p));
-  }
-  return map2;
-}
-async function heroPhoto() {
-  if (!storageEnabled()) return null;
-  const [first] = await photosRepo_exports.listPhotos({ kind: "hero" });
-  return first ? toPhotoView(first) : null;
-}
-async function galleryPage(query) {
-  const staff = await staffRepo_exports.listStaff({ includeDeleted: true });
-  const byId = new Map(staff.map((s2) => [s2._id, s2]));
-  let only = null;
-  if (query.staff) {
-    const wanted = query.staff.toLowerCase();
-    const match2 = staff.find(
-      (s2) => !s2.deletedAt && (s2.slug === wanted || s2.slugAliases.includes(wanted))
-    );
-    if (!match2) throw new AppError("NOT_FOUND", "That chair was not found");
-    only = match2._id;
-  }
-  const all = storageEnabled() ? (await photosRepo_exports.listPhotos({ kind: "gallery" })).filter(
-    (p) => !p.staffId || byId.get(p.staffId)?.deletedAt === null
-  ) : [];
-  const counts = /* @__PURE__ */ new Map();
-  for (const p of all) if (p.staffId) counts.set(p.staffId, (counts.get(p.staffId) ?? 0) + 1);
-  const filtered = only ? all.filter((p) => p.staffId === only) : all;
-  const after = cursors.decode(query.cursor, isOrderCursor);
-  const start = after ? filtered.findIndex((p) => p._id === after.i) + 1 : 0;
-  const page = filtered.slice(start, start + query.limit);
-  const last = page[page.length - 1];
-  const toGallery = (p) => {
-    const s2 = p.staffId ? byId.get(p.staffId) : void 0;
-    return { ...toPhotoView(p), staff: s2 ? { id: s2._id, name: s2.name, slug: s2.slug } : null };
-  };
-  return {
-    photos: page.map(toGallery),
-    nextCursor: last && start + query.limit < filtered.length ? cursors.encode({ s: last.sortOrder, i: last._id }) : null,
-    counts: staff.filter((s2) => !s2.deletedAt && s2.showOnWebsite && (counts.get(s2._id) ?? 0) > 0).map((s2) => ({ staffId: s2._id, slug: s2.slug, name: s2.name, count: counts.get(s2._id) ?? 0 })),
-    total: filtered.length
-  };
-}
-function isOrderCursor(v) {
-  return typeof v === "object" && v !== null && typeof v.s === "number" && typeof v.i === "string";
-}
-
 // server/http/routes/public.ts
 var SITEMAP_PATHS = ["/", "/services", "/chairs", "/gallery", "/visit", "/book"];
 function escapeXml(value) {
@@ -36779,7 +38698,7 @@ var publicRoutes = [
     method: "GET",
     path: "/api/shop",
     auth: "public",
-    handler: async () => {
+    handler: async (ctx) => {
       const [settings, hours, hero] = await Promise.all([
         shopSettingsRepo_exports.requireShopSettings(),
         weeklyHoursRepo_exports.getShopHours(),
@@ -36803,11 +38722,17 @@ var publicRoutes = [
           requireEmail: settings.booking.requireEmail,
           cancelCutoffMinutes: settings.booking.cancelCutoffMinutes
         },
+        // Past its end date the strip is off, so a stale offer never lingers on the site.
+        announcement: {
+          ...settings.announcement,
+          enabled: announcementIsLive(settings.announcement, shopDateOf(ctx.now))
+        },
+        social: settings.social,
         heroPhoto: hero,
         maintenance: getEnv2().MAINTENANCE_MODE === "true",
         demo: demoEnabled()
       });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -36817,7 +38742,7 @@ var publicRoutes = [
     handler: async () => {
       const services = await servicesRepo_exports.listPublicServices();
       const body = publicServicesResponseSchema.parse({ services: services.map(toPublicService) });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -36853,7 +38778,7 @@ ${urls.join("\n")}
       const body = publicStaffListResponseSchema.parse({
         staff: staff.map((s2) => ({ ...toPublicStaff(s2), photo: photos.get(s2._id) ?? null }))
       });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -36864,8 +38789,9 @@ ${urls.join("\n")}
       const { slug } = parseParams(ctx, external_exports.object({ slug: external_exports.string().min(1).max(60) }));
       const requested = slug.toLowerCase();
       const staff = await staffRepo_exports.findStaffBySlug(requested);
-      if (!staff || staff.deletedAt || !staff.showOnWebsite) {
-        throw new AppError("NOT_FOUND", "That chair is no longer listed");
+      if (!staff) throw new AppError("NOT_FOUND", "That chair is no longer listed");
+      if (staff.deletedAt || !staff.showOnWebsite) {
+        throw new AppError("STAFF_REMOVED", "That chair is no longer listed");
       }
       const photos = await staffPhotoMap();
       const body = publicStaffResponseSchema.parse({
@@ -36873,7 +38799,7 @@ ${urls.join("\n")}
         requestedSlug: requested,
         canonical: staff.slug === requested
       });
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -36884,7 +38810,7 @@ ${urls.join("\n")}
       const { slug } = parseParams(ctx, external_exports.object({ slug: external_exports.string().min(1).max(60) }));
       const { count } = parseQuery(ctx, staffOpeningsQuerySchema);
       const body = staffOpeningsResponseSchema.parse(await staffOpenings(slug, count, ctx.now));
-      return { body, headers: { "Cache-Control": "public, max-age=30" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   },
   {
@@ -36894,7 +38820,7 @@ ${urls.join("\n")}
     handler: async (ctx) => {
       const query = parseQuery(ctx, galleryQuerySchema);
       const body = galleryResponseSchema.parse(await galleryPage(query));
-      return { body, headers: { "Cache-Control": "public, max-age=60" } };
+      return { body, headers: { "Cache-Control": "public, max-age=0, must-revalidate" } };
     }
   }
 ];
@@ -36919,7 +38845,11 @@ async function meFor(userId) {
     },
     staff: staff && !staff.deletedAt ? toPublicStaff(staff) : null,
     permissions: { barbersCanBlockTime: settings.permissions.barbersCanBlockTime },
-    features: { photos: storageEnabled(), demo: demoEnabled() }
+    features: {
+      photos: storageEnabled(),
+      demo: demoEnabled(),
+      email: getEnv2().EMAIL_PROVIDER === "resend"
+    }
   });
 }
 var authRoutes = [
@@ -36948,7 +38878,7 @@ var authRoutes = [
   {
     method: "POST",
     path: "/api/auth/logout",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       await endSession(ctx.res, principalOf(ctx), ctx.now);
@@ -36958,7 +38888,7 @@ var authRoutes = [
   {
     method: "POST",
     path: "/api/auth/logout-all",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const sessionsEnded = await endAllSessions(ctx.res, principalOf(ctx), ctx.now);
@@ -36971,14 +38901,24 @@ var authRoutes = [
   {
     method: "GET",
     path: "/api/auth/me",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => ({ body: await meFor(principalOf(ctx).userId), headers: NO_STORE })
   },
   {
     method: "POST",
+    path: "/api/me/email",
+    auth: "owner",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, changeEmailRequestSchema);
+      await changeOwnEmail(principalOf(ctx), input2, metaOf(ctx));
+      return { body: await meFor(principalOf(ctx).userId), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
     path: "/api/me/password",
-    auth: "barber",
+    auth: "owner",
     allowDuringPasswordChange: true,
     handler: async (ctx) => {
       const input2 = await parseBody(ctx, changePasswordRequestSchema);
@@ -37454,6 +39394,43 @@ async function checkDatabase() {
   }
   return checks;
 }
+async function checkCloudinary() {
+  try {
+    const storage = getStorage();
+    await storage.ping?.();
+    return [
+      {
+        id: "storage",
+        label: "Photo storage",
+        status: "pass",
+        detail: "A signed call to the Cloudinary Admin API worked."
+      },
+      {
+        id: "storage-public",
+        label: "Public photo URL",
+        status: "pass",
+        detail: "Photos are delivered from res.cloudinary.com in the sizes each frame needs."
+      },
+      {
+        id: "backups",
+        label: "Backups",
+        status: "warn",
+        detail: "Cloudinary holds photos only, so the daily job writes no backup. Photos stay on Cloudinary; turn on MongoDB Atlas backups for the data.",
+        fix: "In MongoDB Atlas, open the cluster, Backup, and turn on continuous or scheduled snapshots (DEPLOY.md, backups)."
+      }
+    ];
+  } catch (error62) {
+    return [
+      {
+        id: "storage",
+        label: "Photo storage",
+        status: "fail",
+        detail: describe3(error62),
+        fix: "Check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET against the Cloudinary dashboard (Settings, API Keys)."
+      }
+    ];
+  }
+}
 var STORAGE_OFF_FIX = "Set up Cloudflare R2 (see DEPLOY.md) to turn on photos and daily backups.";
 async function checkStorage() {
   const checks = [];
@@ -37477,6 +39454,7 @@ async function checkStorage() {
       }
     ];
   }
+  if (getPartialEnv().STORAGE_DRIVER === "cloudinary") return checkCloudinary();
   const key = `${keyPrefix()}_doctor/${randomUUID3()}.txt`;
   const body = new TextEncoder().encode("exquisite doctor");
   let storage;
@@ -37681,13 +39659,15 @@ var daily = async (ctx) => {
   }
   const photosPurged = await purgeDeletedPhotos(ctx.now);
   const uploadsSwept = await sweepAbandonedUploads(ctx.now);
+  const orphansSwept = await sweepStorageOrphans(ctx.now);
   if (!backupsEnabled()) {
-    logger.warn("daily job: backup skipped", { reason: "STORAGE_DRIVER is mongo (GridFS)" });
+    logger.warn("daily job: backup skipped", { reason: "STORAGE_DRIVER keeps no backups" });
     return {
       body: {
         outbox,
         photosPurged,
         uploadsSwept,
+        orphansSwept,
         backup: null,
         backupsPruned: 0,
         skipped: ["backup", "backupsPruned"]
@@ -37702,6 +39682,7 @@ var daily = async (ctx) => {
       outbox,
       photosPurged,
       uploadsSwept,
+      orphansSwept,
       backup: {
         date: backup.date,
         documents: backup.collections.reduce((n2, c) => n2 + c.count, 0),
@@ -37825,89 +39806,13 @@ var mediaRoutes = [
   }
 ];
 
-// server/http/routes/me.ts
-var idParams2 = external_exports.object({ id: idSchema });
-function own2(ctx) {
-  const principal = principalOf(ctx);
-  return { principal, scope: chairScope(principal) };
-}
-var meRoutes = [
-  {
-    method: "GET",
-    path: "/api/me/schedule",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { scope } = own2(ctx);
-      const query = parseQuery(ctx, myScheduleQuerySchema);
-      return {
-        body: myScheduleResponseSchema.parse(await mySchedule(scope, query, ctx.now)),
-        headers: NO_STORE
-      };
-    }
-  },
-  {
-    method: "GET",
-    path: "/api/me/bookings/:id",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const { id } = parseParams(ctx, idParams2);
-      return {
-        body: bookingDetailResponseSchema.parse(await bookingDetail(principal, scope, id, ctx.now)),
-        headers: NO_STORE
-      };
-    }
-  },
-  {
-    method: "POST",
-    path: "/api/me/bookings/:id/status",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const { id } = parseParams(ctx, idParams2);
-      const input2 = await parseBody(ctx, statusChangeRequestSchema);
-      const done = await changeBookingStatus(principal, scope, id, input2, metaOf(ctx));
-      scheduleDelivery(done.outboxIds);
-      return { body: bookingResponseSchema.parse(done.body) };
-    }
-  },
-  {
-    method: "POST",
-    path: "/api/me/time-blocks",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const input2 = await parseBody(ctx, ownTimeBlockRequestSchema);
-      const done = await createTimeBlock(
-        principal,
-        scope,
-        { ...input2, staffId: scope.staffId },
-        metaOf(ctx)
-      );
-      return { status: 201, body: timeBlockResponseSchema.parse(done.body) };
-    }
-  },
-  {
-    method: "DELETE",
-    path: "/api/me/time-blocks/:id",
-    auth: "barber",
-    handler: async (ctx) => {
-      const { principal, scope } = own2(ctx);
-      const { id } = parseParams(ctx, idParams2);
-      const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
-      const done = await deleteTimeBlock2(principal, scope, id, resolutions, metaOf(ctx));
-      return { body: conflictOnlyResponseSchema.parse(done.body) };
-    }
-  }
-];
-
 // server/http/routes/photos.ts
-var idParams3 = external_exports.object({ id: idSchema });
+var idParams2 = external_exports.object({ id: idSchema });
 var photosRoutes = [
   {
     method: "GET",
     path: "/api/admin/photos",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
       const query = parseQuery(ctx, adminPhotoListQuerySchema);
       return {
@@ -37921,7 +39826,7 @@ var photosRoutes = [
   {
     method: "POST",
     path: "/api/admin/photos/upload-url",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
       const input2 = await parseBody(ctx, uploadUrlRequestSchema);
       return {
@@ -37935,7 +39840,7 @@ var photosRoutes = [
   {
     method: "POST",
     path: "/api/admin/photos/confirm",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
       const input2 = await parseBody(ctx, confirmUploadRequestSchema);
       return {
@@ -37949,9 +39854,9 @@ var photosRoutes = [
   {
     method: "PATCH",
     path: "/api/admin/photos/:id",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams2);
       const patch = await parseBody(ctx, photoPatchRequestSchema);
       return {
         body: adminPhotoResponseSchema.parse({
@@ -37963,11 +39868,427 @@ var photosRoutes = [
   {
     method: "DELETE",
     path: "/api/admin/photos/:id",
-    auth: "barber",
+    auth: "owner",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams2);
       await deletePhoto(principalOf(ctx), id, metaOf(ctx));
       return { body: { ok: true } };
+    }
+  }
+];
+
+// server/services/teamPortal.ts
+function toTeamBookingView(b) {
+  return {
+    id: b._id,
+    referenceCode: b.referenceCode,
+    status: b.status,
+    source: b.source,
+    startAt: b.startAt.toISOString(),
+    endAt: b.endAt.toISOString(),
+    customerName: b.customer.name,
+    services: b.services.map((s2) => s2.name),
+    notes: b.notes
+  };
+}
+async function ownStaff(principal) {
+  const { staffId } = chairScope(principal);
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (!staff || staff.deletedAt)
+    throw new AppError("FORBIDDEN", "This sign-in is no longer active");
+  return staff;
+}
+async function teamMe(principal) {
+  const staff = await ownStaff(principal);
+  const [session, photos] = await Promise.all([
+    teamSessionsRepo_exports.findTeamSessionById(principal.sessionId),
+    staffPhotoMap()
+  ]);
+  return {
+    staff: {
+      id: staff._id,
+      name: staff.name,
+      title: staff.title,
+      photo: photos.get(staff._id) ?? null
+    },
+    expiresAt: (session?.expiresAt ?? /* @__PURE__ */ new Date()).toISOString()
+  };
+}
+var LIVE = ["confirmed", "completed", "noShow"];
+async function teamDay(principal, now2) {
+  const staff = await ownStaff(principal);
+  const date5 = shopDateOf(now2);
+  const bounds = shopDayBounds(date5);
+  const [data, bookings] = await Promise.all([
+    loadScheduleData(date5, date5),
+    bookingsRepo_exports.listBookingsBetween(bounds, { staffId: staff._id, statuses: LIVE })
+  ]);
+  const blocks = data.source.timeBlocks.filter(
+    (b) => b.staffId === staff._id && b.startAt < bounds.end && b.endAt > bounds.start
+  );
+  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  return {
+    date: date5,
+    now: now2.toISOString(),
+    working: workingView(staff._id, date5, data.source),
+    nextUp: toNext(confirmed, now2),
+    bookings: bookings.map(toTeamBookingView),
+    blocks: blocks.map(toTimeBlockView),
+    isOut: blocks.some(
+      (b) => b.kind === "dayOff" && b.startAt <= bounds.start && b.endAt >= bounds.end
+    ),
+    counts: {
+      total: bookings.length,
+      done: bookings.filter((b) => b.status === "completed").length,
+      noShow: bookings.filter((b) => b.status === "noShow").length,
+      left: confirmed.length
+    }
+  };
+}
+function toNext(confirmed, now2) {
+  const next2 = confirmed.find((b) => b.endAt > now2);
+  return next2 ? toTeamBookingView(next2) : null;
+}
+async function teamWeek(principal, now2) {
+  const staff = await ownStaff(principal);
+  const from = shopDateOf(now2);
+  const to = shopDayStart(from).plus({ days: 6 }).toISODate() ?? from;
+  const [data, bookings] = await Promise.all([
+    loadScheduleData(from, to),
+    bookingsRepo_exports.listBookingsBetween(
+      { start: shopDayBounds(from).start, end: shopDayBounds(to).end },
+      { staffId: staff._id, statuses: LIVE }
+    )
+  ]);
+  const days = [];
+  for (let d = shopDayStart(from); (d.toISODate() ?? "") <= to; d = d.plus({ days: 1 })) {
+    const date5 = d.toISODate() ?? from;
+    const bounds = shopDayBounds(date5);
+    const mine = bookings.filter((b) => b.startAt >= bounds.start && b.startAt < bounds.end);
+    days.push({
+      date: date5,
+      working: workingView(staff._id, date5, data.source),
+      count: mine.filter((b) => b.status !== "noShow").length,
+      bookings: mine.map(toTeamBookingView),
+      blocks: data.source.timeBlocks.filter((b) => b.staffId === staff._id && b.startAt < bounds.end && b.endAt > bounds.start).map(toTimeBlockView)
+    });
+  }
+  return { days };
+}
+async function setBookingStatus2(principal, id, status, meta3) {
+  const done = await changeBookingStatus(
+    principal,
+    chairScope(principal),
+    id,
+    { status, notify: false },
+    meta3
+  );
+  return viewById(done.body.booking.id);
+}
+async function setBookingNote(principal, id, notes, meta3) {
+  const done = await updateBookingNotes2(principal, chairScope(principal), id, notes, meta3);
+  return viewById(done.booking.id);
+}
+async function viewById(id) {
+  const booking = await bookingsRepo_exports.findBookingById(id);
+  if (!booking) throw new AppError("NOT_FOUND", "Booking was not found");
+  return toTeamBookingView(booking);
+}
+async function addWalkIn(principal, input2, meta3) {
+  const staff = await ownStaff(principal);
+  const request = manualBookingRequestSchema.parse({
+    source: "walkIn",
+    serviceIds: input2.serviceIds,
+    staff: staff._id,
+    customer: { name: input2.name, phone: input2.phone, email: null },
+    notifyCustomer: false
+  });
+  const outcome2 = await createManualBooking(request, actorOf2(principal), meta3);
+  const body = outcome2.body;
+  return {
+    booking: await viewById(body.booking.id),
+    outsideWorkingTime: body.outsideWorkingTime
+  };
+}
+var AHEAD_DAYS = 90;
+async function teamTimeOff(principal, now2) {
+  const staff = await ownStaff(principal);
+  const today = shopDateOf(now2);
+  const range = {
+    start: shopDayBounds(today).start,
+    end: shopDayBounds(shopDayStart(today).plus({ days: AHEAD_DAYS }).toISODate() ?? today).end
+  };
+  const [blocks, alerts] = await Promise.all([
+    timeBlocksRepo_exports.listTimeBlocksForStaff(staff._id, range),
+    alertsRepo_exports.listOpenAlerts()
+  ]);
+  const todayBounds = shopDayBounds(today);
+  return {
+    isOutToday: blocks.some(
+      (b) => b.kind === "dayOff" && b.startAt <= todayBounds.start && b.endAt >= todayBounds.end
+    ),
+    blocks: blocks.filter((b) => b.kind !== "extraHours").map(toTimeBlockView),
+    requests: alerts.filter((a) => a.staffId === staff._id && a.kind === "timeOffRequest").map((a) => ({ id: a._id, fromDate: a.fromDate, toDate: a.toDate, reason: a.reason }))
+  };
+}
+async function blockTime(principal, input2, meta3) {
+  const staff = await ownStaff(principal);
+  return createTimeBlock(
+    principal,
+    chairScope(principal),
+    {
+      staffId: staff._id,
+      kind: "block",
+      startAt: shopLocalToUtc(input2.date, input2.start).toISOString(),
+      endAt: shopLocalToUtc(input2.date, input2.end).toISOString(),
+      reason: input2.reason
+    },
+    meta3
+  );
+}
+async function removeBlock(principal, id, meta3) {
+  return deleteTimeBlock2(principal, chairScope(principal), id, void 0, meta3);
+}
+function affectedIds(error62) {
+  if (!isAppError(error62) || error62.code !== "SCHEDULE_CONFLICT") return [];
+  const list = error62.extra?.affected;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap(
+    (a) => typeof a === "object" && a !== null && "bookingId" in a && typeof a.bookingId === "string" ? [a.bookingId] : []
+  );
+}
+var keepAll = (ids) => ids.map((bookingId) => ({ bookingId, action: "keep" }));
+async function outToday(principal, meta3) {
+  const staff = await ownStaff(principal);
+  const date5 = shopDateOf(meta3.now);
+  const input2 = { date: date5, status: "out" };
+  let clients = 0;
+  try {
+    await setDayStatus(principal, staff._id, input2, meta3);
+  } catch (error62) {
+    const ids = affectedIds(error62);
+    if (ids.length === 0) throw error62;
+    clients = ids.length;
+    await setDayStatus(principal, staff._id, { ...input2, resolutions: keepAll(ids) }, meta3);
+  }
+  if (clients > 0) await raiseAlert("barberOut", staff._id, date5, date5, null, meta3.now);
+  return { clients };
+}
+async function requestDaysOff(principal, input2, meta3) {
+  const staff = await ownStaff(principal);
+  const range = {
+    start: shopDayBounds(input2.fromDate).start,
+    end: shopDayBounds(input2.toDate).end
+  };
+  const booked = await bookingsRepo_exports.listBookingsBetween(range, {
+    staffId: staff._id,
+    statuses: ["confirmed"]
+  });
+  if (booked.length === 0) {
+    await createTimeBlock(
+      principal,
+      chairScope(principal),
+      {
+        staffId: staff._id,
+        kind: "timeOff",
+        startAt: range.start.toISOString(),
+        endAt: range.end.toISOString(),
+        reason: input2.reason
+      },
+      meta3
+    );
+    return { applied: true, clients: 0 };
+  }
+  await raiseAlert(
+    "timeOffRequest",
+    staff._id,
+    input2.fromDate,
+    input2.toDate,
+    input2.reason ?? null,
+    meta3.now
+  );
+  return { applied: false, clients: booked.length };
+}
+async function raiseAlert(kind, staffId, fromDate, toDate, reason, now2) {
+  await alertsRepo_exports.insertAlert(
+    {
+      kind,
+      staffId,
+      fromDate,
+      toDate,
+      startAt: shopDayBounds(fromDate).start,
+      endAt: shopDayBounds(toDate).end,
+      reason
+    },
+    now2
+  );
+}
+
+// server/http/routes/team.ts
+var idParams3 = external_exports.object({ id: idSchema });
+var tokenParams = external_exports.object({ token: external_exports.string().regex(/^[A-Za-z0-9_-]{43}$/) });
+var teamRoutes = [
+  {
+    method: "POST",
+    path: "/api/team/login",
+    auth: "public",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamLoginRequestSchema);
+      await teamLogin(ctx.res, input2, metaOf(ctx));
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/setup/:token",
+    auth: "public",
+    handler: async (ctx) => {
+      const { token } = parseParams(ctx, tokenParams);
+      return {
+        body: teamSetupInfoResponseSchema.parse(await setupLinkInfo(token, ctx.now)),
+        headers: NO_STORE
+      };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/setup/:token",
+    auth: "public",
+    handler: async (ctx) => {
+      const { token } = parseParams(ctx, tokenParams);
+      const input2 = await parseBody(ctx, teamSetupRequestSchema);
+      await completeSetup(ctx.res, token, input2.pin, metaOf(ctx));
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/logout",
+    auth: "team",
+    handler: async (ctx) => {
+      await endTeamSession(ctx.res, principalOf(ctx), ctx.now);
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/me",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamMeResponseSchema.parse(await teamMe(principalOf(ctx))),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/pin",
+    auth: "team",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamChangePinRequestSchema);
+      await changePin(principalOf(ctx), input2, metaOf(ctx));
+      return { body: okResponseSchema.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/today",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamDayResponseSchema.parse(await teamDay(principalOf(ctx), ctx.now)),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "GET",
+    path: "/api/team/week",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamWeekResponseSchema.parse(await teamWeek(principalOf(ctx), ctx.now)),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/bookings/:id/status",
+    auth: "team",
+    handler: async (ctx) => {
+      const { id } = parseParams(ctx, idParams3);
+      const input2 = await parseBody(ctx, teamStatusRequestSchema);
+      const booking = await setBookingStatus2(principalOf(ctx), id, input2.status, metaOf(ctx));
+      return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/bookings/:id/note",
+    auth: "team",
+    handler: async (ctx) => {
+      const { id } = parseParams(ctx, idParams3);
+      const input2 = await parseBody(ctx, teamNoteRequestSchema);
+      const booking = await setBookingNote(principalOf(ctx), id, input2.notes, metaOf(ctx));
+      return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/walk-ins",
+    auth: "team",
+    handler: async (ctx) => {
+      const key = idempotencyKeyOf(ctx);
+      const input2 = await parseBody(ctx, teamWalkInRequestSchema);
+      const done = await addWalkIn(principalOf(ctx), input2, {
+        ...metaOf(ctx),
+        idempotencyKey: key
+      });
+      return { status: 201, body: teamWalkInResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/team/time-off",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamTimeOffResponseSchema.parse(await teamTimeOff(principalOf(ctx), ctx.now)),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/time-blocks",
+    auth: "team",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamBlockTimeRequestSchema);
+      const done = await blockTime(principalOf(ctx), input2, metaOf(ctx));
+      return { status: 201, body: timeBlockResponseSchema.parse(done.body), headers: NO_STORE };
+    }
+  },
+  {
+    method: "DELETE",
+    path: "/api/team/time-blocks/:id",
+    auth: "team",
+    handler: async (ctx) => {
+      const { id } = parseParams(ctx, idParams3);
+      const done = await removeBlock(principalOf(ctx), id, metaOf(ctx));
+      return { body: conflictOnlyResponseSchema.parse(done.body), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/out-today",
+    auth: "team",
+    handler: async (ctx) => ({
+      body: teamOutTodayResponseSchema.parse(await outToday(principalOf(ctx), metaOf(ctx))),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "POST",
+    path: "/api/team/days-off",
+    auth: "team",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, teamDaysOffRequestSchema);
+      const done = await requestDaysOff(principalOf(ctx), input2, metaOf(ctx));
+      return { status: 201, body: teamDaysOffResponseSchema.parse(done), headers: NO_STORE };
     }
   }
 ];
@@ -37979,7 +40300,7 @@ var allRoutes = [
   ...availabilityRoutes,
   ...bookingRoutes,
   ...authRoutes,
-  ...meRoutes,
+  ...teamRoutes,
   ...adminRoutes,
   ...photosRoutes,
   ...mediaRoutes,
@@ -37988,7 +40309,10 @@ var allRoutes = [
 ];
 var router = null;
 function getRouter() {
-  router ??= createRouter(allRoutes, authenticateFromCookie);
+  router ??= createRouter(
+    allRoutes,
+    (ctx, level) => level === "team" ? authenticateTeam(ctx) : authenticateFromCookie(ctx)
+  );
   return router;
 }
 

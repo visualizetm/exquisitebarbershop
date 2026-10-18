@@ -808,6 +808,20 @@ Access
 
 ## 8b. Photos and storage (prompt 4)
 
+Prompt 10 added the `cloudinary` driver (`server/storage/cloudinary.ts`), the way photos are meant to
+run. `presignUpload` there returns a signed multipart POST (`method: 'POST'` with `fields`) instead of a
+PUT: the server signs `{timestamp, folder, public_id}` with the API secret (SHA-1 of the sorted
+parameters plus the secret) and the browser posts the file straight to
+`https://api.cloudinary.com/v1_1/<cloud>/image/upload`. A photo key is the public id
+(`<CLOUDINARY_FOLDER>/<uuid>`). Confirm takes the browser's `{ publicId, version, bytes }` and checks
+them against the Admin API (`head`) before saving; a mismatch destroys the asset. Delete is the
+signed `destroy` call, run by the daily purge; the daily job also sweeps assets in the folder older than
+24 hours that no photo record names (`sweepStorageOrphans`). Photo views carry
+`delivery: { cloud, publicId }` and the client builds `res.cloudinary.com` URLs for the four widths
+cropped to each frame (`shared/lib/cloudinary.ts`). The driver keeps no backups (images only), so the
+daily job skips them as it does for `mongo`. `npm run photos:migrate` copies GridFS or local photos
+over and rewrites their records.
+
 Storage is a port (`server/storage/types.ts`) with two drivers chosen by
 STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,
 presigned PUT URLs valid for five minutes, public reads through
@@ -879,6 +893,35 @@ site to the client. It is never for a real shop.
 - Not indexed: `X-Robots-Tag: noindex, nofollow` on every API answer, the meta tag at runtime, and
   (when DEMO_MODE is set at build time) in `index.html` plus a `Disallow: /` robots.txt. Vercel
   serves static files without our code, so the header cannot cover the HTML shell.
+
+## 8d. Barber PIN portal, search and the resolver Move (prompt 11)
+
+Auth levels are `public | team | owner | internal`. `app.ts` sends `team` to `authenticateTeam` and everything
+else to `authenticateFromCookie`, which now rejects barber role users, so barbers cannot use `/admin`.
+
+- Cookies: owner `__Host-exq_session`, barber `__Host-exq_team` (12 hour absolute). A barber Principal has
+  `userId` = staffId, role `barber`, `email` empty; `actorOf` gives `userId` null for audit.
+- PIN storage: argon2id of HMAC-SHA256(`MANAGE_LINK_SECRET`, `pin:staffId:pin`) in `staffPins` (unique on
+  `staffId`). Setup tokens: 32 random bytes (43 characters), only the hash is stored in `setupTokens`, 72 hours,
+  single use. Sessions in `teamSessions` (TTL on expiry).
+- Failure handling: five failures lock a barber for 15 minutes (`loginThrottle` under `sha256('pin:'+staffId)`);
+  30 failures per address per 15 minutes (`rateLimits`). Wrong PIN, no PIN, hidden or unknown barber answer the
+  same `INVALID_CREDENTIALS`; only a real, locked barber gets `ACCOUNT_LOCKED` (423). Issuing a setup link or
+  "Reset PIN" deletes the PIN, ends sessions, retires old links and clears the lock.
+- Barber views (`TeamBookingView`) carry name, services, time, status and notes, never phone or email. A walk-in
+  takes a phone as input and requires an `Idempotency-Key`.
+- "I am out today": `setDayStatus`; on a conflict it keeps every affected booking and inserts a `barberOut`
+  alert. Days off ahead apply when empty, otherwise raise a `timeOffRequest` alert. Barbers pass keep-only
+  resolutions; Move, Cancel and Cancel and notify are owner only.
+- Search: `GET /api/admin/search` over `bookings.nameKey` (index `by_name_key`), phone digits and reference code.
+- Resolver Move: `applyScheduleChange` accepts `move` with `toStaffId`; options list only chairs that do the
+  service and are free for the whole booking plus buffer. The move updates the booking, re-points its
+  `slotLocks` and writes `booking.move` audit in one transaction; a concurrent change taking the same free
+  time loses at the unique `(staffId, slotStart)` index and rolls back whole. The customer link version does
+  not change because the time did not.
+- Demo: seeded barbers get PIN 246810; the sign-in shows it only when `/api/shop` says `demo`.
+- Team routes (16) are under `/api/team/*`; owner access routes are `/api/admin/staff/:id/access`,
+  `/setup-link` and `/unlock`.
 
 ## 9. Notifications: outbox and channels
 
@@ -1002,7 +1045,8 @@ Environments
 | SEED_OWNER_PASSWORD                                                                  | now, seed only  | initial owner login at seed time                                                       |
 | SEED_OWNER_EMAIL                                                                     | optional, seed  | overrides the placeholder owner email                                                  |
 | CRON_SECRET                                                                          | later           | bearer token for internal routes                                                       |
-| STORAGE_DRIVER                                                                       | now             | local, r2, none (no photos and no backups until R2 exists) or mongo (demo only)        |
+| STORAGE_DRIVER                                                                       | now             | local, cloudinary, r2, none (no photos and no backups) or mongo (demo only)            |
+| CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_FOLDER  | production      | Cloudinary photo storage; the folder is exquisite/production or exquisite/preview      |
 | STORAGE_DISABLED_ACK                                                                 | production      | "true" allows STORAGE_DRIVER=none in production, on purpose                            |
 | DEMO_MODE                                                                            | showcase only   | "true": auto setup, demo sign-in, GridFS photos, noindex; waives both acknowledgements |
 | R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, R2_PUBLIC_BASE_URL | production      | Cloudflare R2 photo storage                                                            |

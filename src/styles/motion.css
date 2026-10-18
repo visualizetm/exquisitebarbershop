@@ -1,0 +1,427 @@
+/*
+ * Every transition and animation on the site lives here, so reduced motion is one switch.
+ * Rules (checked by tests/unit/motionCss.test.ts):
+ *   - durations come from the motion tokens, never a raw number;
+ *   - only transform and opacity move, plus clip-path (photo wipes) and stroke-dashoffset (the
+ *     drawn check); colors may change state; nothing animates a layout property;
+ *   - nothing loops except the button spinner;
+ *   - below the fold starts hidden only under .motion-ready, which script adds when
+ *     IntersectionObserver exists and the visitor allows motion.
+ */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Buttons -------------------------------------------------------------- */
+  .exq-btn {
+    transition:
+      background-color var(--d-fast) var(--ease-out),
+      color var(--d-fast) var(--ease-out),
+      border-color var(--d-fast) var(--ease-out),
+      transform var(--d-fast) var(--ease-out);
+  }
+  .exq-btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  /* Hover (desktop only): a red fill sweeps in from the left on primary and outline buttons. */
+  .exq-btn[data-variant='primary']::before,
+  .exq-btn[data-variant='outline']::before {
+    display: block;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--d-base) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .exq-btn[data-state='default'][data-variant='primary']:hover::before,
+    .exq-btn[data-state='default'][data-variant='outline']:hover::before {
+      transform: scaleX(1);
+    }
+    .exq-btn[data-state='default'][data-variant='primary']:hover,
+    .exq-btn[data-state='default'][data-variant='outline']:hover {
+      color: var(--on-accent);
+    }
+  }
+  .exq-btn__spinner {
+    animation: exq-spin calc(var(--d-slow) * 2) linear infinite;
+  }
+  @keyframes exq-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Cards and chips: lift on hover (desktop), color on select, the underline grows. */
+  .exq-option,
+  .exq-chip,
+  .exq-timechip,
+  .exq-card {
+    transition:
+      background-color var(--d-fast) var(--ease-out),
+      color var(--d-fast) var(--ease-out),
+      border-color var(--d-fast) var(--ease-out),
+      transform var(--d-fast) var(--ease-out),
+      box-shadow var(--d-fast) var(--ease-out);
+  }
+  .exq-chaircard__frame {
+    transition:
+      transform var(--d-fast) var(--ease-out),
+      box-shadow var(--d-fast) var(--ease-out);
+  }
+  .exq-option__title::after,
+  .exq-chaircard__name::after {
+    transition: transform var(--d-fast) var(--ease-out);
+  }
+  .exq-option::after {
+    transition: transform var(--d-fast) var(--ease-out);
+  }
+  @media (hover: hover) {
+    .exq-option:not([data-state='disabled']):hover,
+    .exq-chip:not([data-state='disabled']):hover,
+    .exq-timechip:not([data-state='disabled']):hover,
+    .exq-card[data-state='interactive']:hover,
+    a.exq-chaircard:hover .exq-chaircard__frame,
+    button.exq-chaircard:hover .exq-chaircard__frame {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-pop);
+    }
+  }
+  .exq-timechip[data-state='selected'] {
+    animation: exq-pop var(--d-base) var(--ease-out);
+  }
+  @keyframes exq-pop {
+    50% {
+      transform: scale(1.06);
+    }
+  }
+  .exq-chaircard__badge,
+  .exq-stepbar__bar::before,
+  .exq-stepbar__bar::after {
+    transition: transform var(--d-base) var(--ease-out);
+  }
+
+  /* Scroll reveals: once each. Only below-the-fold elements are ever hidden. */
+  .motion-ready [data-reveal-kind] {
+    transition:
+      opacity var(--d-base) var(--ease-out),
+      transform var(--d-base) var(--ease-out),
+      clip-path var(--d-slow) var(--ease-out);
+    transition-delay: calc(var(--reveal-i, 0) * var(--stagger));
+  }
+  .motion-ready [data-reveal-kind][data-reveal='hidden'] {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  /* A photo wipes up from the bottom. The wrapper is what the observer watches; its child is what
+     is clipped (an element clipped away entirely would never count as on screen). */
+  .motion-ready [data-reveal-kind='wipe'][data-reveal='hidden'] {
+    opacity: 1;
+    transform: none;
+  }
+  .motion-ready [data-reveal-kind='wipe'] > * {
+    transition: clip-path var(--d-slow) var(--ease-out);
+    transition-delay: calc(var(--reveal-i, 0) * var(--stagger));
+  }
+  .motion-ready [data-reveal-kind='wipe'][data-reveal='hidden'] > * {
+    clip-path: inset(100% 0 0 0);
+  }
+  .motion-ready [data-reveal-kind='wipe'][data-reveal='shown'] > * {
+    clip-path: inset(0 0 0 0);
+  }
+
+  /* Headings set line by line: the hero on load, the CTA band on scroll. */
+  .motion-ready .exq-lines[data-mode='load'] .exq-lines__text {
+    animation: exq-line-rise var(--d-slow) var(--ease-out) both;
+    animation-delay: calc(var(--i) * var(--stagger));
+  }
+  @keyframes exq-line-rise {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  .motion-ready .exq-lines[data-mode='scroll'] .exq-lines__text {
+    transition: transform var(--d-slow) var(--ease-out);
+    transition-delay: calc(var(--i) * var(--stagger));
+  }
+  .motion-ready .exq-lines[data-mode='scroll'][data-reveal='hidden'] .exq-lines__text {
+    transform: translateY(100%);
+  }
+  /* The rest of the hero follows the lines and settles by 700ms. */
+  .motion-ready .exq-hero__rise {
+    animation: exq-rise-small var(--d-base) var(--ease-out) both;
+    animation-delay: calc(var(--rise-i, 4) * var(--stagger));
+  }
+  @keyframes exq-rise-small {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+
+  /* Page changes: React Router asks for a view transition; this is its look. */
+  ::view-transition-old(root) {
+    animation: exq-vt-out var(--d-base) var(--ease-in) both;
+  }
+  ::view-transition-new(root) {
+    animation: exq-vt-in var(--d-base) var(--ease-out) both;
+  }
+  @keyframes exq-vt-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes exq-vt-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  .exq-site-header {
+    view-transition-name: exq-header;
+  }
+  .exq-bar {
+    view-transition-name: exq-bar;
+  }
+
+  /* Overlays: sheets slide, modals scale; closing (--d-fast) is quicker than opening (--d-base). */
+  .exq-dialog {
+    transition:
+      transform var(--d-fast) var(--ease-in),
+      opacity var(--d-fast) var(--ease-in);
+    transition:
+      transform var(--d-fast) var(--ease-in),
+      opacity var(--d-fast) var(--ease-in),
+      display var(--d-fast) allow-discrete,
+      overlay var(--d-fast) allow-discrete;
+  }
+  .exq-dialog[open] {
+    transition-duration: var(--d-base);
+    transition-timing-function: var(--ease-out);
+  }
+  .exq-dialog[data-variant='sheet']:not([open]) {
+    transform: translateY(100%);
+  }
+  .exq-dialog[data-variant='modal']:not([open]),
+  .exq-dialog[data-variant='lightbox']:not([open]) {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  @starting-style {
+    .exq-dialog[data-variant='sheet'][open] {
+      transform: translateY(100%);
+    }
+    .exq-dialog[data-variant='modal'][open],
+    .exq-dialog[data-variant='lightbox'][open] {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  @media (min-width: 768px) {
+    .exq-dialog[data-variant='sheet']:not([open]) {
+      transform: translateX(100%);
+    }
+    @starting-style {
+      .exq-dialog[data-variant='sheet'][open] {
+        transform: translateX(100%);
+      }
+    }
+  }
+  .exq-dialog::backdrop {
+    opacity: 0;
+    transition:
+      opacity var(--d-fast) var(--ease-in),
+      display var(--d-fast) allow-discrete,
+      overlay var(--d-fast) allow-discrete;
+  }
+  .exq-dialog[open]::backdrop {
+    opacity: 1;
+    transition-duration: var(--d-base);
+  }
+  @starting-style {
+    .exq-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  /* The phone menu: slides down, links stagger in, the hamburger becomes an X. */
+  .exq-menu {
+    transform: translateY(-100%);
+    transition:
+      transform var(--d-base) var(--ease-in),
+      visibility 0s linear var(--d-base);
+  }
+  .exq-menu[data-state='open'] {
+    transform: none;
+    transition:
+      transform var(--d-base) var(--ease-out),
+      visibility 0s;
+  }
+  .exq-menu__link,
+  .exq-menu__foot {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  .exq-menu[data-state='open'] .exq-menu__link,
+  .exq-menu[data-state='open'] .exq-menu__foot {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity var(--d-base) var(--ease-out),
+      transform var(--d-base) var(--ease-out);
+    transition-delay: calc(var(--d-fast) + var(--i, 5) * var(--stagger));
+  }
+  .exq-burger span {
+    transition:
+      transform var(--d-base) var(--ease-out),
+      opacity var(--d-fast) var(--ease-out);
+  }
+  .exq-nav__link > span::after {
+    transition: transform var(--d-base) var(--ease-out);
+  }
+
+  /* Toasts slide up from just below their resting place. */
+  .exq-toast {
+    animation: exq-toast-in var(--d-base) var(--ease-out) both;
+  }
+  @keyframes exq-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+
+  /* The phone bottom bar leaves for the keyboard. */
+  .exq-bar {
+    transition:
+      transform var(--d-base) var(--ease-out),
+      visibility 0s linear var(--d-base);
+  }
+  .exq-bar[data-state='shown'] {
+    transition:
+      transform var(--d-base) var(--ease-out),
+      visibility 0s;
+  }
+  .exq-bar[data-state='hidden'] {
+    transform: translateY(100%);
+  }
+
+  /* Booking: step content slides the way you are going; the confirmation rises and draws a check. */
+  .exq-step[data-dir='forward'] {
+    animation: exq-step-forward var(--d-base) var(--ease-out) both;
+  }
+  .exq-step[data-dir='back'] {
+    animation: exq-step-back var(--d-base) var(--ease-out) both;
+  }
+  @keyframes exq-step-forward {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+  }
+  @keyframes exq-step-back {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+  }
+  .exq-ticket {
+    animation: exq-ticket-in var(--d-slow) var(--ease-out) both;
+  }
+  @keyframes exq-ticket-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+  }
+  .exq-ticket__check-ring,
+  .exq-ticket__check-tick {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: exq-draw var(--d-slow) var(--ease-out) forwards;
+  }
+  .exq-ticket__check-ring {
+    animation-delay: var(--d-base);
+  }
+  .exq-ticket__check-tick {
+    animation-delay: calc(var(--d-base) + var(--d-base));
+  }
+  @keyframes exq-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  /* Dashboard kit: color changes only; the tooltip and the chart values fade. */
+  .exq-sidebar__row,
+  .exq-tabs__tab,
+  .exq-table__row,
+  .exq-search__option,
+  .exq-pin__key,
+  .exq-pin__dot,
+  .exq-iconbtn,
+  .exq-alert {
+    transition:
+      background-color var(--d-fast) var(--ease-out),
+      color var(--d-fast) var(--ease-out),
+      border-color var(--d-fast) var(--ease-out);
+  }
+  .exq-switch__thumb,
+  .exq-switch__track {
+    transition:
+      transform var(--d-fast) var(--ease-out),
+      background-color var(--d-fast) var(--ease-out);
+  }
+  [data-tip]::after {
+    transition:
+      opacity var(--d-fast) var(--ease-out),
+      transform var(--d-fast) var(--ease-out);
+  }
+  .exq-chart__bar {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    animation: exq-bar-in var(--d-slow) var(--ease-out) both;
+  }
+  .exq-chart__bar[data-series='b'] {
+    animation-delay: var(--stagger);
+  }
+  @keyframes exq-bar-in {
+    from {
+      transform: scaleY(0);
+    }
+  }
+
+  /* Admin is calmer: rows change color, new rows slide in, undo slides up with the toast. */
+  .exq-adm-chair__slot,
+  .exq-adm-bookings__item,
+  .exq-adm-booking,
+  .exq-adm-block,
+  .exq-seg__btn {
+    transition:
+      background-color var(--d-base) var(--ease-out),
+      color var(--d-base) var(--ease-out),
+      border-color var(--d-base) var(--ease-out);
+  }
+  .exq-adm-bookings__item[data-new='true'],
+  .exq-adm-block {
+    animation: exq-adm-enter var(--d-base) var(--ease-out) both;
+  }
+  @keyframes exq-adm-enter {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+}
+
+/* Reduced motion: every state change is instant, nothing is hidden, nothing moves. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

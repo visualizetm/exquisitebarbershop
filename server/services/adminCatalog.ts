@@ -5,7 +5,6 @@ import type {
   AuditListQuery,
   ConflictOutcome,
   ConflictResolution,
-  LoginView,
   OutboxMessageView,
 } from '../../shared/api/admin';
 import { shopDayBounds } from '../../shared/lib/time';
@@ -13,7 +12,6 @@ import type { EmailOutboxDocument } from '../../shared/schemas/emailOutbox';
 import type { ServiceDocument, ServiceInput, ServiceUpdate } from '../../shared/schemas/service';
 import type { ShopSettingsInput } from '../../shared/schemas/shopSettings';
 import type { StaffDocument, StaffInput, StaffUpdate } from '../../shared/schemas/staff';
-import type { UserDocument } from '../../shared/schemas/user';
 import { withTransaction } from '../db/transaction';
 import type { Principal } from '../http/types';
 import { AppError } from '../lib/errors';
@@ -141,7 +139,7 @@ export async function deleteService(
     alsoAffected: (upcoming) => upcoming.filter((b) => b.services.some((s) => s.serviceId === id)),
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds,
   };
 }
@@ -150,7 +148,7 @@ export async function deleteService(
 // Staff
 // ---------------------------------------------------------------------------
 
-export function toStaffView(s: StaffDocument, logins: ReadonlySet<string>): AdminStaffView {
+export function toStaffView(s: StaffDocument): AdminStaffView {
   return {
     id: s._id,
     slug: s.slug,
@@ -168,17 +166,11 @@ export function toStaffView(s: StaffDocument, logins: ReadonlySet<string>): Admi
     acceptsOnlineBooking: s.acceptsOnlineBooking,
     showOnWebsite: s.showOnWebsite,
     deletedAt: s.deletedAt?.toISOString() ?? null,
-    hasLogin: logins.has(s._id),
   };
 }
 
-async function loginStaffIds(): Promise<Set<string>> {
-  return new Set((await usersRepo.listUsers()).flatMap((u) => (u.staffId ? [u.staffId] : [])));
-}
-
 export async function listStaff(): Promise<{ staff: AdminStaffView[] }> {
-  const [staff, logins] = await Promise.all([staffRepo.listStaff(), loginStaffIds()]);
-  return { staff: staff.map((s) => toStaffView(s, logins)) };
+  return { staff: (await staffRepo.listStaff()).map(toStaffView) };
 }
 
 export async function createStaff(principal: Principal, input: StaffInput, meta: ServiceMeta) {
@@ -188,7 +180,7 @@ export async function createStaff(principal: Principal, input: StaffInput, meta:
     { action: 'staff.create', entityType: 'staff', entityId: staff._id, after: input },
     meta,
   );
-  return { staff: toStaffView(staff, new Set()) };
+  return { staff: toStaffView(staff) };
 }
 
 /**
@@ -228,8 +220,9 @@ export async function updateStaff(
   });
   return {
     body: {
-      staff: toStaffView(change.result, await loginStaffIds()),
+      staff: toStaffView(change.result),
       kept: change.kept,
+      moved: change.moved,
       cancelled: change.cancelled,
     },
     outboxIds: change.outboxIds,
@@ -257,7 +250,7 @@ export async function renameStaffSlug(
     },
     meta,
   );
-  return { staff: toStaffView(staff, await loginStaffIds()) };
+  return { staff: toStaffView(staff) };
 }
 
 /**
@@ -292,7 +285,7 @@ export async function deleteStaff(
     },
   });
   return {
-    body: { ok: true, kept: change.kept, cancelled: change.cancelled },
+    body: { ok: true, kept: change.kept, moved: change.moved, cancelled: change.cancelled },
     outboxIds: change.outboxIds,
   };
 }
@@ -332,32 +325,6 @@ export async function putSettings(
     meta,
   );
   return getSettings();
-}
-
-// ---------------------------------------------------------------------------
-// Logins
-// ---------------------------------------------------------------------------
-
-export function toLoginView(user: UserDocument, staffById: Map<string, StaffDocument>): LoginView {
-  return {
-    _id: user._id,
-    email: user.email,
-    role: user.role,
-    staffId: user.staffId,
-    isActive: user.isActive,
-    mustChangePassword: user.mustChangePassword,
-    lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
-    staffName: user.staffId ? (staffById.get(user.staffId)?.name ?? null) : null,
-  };
-}
-
-export async function staffMap(): Promise<Map<string, StaffDocument>> {
-  return new Map((await staffRepo.listStaff({ includeDeleted: true })).map((s) => [s._id, s]));
-}
-
-export async function listLogins(): Promise<{ users: LoginView[] }> {
-  const [users, staffById] = await Promise.all([usersRepo.listUsers(), staffMap()]);
-  return { users: users.map((u) => toLoginView(u, staffById)) };
 }
 
 // ---------------------------------------------------------------------------
