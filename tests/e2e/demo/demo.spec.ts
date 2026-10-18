@@ -67,7 +67,8 @@ test('the first visit sets the shop up by itself and Home loads fully', async ({
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );
   await expect(cards.first()).toBeVisible();
-  expect(await cards.count()).toBeGreaterThanOrEqual(6);
+  // Cards swap from loading to loaded one by one, so the count is polled rather than read once.
+  await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(6);
 
   // The sample shop asks not to be indexed: in the HTML, as a header, and in robots.txt.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
@@ -194,11 +195,9 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
   await enterDemo(page);
 
   // The real screen: pick a chair, pick a file, describe it, upload. Stored in MongoDB, no R2.
-  await page.goto('/admin/photos');
-  await expect(page.getByRole('heading', { name: 'Photos' })).toBeVisible();
-  await expect(page.locator('.exq-adm-photos-page[data-state="disabled"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Chairs' }).click();
-  await page.getByLabel('Chair', { exact: true }).selectOption({ label: 'Marcus' });
+  await page.goto('/admin/team');
+  await page.getByRole('link', { name: 'Marcus', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Photos of Marcus' })).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'marcus.png',
     mimeType: 'image/png',
@@ -257,7 +256,7 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
 test('Reset demo data wipes the changes and loads the sample shop again', async ({ page }) => {
   const errors = watchConsole(page);
   await enterDemo(page);
-  await page.goto('/admin/settings/demo');
+  await page.goto('/admin/settings?tab=demo');
   await expect(page.getByRole('heading', { name: 'Demo data', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Reset demo data' }).click();
   const sheet = page.locator('dialog.exq-dialog[open]');

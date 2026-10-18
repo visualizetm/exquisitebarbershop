@@ -10,11 +10,12 @@ import { BookingDetailPage } from './pages/BookingDetailPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { CustomersPage } from './customers/CustomersPage';
 import { LoginPage } from './pages/LoginPage';
+import { LoginsSettings } from './pages/settings/LoginsSettings';
 import { MySchedulePage } from './pages/MySchedulePage';
 import { OutboxPage } from './pages/OutboxPage';
-import { PhotosPage } from './pages/PhotosPage';
 import { SchedulePage } from './schedule/SchedulePage';
-import { SettingsPage } from './pages/settings/SettingsPage';
+import { SettingsPage } from './settings/SettingsPage';
+import { WebsitePage } from './website/WebsitePage';
 import { BookingsPage } from './bookings/BookingsPage';
 import { OverviewPage } from './overview/OverviewPage';
 import { TeamDetailPage } from './team/TeamDetailPage';
@@ -97,14 +98,16 @@ function OwnerRoutes() {
       <Route path="bookings/:id" element={<BookingsPage />} />
       <Route path="team" element={<TeamPage />} />
       <Route path="team/:id" element={<TeamDetailPage />} />
-      <Route path="website" element={<Navigate to="/admin/settings/services" replace />} />
+      <Route path="website" element={<WebsitePage />} />
       <Route path="customers" element={<CustomersPage />} />
       <Route path="customers/:phone" element={<CustomersPage />} />
-      <Route path="photos" element={<PhotosPage />} />
-      <Route path="settings/*" element={<SettingsPage />} />
+      <Route path="photos" element={<Navigate to="/admin/website?tab=gallery" replace />} />
+      <Route path="settings" element={<SettingsPage />} />
+      <Route path="settings/logins" element={<LoginsSettings />} />
+      <Route path="settings/*" element={<Navigate to="/admin/settings" replace />} />
       <Route path="audit" element={<AuditPage />} />
       <Route path="outbox" element={<OutboxPage />} />
-      <Route path="account" element={<AccountPage />} />
+      <Route path="account" element={<Navigate to="/admin/settings?tab=account" replace />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />
     </Routes>
   );

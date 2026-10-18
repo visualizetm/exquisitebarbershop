@@ -15,7 +15,13 @@ const MAX = 90;
  * On/Off switch and an optional last day. Saving changes the site right away. Shared by the
  * Overview quick action and the Website page.
  */
-export function AnnouncementPanel({ onDone }: { onDone?: (() => void) | undefined }) {
+export function AnnouncementPanel({
+  onDone,
+  showViewLink = true,
+}: {
+  onDone?: (() => void) | undefined;
+  showViewLink?: boolean;
+}) {
   const quick = useQuick();
   const toast = useToast();
   const [loaded, setLoaded] = useState<{
@@ -132,14 +138,16 @@ export function AnnouncementPanel({ onDone }: { onDone?: (() => void) | undefine
         <Button type="submit" loading={working}>
           Save announcement
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            window.open('/', '_blank', 'noopener');
-          }}
-        >
-          View on site
-        </Button>
+        {showViewLink ? (
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.open('/', '_blank', 'noopener');
+            }}
+          >
+            View on site
+          </Button>
+        ) : null}
       </div>
     </form>
   );

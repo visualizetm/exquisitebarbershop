@@ -359,3 +359,31 @@ describe('a barber', () => {
     expect(mine.photos.every((p) => p.staffId === marcus && p.kind === 'staff')).toBe(true);
   });
 });
+
+describe('crediting a gallery photo to a barber', () => {
+  it('lets the owner tag and untag the work, shows it in the barber filter, and refuses everything else', async () => {
+    const { photo } = await uploadAndConfirm(ownerCookie, { kind: 'gallery' }, 'A skin fade');
+    expect(photo.staffId).toBeNull();
+    const tagged = await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: dee });
+    expect(tagged.status).toBe(200);
+    expect(adminPhotoResponseSchema.parse(tagged.body).photo.staffId).toBe(dee);
+    const gallery = galleryResponseSchema.parse(
+      (await call(server.baseUrl, 'GET', '/api/gallery?staff=dee')).body,
+    );
+    expect(gallery.photos.map((p) => p.id)).toContain(photo.id);
+    const untagged = await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: null });
+    expect(adminPhotoResponseSchema.parse(untagged.body).photo.staffId).toBeNull();
+    // Unknown barbers are refused, and a barber cannot credit anything.
+    expect(
+      (await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: newId() })).status,
+    ).toBe(404);
+    const hero = await uploadAndConfirm(ownerCookie, { kind: 'hero' }, 'The shop');
+    expect(
+      (await owner('PATCH', `/api/admin/photos/${hero.photo.id}`, { staffId: dee })).status,
+    ).toBe(403);
+    const mine = await uploadAndConfirm(marcusCookie, { kind: 'staff', staffId: marcus }, 'Me too');
+    expect(
+      (await barber('PATCH', `/api/admin/photos/${mine.photo.id}`, { staffId: dee })).status,
+    ).toBe(403);
+  });
+});

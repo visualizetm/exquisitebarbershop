@@ -140,7 +140,7 @@ for (const theme of ['light', 'dark'] as const) {
     await signInAsOwner(page);
     await expect(page.locator('.exq-chairrow').first()).toBeVisible();
     await expectNoAxeViolations(page, `admin overview ${theme}`);
-    await page.goto('/admin/account');
+    await page.goto('/admin/settings?tab=account');
     await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
     await expectNoAxeViolations(page, `admin account ${theme}`);
   });

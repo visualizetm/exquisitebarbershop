@@ -254,10 +254,25 @@ export async function confirmUpload(
 export async function updatePhoto(
   principal: Principal,
   id: string,
-  patch: { alt?: string | undefined; sortOrder?: number | undefined },
+  patch: {
+    alt?: string | undefined;
+    sortOrder?: number | undefined;
+    staffId?: string | null | undefined;
+  },
   meta: ServiceMeta,
 ): Promise<AdminPhotoView> {
   const before = await loadManaged(principal, id);
+  if (patch.staffId !== undefined) {
+    // Crediting the work to a barber is the owner's call and only makes sense on the gallery.
+    if (principal.role !== 'owner' || before.kind !== 'gallery') {
+      throw new AppError('FORBIDDEN', 'Only the owner can credit a gallery photo to a barber');
+    }
+    if (patch.staffId !== null) {
+      const credited = await staffRepo.findStaffById(patch.staffId);
+      if (!credited || credited.deletedAt)
+        throw new AppError('NOT_FOUND', 'Staff member was not found');
+    }
+  }
   const updated = await photosRepo.updatePhoto(id, patch);
   if (!updated) throw new AppError('NOT_FOUND', 'Photo was not found');
   await auditLogRepo.appendAuditEntry(
@@ -266,8 +281,8 @@ export async function updatePhoto(
       action: 'photo.update',
       entityType: 'photo',
       entityId: id,
-      before: { alt: before.alt, sortOrder: before.sortOrder },
-      after: { alt: updated.alt, sortOrder: updated.sortOrder },
+      before: { alt: before.alt, sortOrder: before.sortOrder, staffId: before.staffId },
+      after: { alt: updated.alt, sortOrder: updated.sortOrder, staffId: updated.staffId },
       meta: null,
       requestId: meta.requestId,
     },

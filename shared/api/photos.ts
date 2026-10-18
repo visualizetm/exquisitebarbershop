@@ -92,8 +92,10 @@ export const photoPatchRequestSchema = z
   .object({
     alt: z.string().trim().min(1).max(200).optional(),
     sortOrder: z.int().min(0).optional(),
+    /** Gallery photos only, owner only: whose work it is. Null credits nobody in particular. */
+    staffId: idSchema.nullable().optional(),
   })
-  .refine((v) => v.alt !== undefined || v.sortOrder !== undefined, {
+  .refine((v) => v.alt !== undefined || v.sortOrder !== undefined || v.staffId !== undefined, {
     message: 'Nothing to change',
   });
 

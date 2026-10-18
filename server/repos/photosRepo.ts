@@ -77,13 +77,18 @@ export async function nextSortOrder(filter: PhotoFilter, options?: RepoOptions):
 
 export async function updatePhoto(
   id: string,
-  patch: { alt?: string | undefined; sortOrder?: number | undefined },
+  patch: {
+    alt?: string | undefined;
+    sortOrder?: number | undefined;
+    staffId?: string | null | undefined;
+  },
   options?: RepoOptions,
 ): Promise<PhotoDocument | null> {
   const col = await collection('photos');
   const $set: Partial<PhotoDocument> = {};
   if (patch.alt !== undefined) $set.alt = patch.alt;
   if (patch.sortOrder !== undefined) $set.sortOrder = patch.sortOrder;
+  if (patch.staffId !== undefined) $set.staffId = patch.staffId;
   return col.findOneAndUpdate(
     { _id: id, deletedAt: null },
     { $set },

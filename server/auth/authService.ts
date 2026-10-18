@@ -272,6 +272,45 @@ export async function changeOwnPassword(
   );
 }
 
+/** Changes the signed-in login's email. Asks for the current password, like a password change. */
+export async function changeOwnEmail(
+  principal: Principal,
+  input: { currentPassword: string; newEmail: string },
+  meta: RequestMeta,
+): Promise<void> {
+  const hit = await rateLimitsRepo.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta.now,
+  );
+  if (!hit.allowed) {
+    throw new AppError('RATE_LIMITED', 'Too many attempts. Please wait and try again.', {
+      retryAfterSeconds: hit.retryAfterSeconds,
+    });
+  }
+  const user = await usersRepo.findUserById(principal.userId);
+  if (!user) throw new AppError('AUTH_REQUIRED', 'Please sign in');
+  if (!(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    throw new AppError('INVALID_CREDENTIALS', 'Your current password is incorrect');
+  }
+  if (input.newEmail === user.email)
+    throw new AppError('BAD_REQUEST', 'That is already your email');
+  await usersRepo.setUserEmail(user._id, input.newEmail, meta.now);
+  await auditLogRepo.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: 'user.email.change',
+      entityType: 'user',
+      entityId: user._id,
+      before: { email: user.email },
+      after: { email: input.newEmail },
+      meta: null,
+      requestId: meta.requestId,
+    },
+    meta.now,
+  );
+}
+
 export interface IssuedPassword {
   user: UserDocument;
   /** Shown once to the owner, never stored. */

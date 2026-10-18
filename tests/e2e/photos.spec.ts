@@ -33,16 +33,16 @@ async function samplePng(page: Page): Promise<Buffer> {
   return Buffer.from(base64, 'base64');
 }
 
-test('the owner uploads a chair photo through the Photos screen with the local driver', async ({
+test('the owner uploads a chair photo from the Team profile with the local driver', async ({
   page,
 }) => {
   await signInAsOwner(page);
   const png = await samplePng(page);
   // Unique per run, so a reused server with earlier uploads never matches twice.
   const alt = `Tre at chair four ${Date.now()}`;
-  await page.goto('/admin/photos');
-  await page.getByRole('button', { name: 'Chairs' }).click();
-  await page.getByLabel('Chair', { exact: true }).selectOption({ label: 'Tre' });
+  await page.goto('/admin/team');
+  await page.getByRole('link', { name: 'Tre', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Photos of Tre' })).toBeVisible();
   await page.getByLabel('Choose a photo').setInputFiles({
     name: 'tre.png',
     mimeType: 'image/png',

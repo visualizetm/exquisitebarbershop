@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { emailSchema } from '../schemas/common';
 import { publicUserSchema } from '../schemas/user';
 import { publicStaffSchema } from './public';
 
@@ -28,6 +29,12 @@ export const changePasswordRequestSchema = z.object({
   newPassword: z.string().min(1).max(256),
 });
 export type ChangePasswordRequest = z.input<typeof changePasswordRequestSchema>;
+
+export const changeEmailRequestSchema = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newEmail: emailSchema,
+});
+export type ChangeEmailRequest = z.input<typeof changeEmailRequestSchema>;
 
 export const okResponseSchema = z.object({ ok: z.literal(true) });
 export const logoutAllResponseSchema = z.object({ ok: z.literal(true), sessionsEnded: z.int() });

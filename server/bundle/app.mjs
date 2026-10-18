@@ -29743,6 +29743,7 @@ __export(usersRepo_exports, {
   listUsers: () => listUsers,
   recordSuccessfulLogin: () => recordSuccessfulLogin,
   setUserActive: () => setUserActive,
+  setUserEmail: () => setUserEmail,
   setUserPasswordHash: () => setUserPasswordHash
 });
 
@@ -29893,6 +29894,20 @@ async function setUserPasswordHash(id, passwordHash, now2, options) {
     sessionOf(options)
   );
   if (result.matchedCount === 0) throw new AppError("NOT_FOUND", "User was not found");
+}
+async function setUserEmail(id, email3, now2, options) {
+  const col = await collection("users");
+  try {
+    const result = await col.updateOne(
+      { _id: id },
+      { $set: { email: email3, updatedAt: now2 } },
+      sessionOf(options)
+    );
+    if (result.matchedCount === 0) throw new AppError("NOT_FOUND", "User was not found");
+  } catch (error62) {
+    if (isDuplicateKeyError(error62)) throw new AppError("CONFLICT", "That email is already in use");
+    throw error62;
+  }
 }
 async function setUserActive(id, isActive, now2, options) {
   const col = await collection("users");
@@ -30431,6 +30446,7 @@ async function updatePhoto(id, patch, options) {
   const $set = {};
   if (patch.alt !== void 0) $set.alt = patch.alt;
   if (patch.sortOrder !== void 0) $set.sortOrder = patch.sortOrder;
+  if (patch.staffId !== void 0) $set.staffId = patch.staffId;
   return col.findOneAndUpdate(
     { _id: id, deletedAt: null },
     { $set },
@@ -32731,8 +32747,10 @@ var confirmUploadRequestSchema = external_exports.object({
 });
 var photoPatchRequestSchema = external_exports.object({
   alt: external_exports.string().trim().min(1).max(200).optional(),
-  sortOrder: external_exports.int().min(0).optional()
-}).refine((v) => v.alt !== void 0 || v.sortOrder !== void 0, {
+  sortOrder: external_exports.int().min(0).optional(),
+  /** Gallery photos only, owner only: whose work it is. Null credits nobody in particular. */
+  staffId: idSchema.nullable().optional()
+}).refine((v) => v.alt !== void 0 || v.sortOrder !== void 0 || v.staffId !== void 0, {
   message: "Nothing to change"
 });
 var adminPhotoListQuerySchema = external_exports.object({
@@ -32840,6 +32858,10 @@ var meResponseSchema = external_exports.object({
 var changePasswordRequestSchema = external_exports.object({
   currentPassword: external_exports.string().min(1).max(256),
   newPassword: external_exports.string().min(1).max(256)
+});
+var changeEmailRequestSchema = external_exports.object({
+  currentPassword: external_exports.string().min(1).max(256),
+  newEmail: emailSchema
 });
 var okResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
 var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
@@ -34604,6 +34626,39 @@ async function changeOwnPassword(principal, input2, meta3) {
       before: null,
       after: null,
       meta: { otherSessionsEnded: ended, wasTemporary: user.mustChangePassword },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function changeOwnEmail(principal, input2, meta3) {
+  const hit = await rateLimitsRepo_exports.hitRateLimit(
+    `password:user:${principal.userId}`,
+    PASSWORD_CHANGE_LIMIT,
+    meta3.now
+  );
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many attempts. Please wait and try again.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+  const user = await usersRepo_exports.findUserById(principal.userId);
+  if (!user) throw new AppError("AUTH_REQUIRED", "Please sign in");
+  if (!await verifyPassword(user.passwordHash, input2.currentPassword)) {
+    throw new AppError("INVALID_CREDENTIALS", "Your current password is incorrect");
+  }
+  if (input2.newEmail === user.email)
+    throw new AppError("BAD_REQUEST", "That is already your email");
+  await usersRepo_exports.setUserEmail(user._id, input2.newEmail, meta3.now);
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf(principal),
+      action: "user.email.change",
+      entityType: "user",
+      entityId: user._id,
+      before: { email: user.email },
+      after: { email: input2.newEmail },
+      meta: null,
       requestId: meta3.requestId
     },
     meta3.now
@@ -37159,6 +37214,16 @@ async function confirmUpload(principal, input2, meta3) {
 }
 async function updatePhoto2(principal, id, patch, meta3) {
   const before = await loadManaged(principal, id);
+  if (patch.staffId !== void 0) {
+    if (principal.role !== "owner" || before.kind !== "gallery") {
+      throw new AppError("FORBIDDEN", "Only the owner can credit a gallery photo to a barber");
+    }
+    if (patch.staffId !== null) {
+      const credited = await staffRepo_exports.findStaffById(patch.staffId);
+      if (!credited || credited.deletedAt)
+        throw new AppError("NOT_FOUND", "Staff member was not found");
+    }
+  }
   const updated = await photosRepo_exports.updatePhoto(id, patch);
   if (!updated) throw new AppError("NOT_FOUND", "Photo was not found");
   await auditLogRepo_exports.appendAuditEntry(
@@ -37167,8 +37232,8 @@ async function updatePhoto2(principal, id, patch, meta3) {
       action: "photo.update",
       entityType: "photo",
       entityId: id,
-      before: { alt: before.alt, sortOrder: before.sortOrder },
-      after: { alt: updated.alt, sortOrder: updated.sortOrder },
+      before: { alt: before.alt, sortOrder: before.sortOrder, staffId: before.staffId },
+      after: { alt: updated.alt, sortOrder: updated.sortOrder, staffId: updated.staffId },
       meta: null,
       requestId: meta3.requestId
     },
@@ -38346,6 +38411,16 @@ var authRoutes = [
     auth: "barber",
     allowDuringPasswordChange: true,
     handler: async (ctx) => ({ body: await meFor(principalOf(ctx).userId), headers: NO_STORE })
+  },
+  {
+    method: "POST",
+    path: "/api/me/email",
+    auth: "barber",
+    handler: async (ctx) => {
+      const input2 = await parseBody(ctx, changeEmailRequestSchema);
+      await changeOwnEmail(principalOf(ctx), input2, metaOf(ctx));
+      return { body: await meFor(principalOf(ctx).userId), headers: NO_STORE };
+    }
   },
   {
     method: "POST",

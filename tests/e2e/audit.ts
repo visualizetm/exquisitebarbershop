@@ -21,7 +21,7 @@ const ADMIN = [
   '/admin',
   '/admin/schedule',
   '/admin/bookings/new',
-  '/admin/photos',
+  '/admin/website',
   '/admin/settings',
 ];
 
@@ -246,7 +246,7 @@ async function main(): Promise<void> {
   const results: Facts[] = [];
   for (const url of ['/', '/services', '/chairs', '/chairs/marcus', '/gallery', '/visit', '/book'])
     results.push(await facts(browser, url, false));
-  for (const url of ['/admin', '/admin/schedule', '/admin/photos'])
+  for (const url of ['/admin', '/admin/schedule', '/admin/website'])
     results.push(await facts(browser, url, true));
   writeFileSync(join(DIR, 'facts.json'), JSON.stringify(results, null, 2));
   await browser.close();

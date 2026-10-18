@@ -6,7 +6,6 @@ import Trash01 from '@untitled-ui/icons-react/build/esm/Trash01';
 import {
   adminPhotoListResponseSchema,
   adminPhotoResponseSchema,
-  uploadUrlResponseSchema,
   type AdminPhotoView,
 } from '@shared/api/photos';
 import { okResponseSchema } from '@shared/api/auth';
@@ -14,7 +13,7 @@ import type { PhotoKind } from '@shared/schemas/photo';
 import { Button, EmptyState, Input, Sheet, useToast } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
-import { postWithProgress, prepareImage, putWithProgress } from '../lib/resizeImage';
+import { uploadPhoto } from '../lib/uploadPhoto';
 import { ErrorNote } from './ErrorNote';
 
 type UploadState =
@@ -58,45 +57,8 @@ export function PhotoManager({
     if (!file || !alt.trim()) return;
     setError(null);
     try {
-      setUpload({ phase: 'preparing' });
-      const prepared = await prepareImage(file);
-      const issued = await apiRequest('/api/admin/photos/upload-url', uploadUrlResponseSchema, {
-        method: 'POST',
-        body: {
-          kind,
-          ...(staffId ? { staffId } : {}),
-          contentType: 'image/webp',
-          size: prepared.blob.size,
-        },
-      });
-      setUpload({ phase: 'uploading', fraction: 0 });
-      const onProgress = (fraction: number) => {
-        setUpload({ phase: 'uploading', fraction });
-      };
-      let sent: { width: number; height: number; cloudinary?: object } = {
-        width: prepared.width,
-        height: prepared.height,
-      };
-      if (issued.method === 'POST') {
-        // Cloudinary: a signed form straight to Cloudinary; what it returns goes to the confirm step.
-        const result = await postWithProgress(
-          issued.uploadUrl,
-          issued.fields ?? {},
-          prepared.blob,
-          onProgress,
-        );
-        sent = {
-          width: result.width,
-          height: result.height,
-          cloudinary: { publicId: result.publicId, version: result.version, bytes: result.bytes },
-        };
-      } else {
-        await putWithProgress(issued.uploadUrl, issued.headers, prepared.blob, onProgress);
-      }
-      setUpload({ phase: 'confirming' });
-      await apiRequest('/api/admin/photos/confirm', adminPhotoResponseSchema, {
-        method: 'POST',
-        body: { ticket: issued.ticket, ...sent, alt: alt.trim() },
+      await uploadPhoto(file, { kind, staffId, alt }, (phase, fraction) => {
+        setUpload(phase === 'uploading' ? { phase, fraction: fraction ?? 0 } : { phase });
       });
       setFile(null);
       setAlt('');

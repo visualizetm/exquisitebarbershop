@@ -50,6 +50,7 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'POST /api/auth/logout-all': 'barber+',
   'GET /api/auth/me': 'barber+',
   'POST /api/me/password': 'barber+',
+  'POST /api/me/email': 'barber',
   'GET /api/me/schedule': 'barber',
   'GET /api/me/bookings/:id': 'barber',
   'POST /api/me/bookings/:id/status': 'barber',

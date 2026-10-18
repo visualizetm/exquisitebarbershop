@@ -403,3 +403,16 @@ commit, and what is still open.
 - Tests: `tests/integration/customersAlerts.test.ts`, `removedStaff.test.ts`, the authz rows and
   `tests/e2e/team.spec.ts` (schedule, week, customers, resolver Move end to end, add and remove a barber,
   the In or Off switch, axe in both themes at 1280 and 390 on every new screen).
+
+### M4: Website and Settings
+
+- Shipped: Website at `/admin/website` with five tabs (Hours with closed days and special hours through the
+  resolver, Announcement, Services with add, edit, hide and drag or arrow reorder, Home photo with phone and
+  computer crop previews, Gallery with multi upload, required alt text, barber tag, reorder, edit and
+  remove), each with View on site. Settings at `/admin/settings`: Shop info with the three social links,
+  Booking rules in hours, Account (change email, change password, theme, sign out everywhere), Email
+  (read only, with why) and Demo data (demo only). Server: `POST /api/me/email`, `staffId` on the photo
+  patch.
+- Tests: `tests/integration/ownEmail.test.ts`, the photo tag tests, the authz row, and
+  `tests/e2e/website.spec.ts` (every tab, the closed day resolver, services, home photo, gallery, settings
+  saves and errors, email change and back, axe in both themes at 1280 and 390).

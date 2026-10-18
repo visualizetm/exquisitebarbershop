@@ -11,6 +11,16 @@ export async function signInOwner(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 }
 
+/**
+ * Clears the e2e server's rate-limit windows. A full run books more than ten times from one address,
+ * which the real limit (ten per ten minutes) rightly refuses; the hook exists only in
+ * scripts/e2e-server.ts.
+ */
+export async function resetRateLimits(): Promise<void> {
+  const api = `http://127.0.0.1:${process.env.API_PORT ?? '3002'}`;
+  await fetch(`${api}/__e2e/reset`, { method: 'POST' }).catch(() => undefined);
+}
+
 /** A random US number that has not booked before, so the open-bookings guard never trips. */
 export function randomPhone(): string {
   return `215555${String(Math.floor(Math.random() * 9000) + 1000)}`;
@@ -26,6 +36,7 @@ export async function bookPublicly(
   customer: { name: string; phone?: string } = { name: 'Admin Flow Customer' },
 ): Promise<{ code: string; startAt: string; phone: string }> {
   const phone = customer.phone ?? randomPhone();
+  await resetRateLimits();
   await page.goto(`/book?barber=${barber}`);
   await page.getByLabel(/Classic Cut/).click();
   await page.getByRole('button', { name: 'Continue' }).click();

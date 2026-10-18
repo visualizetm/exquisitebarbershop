@@ -1,5 +1,6 @@
 import { getEnv } from '../../env';
 import {
+  changeEmailRequestSchema,
   changePasswordRequestSchema,
   loginRequestSchema,
   logoutAllResponseSchema,
@@ -7,7 +8,7 @@ import {
   okResponseSchema,
   type MeResponse,
 } from '../../../shared/api/auth';
-import { changeOwnPassword, login, loginAsDemoOwner } from '../../auth/authService';
+import { changeOwnEmail, changeOwnPassword, login, loginAsDemoOwner } from '../../auth/authService';
 import { assertDemoEnabled, demoEnabled } from '../../services/demo';
 import { endAllSessions, endSession } from '../../auth/sessions';
 import { shopSettingsRepo, staffRepo, usersRepo } from '../../repos';
@@ -97,6 +98,16 @@ export const authRoutes: RouteDefinition[] = [
     auth: 'barber',
     allowDuringPasswordChange: true,
     handler: async (ctx) => ({ body: await meFor(principalOf(ctx).userId), headers: NO_STORE }),
+  },
+  {
+    method: 'POST',
+    path: '/api/me/email',
+    auth: 'barber',
+    handler: async (ctx) => {
+      const input = await parseBody(ctx, changeEmailRequestSchema);
+      await changeOwnEmail(principalOf(ctx), input, metaOf(ctx));
+      return { body: await meFor(principalOf(ctx).userId), headers: NO_STORE };
+    },
   },
   {
     method: 'POST',

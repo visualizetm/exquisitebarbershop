@@ -672,3 +672,25 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D11-19 The schedule day grid is plain absolutely positioned blocks in a CSS grid (no library, no dragging).
   Empty slots are clickable for a pointer, and each chair header has a New booking button for the keyboard.
   The red now line only draws on today's grid and inside the shown hours.
+- D11-20 Settings saves the whole settings document, so a field with no control on the new Settings page
+  (the per-phone booking limit, cleanup minutes, start time step, most services per booking, the barber
+  permissions) keeps the value it has. Rob can still change them through the API; the owner guide only
+  promises what the page shows. Less to build and verify, and none of them was in the prompt 11 list.
+- D11-21 One "cancel or reschedule until N hours before" control writes both cutoff minutes. If the value is
+  not touched on save, each keeps what it had, so saving other rules never flattens a split setting.
+- D11-22 Replacing the home photo uploads the new one first and only then removes the old ones, so a failed
+  upload never leaves the home page without a photo. Gallery uploads go one by one so one bad file does not
+  stop the rest; a failed one stays in the list with the reason.
+- D11-23 "View on site" is one link in the Website page header that follows the open tab (Hours opens Visit,
+  Services opens Services, Gallery opens Gallery, Announcement and Home photo open Home), always in a new
+  tab. The Overview quick action sheet keeps its own button.
+- D11-24 The sign-in email is changed with the current password and a new `POST /api/me/email`; it keeps
+  every session (the owner is the one asking) and is audited. A duplicate email answers 409.
+- D11-25 Removed pages: Settings (Services, Staff, Hours, Closures, Shop settings, Demo data) and the Photos
+  page. `/admin/photos` redirects to Website, Gallery; `/admin/account` to Settings, Account; the old
+  `/admin/settings/*` addresses to Settings. Barber logins (`settings/logins`) stay until the PIN portal
+  replaces them.
+- D11-26 A toast that appears under a resting pointer was being dismissed at once (the pointer entered it
+  before its clock started, which set the time left to zero). The pause now only acts on a running clock.
+  The e2e booking helper clears the test server's rate-limit windows before each booking, because a full
+  run books more than ten times from one address, which the real limit refuses by design.

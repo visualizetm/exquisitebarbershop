@@ -25,13 +25,18 @@ function ToastView({ toast, onDone }: { toast: ToastItem; onDone: (id: number) =
   const timer = useRef<number | undefined>(undefined);
 
   const start = useCallback(() => {
+    if (timer.current !== undefined) return;
     startedAt.current = Date.now();
     timer.current = window.setTimeout(() => {
       onDone(toast.id);
     }, remaining.current);
   }, [onDone, toast.id]);
+  // A toast that appears under a resting pointer is entered before its clock starts; only a
+  // running clock has time to take off.
   const pause = useCallback(() => {
+    if (timer.current === undefined) return;
     window.clearTimeout(timer.current);
+    timer.current = undefined;
     remaining.current = Math.max(0, remaining.current - (Date.now() - startedAt.current));
   }, []);
 
@@ -39,6 +44,7 @@ function ToastView({ toast, onDone }: { toast: ToastItem; onDone: (id: number) =
     start();
     return () => {
       window.clearTimeout(timer.current);
+      timer.current = undefined;
     };
   }, [start]);
 
