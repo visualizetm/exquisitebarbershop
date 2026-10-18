@@ -12,7 +12,7 @@ async function signInAsOwner(page: Page) {
 
 test("the home strip shows today's chairs and each card books that chair", async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible();
   const cards = page.locator(
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );

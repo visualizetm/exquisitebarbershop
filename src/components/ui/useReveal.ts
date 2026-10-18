@@ -33,7 +33,11 @@ export function useReveal<T extends HTMLElement>() {
     if (!el || !motionReady()) return;
     // Already on screen, or above it: leave it alone.
     if (el.getBoundingClientRect().top < window.innerHeight) return;
+    // Hide without a transition: the element was already measured, so a plain change would fade it out.
+    el.style.transition = 'none';
     el.dataset.reveal = 'hidden';
+    void el.offsetHeight;
+    el.style.transition = '';
     const io = shared();
     io.observe(el);
     return () => {

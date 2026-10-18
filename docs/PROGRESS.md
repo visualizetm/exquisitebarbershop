@@ -303,3 +303,18 @@ commit, and what is still open.
 - Tests: `tests/e2e/frame.spec.ts` (bar visible at 390 and 60px tall, hidden at 1280 and in /admin,
   /setup and /kit, labels per page and per booking step, hidden while a field has focus, never
   covers the page end, no build text or staff link on any public page, the menu).
+
+### M3: the public pages
+
+- Shipped: Home in the order of the brief (hero text with the four line H1 and EXQUISITE in red, the
+  info row from shop data, the hero photo only when one exists, Today's chairs, The Menu in an ink
+  band, The Work hidden when empty, Visit with today highlighted, the ink CTA band); Services as an ink
+  page with group chips and counts and PriceRows that link to `/book?service=id`; The Chairs
+  ("Pick your chair"); the profile (portrait, name in display type, next 3 openings, services, work);
+  Gallery (2 and 3 columns, barber chips, swipeable lightbox); Visit.
+- Motion on these pages: hero line rise and settle by 610ms, scroll reveals with stagger, photo wipes,
+  the CTA line rise, and page transitions (a 250ms cross-fade through `document.startViewTransition`,
+  taken in the kit `Link`).
+- Tests: `tests/e2e/motion.spec.ts` (hero timing and full opacity, hidden below the fold and revealed
+  once, nothing hidden or transformed under reduced motion, nothing hidden without
+  IntersectionObserver, a no-JavaScript page, CLS under 0.1, a view transition on navigation).

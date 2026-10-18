@@ -1,5 +1,4 @@
-import { Link } from 'react-router';
-import Phone from '@untitled-ui/icons-react/build/esm/Phone';
+import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import { galleryResponseSchema } from '@shared/api/photos';
 import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
@@ -7,11 +6,21 @@ import { HoursTable } from '@/components/site/HoursTable';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
 import { ServiceRows } from '@/components/site/ServiceRows';
 import { TodaysChairs } from '@/components/site/TodaysChairs';
-import { ButtonAnchor, ButtonLink } from '@/components/ui';
+import {
+  ButtonAnchor,
+  ButtonLink,
+  Label,
+  Lines,
+  Link,
+  PhotoFrame,
+  Reveal,
+  SectionHead,
+} from '@/components/ui';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
-import { directionsUrl } from '@/lib/shop';
+import { hoursLabel } from '@/lib/hours';
+import { directionsUrl, todayKey } from '@/lib/shop';
 
 export function HomePage() {
   const shop = useShop();
@@ -25,109 +34,130 @@ export function HomePage() {
   const staff = useApi('/api/staff', publicStaffListResponseSchema);
   const services = useApi('/api/services', publicServicesResponseSchema);
   const gallery = useApi('/api/gallery?limit=6', galleryResponseSchema);
-  const hero = shop.status === 'ready' ? (shop.data.heroPhoto ?? null) : null;
-  const phone = shop.status === 'ready' ? shop.data.phone : null;
+  const data = shop.status === 'ready' ? shop.data : null;
+  const hero = data?.heroPhoto ?? null;
+  const today = data ? data.hours[todayKey()] : null;
+  const where = data ? `${data.address.city} ${data.address.state}` : 'Brookhaven PA';
 
   return (
     <article className="exq-home" data-state={shop.status}>
       <section
-        className={`exq-home__hero exq-hero${hero ? '' : ' exq-dark exq-band'}`}
-        data-state={hero ? 'photo' : 'ink'}
+        className="exq-hero exq-home__hero"
+        data-state={hero ? 'photo' : 'text'}
+        aria-labelledby="exq-hero-title"
       >
-        {hero ? (
-          <>
-            <img
-              className="exq-hero__img"
-              src={hero.url}
-              width={hero.width}
-              height={hero.height}
-              alt={hero.alt}
-              fetchPriority="high"
-              decoding="async"
-              sizes="100vw"
+        <div className="exq-wrap exq-hero__grid">
+          <div className="exq-hero__text">
+            <p className="exq-label exq-hero__label">Barber &amp; Beauty Lounge &middot; {where}</p>
+            <Lines
+              as="h1"
+              id="exq-hero-title"
+              mode="load"
+              className="exq-display exq-home__title exq-hero__title"
+              lines={[
+                { text: 'Gifted' },
+                { text: 'hands.' },
+                { text: 'Exquisite', accent: true },
+                { text: 'cuts.' },
+              ]}
             />
-            <span className="exq-hero__scrim" aria-hidden="true" />
-          </>
-        ) : (
-          <div className="exq-wrap exq-hero__brand">
-            <img
-              className="exq-hero__logo"
-              src="/brand/exq-primary-white.svg"
-              alt=""
-              width="500"
-              height="204"
-            />
-          </div>
-        )}
-        <div className="exq-wrap exq-hero__content exq-dark">
-          <h1 className="exq-home__title exq-hero__title">Fresh cuts. Gifted hands.</h1>
-          <p className="exq-home__lead exq-hero__lead">
-            Barbers and stylists under one roof in Brookhaven. Pick your chair and book in under a
-            minute.
-          </p>
-          <p className="exq-home__actions exq-hero__actions">
-            <ButtonLink to="/book" size="lg">
-              Book a chair
-            </ButtonLink>
-            <ButtonAnchor
-              href={phone ? `tel:${phone}` : '/visit'}
-              variant="onink"
-              size="lg"
-              icon={<Phone aria-hidden="true" />}
+            <p
+              className="exq-hero__sub exq-hero__rise exq-home__lead"
+              style={{ '--rise-i': 4 } as React.CSSProperties}
             >
-              Call the shop
-            </ButtonAnchor>
-          </p>
+              Barbers and stylists under one roof. Pick your chair and book in under a minute.
+            </p>
+            <p
+              className="exq-hero__actions exq-hero__rise exq-home__actions"
+              style={{ '--rise-i': 5 } as React.CSSProperties}
+            >
+              <ButtonLink to="/book">Book a chair</ButtonLink>
+              <ButtonLink to="/services" variant="outline">
+                See services
+              </ButtonLink>
+            </p>
+            <dl
+              className="exq-hero__info exq-hero__rise"
+              data-state={data ? 'ready' : 'loading'}
+              style={{ '--rise-i': 6 } as React.CSSProperties}
+            >
+              <div>
+                <dt>{today?.length === 0 ? 'Today' : 'Open today'}</dt>
+                <dd>{today ? hoursLabel(today) : ''}</dd>
+              </div>
+              <div>
+                <dt>Find us</dt>
+                <dd>{data?.address.line1 ?? ''}</dd>
+              </div>
+              <div>
+                <dt>Walk ins</dt>
+                <dd>Welcome</dd>
+              </div>
+            </dl>
+          </div>
+          {hero ? (
+            <Reveal kind="wipe" className="exq-hero__photo">
+              <PhotoFrame
+                photo={hero}
+                name="The shop"
+                priority
+                sizes="(min-width: 1024px) 480px, 100vw"
+              />
+            </Reveal>
+          ) : null}
         </div>
       </section>
 
       <section className="exq-wrap exq-section exq-home__chairs" aria-labelledby="exq-home-chairs">
-        <p className="exq-label">Today</p>
-        <h2 id="exq-home-chairs">Today's chairs</h2>
+        <SectionHead label="Today" title="Today's chairs" id="exq-home-chairs">
+          <Link className="exq-link-row" to="/chairs">
+            All chairs
+          </Link>
+        </SectionHead>
         <TodaysChairs staff={staff.status === 'ready' ? staff.data.staff : null} />
       </section>
 
-      <section
-        className="exq-wrap exq-section exq-home__services"
-        aria-labelledby="exq-home-services"
-      >
-        <p className="exq-label">Services</p>
-        <h2 id="exq-home-services">The menu</h2>
-        {services.status === 'ready' ? (
-          <ServiceRows services={services.data.services} limit={5} showDescription={false} />
-        ) : null}
-        <p className="exq-home__more">
-          <Link to="/services">Full menu</Link>
-        </p>
+      <section className="exq-band exq-dark exq-home__services" aria-labelledby="exq-home-services">
+        <div className="exq-wrap exq-section">
+          <SectionHead label="The menu" title="Services" id="exq-home-services" />
+          {services.status === 'ready' ? (
+            <ServiceRows services={services.data.services} limit={5} showDescription />
+          ) : null}
+          <p className="exq-home__more">
+            <Link className="exq-link-row" to="/services">
+              See all services
+            </Link>
+          </p>
+        </div>
       </section>
 
       {gallery.status === 'ready' && gallery.data.photos.length > 0 ? (
         <section className="exq-wrap exq-section exq-home__work" aria-labelledby="exq-home-work">
-          <p className="exq-label">Gallery</p>
-          <h2 id="exq-home-work">The work</h2>
+          <SectionHead label="The work" title="Fresh from the chairs" id="exq-home-work">
+            <Link className="exq-link-row" to="/gallery">
+              See the gallery
+            </Link>
+          </SectionHead>
           <PhotoGrid photos={gallery.data.photos} columns="work" />
-          <p className="exq-home__more">
-            <Link to="/gallery">See the gallery</Link>
-          </p>
         </section>
       ) : null}
 
       <section className="exq-wrap exq-section exq-home__visit" aria-labelledby="exq-home-visit">
-        <p className="exq-label">Visit</p>
-        <h2 id="exq-home-visit">Find us</h2>
-        {shop.status === 'ready' ? (
-          <div className="exq-visit__grid">
-            <HoursTable hours={shop.data.hours} />
+        <SectionHead label="Visit" title="Find us" id="exq-home-visit" />
+        {data ? (
+          <Reveal className="exq-visit__grid">
+            <HoursTable hours={data.hours} />
             <div className="exq-visit__where">
+              <Label quiet>Address</Label>
               <address className="exq-visit__address-text">
-                {shop.data.address.line1}
-                {shop.data.address.line2 ? <>, {shop.data.address.line2}</> : null}
+                {data.address.line1}
+                {data.address.line2 ? <>, {data.address.line2}</> : null}
                 <br />
-                {shop.data.address.city}, {shop.data.address.state} {shop.data.address.postalCode}
+                {data.address.city}, {data.address.state} {data.address.postalCode}
               </address>
               <p className="exq-visit__actions">
                 <ButtonAnchor
-                  href={directionsUrl(shop.data.address)}
+                  href={directionsUrl(data.address)}
                   variant="outline"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -135,26 +165,33 @@ export function HomePage() {
                   Directions
                 </ButtonAnchor>
                 <ButtonAnchor
-                  href={`tel:${shop.data.phone}`}
+                  href={`tel:${data.phone}`}
                   variant="outline"
-                  icon={<Phone aria-hidden="true" />}
+                  icon={<Phone01 aria-hidden="true" />}
                 >
-                  {formatUsPhone(shop.data.phone)}
+                  {formatUsPhone(data.phone)}
                 </ButtonAnchor>
               </p>
             </div>
-          </div>
-        ) : null}
+          </Reveal>
+        ) : (
+          <div className="exq-visit__grid exq-visit__grid--loading" aria-hidden="true" />
+        )}
       </section>
 
       <section className="exq-band exq-dark exq-home__cta" aria-labelledby="exq-home-cta">
-        <div className="exq-wrap exq-section">
-          <h2 id="exq-home-cta">Your chair is ready.</h2>
-          <p>
-            <ButtonLink to="/book" variant="onink" size="lg">
+        <div className="exq-wrap exq-section exq-cta">
+          <Lines
+            id="exq-home-cta"
+            mode="scroll"
+            className="exq-display"
+            lines={[{ text: 'Your chair' }, { text: 'is ready.', accent: true }]}
+          />
+          <Reveal as="p">
+            <ButtonLink to="/book" size="lg">
               Book a chair
             </ButtonLink>
-          </p>
+          </Reveal>
         </div>
       </section>
     </article>

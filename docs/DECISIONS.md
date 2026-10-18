@@ -558,3 +558,15 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D10-16 Header is sticky on every width (the strip scrolls away), because the phone bar carries only
   Call and Book and the menu must stay reachable. The announcement strip is 40px, not thinner, so its
   link is a real tap target.
+- D10-17 View transitions: the app uses the declarative BrowserRouter, whose `viewTransition` prop does
+  nothing (only data routers honor it). Rather than change the router, the kit `Link` and `NavLink`
+  take the click and run the navigation inside `document.startViewTransition` with `flushSync`. It is
+  skipped for modified clicks, new-tab links, reduced motion and browsers without the API, so there is
+  no fallback animation.
+- D10-18 Reveals hide an element only after measuring it (below the fold, motion ready) and do it
+  without a transition, so nothing fades out after first paint. A photo wipe clips the child, not the
+  element the observer watches, because an element clipped away entirely never counts as on screen.
+- D10-19 Home's right half stays empty on desktop when there is no hero photo. The text column keeps the
+  same width either way, so a photo arriving after the shop data does not move the text (CLS).
+- D10-20 The Menu on Home shows each service's description and duration (the mockup shows one line);
+  on Services the group name sits over a 2px rule, as in the mockup.

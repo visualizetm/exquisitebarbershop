@@ -62,7 +62,7 @@ test('the first visit sets the shop up by itself and Home loads fully', async ({
   const response = await page.goto('/');
   expect(response?.status()).toBe(200);
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible();
   const cards = page.locator(
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );
@@ -87,17 +87,13 @@ test('every public page renders with intentional placeholders and no console err
   const errors = watchConsole(page);
   await page.goto('/');
   await expectUp(page);
-  // No photos yet: the ink hero carries the white primary mark, and the work section is hidden.
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
-  await expect(page.locator('.exq-hero__logo')).toHaveAttribute(
-    'src',
-    '/brand/exq-primary-white.svg',
-  );
+  // No photos yet: the text hero stands alone, and the work section is hidden.
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expect(page.locator('.exq-home__work')).toHaveCount(0);
 
   await page.goto('/services');
   await expectUp(page);
-  await expect(page.locator('.exq-service__row').first()).toBeVisible();
+  await expect(page.locator('.exq-pricerow').first()).toBeVisible();
 
   await page.goto('/chairs');
   await expectUp(page);
@@ -117,7 +113,7 @@ test('every public page renders with intentional placeholders and no console err
 
   await page.goto('/visit');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Visit', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Find us', exact: true })).toBeVisible();
 
   await page.goto('/manage');
   await expectUp(page);
@@ -285,7 +281,7 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
   await page.goto('/gallery');
   await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();
   await page.goto('/');
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expectUp(page);
   expect(errors).toEqual([]);
 });

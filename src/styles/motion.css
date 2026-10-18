@@ -109,12 +109,20 @@
     opacity: 0;
     transform: translateY(16px);
   }
+  /* A photo wipes up from the bottom. The wrapper is what the observer watches; its child is what
+     is clipped (an element clipped away entirely would never count as on screen). */
   .motion-ready [data-reveal-kind='wipe'][data-reveal='hidden'] {
     opacity: 1;
     transform: none;
+  }
+  .motion-ready [data-reveal-kind='wipe'] > * {
+    transition: clip-path var(--d-slow) var(--ease-out);
+    transition-delay: calc(var(--reveal-i, 0) * var(--stagger));
+  }
+  .motion-ready [data-reveal-kind='wipe'][data-reveal='hidden'] > * {
     clip-path: inset(100% 0 0 0);
   }
-  .motion-ready [data-reveal-kind='wipe'][data-reveal='shown'] {
+  .motion-ready [data-reveal-kind='wipe'][data-reveal='shown'] > * {
     clip-path: inset(0 0 0 0);
   }
 

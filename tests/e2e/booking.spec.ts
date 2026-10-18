@@ -109,7 +109,12 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
       ],
       staff: 'dee',
       startAt,
-      customer: { name: 'Faster Customer', phone: '2155550199', email: null },
+      customer: {
+        name: 'Faster Customer',
+        // A fresh number each run: one phone may hold only a few open bookings.
+        phone: `215555${String(Math.floor(Math.random() * 9000) + 1000)}`,
+        email: null,
+      },
     },
   });
   expect(taken.status(), await taken.text()).toBe(201);

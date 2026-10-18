@@ -1,7 +1,7 @@
-import Phone from '@untitled-ui/icons-react/build/esm/Phone';
+import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import { formatUsPhone } from '@shared/lib/phone';
 import { HoursTable } from '@/components/site/HoursTable';
-import { ButtonAnchor, ErrorState } from '@/components/ui';
+import { ButtonAnchor, ErrorState, Reveal, SectionHead } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
@@ -18,21 +18,24 @@ export function VisitPage() {
   });
   return (
     <article className="exq-visit exq-wrap exq-section" data-state={result.status}>
-      <p className="exq-label">Visit</p>
-      <h1 className="exq-visit__title">Visit</h1>
+      <SectionHead label="Visit" title="Find us" level={1} />
       {result.status === 'loading' ? <Status state="loading" /> : null}
       {result.status === 'error' ? (
         <ErrorState>We could not load the shop details.</ErrorState>
       ) : null}
       {result.status === 'ready' ? (
         <div className="exq-visit__grid">
-          <section className="exq-visit__hours" aria-labelledby="exq-visit-hours">
-            <h2 id="exq-visit-hours">Hours</h2>
+          <Reveal as="section" className="exq-visit__hours" aria-labelledby="exq-visit-hours">
+            <h2 id="exq-visit-hours" className="exq-visit__heading">
+              Hours
+            </h2>
             <HoursTable hours={result.data.hours} />
-          </section>
+          </Reveal>
           <div className="exq-visit__where">
-            <section className="exq-visit__address" aria-labelledby="exq-visit-address">
-              <h2 id="exq-visit-address">Address</h2>
+            <Reveal as="section" className="exq-visit__address" aria-labelledby="exq-visit-address">
+              <h2 id="exq-visit-address" className="exq-visit__heading">
+                Address
+              </h2>
               <address className="exq-visit__address-text">
                 {result.data.address.line1}
                 {result.data.address.line2 ? <>, {result.data.address.line2}</> : null}
@@ -51,14 +54,16 @@ export function VisitPage() {
                 <ButtonAnchor
                   href={`tel:${result.data.phone}`}
                   variant="outline"
-                  icon={<Phone aria-hidden="true" />}
+                  icon={<Phone01 aria-hidden="true" />}
                 >
                   Call
                 </ButtonAnchor>
               </p>
-            </section>
-            <section className="exq-visit__contact" aria-labelledby="exq-visit-contact">
-              <h2 id="exq-visit-contact">Contact</h2>
+            </Reveal>
+            <Reveal as="section" className="exq-visit__contact" aria-labelledby="exq-visit-contact">
+              <h2 id="exq-visit-contact" className="exq-visit__heading">
+                Contact
+              </h2>
               <p>
                 <a href={`tel:${result.data.phone}`}>{formatUsPhone(result.data.phone)}</a>
               </p>
@@ -74,16 +79,22 @@ export function VisitPage() {
                   @{result.data.instagramHandle}
                 </a>
               </p>
-            </section>
-            <section className="exq-visit__policies" aria-labelledby="exq-visit-policies">
-              <h2 id="exq-visit-policies">Policies</h2>
+            </Reveal>
+            <Reveal
+              as="section"
+              className="exq-visit__policies"
+              aria-labelledby="exq-visit-policies"
+            >
+              <h2 id="exq-visit-policies" className="exq-visit__heading">
+                Walk ins and changes
+              </h2>
               <ul className="exq-visit__policy-list">
                 <li>Walk ins welcome when a chair is free.</li>
                 <li>Cancel or move your booking up to 2 hours before.</li>
               </ul>
-              <h3>Parking</h3>
+              <h3 className="exq-visit__subheading">Parking</h3>
               <p data-state="placeholder">Parking details coming soon.</p>
-            </section>
+            </Reveal>
           </div>
         </div>
       ) : null}
