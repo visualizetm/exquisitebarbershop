@@ -68,10 +68,9 @@ function toHtml(markdown: string): string {
 }
 
 async function main(): Promise<void> {
-  const fonts = resolve('node_modules', '@fontsource', 'jost', 'files');
+  const fonts = resolve('node_modules', '@fontsource-variable', 'jost', 'files');
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Jost;font-weight:400;src:url(${dataUri(`${fonts}/jost-latin-400-normal.woff2`)}) format('woff2')}
-@font-face{font-family:Jost;font-weight:700;src:url(${dataUri(`${fonts}/jost-latin-700-normal.woff2`)}) format('woff2')}
+@font-face{font-family:Jost;font-weight:100 900;src:url(${dataUri(`${fonts}/jost-latin-wght-normal.woff2`)}) format('woff2')}
 body{font-family:Jost,sans-serif;font-size:12pt;line-height:1.5;color:#111;margin:0;padding:0 8mm}
 h1{font-size:24pt;text-transform:uppercase;letter-spacing:-0.01em;margin:0 0 12pt}
 h2{font-size:16pt;text-transform:uppercase;margin:24pt 0 8pt;page-break-after:avoid}

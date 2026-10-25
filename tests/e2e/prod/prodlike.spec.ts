@@ -49,7 +49,7 @@ test('with DEMO_MODE off nothing of the showcase exists and nothing seeds itself
   expect(await (await page.request.get('/robots.txt')).text()).not.toMatch(/^Disallow: \/$/m);
 
   // The down screen names the error code, and nothing else, in a Details disclosure.
-  await page.goto('/');
+  await page.goto('/book');
   const down = page.locator('.exq-site-down[data-state="down"]');
   await expect(down).toBeVisible();
   await down.locator('summary').click();
@@ -67,7 +67,7 @@ test('a missing MONGODB_URI shows the down message and the health check names it
   expect(body.missing).toEqual(['MONGODB_URI']);
   expect(JSON.stringify(body)).not.toContain('mongodb://');
 
-  await page.goto(`${BROKEN}/`);
+  await page.goto(`${BROKEN}/book`);
   const down = page.locator('.exq-site-down[data-state="down"]');
   await expect(down).toBeVisible();
   await expect(down.locator('.exq-state__title')).toHaveText('Online booking is having a moment');
@@ -128,9 +128,9 @@ test('every public page loads fully with placeholders and no console errors', as
 
   await page.goto('/');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible();
   // The ink hero and the initials placeholders stand in for photos; nothing looks unfinished.
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expect(page.locator('.exq-home__work')).toHaveCount(0);
   await expect(page.locator('.exq-nav__logo-wide .exq-mark--light')).toBeVisible();
   await expect(page.locator('.exq-nav__logo-narrow .exq-mark--light')).toBeHidden();
@@ -140,11 +140,11 @@ test('every public page loads fully with placeholders and no console errors', as
   await page.goto('/services');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Services', exact: true })).toBeVisible();
-  await expect(page.locator('.exq-service__row').first()).toBeVisible();
+  await expect(page.locator('.exq-pricerow').first()).toBeVisible();
 
   await page.goto('/chairs');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'The chairs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pick your chair' })).toBeVisible();
   const cards = page.locator('.exq-chaircard[data-state]:not([data-state="loading"])');
   await expect(cards.first()).toBeVisible();
   expect(await cards.count()).toBeGreaterThanOrEqual(6);
@@ -152,7 +152,7 @@ test('every public page loads fully with placeholders and no console errors', as
   await page.goto('/chairs/marcus');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
-  await expect(page.locator('.exq-chair .exq-arch[data-state="placeholder"]')).toBeVisible();
+  await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await expect(page.locator('.exq-chair__work')).toHaveCount(0);
 
   await page.goto('/gallery');
@@ -163,7 +163,7 @@ test('every public page loads fully with placeholders and no console errors', as
 
   await page.goto('/visit');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Visit', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Find us', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Call/ })).toBeVisible();
 
   await page.goto('/manage');
@@ -226,15 +226,16 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await page.getByLabel('Email').fill(PRODLIKE_OWNER.email);
   await page.getByLabel('Password').fill(PRODLIKE_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
-  await expect(page.locator('.exq-adm-nav__logo.exq-mark--light')).toHaveAttribute(
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  // The sidebar is ink in both themes, so it carries the white mark.
+  await expect(page.locator('.exq-sidebar .exq-mark--dark')).toHaveAttribute(
     'src',
-    '/brand/exq-stacked-black.svg',
+    '/brand/exq-stacked-white.svg',
   );
 
-  await page.goto('/admin/photos');
-  await expect(page.getByRole('heading', { name: 'Photos' })).toBeVisible();
-  const empty = page.locator('.exq-adm-photos-page[data-state="disabled"] .exq-state');
+  await page.goto('/admin/website?tab=gallery');
+  await expect(page.getByRole('heading', { name: 'Website' })).toBeVisible();
+  const empty = page.locator('.exq-tabs__panel .exq-state[data-state="empty"]');
   await expect(empty).toContainText("Photo storage isn't set up yet.");
   await expect(empty).toContainText("Photos can be added once it's connected.");
   await expect(page.getByRole('button', { name: 'Upload photo' })).toHaveCount(0);
@@ -252,6 +253,14 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
 
   // Signing in left no 401 behind, and the day loaded.
   await page.goto('/admin');
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('the kit page is not in the production build', async ({ page }) => {
+  await page.goto('/kit');
+  await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+  const index = await (await page.request.get('/')).text();
+  const assets = [...index.matchAll(/\/assets\/[\w.-]+\.js/g)].map((m) => m[0]);
+  for (const asset of assets) expect(asset).not.toMatch(/Kit/i);
 });

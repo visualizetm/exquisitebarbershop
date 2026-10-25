@@ -17,3 +17,8 @@ export * as scheduleGuardsRepo from './scheduleGuardsRepo';
 export * as photosRepo from './photosRepo';
 export * as pendingUploadsRepo from './pendingUploadsRepo';
 export * as systemStateRepo from './systemStateRepo';
+export * as alertsRepo from './alertsRepo';
+export * as customerNotesRepo from './customerNotesRepo';
+export * as staffPinsRepo from './staffPinsRepo';
+export * as setupTokensRepo from './setupTokensRepo';
+export * as teamSessionsRepo from './teamSessionsRepo';

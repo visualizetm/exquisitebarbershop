@@ -1,9 +1,14 @@
+import Check from '@untitled-ui/icons-react/build/esm/Check';
+
 export interface Step<K extends string> {
   key: K;
   label: string;
 }
 
-/** Progress across a flow. Done steps are buttons that go back; later steps are inert. */
+/**
+ * Progress across a flow: "1 SERVICE, 2 BARBER, ...". Done parts are red and go back when
+ * pressed, the current part is ink, later parts are gray and inert.
+ */
 export function StepBar<K extends string>({
   steps,
   current,
@@ -29,7 +34,13 @@ export function StepBar<K extends string>({
             >
               <span className="exq-stepbar__bar" aria-hidden="true" />
               <span className="exq-stepbar__label">
-                <span className="exq-visually-hidden">Step {i + 1}: </span>
+                <span className="exq-stepbar__n" aria-hidden="true">
+                  {state === 'done' ? <Check /> : i + 1}
+                </span>
+                <span className="exq-visually-hidden">
+                  Step {i + 1}
+                  {state === 'done' ? ' (done)' : ''}:{' '}
+                </span>
                 {step.label}
               </span>
             </button>

@@ -1,5 +1,9 @@
 import { useState } from 'react';
+import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
+import Copy01 from '@untitled-ui/icons-react/build/esm/Copy01';
+import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import {
+  BarChart,
   Button,
   ButtonLink,
   Card,
@@ -9,112 +13,221 @@ import {
   Chips,
   EmptyState,
   ErrorState,
+  DataTable,
+  Footer,
+  Header,
+  IconButton,
   Input,
-  PhotoArch,
+  Label,
+  Lightbox,
+  Lines,
+  Modal,
+  OptionCard,
+  PhotoFrame,
+  PinPad,
+  PriceRow,
+  Reveal,
+  SearchBox,
+  SectionHead,
   Select,
   Sheet,
+  StatTile,
   StepBar,
+  Tabs,
   Textarea,
   Ticket,
   TimeChip,
+  TopStrip,
   useToast,
+  type LightboxPhoto,
 } from '@/components/ui';
+import { BarView } from '@/components/ui/BottomBar';
 import { usePageTitle } from '@/lib/usePageTitle';
+import '@/styles/dashboard.css';
 
 const STEPS = [
-  { key: 'services', label: 'Services' },
-  { key: 'barber', label: 'Chair' },
-  { key: 'day', label: 'Day' },
+  { key: 'service', label: 'Service' },
+  { key: 'barber', label: 'Barber' },
   { key: 'time', label: 'Time' },
   { key: 'details', label: 'Details' },
 ] as const;
 
-/** Every kit component in every state, on one page. Development builds only. */
-export default function KitPage() {
-  usePageTitle('Kit');
+/** A flat sample image so the loaded state can be seen without a real upload. */
+function sample(label: string, w: number, h: number): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${String(w)}" height="${String(h)}"><rect width="100%" height="100%" fill="#555"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="${String(Math.round(w / 8))}" text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+const PHOTO = { url: sample('4:5', 400, 500), width: 400, height: 500, alt: 'Sample portrait' };
+const LIGHTBOX: LightboxPhoto[] = [1, 2, 3].map((n) => ({
+  id: String(n),
+  url: sample(`Photo ${String(n)}`, 800, 600),
+  width: 800,
+  height: 600,
+  alt: `Sample photo ${String(n)}`,
+  barber: { name: 'Marcus', slug: 'marcus' },
+}));
+
+/** Every component in every state, for one theme. */
+function Specimen() {
+  const [tab, setTab] = useState('a');
   const toast = useToast();
   const [sheet, setSheet] = useState(false);
+  const [modal, setModal] = useState(false);
+  const [box, setBox] = useState<number | null>(null);
   const [chip, setChip] = useState('all');
-  const [time, setTime] = useState('10:00');
-  return (
-    <article className="exq-wrap exq-section exq-kit" data-state="ready">
-      <p className="exq-label">Kit</p>
-      <h1>Components</h1>
+  const [time, setTime] = useState('10:00 AM');
+  const [picked, setPicked] = useState<string[]>(['cut']);
+  const [chair, setChair] = useState('marcus');
+  const [step, setStep] = useState<(typeof STEPS)[number]['key']>('barber');
 
-      <section className="exq-section">
-        <h2>Buttons</h2>
-        <div className="exq-chips" style={{ marginTop: 16 }}>
-          <Button>Primary</Button>
-          <Button variant="secondary">Secondary</Button>
-          <Button pressed>Pressed</Button>
-          <Button disabled>Disabled</Button>
-          <Button loading>Loading</Button>
-          <ButtonLink to="/book" size="lg">
-            Large link
-          </ButtonLink>
-          <Button size="sm" variant="secondary">
-            Small
-          </Button>
+  return (
+    <div className="exq-kit__specimen">
+      <section className="exq-kit__block" aria-label="Frame">
+        <h2>Frame</h2>
+        <div className="exq-kit__frame">
+          <TopStrip
+            announcement={{
+              enabled: true,
+              text: 'Walk ins welcome',
+              linkLabel: 'Book online',
+              linkUrl: '/book',
+              endsOn: '',
+            }}
+            loading={false}
+          />
+          <Header phone="+16105550100" />
         </div>
-        <div className="exq-dark exq-band" style={{ padding: 16, marginTop: 16, borderRadius: 16 }}>
-          <Button variant="inverse">Ink inverse</Button>
+        <div className="exq-kit__frame" data-label="Bottom bar, default">
+          <BarView
+            state="shown"
+            style={{ position: 'static' }}
+            config={{
+              left: { label: 'Call', href: 'tel:+16105550100', tone: 'ink' },
+              right: { label: 'Book now', to: '/book', tone: 'paper' },
+            }}
+          />
+        </div>
+        <div className="exq-kit__frame" data-label="Bottom bar, booking">
+          <BarView
+            state="shown"
+            style={{ position: 'static' }}
+            config={{
+              mode: 'booking',
+              summary: (
+                <>
+                  <span>From $75</span>
+                  <span>45 min with Marcus</span>
+                </>
+              ),
+              left: { label: 'Back', onClick: () => undefined, tone: 'ink' },
+              right: { label: 'Continue', onClick: () => undefined, tone: 'paper' },
+            }}
+          />
+        </div>
+        <div className="exq-kit__frame" data-label="Bottom bar, last step and disabled">
+          <BarView
+            state="shown"
+            style={{ position: 'static' }}
+            config={{
+              left: { label: 'Back', onClick: () => undefined, tone: 'ink' },
+              right: { label: 'Confirm booking', onClick: () => undefined, tone: 'red' },
+            }}
+          />
+          <BarView
+            state="shown"
+            style={{ position: 'static' }}
+            config={{
+              left: { label: 'Back', onClick: () => undefined, tone: 'ink' },
+              right: { label: 'Continue', disabled: true, tone: 'paper' },
+            }}
+          />
+        </div>
+        <Footer shop={null} />
+      </section>
+
+      <section className="exq-kit__block" aria-label="Buttons">
+        <h2>Buttons</h2>
+        {(['primary', 'accent', 'outline', 'ghost', 'onink'] as const).map((variant) => (
+          <div
+            key={variant}
+            className={`exq-kit__row${variant === 'onink' ? ' exq-dark exq-kit__ink' : ''}`}
+          >
+            <Button variant={variant}>{variant}</Button>
+            <Button variant={variant} pressed>
+              Pressed
+            </Button>
+            <Button variant={variant} disabled>
+              Disabled
+            </Button>
+            <Button variant={variant} loading>
+              Loading
+            </Button>
+            <Button variant={variant} size="sm" icon={<Phone01 aria-hidden="true" />}>
+              Small
+            </Button>
+          </div>
+        ))}
+        <div className="exq-kit__row">
+          <ButtonLink to="/book" size="lg">
+            Book a chair
+          </ButtonLink>
+          <ButtonLink to="/services" variant="outline" size="lg">
+            See services
+          </ButtonLink>
         </div>
       </section>
 
-      <section className="exq-section">
+      <section className="exq-kit__block" aria-label="Fields">
         <h2>Fields</h2>
-        <div className="exq-grid" data-md="2" style={{ marginTop: 16 }}>
-          <Input label="Name" placeholder="Your name" autoComplete="name" />
+        <div className="exq-grid" data-md="2">
+          <Input label="Default" placeholder="Your name" autoComplete="name" />
           <Input
-            label="Phone"
+            label="Error"
             type="tel"
             error="Enter a valid US phone number"
             defaultValue="123"
           />
-          <Input label="Email" type="email" warning="We could not verify this address" />
-          <Select label="Chair" hint="First available picks the least booked chair">
+          <Input
+            label="Warning"
+            type="email"
+            warning="This address looks unusual"
+            defaultValue="x@y"
+          />
+          <Input label="Disabled" disabled defaultValue="Locked" />
+          <Select label="Select" hint="First available picks the least booked chair">
             <option>First available</option>
             <option>Marcus</option>
           </Select>
-          <Textarea label="Notes" placeholder="Anything we should know?" />
+          <Textarea label="Textarea" placeholder="Anything we should know?" />
         </div>
       </section>
 
-      <section className="exq-section">
+      <section className="exq-kit__block" aria-label="Chips">
         <h2>Chips</h2>
         <Chips label="Groups">
-          <Chip
-            selected={chip === 'all'}
-            count={13}
-            onClick={() => {
-              setChip('all');
-            }}
-          >
-            All
-          </Chip>
-          <Chip
-            selected={chip === 'barber'}
-            count={8}
-            onClick={() => {
-              setChip('barber');
-            }}
-          >
-            Barber
-          </Chip>
-          <Chip
-            selected={chip === 'beauty'}
-            count={5}
-            onClick={() => {
-              setChip('beauty');
-            }}
-          >
-            Beauty
-          </Chip>
+          {(
+            [
+              ['all', 'All', 13],
+              ['barber', 'Barber', 8],
+              ['beauty', 'Beauty', 5],
+            ] as const
+          ).map(([key, text, count]) => (
+            <Chip
+              key={key}
+              selected={chip === key}
+              count={count}
+              onClick={() => {
+                setChip(key);
+              }}
+            >
+              {text}
+            </Chip>
+          ))}
           <Chip disabled count={0}>
             Nails
           </Chip>
         </Chips>
-        <h3 style={{ marginTop: 24 }}>Time chips</h3>
+        <h3>Time chips</h3>
         <Chips label="Times">
           {['9:00 AM', '9:30 AM', '10:00 AM'].map((t) => (
             <TimeChip
@@ -130,141 +243,390 @@ export default function KitPage() {
         </Chips>
       </section>
 
-      <section className="exq-section">
-        <h2>Steps</h2>
-        <StepBar steps={STEPS} current="day" onJump={() => undefined} />
+      <section className="exq-kit__block" aria-label="Cards">
+        <h2>Cards</h2>
+        <div className="exq-grid" data-md="2">
+          <Card>A static card.</Card>
+          <Card interactive>An interactive card lifts on hover.</Card>
+        </div>
+        <h3>Option cards</h3>
+        <div className="exq-grid" data-md="2">
+          {[
+            { id: 'cut', name: 'Classic Cut', desc: 'Clipper or scissor cut.', price: '$30' },
+            { id: 'fade', name: 'Skin Fade', desc: 'Down to the skin.', price: '$35' },
+          ].map((o) => (
+            <OptionCard
+              key={o.id}
+              selected={picked.includes(o.id)}
+              title={o.name}
+              description={o.desc}
+              meta={<span className="exq-price">{o.price}</span>}
+              onChange={() => {
+                setPicked((p) => (p.includes(o.id) ? p.filter((x) => x !== o.id) : [...p, o.id]));
+              }}
+            />
+          ))}
+          <OptionCard
+            selected={false}
+            disabled
+            title="Hot Towel Shave"
+            description="Unavailable today."
+            meta={<span className="exq-price">$40</span>}
+          />
+        </div>
       </section>
 
-      <section className="exq-section">
-        <h2>Chair cards</h2>
-        <div className="exq-grid" data-cols="2" data-lg="4" style={{ marginTop: 16 }}>
+      <section className="exq-kit__block" aria-label="Type and rows">
+        <h2>Type and rows</h2>
+        <Label>The menu</Label>
+        <SectionHead label="The crew" title="Pick your chair" />
+        <p className="exq-display">Display</p>
+        <p className="exq-price">$35</p>
+        <div className="exq-kit__ink exq-dark">
+          <PriceRow
+            name="Classic Cut"
+            description="Clipper or scissor cut with a clean lineup."
+            price="$30"
+            to="/book"
+          />
+          <PriceRow name="Skin Fade" description="Down to the skin, blended." price="From $35" />
+        </div>
+      </section>
+
+      <section className="exq-kit__block" aria-label="Photos and chairs">
+        <h2>Photos and chairs</h2>
+        <div className="exq-grid" data-cols="2" data-md="3">
+          <PhotoFrame photo={PHOTO} name="Sample" />
+          <PhotoFrame
+            photo={{ ...PHOTO, url: sample('1:1', 400, 400) }}
+            name="Sample"
+            ratio="1:1"
+          />
+          <PhotoFrame photo={null} name="Placeholder" ratio="1:1" />
+        </div>
+        <PhotoFrame photo={null} name="Wide placeholder" ratio="16:9" />
+        <h3>Chair cards</h3>
+        <div className="exq-grid" data-cols="2" data-md="3" data-lg="4">
           <ChairCard
-            name="Marcus Reed"
-            specialty="Fades and designs"
-            chairNumber={2}
-            photo={null}
+            name="Marcus"
+            specialty="Fades and tapers"
+            chairNumber={1}
+            photo={PHOTO}
             status="next-open"
             statusLabel="Next open 2:15 PM"
-            to="/book?barber=marcus"
           />
           <ChairCard
-            name="Dee Carter"
-            specialty="Silk press and braids"
-            chairNumber={3}
+            name="Dee"
+            specialty="Braids"
+            chairNumber={2}
+            photo={null}
+            status="in"
+            statusLabel="In today"
+          />
+          <ChairCard
+            name="Tre"
+            specialty="Color"
+            chairNumber={4}
             photo={null}
             status="off"
             statusLabel="Off today"
-            to="/book?barber=dee"
           />
           <ChairCard
-            name="Tre Lewis"
-            chairNumber={4}
+            name="Jay"
+            specialty="Cuts"
+            chairNumber={5}
             photo={null}
-            status="closed"
-            statusLabel="Closed today"
+            selected={chair === 'jay'}
+            onSelect={() => {
+              setChair(chair === 'jay' ? 'marcus' : 'jay');
+            }}
           />
           <ChairCardSkeleton />
         </div>
-        <div style={{ maxWidth: 200, marginTop: 16 }}>
-          <PhotoArch photo={null} name="Jay Q" tone="ink" />
-        </div>
       </section>
 
-      <section className="exq-section">
-        <h2>Card, states, sheet, toast</h2>
-        <div className="exq-grid" data-md="2" style={{ marginTop: 16 }}>
-          <Card>
-            <h3>A card</h3>
-            <p className="exq-muted">Bordered, soft shadow in light, none in dark.</p>
-          </Card>
-          <Card interactive>
-            <h3>Interactive</h3>
-            <p className="exq-muted">Brightens on hover, never moves.</p>
-          </Card>
-          <EmptyState
-            title="No photos yet"
-            action={<ButtonLink to="/gallery">See the gallery</ButtonLink>}
-          >
-            Follow the shop on Instagram for the latest work.
-          </EmptyState>
-          <ErrorState action={<Button variant="secondary">Try again</Button>}>
-            We could not load the schedule.
-          </ErrorState>
-        </div>
-        <div className="exq-chips" style={{ marginTop: 16 }}>
+      <section className="exq-kit__block" aria-label="Progress and ticket">
+        <h2>Progress and ticket</h2>
+        <StepBar steps={STEPS} current={step} onJump={setStep} />
+        <p>
           <Button
-            variant="secondary"
+            variant="outline"
+            size="sm"
             onClick={() => {
-              setSheet(true);
+              setStep('details');
             }}
           >
-            Open a sheet
+            Go to details
+          </Button>
+        </p>
+        <Ticket
+          code="K7M-4QX2"
+          heading="You are booked"
+          rows={[
+            { label: 'Chair', value: 'Marcus' },
+            { label: 'When', value: 'Thu, Oct 22, 2:15 PM' },
+            { label: 'Services', value: 'Classic Cut' },
+          ]}
+          total="$30"
+          actions={<Button variant="outline">Manage this booking</Button>}
+        />
+      </section>
+
+      <section className="exq-kit__block" aria-label="Feedback">
+        <h2>Feedback</h2>
+        <div className="exq-kit__row">
+          <Button
+            variant="outline"
+            onClick={() => {
+              toast({ text: 'Saved.', tone: 'ok' });
+            }}
+          >
+            Toast ok
           </Button>
           <Button
-            variant="secondary"
+            variant="outline"
+            onClick={() => {
+              toast({ text: 'That time was just taken.', tone: 'warn' });
+            }}
+          >
+            Toast warn
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => {
               toast({
-                text: 'Marked completed.',
-                tone: 'ok',
+                text: 'Booking marked done.',
                 action: { label: 'Undo', onClick: () => undefined },
               });
             }}
           >
-            Show a toast
+            Toast undo
+          </Button>
+        </div>
+        <EmptyState
+          title="Photos are coming soon"
+          action={<Button variant="outline">Follow on Instagram</Button>}
+        >
+          Nothing here yet.
+        </EmptyState>
+        <ErrorState action={<Button variant="outline">Try again</Button>}>
+          We could not load that.
+        </ErrorState>
+      </section>
+
+      <section className="exq-kit__block" aria-label="Overlays">
+        <h2>Overlays</h2>
+        <div className="exq-kit__row">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSheet(true);
+            }}
+          >
+            Open sheet
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setModal(true);
+            }}
+          >
+            Open modal
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setBox(0);
+            }}
+          >
+            Open lightbox
           </Button>
         </div>
         <Sheet
           open={sheet}
-          title="Cancel this booking?"
+          title="Cancel this appointment?"
           onClose={() => {
             setSheet(false);
           }}
         >
           <p>You can book again any time.</p>
-          <div className="exq-chips" style={{ marginTop: 16 }}>
-            <Button
-              onClick={() => {
-                setSheet(false);
-              }}
-            >
-              Yes, cancel it
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setSheet(false);
-              }}
-            >
-              Keep it
-            </Button>
-          </div>
+          <Button
+            variant="accent"
+            onClick={() => {
+              setSheet(false);
+            }}
+          >
+            Yes, cancel it
+          </Button>
         </Sheet>
+        <Modal
+          open={modal}
+          title="Reset demo data?"
+          onClose={() => {
+            setModal(false);
+          }}
+        >
+          <p>This puts the sample data back.</p>
+        </Modal>
+        <Lightbox
+          photos={LIGHTBOX}
+          index={box}
+          onClose={() => {
+            setBox(null);
+          }}
+          onIndex={setBox}
+        />
       </section>
 
-      <section className="exq-section">
-        <h2>Ticket</h2>
-        <div style={{ maxWidth: 480, marginTop: 16 }}>
-          <Ticket
-            code="KZT-7MQ4"
-            rows={[
-              { label: 'Chair', value: 'Chair 02, Marcus Reed' },
-              { label: 'When', value: 'Thu, Oct 23, 2:15 PM' },
-              { label: 'Services', value: 'Classic Cut' },
+      <section className="exq-kit__block" aria-label="Dashboard">
+        <h2>Dashboard</h2>
+        <div className="exq-dash-grid" data-cols="4">
+          <StatTile
+            icon={<Calendar aria-hidden="true" />}
+            label="Bookings today"
+            value={12}
+            compare="vs last Tuesday: 9"
+          />
+          <StatTile
+            icon={<Calendar aria-hidden="true" />}
+            label="Booked value today"
+            value="$480"
+          />
+          <StatTile
+            icon={<Calendar aria-hidden="true" />}
+            label="Walk-ins today"
+            value={0}
+            loading
+          />
+        </div>
+        <div className="exq-panel">
+          <BarChart
+            title="Bookings this week"
+            nameA="This week"
+            nameB="Last week"
+            groups={[
+              { label: 'Mon', a: 6, b: 4 },
+              { label: 'Tue', a: 9, b: 7, current: true },
+              { label: 'Wed', a: 3, b: 8 },
+              { label: 'Thu', a: 0, b: 5 },
+              { label: 'Fri', a: 0, b: 11 },
+              { label: 'Sat', a: 0, b: 14 },
+              { label: 'Sun', a: 0, b: 0 },
             ]}
-            total="$30"
-            actions={
-              <>
-                <Button variant="secondary" size="sm">
-                  Add to calendar
-                </Button>
-                <Button variant="secondary" size="sm">
-                  Manage this booking
-                </Button>
-              </>
-            }
+          />
+        </div>
+        <Tabs
+          label="Kit tabs"
+          tabs={[
+            { id: 'a', label: 'Profile' },
+            { id: 'b', label: 'Hours', count: 2 },
+          ]}
+          value={tab}
+          onChange={setTab}
+        >
+          <p>Panel {tab}</p>
+        </Tabs>
+        <div className="exq-panel" data-flush="true">
+          <DataTable
+            caption="Sample bookings"
+            state="ready"
+            rows={[
+              { id: '1', when: 'Today 10:00 AM', who: 'Sam Rivera' },
+              { id: '2', when: 'Today 11:00 AM', who: 'Lee Park' },
+            ]}
+            rowKey={(r) => r.id}
+            columns={[
+              { key: 'when', header: 'When', sortable: true, render: (r) => r.when },
+              { key: 'who', header: 'Client', primary: true, render: (r) => r.who },
+            ]}
+            sort={{ key: 'when', dir: 'asc' }}
+            onSort={() => undefined}
+            onOpen={() => undefined}
+            empty="Nothing here"
+          />
+        </div>
+        <div className="exq-panel" data-flush="true">
+          <DataTable
+            caption="Loading sample"
+            state="loading"
+            rows={[]}
+            rowKey={() => ''}
+            columns={[
+              { key: 'a', header: 'When', render: () => null },
+              { key: 'b', header: 'Client', render: () => null },
+            ]}
+            empty="Nothing here"
+          />
+        </div>
+        <SearchBox
+          label="Kit search"
+          placeholder="Search name, phone or code"
+          status="idle"
+          groups={[
+            {
+              label: 'Customers',
+              items: [
+                {
+                  key: 'x',
+                  text: 'Sam Rivera',
+                  title: 'Sam Rivera',
+                  detail: '(215) 555-0142, 3 visits',
+                },
+              ],
+            },
+          ]}
+          onQuery={() => undefined}
+          onChoose={() => undefined}
+        />
+        <p>
+          <span className="exq-status-chip" data-tone="ok">
+            Done
+          </span>{' '}
+          <span className="exq-status-chip" data-tone="accent">
+            No show
+          </span>{' '}
+          <span className="exq-status-chip">Confirmed</span>{' '}
+          <IconButton label="Copy manage link" icon={<Copy01 aria-hidden="true" />} />
+        </p>
+        <PinPad label="Enter your PIN" onComplete={() => undefined} />
+      </section>
+
+      <section className="exq-kit__block" aria-label="Motion">
+        <h2>Motion</h2>
+        <Reveal className="exq-card" data-pad="md">
+          This card reveals once when it scrolls into view.
+        </Reveal>
+        <div className="exq-dark exq-kit__ink">
+          <Lines
+            mode="scroll"
+            lines={[{ text: 'Your chair' }, { text: 'is ready.', accent: true }]}
           />
         </div>
       </section>
+    </div>
+  );
+}
+
+/** Every kit component in every state, in both themes. Development builds only. */
+export default function KitPage() {
+  usePageTitle('Kit');
+  return (
+    <article className="exq-kit" data-state="ready">
+      <div className="exq-wrap exq-kit__intro">
+        <Label>Kit</Label>
+        <h1>Components</h1>
+        <p className="exq-muted">
+          Light on the left, dark on the right (stacked on a phone). Development builds only.
+        </p>
+      </div>
+      <div className="exq-kit__panels">
+        <div data-theme="light" className="exq-kit__panel" aria-label="Light theme">
+          <Specimen />
+        </div>
+        <div data-theme="dark" className="exq-kit__panel" aria-label="Dark theme">
+          <Specimen />
+        </div>
+      </div>
     </article>
   );
 }

@@ -7,7 +7,7 @@ import { chromium } from '@playwright/test';
  * Outputs land in public/ and are committed, so the build never needs a browser.
  */
 const INK = '#111111';
-const fonts = `${process.cwd()}/node_modules/@fontsource/jost/files`;
+const fonts = `${process.cwd()}/node_modules/@fontsource-variable/jost/files`;
 const primaryWhite = readFileSync('public/brand/exq-primary-white.svg', 'utf8');
 const qBlack = readFileSync('public/brand/exq-q-icon-black.svg', 'utf8');
 const qWhite = readFileSync('public/brand/exq-q-icon-white.svg', 'utf8');
@@ -55,7 +55,7 @@ async function main() {
     1200,
     630,
     `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Jost;font-weight:500;src:url(file://${fonts}/jost-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:Jost;font-weight:100 900;src:url(file://${fonts}/jost-latin-wght-normal.woff2) format('woff2')}
 html,body{margin:0;width:1200px;height:630px;background:${INK};overflow:hidden}
 .wrap{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:40px;height:630px;padding:0 96px;box-sizing:border-box;font-family:Jost,sans-serif;color:#fff}
 .logo{width:680px}

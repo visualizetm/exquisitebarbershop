@@ -5,6 +5,8 @@ import {
   bookingDetailResponseSchema,
   bookingListQuerySchema,
   bookingListResponseSchema,
+  bookingTableQuerySchema,
+  bookingTableResponseSchema,
   bookingNotesRequestSchema,
   bookingResponseSchema,
   closureListQuerySchema,
@@ -12,6 +14,9 @@ import {
   closureResponseSchema,
   closureUpsertRequestSchema,
   conflictOnlyResponseSchema,
+  customerListQuerySchema,
+  customerListResponseSchema,
+  customerNotesRequestSchema,
   customerQuerySchema,
   customerResponseSchema,
   dateQuerySchema,
@@ -19,18 +24,18 @@ import {
   dayStatusResponseSchema,
   hoursRequestSchema,
   hoursResponseSchema,
-  issuedPasswordResponseSchema,
-  loginCreateRequestSchema,
-  loginListResponseSchema,
-  loginResponseSchema,
   manualBookingRequestSchema,
   manualBookingResponseSchema,
   outboxListQuerySchema,
   outboxListResponseSchema,
+  overviewResponseSchema,
   ownerCancelRequestSchema,
   ownerRescheduleRequestSchema,
   resolutionsBodySchema,
   scheduleQuerySchema,
+  scheduleWeekResponseSchema,
+  searchQuerySchema,
+  searchResponseSchema,
   scheduleResponseSchema,
   serviceCreateRequestSchema,
   serviceListResponseSchema,
@@ -55,7 +60,9 @@ import {
 import { createBookingResponseSchema } from '../../../shared/api/bookings';
 import { idSchema } from '../../../shared/schemas/common';
 import { shopDateOf } from '../../../shared/lib/time';
-import { createStaffLogin, resetLoginPassword, setLoginActive } from '../../auth/authService';
+import { setupLinkResponseSchema, staffAccessResponseSchema } from '../../../shared/api/team';
+import { issueSetupLink, staffAccess, unlockStaff } from '../../auth/teamAuth';
+import { getEnv } from '../../env';
 import { runAfterResponse } from '../../lib/afterResponse';
 import { deliverOutboxIds } from '../../notifications/deliver';
 import { ownerScope, actorOf } from '../../services/access';
@@ -63,8 +70,12 @@ import {
   bookingDetail,
   changeBookingStatus,
   customerByPhone,
+  customerList,
+  saveCustomerNotes,
+  scheduleWeek,
   listBookings,
   ownerReschedule,
+  resendConfirmation,
   scheduleForDay,
   todaySummary,
   updateBookingNotes,
@@ -77,15 +88,12 @@ import {
   deleteStaff,
   getSettings,
   listAudit,
-  listLogins,
   listOutbox,
   listServices,
   listStaff,
   putSettings,
   renameStaffSlug,
   retryOutboxMessage,
-  staffMap,
-  toLoginView,
   updateService,
   updateStaff,
 } from '../../services/adminCatalog';
@@ -101,6 +109,9 @@ import {
   setStaffHours,
   upsertClosure,
 } from '../../services/adminSchedule';
+import { bookingTable, overview } from '../../services/adminDashboard';
+import { adminSearch } from '../../services/adminSearch';
+import { dismissAlert, resolveAlert } from '../../services/alerts';
 import { createManualBooking } from '../../services/bookingService';
 import { idempotencyKeyOf, metaOf, NO_STORE, principalOf } from '../context';
 import { scheduleDelivery } from '../delivery';
@@ -145,10 +156,39 @@ export const adminRoutes: RouteDefinition[] = [
       headers: NO_STORE,
     };
   }),
+  owner('GET', '/api/admin/schedule/week', async (ctx) => {
+    ctxScope(ctx);
+    const { date } = parseQuery(ctx, dateQuerySchema);
+    return {
+      body: scheduleWeekResponseSchema.parse(await scheduleWeek(date, ctx.now)),
+      headers: NO_STORE,
+    };
+  }),
   owner('GET', '/api/admin/whos-in', async (ctx) => {
     ctxScope(ctx);
     const { date } = parseQuery(ctx, dateQuerySchema);
     return { body: whoIsInResponseSchema.parse(await whoIsIn(date, ctx.now)), headers: NO_STORE };
+  }),
+
+  // Overview and the bookings table -----------------------------------------
+  owner('GET', '/api/admin/overview', async (ctx) => {
+    ctxScope(ctx);
+    return { body: overviewResponseSchema.parse(await overview(ctx.now)), headers: NO_STORE };
+  }),
+  owner('GET', '/api/admin/booking-table', async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, bookingTableQuerySchema);
+    return {
+      body: bookingTableResponseSchema.parse(await bookingTable(query, ctx.now)),
+      headers: NO_STORE,
+    };
+  }),
+
+  // Search ----------------------------------------------------------------
+  owner('GET', '/api/admin/search', async (ctx) => {
+    ctxScope(ctx);
+    const { q } = parseQuery(ctx, searchQuerySchema);
+    return { body: searchResponseSchema.parse(await adminSearch(q)), headers: NO_STORE };
   }),
 
   // Bookings --------------------------------------------------------------
@@ -215,6 +255,13 @@ export const adminRoutes: RouteDefinition[] = [
     scheduleDelivery(done.outboxIds);
     return { body: bookingResponseSchema.parse(done.body) };
   }),
+  owner('POST', '/api/admin/bookings/:id/resend', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await resendConfirmation(principal, scope, id, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: { ok: true } };
+  }),
   owner('POST', '/api/admin/bookings/:id/reschedule', async (ctx) => {
     const { principal, scope } = ctxScope(ctx);
     const { id } = parseParams(ctx, idParams);
@@ -229,6 +276,19 @@ export const adminRoutes: RouteDefinition[] = [
   }),
 
   // Customers -------------------------------------------------------------
+  owner('GET', '/api/admin/customer-list', async (ctx) => {
+    ctxScope(ctx);
+    const query = parseQuery(ctx, customerListQuerySchema);
+    return {
+      body: customerListResponseSchema.parse(await customerList(query)),
+      headers: NO_STORE,
+    };
+  }),
+  owner('PUT', '/api/admin/customers/notes', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { phone, notes } = await parseBody(ctx, customerNotesRequestSchema);
+    return { body: await saveCustomerNotes(principal, phone, notes, metaOf(ctx)) };
+  }),
   owner('GET', '/api/admin/customers', async (ctx) => {
     ctxScope(ctx);
     const { phone } = parseQuery(ctx, customerQuerySchema);
@@ -236,6 +296,22 @@ export const adminRoutes: RouteDefinition[] = [
       body: customerResponseSchema.parse(await customerByPhone(phone, ctx.now)),
       headers: NO_STORE,
     };
+  }),
+
+  // Alerts ----------------------------------------------------------------
+  owner('POST', '/api/admin/alerts/:id/resolve', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { resolutions } = await parseBody(ctx, resolutionsBodySchema);
+    const done = await resolveAlert(principal, id, resolutions, metaOf(ctx));
+    scheduleDelivery(done.outboxIds);
+    return { body: conflictOnlyResponseSchema.parse(done.body) };
+  }),
+  owner('POST', '/api/admin/alerts/:id/dismiss', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    await dismissAlert(principal, id, ctx.now);
+    return { body: { ok: true } };
   }),
 
   // Time blocks and day status -------------------------------------------
@@ -392,47 +468,40 @@ export const adminRoutes: RouteDefinition[] = [
     return { body: settingsResponseSchema.parse(await putSettings(principal, input, metaOf(ctx))) };
   }),
 
-  // Logins ----------------------------------------------------------------
-  owner('GET', '/api/admin/users', async (ctx) => {
+  // A barber's PIN access ---------------------------------------------------
+  owner('GET', '/api/admin/staff/:id/access', async (ctx) => {
     ctxScope(ctx);
-    return { body: loginListResponseSchema.parse(await listLogins()), headers: NO_STORE };
+    const { id } = parseParams(ctx, idParams);
+    const access = await staffAccess(id, ctx.now);
+    return {
+      body: staffAccessResponseSchema.parse({
+        hasPin: access.hasPin,
+        lastSignInAt: access.lastSignInAt?.toISOString() ?? null,
+        lockedUntil: access.lockedUntil?.toISOString() ?? null,
+        setupLinkActive: access.setupLinkActive,
+      }),
+      headers: NO_STORE,
+    };
   }),
-  owner('POST', '/api/admin/users', async (ctx) => {
+  // Also how a PIN is reset: the old PIN stops working and the barber's sessions end.
+  owner('POST', '/api/admin/staff/:id/setup-link', async (ctx) => {
     const { principal } = ctxScope(ctx);
-    const input = await parseBody(ctx, loginCreateRequestSchema);
-    const issued = await createStaffLogin(principal, input, metaOf(ctx));
+    const { id } = parseParams(ctx, idParams);
+    const issued = await issueSetupLink(actorOf(principal), principal.userId, id, metaOf(ctx));
     return {
       status: 201,
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword,
+      body: setupLinkResponseSchema.parse({
+        url: `${getEnv().APP_BASE_URL}/team/setup/${issued.token}`,
+        expiresAt: issued.expiresAt.toISOString(),
       }),
       headers: NO_STORE,
     };
   }),
-  owner('POST', '/api/admin/users/:id/reset-password', async (ctx) => {
+  owner('POST', '/api/admin/staff/:id/unlock', async (ctx) => {
     const { principal } = ctxScope(ctx);
     const { id } = parseParams(ctx, idParams);
-    const issued = await resetLoginPassword(principal, id, metaOf(ctx));
-    return {
-      body: issuedPasswordResponseSchema.parse({
-        user: toLoginView(issued.user, await staffMap()),
-        temporaryPassword: issued.temporaryPassword,
-      }),
-      headers: NO_STORE,
-    };
-  }),
-  owner('POST', '/api/admin/users/:id/disable', async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, false, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
-  }),
-  owner('POST', '/api/admin/users/:id/enable', async (ctx) => {
-    const { principal } = ctxScope(ctx);
-    const { id } = parseParams(ctx, idParams);
-    const user = await setLoginActive(principal, id, true, metaOf(ctx));
-    return { body: loginResponseSchema.parse({ user: toLoginView(user, await staffMap()) }) };
+    await unlockStaff(actorOf(principal), id, metaOf(ctx));
+    return { body: { ok: true }, headers: NO_STORE };
   }),
 
   // Audit and outbox ------------------------------------------------------

@@ -1,6 +1,7 @@
 import { getEnv } from '../env';
 import { PHOTO_MAX_BYTES } from '../../shared/schemas/photo';
 import { AppError } from '../lib/errors';
+import { createCloudinaryDriver, CLOUDINARY_MAX_BYTES } from './cloudinary';
 import { createLocalDriver } from './local';
 import { createMongoDriver, MONGO_MAX_BYTES } from './mongo';
 import { createR2Driver } from './r2';
@@ -13,7 +14,10 @@ export function storageEnabled(): boolean {
   return getEnv().STORAGE_DRIVER !== 'none';
 }
 
-/** True when the daily job can write backups: GridFS photos live in the database itself, so they skip it. */
+/**
+ * True when the daily job can write backups: GridFS photos live in the database itself and Cloudinary
+ * holds images only, so neither has a place to put the export.
+ */
 export function backupsEnabled(): boolean {
   const driver = getEnv().STORAGE_DRIVER;
   return driver === 'r2' || driver === 'local';
@@ -21,7 +25,9 @@ export function backupsEnabled(): boolean {
 
 /** The largest photo the driver accepts after the browser resize. */
 export function maxUploadBytes(): number {
-  return getEnv().STORAGE_DRIVER === 'mongo' ? MONGO_MAX_BYTES : PHOTO_MAX_BYTES;
+  const driver = getEnv().STORAGE_DRIVER;
+  if (driver === 'mongo') return MONGO_MAX_BYTES;
+  return driver === 'cloudinary' ? CLOUDINARY_MAX_BYTES : PHOTO_MAX_BYTES;
 }
 
 /** Throws the 503 every upload route answers while photo storage is not set up. */
@@ -47,6 +53,13 @@ export function getStorage(): StorageDriver {
       bucket: env.R2_BUCKET ?? '',
       publicBaseUrl: env.R2_PUBLIC_BASE_URL ?? '',
     });
+  } else if (env.STORAGE_DRIVER === 'cloudinary') {
+    cached = createCloudinaryDriver({
+      cloudName: env.CLOUDINARY_CLOUD_NAME ?? '',
+      apiKey: env.CLOUDINARY_API_KEY ?? '',
+      apiSecret: env.CLOUDINARY_API_SECRET ?? '',
+      folder: env.CLOUDINARY_FOLDER ?? '',
+    });
   } else if (env.STORAGE_DRIVER === 'mongo') {
     cached = createMongoDriver({ baseUrl: env.APP_BASE_URL, secret: env.MANAGE_LINK_SECRET });
   } else {
@@ -58,6 +71,21 @@ export function getStorage(): StorageDriver {
 /** The folder every generated key sits under (R2_KEY_PREFIX), or nothing. */
 export function keyPrefix(): string {
   return getEnv().R2_KEY_PREFIX ?? '';
+}
+
+/**
+ * The key for a new photo. Files are `staff/<id>/<uuid>.webp`, `gallery/<uuid>.webp` or
+ * `hero/<uuid>.webp`; on Cloudinary the key is the public id, the folder and the uuid.
+ */
+export function newPhotoKey(
+  kind: 'staff' | 'gallery' | 'hero',
+  staffId: string | null,
+  uuid: string,
+) {
+  const env = getEnv();
+  if (env.STORAGE_DRIVER === 'cloudinary') return `${env.CLOUDINARY_FOLDER ?? ''}/${uuid}`;
+  const tail = kind === 'staff' ? `staff/${staffId ?? ''}/${uuid}.webp` : `${kind}/${uuid}.webp`;
+  return `${keyPrefix()}${tail}`;
 }
 
 /** Test helper: forget the driver so the next call re-reads the environment. */

@@ -66,6 +66,8 @@ export const bookingDocumentSchema = z
     manageTokenVersion: z.int().min(1),
     /** When the owner first opened it. Online bookings without it show as new. */
     ownerSeenAt: z.date().nullable().optional(),
+    /** The customer name without accents or case, for the owner's search. Set on insert. */
+    nameKey: z.string().max(200).optional(),
   })
   .extend(timestampsSchema.shape)
   .refine((v) => v.endAt.getTime() > v.startAt.getTime(), {

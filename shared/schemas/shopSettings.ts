@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { LOCK_GRANULARITY_MINUTES, SHOP_SETTINGS_ID } from '../lib/constants';
-import { emailSchema, idSchema, nonEmptyText, phoneSchema, timestampsSchema } from './common';
+import {
+  emailSchema,
+  idSchema,
+  isoDateSchema,
+  nonEmptyText,
+  phoneSchema,
+  timestampsSchema,
+} from './common';
 
 export const addressSchema = z.object({
   line1: nonEmptyText(120),
@@ -82,6 +89,86 @@ export const featureFlagsSchema = z.object({
   smsReminders: z.boolean().default(false),
 });
 
+/** A link target: a path on this site or an https address. */
+const announcementLinkSchema = z
+  .string()
+  .trim()
+  .max(200)
+  .refine(
+    (v) => v === '' || (v.startsWith('/') && !v.startsWith('//')) || v.startsWith('https://'),
+    {
+      message: 'Use a path such as /book or an https address',
+    },
+  );
+
+/** The line in the thin ink strip above the header. The link is optional (leave both parts empty). */
+export const announcementSchema = z
+  .object({
+    enabled: z.boolean(),
+    text: z.string().trim().max(90),
+    linkLabel: z.string().trim().max(30),
+    linkUrl: announcementLinkSchema,
+    /** The last day the strip shows (shop date), or empty to keep it until it is switched off. */
+    endsOn: z.union([z.literal(''), isoDateSchema]).default(''),
+  })
+  .refine((a) => !a.enabled || a.text.length > 0, {
+    path: ['text'],
+    message: 'Add the announcement text, or switch it off',
+  })
+  .refine((a) => (a.linkLabel === '') === (a.linkUrl === ''), {
+    path: ['linkUrl'],
+    message: 'Give the link both a label and an address, or leave both empty',
+  });
+export type Announcement = z.infer<typeof announcementSchema>;
+export const DEFAULT_ANNOUNCEMENT: Announcement = {
+  enabled: true,
+  text: 'Walk ins welcome',
+  linkLabel: 'Book online',
+  linkUrl: '/book',
+  endsOn: '',
+};
+
+/** Whether the strip should show on a shop date: switched on and not past its end date. */
+export function announcementIsLive(a: Announcement, today: string): boolean {
+  return a.enabled && (a.endsOn === '' || today <= a.endsOn);
+}
+
+/** A link to one of the shop's own pages on a social network: https, on that network's host. */
+function socialUrl(domain: string, label: string) {
+  return z
+    .string()
+    .trim()
+    .max(200)
+    .refine(
+      (v) => {
+        if (v === '') return true;
+        try {
+          const url = new URL(v);
+          return (
+            url.protocol === 'https:' &&
+            (url.hostname === domain || url.hostname.endsWith(`.${domain}`))
+          );
+        } catch {
+          return false;
+        }
+      },
+      { message: `Use the full https address of the ${label} page, or leave it empty` },
+    );
+}
+
+/** Empty means "not set": the footer shows an icon only for a link that is set. */
+export const socialLinksSchema = z.object({
+  instagramUrl: socialUrl('instagram.com', 'Instagram'),
+  tiktokUrl: socialUrl('tiktok.com', 'TikTok'),
+  facebookUrl: socialUrl('facebook.com', 'Facebook'),
+});
+export type SocialLinks = z.infer<typeof socialLinksSchema>;
+export const DEFAULT_SOCIAL_LINKS: SocialLinks = {
+  instagramUrl: '',
+  tiktokUrl: '',
+  facebookUrl: '',
+};
+
 export const shopSettingsDocumentSchema = z
   .object({
     _id: z.literal(SHOP_SETTINGS_ID),
@@ -97,6 +184,8 @@ export const shopSettingsDocumentSchema = z
     notifications: notificationSettingsSchema,
     features: featureFlagsSchema,
     permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
+    announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
+    social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
     /** The service "next open" times are computed for. Null means each chair's shortest service. */
     nextOpenServiceId: idSchema.nullable().default(null),
   })

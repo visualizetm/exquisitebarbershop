@@ -4,6 +4,7 @@ import {
   type BookingDocument,
   type BookingStatus,
 } from '../../shared/schemas/booking';
+import { nameKeyOf } from '../../shared/lib/search';
 import { collection } from '../db/collections';
 import { AppError, isDuplicateKeyError } from '../lib/errors';
 import { newId } from '../lib/ids';
@@ -27,6 +28,7 @@ export async function insertBooking(
   const doc = bookingDocumentSchema.parse({
     _id: options?.id ?? newId(),
     ...input,
+    nameKey: nameKeyOf(input.customer.name),
     createdAt: now,
     updatedAt: now,
   });
@@ -304,4 +306,291 @@ export async function listBookingsPage(
   }
   const query: Filter<BookingDocument> = and.length > 0 ? { $and: and } : {};
   return col.find(query, sessionOf(options)).sort({ startAt: 1, _id: 1 }).limit(limit).toArray();
+}
+
+// ---------------------------------------------------------------------------
+// Owner search
+// ---------------------------------------------------------------------------
+
+/** One customer, as the search and the customer list see them: all bookings with one phone. */
+export interface CustomerSummary {
+  phone: string;
+  name: string;
+  visits: number;
+  lastVisitAt: Date;
+}
+
+type SearchMatch = { kind: 'phone'; digits: string } | { kind: 'name'; key: string };
+
+function matchFilter(match: SearchMatch): Filter<BookingDocument> {
+  if (match.kind === 'name') return { nameKey: { $regex: `^${escapeRegex(match.key)}` } };
+  // Ten digits are one exact phone; fewer match the end of the number (the last four are enough).
+  return match.digits.length === 10
+    ? { 'customer.phone': `+1${match.digits}` }
+    : { 'customer.phone': { $regex: `${escapeRegex(match.digits)}$` } };
+}
+
+/** The newest bookings matching a name prefix or a phone, for the search dropdown. */
+export async function searchBookings(
+  match: SearchMatch,
+  limit: number,
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  return col
+    .find(matchFilter(match), sessionOf(options))
+    .sort({ startAt: -1 })
+    .limit(limit)
+    .toArray();
+}
+
+/** Customers (grouped by phone) whose bookings match, most recent visit first. */
+export async function searchCustomers(
+  match: SearchMatch,
+  limit: number,
+  options?: RepoOptions,
+): Promise<CustomerSummary[]> {
+  return customerSummaries(matchFilter(match), limit, options);
+}
+
+async function customerSummaries(
+  filter: Filter<BookingDocument>,
+  limit: number,
+  options?: RepoOptions,
+  skip = 0,
+): Promise<CustomerSummary[]> {
+  const col = await collection('bookings');
+  const rows = await col
+    .aggregate<{ _id: string; name: string; visits: number; last: Date }>(
+      [
+        { $match: filter },
+        { $sort: { startAt: -1 } },
+        {
+          $group: {
+            _id: '$customer.phone',
+            name: { $first: '$customer.name' },
+            visits: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            last: { $max: '$startAt' },
+          },
+        },
+        { $sort: { last: -1, _id: 1 } },
+        { $skip: skip },
+        { $limit: limit },
+      ],
+      sessionOf(options),
+    )
+    .toArray();
+  return rows.map((r) => ({ phone: r._id, name: r.name, visits: r.visits, lastVisitAt: r.last }));
+}
+
+/** Backfills nameKey on bookings written before the field existed. Cheap when none are missing. */
+export async function backfillNameKeys(): Promise<number> {
+  const col = await collection('bookings');
+  let total = 0;
+  for (;;) {
+    const batch = await col
+      .find({ nameKey: { $exists: false } })
+      .limit(500)
+      .toArray();
+    if (batch.length === 0) return total;
+    await col.bulkWrite(
+      batch.map((b) => ({
+        updateOne: {
+          filter: { _id: b._id },
+          update: { $set: { nameKey: nameKeyOf(b.customer.name) } },
+        },
+      })),
+    );
+    total += batch.length;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Owner bookings table and overview
+// ---------------------------------------------------------------------------
+
+export interface TableFilter {
+  /** Start time bounds: from inclusive, to exclusive. */
+  from?: Date;
+  to?: Date;
+  staffId?: string;
+  status?: BookingStatus;
+}
+
+function tableQuery(filter: TableFilter): Filter<BookingDocument> {
+  const query: Filter<BookingDocument> = {};
+  if (filter.from || filter.to) {
+    query.startAt = {
+      ...(filter.from ? { $gte: filter.from } : {}),
+      ...(filter.to ? { $lt: filter.to } : {}),
+    };
+  }
+  if (filter.staffId) query.staffId = filter.staffId;
+  if (filter.status) query.status = filter.status;
+  return query;
+}
+
+export type TableSortKey = 'when' | 'client' | 'status' | 'source';
+
+/** One page of the owner's bookings table: stable order, the chosen column first. */
+export async function tablePage(
+  filter: TableFilter,
+  sort: { key: TableSortKey; dir: 1 | -1 },
+  skip: number,
+  limit: number,
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  const first: Record<TableSortKey, string> = {
+    when: 'startAt',
+    client: 'nameKey',
+    status: 'status',
+    source: 'source',
+  };
+  const order: Record<string, 1 | -1> = { [first[sort.key]]: sort.dir };
+  if (sort.key !== 'when') order.startAt = -1;
+  order._id = 1;
+  return col
+    .find(tableQuery(filter), sessionOf(options))
+    .sort(order)
+    .skip(skip)
+    .limit(limit)
+    .toArray();
+}
+
+export async function countTable(filter: TableFilter, options?: RepoOptions): Promise<number> {
+  const col = await collection('bookings');
+  return col.countDocuments(tableQuery(filter), sessionOf(options));
+}
+
+export async function findBookingsByIds(
+  ids: readonly string[],
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  if (ids.length === 0) return [];
+  const col = await collection('bookings');
+  return col.find({ _id: { $in: [...ids] } }, sessionOf(options)).toArray();
+}
+
+/** Bookings that start in [start, end), any status, for the weekly counts. */
+export async function listBookingsStartingBetween(
+  range: { start: Date; end: Date },
+  options?: RepoOptions,
+): Promise<BookingDocument[]> {
+  const col = await collection('bookings');
+  return col
+    .find({ startAt: { $gte: range.start, $lt: range.end } }, sessionOf(options))
+    .sort({ startAt: 1 })
+    .toArray();
+}
+
+/**
+ * Gives a confirmed booking to another chair at the same time. The time does not change, so the
+ * customer's manage link stays valid (no token version bump).
+ */
+export async function moveBookingToStaff(
+  id: string,
+  staffId: string,
+  now: Date,
+  options?: RepoOptions,
+): Promise<BookingDocument> {
+  const col = await collection('bookings');
+  const updated = await col.findOneAndUpdate(
+    { _id: id, status: 'confirmed' },
+    { $set: { staffId, staffRequested: true, updatedAt: now } },
+    { returnDocument: 'after', ...sessionOf(options) },
+  );
+  if (!updated)
+    throw new AppError('BOOKING_NOT_RESCHEDULABLE', 'This booking can no longer be moved');
+  return updated;
+}
+
+// ---------------------------------------------------------------------------
+// Customer list (customers are everyone who booked with one phone number)
+// ---------------------------------------------------------------------------
+
+export interface CustomerRow {
+  phone: string;
+  name: string;
+  bookings: number;
+  visits: number;
+  noShows: number;
+  lastVisitAt: Date | null;
+  usualStaffId: string | null;
+}
+
+export type CustomerSortKey = 'name' | 'visits' | 'last' | 'noShows';
+
+/** One page of customers, grouped from bookings, with the totals the list shows. */
+export async function customerPage(
+  match: SearchMatch | null,
+  sort: { key: CustomerSortKey; dir: 1 | -1 },
+  skip: number,
+  limit: number,
+  options?: RepoOptions,
+): Promise<{ rows: CustomerRow[]; total: number }> {
+  const col = await collection('bookings');
+  const sortField: Record<CustomerSortKey, string> = {
+    name: 'nameKey',
+    visits: 'visits',
+    last: 'lastVisit',
+    noShows: 'noShows',
+  };
+  const [result] = await col
+    .aggregate<{
+      rows: {
+        _id: string;
+        name: string;
+        bookings: number;
+        visits: number;
+        noShows: number;
+        lastVisit: Date | null;
+        staff: { id: string; gone: boolean }[];
+      }[];
+      total: { n: number }[];
+    }>(
+      [
+        ...(match ? [{ $match: matchFilter(match) }] : []),
+        { $sort: { startAt: -1 } },
+        {
+          $group: {
+            _id: '$customer.phone',
+            name: { $first: '$customer.name' },
+            nameKey: { $first: '$nameKey' },
+            bookings: { $sum: 1 },
+            visits: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+            noShows: { $sum: { $cond: [{ $eq: ['$status', 'noShow'] }, 1, 0] } },
+            lastVisit: { $max: { $cond: [{ $eq: ['$status', 'completed'] }, '$startAt', null] } },
+            staff: { $push: { id: '$staffId', gone: { $eq: ['$status', 'cancelled'] } } },
+          },
+        },
+        {
+          $facet: {
+            rows: [
+              { $sort: { [sortField[sort.key]]: sort.dir, _id: 1 } },
+              { $skip: skip },
+              { $limit: limit },
+            ],
+            total: [{ $count: 'n' }],
+          },
+        },
+      ],
+      sessionOf(options),
+    )
+    .toArray();
+  const rows = (result?.rows ?? []).map((r) => {
+    const counts = new Map<string, number>();
+    for (const s of r.staff) if (!s.gone) counts.set(s.id, (counts.get(s.id) ?? 0) + 1);
+    const usual = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return {
+      phone: r._id,
+      name: r.name,
+      bookings: r.bookings,
+      visits: r.visits,
+      noShows: r.noShows,
+      lastVisitAt: r.lastVisit,
+      usualStaffId: usual?.[0] ?? null,
+    };
+  });
+  return { rows, total: result?.total[0]?.n ?? 0 };
 }

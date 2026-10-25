@@ -5,7 +5,7 @@ import { newId } from '../../server/lib/ids';
 import { runSeed } from '../../server/services/seedService';
 import { staffSeedId } from '../../seed/shop';
 import { apiErrorSchema } from '../../shared/api/errors';
-import { createLogin, sessionCookie } from '../helpers/auth';
+import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
 import { call, startTestServer, type TestServer } from '../helpers/bookingApi';
 import { NOW, useTestDb } from '../helpers/db';
 
@@ -16,10 +16,11 @@ let server: TestServer;
 /**
  * The single source of truth for who may call what. A route registered in
  * server/http/app.ts but missing here fails the first test, so a new route can
- * never ship without a deliberate decision about its role. A trailing "+" marks
- * the routes still reachable while a temporary password is in use.
+ * never ship without a deliberate decision about its role. The roles are anonymous, a barber
+ * signed in with a PIN (team), the owner, and an owner still on a temporary password. A trailing
+ * "+" marks the routes still reachable while a temporary password is in use.
  */
-const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
+const EXPECTED: Record<string, AuthLevel | 'owner+'> = {
   'GET /api/health': 'public',
   'GET /api/shop': 'public',
   'GET /api/sitemap.xml': 'public',
@@ -46,18 +47,42 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'POST /api/bookings/manage/cancel': 'public',
   'POST /api/bookings/manage/reschedule': 'public',
   'POST /api/auth/login': 'public',
-  'POST /api/auth/logout': 'barber+',
-  'POST /api/auth/logout-all': 'barber+',
-  'GET /api/auth/me': 'barber+',
-  'POST /api/me/password': 'barber+',
-  'GET /api/me/schedule': 'barber',
-  'GET /api/me/bookings/:id': 'barber',
-  'POST /api/me/bookings/:id/status': 'barber',
-  'POST /api/me/time-blocks': 'barber',
-  'DELETE /api/me/time-blocks/:id': 'barber',
+  'POST /api/auth/logout': 'owner+',
+  'POST /api/auth/logout-all': 'owner+',
+  'GET /api/auth/me': 'owner+',
+  'POST /api/me/password': 'owner+',
+  'POST /api/me/email': 'owner',
+  'POST /api/team/login': 'public',
+  'GET /api/team/setup/:token': 'public',
+  'POST /api/team/setup/:token': 'public',
+  'POST /api/team/logout': 'team',
+  'GET /api/team/me': 'team',
+  'POST /api/team/pin': 'team',
+  'GET /api/team/today': 'team',
+  'GET /api/team/week': 'team',
+  'POST /api/team/bookings/:id/status': 'team',
+  'POST /api/team/bookings/:id/note': 'team',
+  'POST /api/team/walk-ins': 'team',
+  'GET /api/team/time-off': 'team',
+  'POST /api/team/time-blocks': 'team',
+  'DELETE /api/team/time-blocks/:id': 'team',
+  'POST /api/team/out-today': 'team',
+  'POST /api/team/days-off': 'team',
+  'GET /api/admin/staff/:id/access': 'owner',
+  'POST /api/admin/staff/:id/setup-link': 'owner',
+  'POST /api/admin/staff/:id/unlock': 'owner',
   'GET /api/admin/today': 'owner',
   'GET /api/admin/schedule': 'owner',
   'GET /api/admin/whos-in': 'owner',
+  'GET /api/admin/search': 'owner',
+  'GET /api/admin/overview': 'owner',
+  'GET /api/admin/schedule/week': 'owner',
+  'GET /api/admin/customer-list': 'owner',
+  'PUT /api/admin/customers/notes': 'owner',
+  'POST /api/admin/alerts/:id/resolve': 'owner',
+  'POST /api/admin/alerts/:id/dismiss': 'owner',
+  'GET /api/admin/booking-table': 'owner',
+  'POST /api/admin/bookings/:id/resend': 'owner',
   'GET /api/admin/bookings': 'owner',
   'POST /api/admin/bookings': 'owner',
   'GET /api/admin/bookings/:id': 'owner',
@@ -87,47 +112,44 @@ const EXPECTED: Record<string, AuthLevel | 'barber+'> = {
   'DELETE /api/admin/closures/:id': 'owner',
   'GET /api/admin/settings': 'owner',
   'PUT /api/admin/settings': 'owner',
-  'GET /api/admin/users': 'owner',
-  'POST /api/admin/users': 'owner',
-  'POST /api/admin/users/:id/reset-password': 'owner',
-  'POST /api/admin/users/:id/disable': 'owner',
-  'POST /api/admin/users/:id/enable': 'owner',
   'GET /api/admin/audit': 'owner',
   'GET /api/admin/outbox': 'owner',
   'POST /api/admin/outbox/:id/retry': 'owner',
   'GET /api/internal/outbox/deliver': 'internal',
   'POST /api/internal/outbox/deliver': 'internal',
-  'GET /api/admin/photos': 'barber',
-  'POST /api/admin/photos/upload-url': 'barber',
-  'POST /api/admin/photos/confirm': 'barber',
-  'PATCH /api/admin/photos/:id': 'barber',
-  'DELETE /api/admin/photos/:id': 'barber',
+  'GET /api/admin/photos': 'owner',
+  'POST /api/admin/photos/upload-url': 'owner',
+  'POST /api/admin/photos/confirm': 'owner',
+  'PATCH /api/admin/photos/:id': 'owner',
+  'DELETE /api/admin/photos/:id': 'owner',
 };
 
-type Role = 'anonymous' | 'barber' | 'owner' | 'tempPassword';
-const ROLES: Role[] = ['anonymous', 'barber', 'owner', 'tempPassword'];
-let ids: { barber: string; owner: string; temp: string };
+type Role = 'anonymous' | 'team' | 'owner' | 'tempPassword';
+const ROLES: Role[] = ['anonymous', 'team', 'owner', 'tempPassword'];
+let ids: { owner: string; temp: string };
 
 function pathFor(path: string): string {
-  return path.replace(/:id\b/g, newId()).replace(/:slug\b/g, 'nobody');
+  return path
+    .replace(/:id\b/g, newId())
+    .replace(/:slug\b/g, 'nobody')
+    .replace(/:token\b/g, 'A'.repeat(43));
 }
 
 async function cookieFor(role: Role): Promise<Record<string, string>> {
   if (role === 'anonymous') return {};
-  const userId = role === 'barber' ? ids.barber : role === 'owner' ? ids.owner : ids.temp;
-  return { cookie: await sessionCookie(userId) };
+  if (role === 'team') return { cookie: await teamCookie(staffSeedId('marcus')) };
+  return { cookie: await sessionCookie(role === 'owner' ? ids.owner : ids.temp) };
 }
 
 beforeAll(async () => {
   await runSeed(db(), NOW);
-  const barber = await createLogin({ role: 'barber', staffId: staffSeedId('marcus') });
   const owner = await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') });
   const temp = await createLogin({
-    role: 'barber',
+    role: 'owner',
     staffId: staffSeedId('dee'),
     mustChangePassword: true,
   });
-  ids = { barber: barber._id, owner: owner._id, temp: temp._id };
+  ids = { owner: owner._id, temp: temp._id };
   server = await startTestServer();
 });
 afterAll(async () => {
@@ -174,9 +196,16 @@ describe('authorization matrix', () => {
         else if (level === 'public')
           ok = code !== 'AUTH_REQUIRED' && code !== 'PASSWORD_CHANGE_REQUIRED' && !ownerOnly;
         else if (!signedIn) ok = res.status === 401 && code === 'AUTH_REQUIRED';
-        else if (role === 'tempPassword' && level !== 'barber+')
+        // The two kinds of sign-in never stand in for each other: a barber's PIN session opens no
+        // owner route, and the owner's login opens no barber route.
+        else if (level === 'team')
+          ok =
+            role === 'team'
+              ? code !== 'AUTH_REQUIRED' && code !== 'PASSWORD_CHANGE_REQUIRED'
+              : res.status === 401 && code === 'AUTH_REQUIRED';
+        else if (role === 'team') ok = res.status === 401 && code === 'AUTH_REQUIRED';
+        else if (role === 'tempPassword' && level !== 'owner+')
           ok = res.status === 403 && code === 'PASSWORD_CHANGE_REQUIRED';
-        else if (level === 'owner' && role === 'barber') ok = res.status === 403 && ownerOnly;
         else ok = code !== 'AUTH_REQUIRED' && code !== 'PASSWORD_CHANGE_REQUIRED' && !ownerOnly;
         if (!ok) failures.push(label);
       }
@@ -197,7 +226,7 @@ describe('authorization matrix', () => {
       ]);
       const failures: string[] = [];
       // The owner goes last: a reset deletes the other logins.
-      const order: Role[] = ['anonymous', 'tempPassword', 'barber', 'owner'];
+      const order: Role[] = ['anonymous', 'tempPassword', 'team', 'owner'];
       for (const route of demoRoutes) {
         for (const role of order) {
           const res = await call(server.baseUrl, route.method, route.path, {
@@ -212,7 +241,7 @@ describe('authorization matrix', () => {
           else if (role === 'anonymous') ok = res.status === 401 && code === 'AUTH_REQUIRED';
           else if (role === 'tempPassword')
             ok = res.status === 403 && code === 'PASSWORD_CHANGE_REQUIRED';
-          else if (role === 'barber') ok = res.status === 403 && code === 'FORBIDDEN';
+          else if (role === 'team') ok = res.status === 401 && code === 'AUTH_REQUIRED';
           else ok = res.status === 200;
           if (!ok) failures.push(label);
         }

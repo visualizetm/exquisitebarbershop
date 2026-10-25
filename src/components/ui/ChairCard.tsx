@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
-import { PhotoArch, type Photo } from './PhotoArch';
+import { Link } from './Link';
+import { PhotoFrame, type Photo } from './PhotoFrame';
 
 export type ChairStatus = 'next-open' | 'in' | 'off' | 'closed' | 'none';
 
@@ -23,7 +23,10 @@ function chairBadge(n: number | null | undefined): string | null {
   return n === null || n === undefined ? null : `Chair ${String(n).padStart(2, '0')}`;
 }
 
-/** A barber as a card: photo, chair badge, name, specialty and today's status. */
+/**
+ * A barber as a card: a 4:5 portrait with its CHAIR tag, then the name in heavy caps,
+ * the specialty and today's status underneath. Text never sits on the photo.
+ */
 export function ChairCard(props: ChairCardProps) {
   const {
     name,
@@ -40,10 +43,12 @@ export function ChairCard(props: ChairCardProps) {
   const badge = chairBadge(chairNumber);
   const body = (
     <>
-      <PhotoArch photo={photo} name={name} priority={priority} />
-      <span className="exq-chaircard__body">
+      <span className="exq-chaircard__frame">
+        <PhotoFrame photo={photo} name={name} priority={priority} />
         {badge ? <span className="exq-chaircard__badge">{badge}</span> : null}
-        <span className="exq-chaircard__name exq-h">{name}</span>
+      </span>
+      <span className="exq-chaircard__body">
+        <span className="exq-chaircard__name exq-h3">{name}</span>
         {specialty ? <span className="exq-chaircard__specialty">{specialty}</span> : null}
         {statusLabel ? (
           <span className="exq-chaircard__status" data-state={status}>
@@ -93,9 +98,10 @@ export function ChairCard(props: ChairCardProps) {
 export function ChairCardSkeleton(): ReactNode {
   return (
     <div className="exq-chaircard" data-state="loading" aria-hidden="true">
-      <span className="exq-arch exq-skeleton" data-state="loading" />
+      <span className="exq-chaircard__frame">
+        <span className="exq-photoframe exq-skeleton" data-state="loading" data-ratio="4:5" />
+      </span>
       <span className="exq-chaircard__body">
-        <span className="exq-skeleton">Chair 00</span>
         <span className="exq-skeleton exq-chaircard__name">Loading name</span>
         <span className="exq-skeleton exq-chaircard__specialty">Loading specialty</span>
       </span>

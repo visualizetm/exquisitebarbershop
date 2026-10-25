@@ -1,7 +1,15 @@
 import { useSearchParams } from 'react-router';
 import { galleryResponseSchema, type GalleryPhoto, type GalleryResponse } from '@shared/api/photos';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
-import { Button, ButtonAnchor, ChipLink, Chips, EmptyState, ErrorState } from '@/components/ui';
+import {
+  Button,
+  ButtonAnchor,
+  ChipLink,
+  Chips,
+  EmptyState,
+  ErrorState,
+  SectionHead,
+} from '@/components/ui';
 import { Status } from '@/components/Status';
 import { usePagedList } from '@/lib/usePagedList';
 import { usePageMeta } from '@/lib/usePageTitle';
@@ -31,11 +39,10 @@ export function GalleryPage() {
       className="exq-gallery exq-wrap exq-section"
       data-state={list.status === 'ready' && list.rows.length === 0 ? 'empty' : list.status}
     >
-      <p className="exq-label">Gallery</p>
-      <h1 className="exq-gallery__title">The work</h1>
+      <SectionHead label="Gallery" title="The work" level={1} />
       {first && first.counts.length > 0 ? (
         <Chips label="Filter by chair" scroll>
-          <ChipLink to="/gallery" selected={staff === ''} count={first.total + (staff ? 0 : 0)}>
+          <ChipLink to="/gallery" selected={staff === ''} count={first.total}>
             All
           </ChipLink>
           {first.counts.map((c) => (
@@ -60,7 +67,7 @@ export function GalleryPage() {
           action={
             <ButtonAnchor
               href="https://instagram.com/exquisitebarberbeauty"
-              variant="secondary"
+              variant="outline"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -71,10 +78,14 @@ export function GalleryPage() {
           Follow @exquisitebarberbeauty for the latest work.
         </EmptyState>
       ) : null}
-      {list.rows.length > 0 ? <PhotoGrid photos={list.rows} firstPriority /> : null}
+      {list.rows.length > 0 ? (
+        <div className="exq-gallery__grid">
+          <PhotoGrid photos={list.rows} firstPriority />
+        </div>
+      ) : null}
       {list.hasMore ? (
         <p className="exq-gallery__more">
-          <Button variant="secondary" onClick={() => void list.loadMore()}>
+          <Button variant="outline" onClick={() => void list.loadMore()}>
             Load more
           </Button>
         </p>

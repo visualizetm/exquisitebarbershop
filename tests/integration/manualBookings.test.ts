@@ -131,7 +131,8 @@ describe('phone bookings', () => {
   });
 
   it('the override never takes a slot someone already holds', async () => {
-    const at = startIn(300);
+    // A fixed open slot tomorrow: five hours from now can cross midnight late in the day.
+    const at = slotAt(shopDateOf(new Date(Date.now() + 24 * 60 * 60_000)), '15:00');
     await bookPublic(server.baseUrl, { staff: 'marcus', serviceIds: [cut], startAt: at });
     const res = await manual({ source: 'phone', staff: 'marcus', startAt: at, override: true });
     expect(res.status).toBe(409);

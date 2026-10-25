@@ -40,7 +40,7 @@ emails. Set these in Production and the site is complete and bookable.
 | APP_BASE_URL         | Preview             | required | the preview address Vercel gives the branch, with `https://`                                                              |
 | MANAGE_LINK_SECRET   | Production, Preview | required | secret 1                                                                                                                  |
 | CRON_SECRET          | Production, Preview | required | secret 2                                                                                                                  |
-| STORAGE_DRIVER       | Production, Preview | required | `none` until R2 exists (section 10), then `r2`                                                                            |
+| STORAGE_DRIVER       | Production, Preview | required | `none` until photos are set up, then `cloudinary` (section 10b) or `r2` (section 10)                                      |
 | STORAGE_DISABLED_ACK | Production          | optional | `true` while STORAGE_DRIVER is `none`. It says "no photos and no backups, on purpose". Remove it once R2 is on.           |
 | EMAIL_PROVIDER       | Production, Preview | optional | `log` until Resend is verified (section 8), then `resend` in Production                                                   |
 | EMAIL_DISABLED_ACK   | Production          | optional | `true` while EMAIL_PROVIDER is `log`. Remove it once email is on.                                                         |
@@ -188,6 +188,66 @@ R2; see section 11.
 To switch R2 off again, set STORAGE_DRIVER back to `none` with
 STORAGE_DISABLED_ACK=true and redeploy. Photos already in the bucket stay there
 and are hidden until the driver is `r2` again.
+
+## 10b. Photos on Cloudinary (the way photos are meant to run)
+
+Cloudinary replaces R2 and the showcase's GridFS for photos. Uploads go straight from the browser to
+Cloudinary with a signature this server makes; the API secret never reaches the browser. Pictures
+are delivered from `res.cloudinary.com` in four widths (400, 800, 1200, 1600), cropped to the frame
+they sit in, in the best format for the visitor's browser.
+
+### The variables
+
+| Variable              | Environments        | Value                                                                              |
+| --------------------- | ------------------- | ---------------------------------------------------------------------------------- |
+| STORAGE_DRIVER        | Production, Preview | `cloudinary`                                                                       |
+| CLOUDINARY_CLOUD_NAME | Production, Preview | Cloudinary dashboard, the cloud name at the top of Settings                        |
+| CLOUDINARY_API_KEY    | Production, Preview | Settings, API Keys                                                                 |
+| CLOUDINARY_API_SECRET | Production, Preview | the secret next to that key (server side only, never a `VITE_` variable)           |
+| CLOUDINARY_FOLDER     | Production          | `exquisite/production`                                                             |
+| CLOUDINARY_FOLDER     | Preview             | `exquisite/preview` (the app refuses a Preview folder that does not say `preview`) |
+
+Preview always uses its own folder, so a test upload on a preview deployment never lands among live
+photos and the daily sweep of one folder never touches the other. The same cloud serves both.
+
+### Switching on
+
+1. In Vercel set the rows above in Production and Preview. Set STORAGE_DRIVER to `cloudinary`.
+   Delete STORAGE_DISABLED_ACK if it is there.
+2. Redeploy (the top row of Deployments for main). A site with `cloudinary` selected and a missing
+   value refuses to serve and `/api/health` names the variable; it never prints a value.
+3. Open `/api/health`: `ok` is true.
+4. Admin, Photos: upload one photo. It shows on the page at once.
+5. Doctor (`npm run doctor` with the production variables in `.env`, or /setup): Photo storage reads OK
+   after a signed ping to the Cloudinary Admin API. Backups read Check: Cloudinary holds photos only,
+   so the daily job writes no export. Turn on MongoDB Atlas backups (Atlas, the cluster, Backup).
+
+### What the server does
+
+- Signs `{timestamp, folder, public_id}` for an owner session, or for a barber uploading their own
+  portrait while the owner allows it. Nobody else can get a signature.
+- After the browser upload it asks the Cloudinary Admin API whether the asset exists, with the size
+  and version the browser reported, before the photo is saved. A mismatch destroys the asset.
+- Removing a photo destroys the Cloudinary asset (the daily job does it, with the other clean up).
+- The daily job also sweeps assets in the folder that are over 24 hours old and that no photo record
+  points at (an upload that was never confirmed).
+- Limits: images only, 10 MB per file after the browser's resize to 2000px.
+- The site's content security policy allows `res.cloudinary.com` for images and `api.cloudinary.com`
+  for the upload, and nothing else.
+
+### Moving the showcase photos over
+
+With the production variables in `.env` (including the four CLOUDINARY values):
+
+```
+npm run photos:migrate -- --from mongo --to cloudinary --dry-run
+npm run photos:migrate -- --from mongo --to cloudinary
+```
+
+The dry run lists what it would copy and writes nothing. The real run copies each photo to
+`<CLOUDINARY_FOLDER>/<its id>` and rewrites its record; run it again any time, a finished photo is
+skipped and a half finished one is adopted. The GridFS copies are left in place; delete them when the
+site looks right. `--from local` does the same for photos on a developer's disk.
 
 ## 11. Showcase demo (for showing the site to the client)
 

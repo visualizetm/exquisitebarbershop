@@ -7,7 +7,11 @@ import { bootstrap } from '../../services/bootstrap';
 import { clearDemoData } from '../../services/demo';
 import { runDoctor } from '../../services/doctor';
 import { parseBody } from '../request';
-import { purgeDeletedPhotos, sweepAbandonedUploads } from '../../services/photosService';
+import {
+  purgeDeletedPhotos,
+  sweepAbandonedUploads,
+  sweepStorageOrphans,
+} from '../../services/photosService';
 import { backupsEnabled, storageEnabled } from '../../storage';
 import type { RouteDefinition, RouteHandler } from '../types';
 
@@ -49,14 +53,17 @@ const daily: RouteHandler = async (ctx) => {
   }
   const photosPurged = await purgeDeletedPhotos(ctx.now);
   const uploadsSwept = await sweepAbandonedUploads(ctx.now);
+  // Cloudinary only: assets over 24 hours old that no photo record points at.
+  const orphansSwept = await sweepStorageOrphans(ctx.now);
   if (!backupsEnabled()) {
-    // GridFS photos live in the database itself, so a backup written there would back up nothing.
-    logger.warn('daily job: backup skipped', { reason: 'STORAGE_DRIVER is mongo (GridFS)' });
+    // GridFS and Cloudinary hold photos only, so there is nowhere to write a backup.
+    logger.warn('daily job: backup skipped', { reason: 'STORAGE_DRIVER keeps no backups' });
     return {
       body: {
         outbox,
         photosPurged,
         uploadsSwept,
+        orphansSwept,
         backup: null,
         backupsPruned: 0,
         skipped: ['backup', 'backupsPruned'],
@@ -71,6 +78,7 @@ const daily: RouteHandler = async (ctx) => {
       outbox,
       photosPurged,
       uploadsSwept,
+      orphansSwept,
       backup: {
         date: backup.date,
         documents: backup.collections.reduce((n, c) => n + c.count, 0),

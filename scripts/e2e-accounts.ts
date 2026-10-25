@@ -4,11 +4,12 @@ export const E2E_OWNER = {
   password: 'e2e-owner-long-phrase-correct-48',
 };
 
-export const E2E_BARBER = {
-  email: 'marcus.e2e@example.com',
-  password: 'e2e-barber-long-phrase-correct-73',
-  staffKey: 'marcus',
-};
+/**
+ * Every barber has chosen this PIN, so the tests can sign in as any of them at /team. The portal
+ * tests pick a chair at random, because a walk-in holds its chair for the next 40 minutes.
+ */
+export const E2E_BARBER_PIN = '482915';
+export const E2E_BARBER_NAMES = ['Marcus', 'Dee', 'Tre', 'Jay', 'Kris'] as const;
 
 /**
  * The owner the production-like run creates through /setup, from

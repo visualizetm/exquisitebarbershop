@@ -32,3 +32,29 @@ describe('the pre-paint theme script', () => {
     expect(script).toContain('catch(e){}');
   });
 });
+
+describe('the content security policy and Cloudinary', () => {
+  const csp =
+    (
+      JSON.parse(readFileSync('vercel.json', 'utf8')) as {
+        headers: { headers: { key: string; value: string }[] }[];
+      }
+    ).headers
+      .flatMap((h) => h.headers)
+      .find((h) => h.key === 'Content-Security-Policy')?.value ?? '';
+  const directive = (name: string) =>
+    csp
+      .split(';')
+      .map((d) => d.trim())
+      .find((d) => d.startsWith(`${name} `))
+      ?.split(/\s+/)
+      .slice(1);
+
+  it('allows images only from the site, data and res.cloudinary.com', () => {
+    expect(directive('img-src')).toEqual(["'self'", 'data:', 'https://res.cloudinary.com']);
+  });
+
+  it('allows connections only to the site and api.cloudinary.com', () => {
+    expect(directive('connect-src')).toEqual(["'self'", 'https://api.cloudinary.com']);
+  });
+});

@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { staffIds, uploadSamplePhoto } from '../photos';
 
@@ -8,6 +9,15 @@ import { staffIds, uploadSamplePhoto } from '../photos';
  * first visit to Home sets the shop up.
  */
 test.describe.configure({ mode: 'serial' });
+
+const NOTICE_FLAG = 'exq-demo-notice-seen';
+// The notice blocks the page on a first visit; every test but the notice's own has already seen it.
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.titlePath.includes('the demo notice')) return;
+  await page.addInitScript((flag) => {
+    sessionStorage.setItem(flag, '1');
+  }, NOTICE_FLAG);
+});
 
 const REFERENCE = /[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{4}/;
 const BANNER = 'Demo mode. Sample data, resets anytime.';
@@ -34,7 +44,7 @@ async function enterDemo(page: Page) {
   await expect(page).toHaveURL(/\/admin\/login/);
   await expect(page.getByText(BANNER)).toBeVisible();
   await page.getByRole('button', { name: 'Enter demo dashboard' }).click();
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
 }
 
 /** A PNG drawn in the page, so the real file input and the real resize run. */
@@ -62,12 +72,16 @@ test('the first visit sets the shop up by itself and Home loads fully', async ({
   const response = await page.goto('/');
   expect(response?.status()).toBe(200);
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Fresh cuts. Gifted hands.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gifted hands. Exquisite cuts.' })).toBeVisible({
+    timeout: 40_000,
+  });
   const cards = page.locator(
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );
-  await expect(cards.first()).toBeVisible();
-  expect(await cards.count()).toBeGreaterThanOrEqual(6);
+  // The first request seeds the whole shop, so the very first paint of data can take a while.
+  await expect(cards.first()).toBeVisible({ timeout: 40_000 });
+  // Cards swap from loading to loaded one by one, so the count is polled rather than read once.
+  await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(6);
 
   // The sample shop asks not to be indexed: in the HTML, as a header, and in robots.txt.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
@@ -87,28 +101,24 @@ test('every public page renders with intentional placeholders and no console err
   const errors = watchConsole(page);
   await page.goto('/');
   await expectUp(page);
-  // No photos yet: the ink hero carries the white primary mark, and the work section is hidden.
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
-  await expect(page.locator('.exq-hero__logo')).toHaveAttribute(
-    'src',
-    '/brand/exq-primary-white.svg',
-  );
+  // No photos yet: the text hero stands alone, and the work section is hidden.
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expect(page.locator('.exq-home__work')).toHaveCount(0);
 
   await page.goto('/services');
   await expectUp(page);
-  await expect(page.locator('.exq-service__row').first()).toBeVisible();
+  await expect(page.locator('.exq-pricerow').first()).toBeVisible();
 
   await page.goto('/chairs');
   await expectUp(page);
   await expect(
-    page.locator('.exq-chaircard .exq-arch[data-state="placeholder"]').first(),
+    page.locator('.exq-chaircard .exq-photoframe[data-state="placeholder"]').first(),
   ).toBeVisible();
 
   await page.goto('/chairs/marcus');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
-  await expect(page.locator('.exq-chair .exq-arch[data-state="placeholder"]')).toBeVisible();
+  await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await expect(page.locator('.exq-chair__work')).toHaveCount(0);
 
   await page.goto('/gallery');
@@ -117,7 +127,7 @@ test('every public page renders with intentional placeholders and no console err
 
   await page.goto('/visit');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Visit', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Find us', exact: true })).toBeVisible();
 
   await page.goto('/manage');
   await expectUp(page);
@@ -180,7 +190,7 @@ test('the demo button opens admin Today with sample bookings, and Bookings lists
   await enterDemo(page);
   // The banner rides along in the admin.
   await expect(page.getByText(BANNER)).toBeVisible();
-  await expect(page.locator('.exq-adm-today__chairs .exq-adm-chair').first()).toBeVisible();
+  await expect(page.locator('.exq-chairrow').first()).toBeVisible();
 
   await page.goto('/admin/bookings');
   await expect(page.getByRole('heading', { name: 'Bookings' })).toBeVisible();
@@ -198,11 +208,9 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
   await enterDemo(page);
 
   // The real screen: pick a chair, pick a file, describe it, upload. Stored in MongoDB, no R2.
-  await page.goto('/admin/photos');
-  await expect(page.getByRole('heading', { name: 'Photos' })).toBeVisible();
-  await expect(page.locator('.exq-adm-photos-page[data-state="disabled"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Chairs' }).click();
-  await page.getByLabel('Chair', { exact: true }).selectOption({ label: 'Marcus' });
+  await page.goto('/admin/team');
+  await page.getByRole('link', { name: 'Marcus', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Photos of Marcus' })).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'marcus.png',
     mimeType: 'image/png',
@@ -237,7 +245,7 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
   // Public pages, signed out: the portrait, the gallery tile, the work strip and the hero.
   await page.context().clearCookies();
   await page.goto('/chairs/marcus');
-  const arch = page.locator('.exq-chair .exq-arch[data-state="loaded"] img');
+  const arch = page.locator('.exq-chair .exq-photoframe[data-state="loaded"] img');
   await expect(arch).toHaveAttribute('src', /\/api\/media\//);
   expect(await arch.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await expect(page.locator('.exq-chair__work .exq-photo-grid__item').first()).toBeVisible();
@@ -258,19 +266,164 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
   expect(errors).toEqual([]);
 });
 
+test('the barber portal shows the demo PIN, and it opens the portal', async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/team');
+  await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
+  await expect(page.getByText('Demo PIN: 246810')).toBeVisible();
+  await page.getByRole('button', { name: /^Marcus/ }).click();
+  await expect(page.getByText('Demo PIN: 246810')).toBeVisible();
+  const pad = page.getByRole('group', { name: 'PIN for Marcus' });
+  // A wrong PIN is refused, the demo PIN opens Today.
+  for (const digit of '135790') await pad.getByRole('button', { name: digit, exact: true }).click();
+  await expect(page.getByText('That PIN did not work. Try again.')).toBeVisible();
+  for (const digit of '246810') await pad.getByRole('button', { name: digit, exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Week', exact: true }).click();
+  await expect(page.locator('.exq-team-day')).toHaveCount(7);
+  // The one wrong PIN is a 401 the browser logs; nothing else may be.
+  expect(errors.filter((e) => !e.includes('401'))).toEqual([]);
+});
+
+test.describe('the demo notice', () => {
+  const BODY =
+    'This site is a demo built by Visualize Studio for Exquisite Barber & Beauty Lounge. Bookings made here are not real and nothing is sent to the shop. It is a preview for Visualize clients.';
+  test('blocks the first visit with the words, a link, and the page behind unreachable', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const dialog = page.getByRole('dialog', { name: 'This is a demo' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(BODY);
+    const about = dialog.getByRole('link', { name: 'visualizestudio.org' });
+    await expect(about).toHaveAttribute('href', 'https://visualizestudio.org');
+    await expect(about).toHaveAttribute('target', '_blank');
+    await expect(about).toHaveAttribute('rel', /noopener/);
+    await expect(dialog.getByRole('button', { name: 'Enter the demo' })).toBeVisible();
+    // Tab cycles inside the dialog (or out to the browser itself) and never reaches the page.
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press('Tab');
+      expect(
+        await page.evaluate(
+          () => document.activeElement?.closest('header, main, footer, nav, .exq-bar') ?? null,
+        ),
+      ).toBeNull();
+    }
+    const blocked = await page.evaluate(() =>
+      document
+        .elementsFromPoint(window.innerWidth / 2, 10)
+        .some((el) => el.tagName === 'DIALOG' || el.closest('dialog') !== null),
+    );
+    expect(blocked).toBe(true);
+  });
+
+  test('Escape closes it, and it stays away for the rest of the session on every area', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page.getByRole('dialog', { name: 'This is a demo' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'This is a demo' })).toBeHidden();
+    // The footer keeps a small line afterwards.
+    await expect(page.getByRole('link', { name: 'Demo by Visualize Studio' })).toHaveAttribute(
+      'href',
+      'https://visualizestudio.org',
+    );
+    for (const path of ['/', '/services', '/admin/login', '/team']) {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('dialog[open]'), path).toHaveCount(0);
+    }
+  });
+
+  test('Enter the demo closes it too, and the admin and the barber portal show it first thing', async ({
+    browser,
+    baseURL,
+  }) => {
+    for (const path of ['/admin/login', '/team']) {
+      const fresh = await (
+        await browser.newContext({ ignoreHTTPSErrors: true, ...(baseURL ? { baseURL } : {}) })
+      ).newPage();
+      await fresh.goto(path);
+      const dialog = fresh.getByRole('dialog', { name: 'This is a demo' });
+      await expect(dialog, path).toBeVisible();
+      await dialog.getByRole('button', { name: 'Enter the demo' }).click();
+      await expect(dialog, path).toBeHidden();
+      await fresh.context().close();
+    }
+  });
+
+  test('with storage blocked it shows on every page load', async ({ page }) => {
+    await page.addInitScript(() => {
+      const blocked = () => {
+        throw new DOMException('blocked', 'SecurityError');
+      };
+      Object.defineProperty(window, 'sessionStorage', {
+        get: blocked,
+        configurable: true,
+      });
+    });
+    await page.goto('/');
+    const dialog = page.getByRole('dialog', { name: 'This is a demo' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Enter the demo' }).click();
+    await expect(dialog).toBeHidden();
+    await page.reload();
+    await expect(page.getByRole('dialog', { name: 'This is a demo' })).toBeVisible();
+  });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`passes axe with no layout shift, ${theme}`, async ({ page }) => {
+      await page.addInitScript((t) => {
+        localStorage.setItem('exq-theme', t);
+      }, theme);
+      await page.goto('/');
+      const dialog = page.getByRole('dialog', { name: 'This is a demo' });
+      await expect(dialog).toBeVisible();
+      await page.waitForFunction(() =>
+        document.getAnimations().every((a) => a.playState !== 'running'),
+      );
+      const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+      expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.html ?? ''}`)).toEqual([]);
+      // An overlay: it moves nothing on the page behind it.
+      const shift = await page.evaluate(
+        () =>
+          new Promise<number>((resolve) => {
+            let total = 0;
+            const observer = new PerformanceObserver((list) => {
+              for (const entry of list.getEntries()) {
+                const shiftEntry = entry as PerformanceEntry & {
+                  value: number;
+                  hadRecentInput: boolean;
+                };
+                if (!shiftEntry.hadRecentInput) total += shiftEntry.value;
+              }
+            });
+            observer.observe({ type: 'layout-shift', buffered: true });
+            setTimeout(() => {
+              resolve(total);
+            }, 300);
+          }),
+      );
+      expect(shift).toBeLessThan(0.1);
+    });
+  }
+});
+
 test('Reset demo data wipes the changes and loads the sample shop again', async ({ page }) => {
   const errors = watchConsole(page);
   await enterDemo(page);
-  await page.goto('/admin/settings/demo');
+  await page.goto('/admin/settings?tab=demo');
   await expect(page.getByRole('heading', { name: 'Demo data', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Reset demo data' }).click();
-  const sheet = page.locator('dialog.exq-sheet[open]');
+  const sheet = page.locator('dialog.exq-dialog[open]');
   await expect(sheet.getByRole('heading', { name: 'Reset demo data?' })).toBeVisible();
   await sheet.getByRole('button', { name: 'Reset it' }).click();
 
   // Back on a fresh Today, still signed in.
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByRole('heading', { name: /^Today/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
 
   // The photos and the visitor's booking are gone; the sample shop is back.
   await page.goto('/admin/bookings');
@@ -281,11 +434,11 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
   );
   await page.context().clearCookies();
   await page.goto('/chairs/marcus');
-  await expect(page.locator('.exq-chair .exq-arch[data-state="placeholder"]')).toBeVisible();
+  await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await page.goto('/gallery');
   await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();
   await page.goto('/');
-  await expect(page.locator('.exq-hero[data-state="ink"]')).toBeVisible();
+  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
   await expectUp(page);
   expect(errors).toEqual([]);
 });

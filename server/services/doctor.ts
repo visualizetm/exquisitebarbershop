@@ -208,6 +208,46 @@ async function checkDatabase(): Promise<DoctorCheck[]> {
   return checks;
 }
 
+/** Cloudinary: a signed call to the Admin API (nothing is written), then what delivery and backups mean. */
+async function checkCloudinary(): Promise<DoctorCheck[]> {
+  try {
+    const storage = getStorage();
+    await storage.ping?.();
+    return [
+      {
+        id: 'storage',
+        label: 'Photo storage',
+        status: 'pass',
+        detail: 'A signed call to the Cloudinary Admin API worked.',
+      },
+      {
+        id: 'storage-public',
+        label: 'Public photo URL',
+        status: 'pass',
+        detail: 'Photos are delivered from res.cloudinary.com in the sizes each frame needs.',
+      },
+      {
+        id: 'backups',
+        label: 'Backups',
+        status: 'warn',
+        detail:
+          'Cloudinary holds photos only, so the daily job writes no backup. Photos stay on Cloudinary; turn on MongoDB Atlas backups for the data.',
+        fix: 'In MongoDB Atlas, open the cluster, Backup, and turn on continuous or scheduled snapshots (DEPLOY.md, backups).',
+      },
+    ];
+  } catch (error) {
+    return [
+      {
+        id: 'storage',
+        label: 'Photo storage',
+        status: 'fail',
+        detail: describe(error),
+        fix: 'Check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET against the Cloudinary dashboard (Settings, API Keys).',
+      },
+    ];
+  }
+}
+
 const STORAGE_OFF_FIX = 'Set up Cloudflare R2 (see DEPLOY.md) to turn on photos and daily backups.';
 
 /** Photo storage, its public address and the daily backups that go to the same bucket. */
@@ -233,6 +273,7 @@ async function checkStorage(): Promise<DoctorCheck[]> {
       },
     ];
   }
+  if (getPartialEnv().STORAGE_DRIVER === 'cloudinary') return checkCloudinary();
   const key = `${keyPrefix()}_doctor/${randomUUID()}.txt`;
   const body = new TextEncoder().encode('exquisite doctor');
   let storage;

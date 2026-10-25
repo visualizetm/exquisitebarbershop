@@ -1,22 +1,9 @@
-import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { shopSettingsSeed } from './seed/shop';
-
-function resolveBuildSha(): string {
-  const fromVercel = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
-  if (fromVercel) return fromVercel;
-  try {
-    return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
-      .toString()
-      .trim();
-  } catch {
-    return 'unknown';
-  }
-}
 
 /** The public origin for absolute URLs (Open Graph, the robots Sitemap line). Not a secret. */
 function configuredSiteUrl(): string | null {
@@ -35,8 +22,8 @@ function resolveSiteUrl(): string {
 }
 
 /**
- * Fills %SITE_URL% in index.html, preloads the three Jost files so text renders in the
- * right font from the first paint (otherwise the swap shifts the whole page below the
+ * Fills %SITE_URL% in index.html, preloads the one variable Jost file so text renders in
+ * the right font from the first paint (otherwise the swap shifts the whole page below the
  * hero), and adds the Sitemap line to robots.txt when the site URL is known.
  */
 function headPlugin(): Plugin {
@@ -63,7 +50,7 @@ function headPlugin(): Plugin {
       order: 'post',
       handler(html, ctx) {
         const fonts = Object.keys(ctx.bundle ?? {}).filter((file) =>
-          /jost-latin-(400|500|700)-normal.*\.woff2$/.test(file),
+          /jost-latin-wght-normal.*\.woff2$/.test(file),
         );
         const tags: HtmlTagDescriptor[] = fonts.map((href) => ({
           tag: 'link',
@@ -84,7 +71,14 @@ function headPlugin(): Plugin {
             attrs: { name: 'robots', content: 'noindex, nofollow' },
           });
         }
-        return { html: html.replaceAll('%SITE_URL%', resolveSiteUrl()), tags };
+        const phone = shopSettingsSeed.phone;
+        return {
+          html: html
+            .replaceAll('%SITE_URL%', resolveSiteUrl())
+            .replaceAll('%SHOP_PHONE_TEL%', phone.replace(/[^\d+]/g, ''))
+            .replaceAll('%SHOP_PHONE%', phone),
+          tags,
+        };
       },
     },
   };
@@ -93,7 +87,6 @@ function headPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), tsconfigPaths({ projects: ['./tsconfig.app.json'] }), headPlugin()],
   define: {
-    __BUILD_SHA__: JSON.stringify(resolveBuildSha()),
     // The placeholder stays in seed/shop.ts; the client only gets the value for the API-down message.
     __SHOP_PHONE__: JSON.stringify(shopSettingsSeed.phone),
   },

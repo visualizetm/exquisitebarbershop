@@ -271,3 +271,177 @@ commit, and what is still open.
   replay, the demo flow end to end) as a required CI step with a bundle freshness check; the
   production-like e2e servers load the real function file; DEPLOY.md, SITE-REPORT, CLAUDE.md.
 - Open: merge, let Vercel deploy, open `/api/health`: JSON, not an error page.
+
+## Prompt 10
+
+### M1: tokens, kit and /kit
+
+- Shipped: `src/styles/tokens.css` rewritten (one variables file, the Shop Sign palette, the six
+  type sizes, motion tokens, dark values per the brief); `@fontsource-variable/jost` replaces the
+  three static weights; `base.css`, `kit.css`, `frame.css`, `motion.css` split by job; the kit
+  rebuilt (Button variants primary, accent, outline, ghost, onink; OptionCard, Label,
+  SectionHead, PriceRow, PhotoFrame, ChairCard, StepBar with numbers, Ticket with a drawn check,
+  Toast with pause on hover, Dialog under Sheet, Modal and Lightbox, Reveal and Lines, TopStrip,
+  Header, MobileMenu, BottomBar); `/kit` shows every component in every state in both themes;
+  `docs/DESIGN-SYSTEM.md` and `docs/brand/DESIGN-DIRECTION-V2.md`; `announcement` in shop settings
+  and the public shop response (the editor is prompt 11's).
+- Transitional: `src/styles/legacy.css` aliases the old token names for the pages not yet rebuilt
+  (removed in M4); the old Nav, Footer and StickyCTA still run until M2.
+- Tests: `tests/unit/motionCss.test.ts` (durations from tokens, allowed animated properties, no
+  loops but the spinner, no literal colors or font sizes in the kit stylesheets).
+
+### M2: the frame
+
+- Shipped: TopStrip (announcement from shop settings, default "Walk ins welcome" plus a red
+  "Book online" link; an empty ink bar while settings load), the Header (stacked logo below 1024px,
+  wordmark above, hamburger that becomes an X, a Book a chair button always visible on desktop), the
+  full-screen ink MobileMenu (big caps links, theme switch, Call and Book, page behind inert), the
+  phone BottomBar (CALL and BOOK NOW; BOOK MARCUS on a profile; BACK and CONTINUE, then CONFIRM
+  BOOKING, with a total row in booking; hides for the keyboard; publishes `--bar-h`), a Footer with
+  no build stamp and no staff link, `viewport-fit=cover`, and a no-JavaScript fallback in
+  `index.html`. The old Nav and StickyCTA are gone; the build sha is only in `/api/health`.
+- Tests: `tests/e2e/frame.spec.ts` (bar visible at 390 and 60px tall, hidden at 1280 and in /admin,
+  /setup and /kit, labels per page and per booking step, hidden while a field has focus, never
+  covers the page end, no build text or staff link on any public page, the menu).
+
+### M3: the public pages
+
+- Shipped: Home in the order of the brief (hero text with the four line H1 and EXQUISITE in red, the
+  info row from shop data, the hero photo only when one exists, Today's chairs, The Menu in an ink
+  band, The Work hidden when empty, Visit with today highlighted, the ink CTA band); Services as an ink
+  page with group chips and counts and PriceRows that link to `/book?service=id`; The Chairs
+  ("Pick your chair"); the profile (portrait, name in display type, next 3 openings, services, work);
+  Gallery (2 and 3 columns, barber chips, swipeable lightbox); Visit.
+- Motion on these pages: hero line rise and settle by 610ms, scroll reveals with stagger, photo wipes,
+  the CTA line rise, and page transitions (a 250ms cross-fade through `document.startViewTransition`,
+  taken in the kit `Link`).
+- Tests: `tests/e2e/motion.spec.ts` (hero timing and full opacity, hidden below the fold and revealed
+  once, nothing hidden or transformed under reduced motion, nothing hidden without
+  IntersectionObserver, a no-JavaScript page, CLS under 0.1, a view transition on navigation).
+
+### M4: Book, Manage, overlays and the admin restyle
+
+- Shipped: Book with the four part StepBar (1 SERVICE, 2 BARBER, 3 TIME, 4 DETAILS; day and time share a
+  part, details and confirm share a part), numbered ink circles on every step heading, OptionCards for
+  services, barbers and "Anyone available", the day strip with open counts, times grouped into morning,
+  afternoon and evening, the details form built from the kit's Input and Textarea, the confirmation and
+  Manage as a Ticket (it rises and its check draws itself), the cancel confirmation in a Sheet, step
+  content that slides the way you are travelling; the admin screens on the new tokens with the 13 to
+  22px scale, color fades on status changes, new items sliding in and still skeleton blocks while
+  loading; the temporary `legacy.css` is gone.
+- Tests: `tests/e2e/kit.spec.ts` (every kit section in both themes, a sheet opens in 250ms and closes in
+  150ms, the modal and the swipeable lightbox), `/kit` is absent from the production build.
+
+### M5: Cloudinary photos
+
+- Shipped: the `cloudinary` storage driver (signed browser uploads, verification on confirm,
+  destroy on delete, the 24 hour orphan sweep, a signed doctor ping), `STORAGE_DRIVER=cloudinary`
+  allowed in production without DEMO_MODE and requiring the four CLOUDINARY variables (Preview must
+  use a folder that says preview), responsive images (`f_auto,q_auto,c_fill,g_auto`, four widths,
+  `sizes`, lazy below the fold, `fetchpriority=high` on the hero), the CSP naming `res.cloudinary.com`
+  and `api.cloudinary.com` only, `npm run photos:migrate -- --from mongo --to cloudinary [--dry-run]`,
+  DEPLOY.md section 10b and the env table.
+- Tests: signing and URL building (`tests/unit/cloudinary.test.ts`), the env rules, the CSP, a fake
+  Cloudinary (`tests/helpers/fakeCloudinary.ts`) driving upload, confirm, show, delete, the sweep, the
+  doctor and who can sign (`tests/integration/cloudinary.test.ts`), the migration
+  (`tests/integration/photosMigrate.test.ts`), and the browser picking the right sizes
+  (`tests/e2e/cloudinary-images.spec.ts`).
+
+### M6: QA
+
+- Lighthouse mobile on the production-like build (served with brotli like Vercel): Home 95 / 100 / 96 / 69,
+  Services 96 / 100 / 96 / 69, Book 97 / 100 / 96 / 69 (performance, accessibility, best practices, SEO;
+  the SEO score is the showcase build's noindex), CLS 0 on all three, LCP 2.2 to 2.5s. Without
+  compression the same build scored 73 to 76: the local https server now compresses like Vercel's edge.
+- Axe (WCAG 2 A and AA): nothing on any public page or booking step, light or dark, at 390 and 1280
+  (`tests/e2e/rules.spec.ts`), plus the earlier admin runs. Also tested there: only the six type sizes,
+  tap targets of 44px, alt text and dimensions on every image, the hero fitting a 390px first screen.
+- Found and fixed on the way: the phone bar's `:hover { color: inherit }` made CONFIRM BOOKING ink on red after a
+  tap (hover sticks on touch); the "Today" tag on the hours table failed contrast in dark; the skip link
+  was 42px tall; booking tests clicked options through a 1px input.
+- Screenshots (light and dark, 390 and 1280, a montage per width and theme): `docs/screens/p10/`;
+  recordings of Home scrolling with the menu and of a booking at 390: `docs/screens/p10/motion/`.
+
+## Prompt 11
+
+### M1: kit gaps, dashboard shell, search
+
+- Shipped: `Sidebar`, `StatTile`, `DataTable`, `SearchBox`, `PinPad`, `BarChart`, `Tabs`, `BottomTabs` and
+  `IconButton` (with the desktop tooltip) in `src/components/ui/`, styled in `src/styles/dashboard.css`;
+  the owner shell (ink 248px sidebar from 1024px, a top bar with search, today's date and New booking, a
+  three tab bar plus More below it) in `src/admin/shell/`; `GET /api/admin/search` with the
+  `by_name_key` index; `Mark` lost `pole` and `pill` and gained `crest`, `disc`, `arched` and
+  `lockup-vertical`.
+- Tests: `tests/unit/search.test.ts`, `tests/integration/adminSearch.test.ts`, the authz matrix row,
+  `tests/e2e/dashboard.spec.ts` (shell at 1280 and 390, the `/` shortcut, search by code, phone and
+  accent free name, axe in both themes) and the Dashboard section of `tests/e2e/kit.spec.ts`.
+
+### M2: Overview and Bookings
+
+- Shipped: the Overview (alerts strip, quick actions, four stat tiles with compare lines only when last
+  week has data, Now and next, the week chart with a text table, the latest eight events), the Bookings
+  table (25 per page, sortable, quick filters with counts, barber and status filters, state in the
+  address), the booking panel (Reschedule, Cancel or Cancel and notify, Mark done, No show with Undo, Resend
+  confirmation with its reason when email is off, Copy manage link, notes, history), and the quick action
+  panels (New booking, Walk-in, Block time, Barber out today, Edit announcement). Server: `GET
+/api/admin/overview`, `GET /api/admin/booking-table`, `POST /api/admin/bookings/:id/resend`, the `alerts`
+  collection, Move in the resolver, `features.email` on `/api/auth/me`.
+- Tests: `tests/integration/adminDashboard.test.ts`, `resolverMove.test.ts` (including the race), the
+  authz matrix rows, and `tests/e2e/dashboard.spec.ts` (overview, filters, deep link, cancel, announcement,
+  axe in both themes at 1280 and 390 on the overview, the list and the panel).
+
+### M3: Schedule, Customers, Team
+
+- Shipped: the Schedule (day grid with a column per chair, hatched blocks, gray time off, a red now line,
+  click an empty slot or a chair's plus to open New booking filled in; week table of counts that opens a
+  day), Customers (list grouped by phone, search, sort, a panel with history and a private note), Team
+  (cards with an In or Off today switch and the next booking; a profile page with Profile, Services, Working
+  hours and Time off tabs; Add barber; Remove from schedule through the resolver), the alert resolver
+  (Decide on the overview strip), and the removed barber redirect. Server: `GET /api/admin/schedule/week`,
+  `GET /api/admin/customer-list`, `PUT /api/admin/customers/notes`, `POST /api/admin/alerts/:id/resolve`
+  and `/dismiss`, the `customerNotes` collection.
+- Tests: `tests/integration/customersAlerts.test.ts`, `removedStaff.test.ts`, the authz rows and
+  `tests/e2e/team.spec.ts` (schedule, week, customers, resolver Move end to end, add and remove a barber,
+  the In or Off switch, axe in both themes at 1280 and 390 on every new screen).
+
+### M4: Website and Settings
+
+- Shipped: Website at `/admin/website` with five tabs (Hours with closed days and special hours through the
+  resolver, Announcement, Services with add, edit, hide and drag or arrow reorder, Home photo with phone and
+  computer crop previews, Gallery with multi upload, required alt text, barber tag, reorder, edit and
+  remove), each with View on site. Settings at `/admin/settings`: Shop info with the three social links,
+  Booking rules in hours, Account (change email, change password, theme, sign out everywhere), Email
+  (read only, with why) and Demo data (demo only). Server: `POST /api/me/email`, `staffId` on the photo
+  patch.
+- Tests: `tests/integration/ownEmail.test.ts`, the photo tag tests, the authz row, and
+  `tests/e2e/website.spec.ts` (every tab, the closed day resolver, services, home photo, gallery, settings
+  saves and errors, email change and back, axe in both themes at 1280 and 390).
+
+### M5: the barber portal
+
+- Shipped: `/team`, one shared link. Tap a name, then a 6 dot PIN pad that submits on the sixth digit.
+  Four tabs: Today (Next up with Done and No show, the day, Add note, Undo, Walk-in), Week (seven days
+  with counts), Time off ("I am out today" with a confirm, Block time, Days off ahead, requests waiting)
+  and Me (change PIN, theme, sign out). `/team/setup/:token` is the one-time link where a barber chooses and
+  confirms a PIN. The owner's Team page has a new Access tab: Copy setup link, Reset PIN, Unlock, last sign
+  in. Barbers can no longer sign in at `/admin`.
+- Server: `staffPins`, `setupTokens`, `teamSessions`; the `team` auth level; `/api/team/*` (16 routes) and
+  `/api/admin/staff/:id/access|setup-link|unlock`; demo PIN seeding.
+- Tests: `tests/unit/pin.test.ts`, `teamAuth.test.ts` (links, hashing, 12 hours, identical failures, lockout,
+  address limit, change PIN, audit), `teamPortal.test.ts` (day, status, notes, out today and the owner's
+  decision, days off, blocks, walk-in), `idor.test.ts` rewritten for the barber API, the demo PIN tests in
+  `demo.test.ts`, the authz matrix across anonymous, barber, owner and temporary password, and
+  `tests/e2e/portal.spec.ts` (sign in, the whole barber day at 390, setup link, lockout and unlock, axe on
+  every screen in both themes).
+
+### M6: demo notice, icons, social links, fixes, guides
+
+- Shipped: the demo notice (D11-36), icons on the bottom bar, hero facts, Visit facts, step bar, ticket and
+  toasts, `SocialIcon` and the footer follow links (D11-37), the footer crest, the outage fallback for public
+  pages (D11-39), the 170 by 40 phone logo (D11-41), the `/team` disc mark, Directions icons.
+- Docs: `OWNER-GUIDE.md` and `BARBER-GUIDE.md` rewritten as step by step scenarios with screens in
+  `docs/screens/p11/guide/`; `DESIGN-SYSTEM.md`, `ARCHITECTURE.md`, `SITE-REPORT.md` and `DECISIONS.md`
+  updated.
+- Captures: `tests/e2e/p11-capture.ts` (`milestones`, `guide`, `m6`, `recordings`); montages per milestone in
+  `docs/screens/p11/m*/`; recordings in `docs/screens/p11/recordings/`.
+- Tests: `tests/e2e/chrome.spec.ts`, `outage.spec.ts`, the demo notice suite in `tests/e2e/demo/demo.spec.ts`.

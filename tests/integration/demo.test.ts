@@ -6,6 +6,7 @@ import { resetDemoReadyCache } from '../../server/services/demo';
 import { resetStorageCache } from '../../server/storage';
 import { MONGO_MAX_BYTES } from '../../server/storage/mongo';
 import { apiErrorSchema } from '../../shared/api/errors';
+import { DEMO_PIN } from '../../shared/lib/pin';
 import { meResponseSchema } from '../../shared/api/auth';
 import { adminPhotoResponseSchema, uploadUrlResponseSchema } from '../../shared/api/photos';
 import { publicShopSchema, publicStaffListResponseSchema } from '../../shared/api/public';
@@ -149,7 +150,7 @@ describe('the demo owner login', () => {
     const me = await call(server.baseUrl, 'GET', '/api/auth/me', { headers: { cookie } });
     const parsed = meResponseSchema.parse(me.body);
     expect(parsed.user.role).toBe('owner');
-    expect(parsed.features).toEqual({ photos: true, demo: true });
+    expect(parsed.features).toEqual({ photos: true, demo: true, email: false });
     const today = await call(server.baseUrl, 'GET', '/api/admin/today', { headers: { cookie } });
     expect(today.status).toBe(200);
     const bookings = await call(server.baseUrl, 'GET', '/api/admin/bookings', {
@@ -363,5 +364,63 @@ describe('reset and clear', () => {
     expect(refused.status).toBe(409);
     expect(await db().collection('shopSettings').countDocuments()).toBe(1);
     await db().collection('shopSettings').deleteMany({});
+  });
+});
+
+describe('barber PINs in the showcase', () => {
+  const marcusId = async () => {
+    const staff = publicStaffListResponseSchema.parse(
+      (await call(server.baseUrl, 'GET', '/api/staff')).body,
+    ).staff;
+    return staff.find((s) => s.slug === 'marcus')?.id ?? '';
+  };
+  const signIn = (staffId: string, pin: string) =>
+    call(server.baseUrl, 'POST', '/api/team/login', { body: { staffId, pin } });
+
+  it('gives every barber the demo PIN on setup, and it signs them in', async () => {
+    await wipeEverything();
+    await call(server.baseUrl, 'GET', '/api/shop');
+    expect(await db().collection('staffPins').countDocuments()).toBe(6);
+    expect((await signIn(await marcusId(), DEMO_PIN)).status).toBe(200);
+    expect((await signIn(await marcusId(), '135790')).status).toBe(401);
+    // The stored hash is argon2id, never the PIN.
+    const stored = await db().collection('staffPins').findOne({});
+    expect(stored?.pinHash).toMatch(/^\$argon2id\$/);
+    expect(JSON.stringify(stored)).not.toContain(DEMO_PIN);
+  });
+
+  it('a demo seeded before PINs existed gets them once; handing out a link is not undone', async () => {
+    await wipeEverything();
+    await call(server.baseUrl, 'GET', '/api/shop');
+    await db().collection('staffPins').deleteMany({});
+    resetDemoReadyCache();
+    await call(server.baseUrl, 'GET', '/api/shop');
+    expect(await db().collection('staffPins').countDocuments()).toBe(6);
+
+    const cookie = await demoSignIn();
+    const id = await marcusId();
+    const link = await call(server.baseUrl, 'POST', `/api/admin/staff/${id}/setup-link`, {
+      headers: { cookie },
+      body: {},
+    });
+    expect(link.status).toBe(201);
+    resetDemoReadyCache();
+    await call(server.baseUrl, 'GET', '/api/shop');
+    expect(await db().collection('staffPins').countDocuments()).toBe(5);
+    expect((await signIn(id, DEMO_PIN)).status).toBe(401);
+  });
+
+  it('Reset demo data gives everyone the demo PIN again', async () => {
+    await wipeEverything();
+    await call(server.baseUrl, 'GET', '/api/shop');
+    const cookie = await demoSignIn();
+    await db().collection('staffPins').deleteOne({});
+    const reset = await call(server.baseUrl, 'POST', '/api/admin/demo/reset', {
+      headers: { cookie },
+      body: {},
+    });
+    expect(reset.status).toBe(200);
+    expect(await db().collection('staffPins').countDocuments()).toBe(6);
+    expect((await signIn(await marcusId(), DEMO_PIN)).status).toBe(200);
   });
 });

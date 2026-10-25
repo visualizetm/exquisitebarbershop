@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { KEY_PREFIX_PATTERN } from '../shared/schemas/photo';
+import { CLOUDINARY_FOLDER_PATTERN, KEY_PREFIX_PATTERN } from '../shared/schemas/photo';
 
 /**
  * Server-side environment. Parsed lazily on first use so importing modules in
@@ -39,9 +39,10 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   /**
    * Where photos live: Cloudflare R2 in production, the local disk in dev and tests,
-   * "none" to run without photos until R2 exists, or "mongo" (MongoDB GridFS, demo mode only).
+   * "cloudinary" (photos on Cloudinary, signed uploads from the browser), "none" to run
+   * without photos, or "mongo" (MongoDB GridFS, demo mode only).
    */
-  STORAGE_DRIVER: z.enum(['local', 'r2', 'none', 'mongo']).default('local'),
+  STORAGE_DRIVER: z.enum(['local', 'r2', 'cloudinary', 'none', 'mongo']).default('local'),
   /**
    * Showcase mode: the first request sets the shop up with sample data, the admin login
    * offers a one-click demo sign-in, photos can live in MongoDB (STORAGE_DRIVER=mongo),
@@ -50,6 +51,18 @@ const envSchema = z.object({
   DEMO_MODE: z.enum(['true', 'false']).default('false'),
   /** Lets production launch with STORAGE_DRIVER=none on purpose, before R2 is set up. */
   STORAGE_DISABLED_ACK: z.enum(['true', 'false']).default('false'),
+  /** Cloudinary (STORAGE_DRIVER=cloudinary). The secret never leaves the server. */
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  /** The folder every upload goes into: exquisite/production, or exquisite/preview for Preview. */
+  CLOUDINARY_FOLDER: z
+    .string()
+    .regex(
+      CLOUDINARY_FOLDER_PATTERN,
+      'CLOUDINARY_FOLDER must be lowercase letters, digits, hyphens or underscores, with slashes between folders',
+    )
+    .optional(),
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),
@@ -117,8 +130,8 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
     need(
       'STORAGE_DRIVER',
       env.STORAGE_DRIVER !== 'local',
-      'STORAGE_DRIVER must be r2, none or mongo on Vercel',
-      'Set STORAGE_DRIVER to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on.',
+      'STORAGE_DRIVER must be cloudinary, r2, none or mongo on Vercel',
+      'Set STORAGE_DRIVER to cloudinary with the four CLOUDINARY variables (see DEPLOY.md), to r2 with the R2 variables, to none (with STORAGE_DISABLED_ACK=true in Production) to run without photos for now, or to mongo with DEMO_MODE=true for a showcase. Vercel functions have no disk to keep photos on.',
     );
   }
   const demo = env.DEMO_MODE === 'true';
@@ -127,7 +140,7 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
       'STORAGE_DRIVER',
       demo,
       'STORAGE_DRIVER is mongo without DEMO_MODE',
-      'Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md) for a real launch.',
+      'Photos in MongoDB are only for the showcase. Set DEMO_MODE=true for a demo, or set STORAGE_DRIVER=cloudinary with the CLOUDINARY variables (see DEPLOY.md) for a real launch.',
     );
   }
   // Demo mode says "no photos or email on purpose" by itself; the acknowledgements are for real launches.
@@ -136,7 +149,7 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
       'STORAGE_DISABLED_ACK',
       env.STORAGE_DISABLED_ACK === 'true',
       'STORAGE_DRIVER is none, so photos and daily backups are off',
-      'Either set STORAGE_DRIVER=r2 with the R2 variables (see DEPLOY.md), or set STORAGE_DISABLED_ACK=true to launch without photos and backups on purpose.',
+      'Either set STORAGE_DRIVER=cloudinary with the CLOUDINARY variables (see DEPLOY.md), or set STORAGE_DISABLED_ACK=true to launch without photos and backups on purpose.',
     );
   }
   if (env.STORAGE_DRIVER === 'r2') {
@@ -152,6 +165,31 @@ export function envProblems(env: Env, environment: Environment = environmentOf(e
         Boolean(env[name]),
         `${name} is not set`,
         `Set ${name} from the Cloudflare R2 bucket (R2, the bucket, Settings for the public URL; Manage R2 API Tokens for the keys).`,
+      );
+    }
+  }
+  if (env.STORAGE_DRIVER === 'cloudinary') {
+    for (const name of [
+      'CLOUDINARY_CLOUD_NAME',
+      'CLOUDINARY_API_KEY',
+      'CLOUDINARY_API_SECRET',
+      'CLOUDINARY_FOLDER',
+    ] as const) {
+      need(
+        name,
+        Boolean(env[name]),
+        `${name} is not set`,
+        name === 'CLOUDINARY_FOLDER'
+          ? 'Set CLOUDINARY_FOLDER to exquisite/production in Production and exquisite/preview in Preview, so previews never touch live photos.'
+          : `Set ${name} from the Cloudinary dashboard (Settings, API Keys). The API secret is server side only.`,
+      );
+    }
+    if (environment === 'preview' && env.CLOUDINARY_FOLDER) {
+      need(
+        'CLOUDINARY_FOLDER',
+        env.CLOUDINARY_FOLDER.includes('preview'),
+        'CLOUDINARY_FOLDER does not say preview for a preview deployment',
+        'Set CLOUDINARY_FOLDER to exquisite/preview in the Preview environment only, so preview uploads never touch production photos.',
       );
     }
   }

@@ -1,12 +1,11 @@
 import { existsSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newId } from '../../server/lib/ids';
-import { shopSettingsRepo } from '../../server/repos';
 import { resetEnvCache } from '../../server/env';
 import { purgeDeletedPhotos, sweepAbandonedUploads } from '../../server/services/photosService';
 import { runSeed } from '../../server/services/seedService';
 import { localPathFor } from '../../server/storage/local';
-import { shopSettingsSeed, staffSeedId } from '../../seed/shop';
+import { staffSeedId } from '../../seed/shop';
 import { apiErrorSchema } from '../../shared/api/errors';
 import {
   adminPhotoListResponseSchema,
@@ -17,14 +16,13 @@ import {
 } from '../../shared/api/photos';
 import { publicShopSchema, publicStaffListResponseSchema } from '../../shared/api/public';
 import { photoKeySchema } from '../../shared/schemas/photo';
-import { createLogin, sessionCookie } from '../helpers/auth';
+import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
 import { call, startTestServer, type TestServer } from '../helpers/bookingApi';
 import { NOW, useTestDb } from '../helpers/db';
 
 const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
-let marcusCookie: string;
 const marcus = staffSeedId('marcus');
 const dee = staffSeedId('dee');
 
@@ -39,7 +37,6 @@ const as =
       ...(body === undefined ? {} : { body }),
     });
 const owner = (m: string, p: string, b?: unknown) => as(ownerCookie)(m, p, b);
-const barber = (m: string, p: string, b?: unknown) => as(marcusCookie)(m, p, b);
 const codeOf = (body: unknown) => apiErrorSchema.parse(body).error.code;
 
 /** PUTs bytes to the presigned URL through the test server (same path, our port). */
@@ -86,8 +83,6 @@ beforeAll(async () => {
   server = await startTestServer();
   const ownerLogin = await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') });
   ownerCookie = await sessionCookie(ownerLogin._id);
-  const marcusLogin = await createLogin({ role: 'barber', staffId: marcus });
-  marcusCookie = await sessionCookie(marcusLogin._id);
 });
 afterAll(async () => {
   await server.close();
@@ -313,49 +308,35 @@ describe('the local driver end to end', () => {
   });
 });
 
-describe('a barber', () => {
-  it('cannot upload until the owner allows it, then only to their own chair', async () => {
-    const off = await issue(marcusCookie, { kind: 'staff', staffId: marcus });
-    expect(off.res.status).toBe(403);
-    await shopSettingsRepo.updateShopSettings(
-      {
-        ...shopSettingsSeed,
-        permissions: { barbersCanBlockTime: false, barbersCanUploadPhotos: true },
-      },
-      new Date(),
+describe('crediting a gallery photo to a barber', () => {
+  it('lets the owner tag and untag the work, shows it in the barber filter, and refuses everything else', async () => {
+    const { photo } = await uploadAndConfirm(ownerCookie, { kind: 'gallery' }, 'A skin fade');
+    expect(photo.staffId).toBeNull();
+    const tagged = await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: dee });
+    expect(tagged.status).toBe(200);
+    expect(adminPhotoResponseSchema.parse(tagged.body).photo.staffId).toBe(dee);
+    const gallery = galleryResponseSchema.parse(
+      (await call(server.baseUrl, 'GET', '/api/gallery?staff=dee')).body,
     );
-    const other = await issue(marcusCookie, { kind: 'staff', staffId: dee });
-    expect(other.res.status).toBe(403);
-    const gallery = await issue(marcusCookie, { kind: 'gallery', staffId: marcus });
-    expect(gallery.res.status).toBe(403);
-    const { photo } = await uploadAndConfirm(
-      marcusCookie,
-      { kind: 'staff', staffId: marcus },
-      'Me',
-    );
-    expect(photo.staffId).toBe(marcus);
-
-    // A ticket issued for another chair is refused even with a valid upload behind it.
-    const { issued } = await issue(ownerCookie, { kind: 'staff', staffId: dee });
-    if (!issued) throw new Error('no upload url');
-    await put(issued, BYTES);
-    const stolen = await barber('POST', '/api/admin/photos/confirm', {
-      ticket: issued.ticket,
-      width: 10,
-      height: 10,
-      alt: 'x',
-    });
-    expect(stolen.status).toBe(403);
-
-    // Someone else's photo reads as not found, like a made-up id.
-    const deePhoto = await uploadAndConfirm(ownerCookie, { kind: 'staff', staffId: dee }, 'Dee');
+    expect(gallery.photos.map((p) => p.id)).toContain(photo.id);
+    const untagged = await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: null });
+    expect(adminPhotoResponseSchema.parse(untagged.body).photo.staffId).toBeNull();
+    // Unknown barbers are refused, and so is a hero photo.
     expect(
-      (await barber('PATCH', `/api/admin/photos/${deePhoto.photo.id}`, { alt: 'x' })).status,
+      (await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: newId() })).status,
     ).toBe(404);
-    expect((await barber('DELETE', `/api/admin/photos/${deePhoto.photo.id}`)).status).toBe(404);
-    const mine = adminPhotoListResponseSchema.parse(
-      (await barber('GET', '/api/admin/photos?kind=hero')).body,
-    );
-    expect(mine.photos.every((p) => p.staffId === marcus && p.kind === 'staff')).toBe(true);
+    const hero = await uploadAndConfirm(ownerCookie, { kind: 'hero' }, 'The shop');
+    expect(
+      (await owner('PATCH', `/api/admin/photos/${hero.photo.id}`, { staffId: dee })).status,
+    ).toBe(403);
+    // A barber's PIN session is not an owner session: the photo routes refuse it outright.
+    expect(
+      (
+        await call(server.baseUrl, 'PATCH', `/api/admin/photos/${photo.id}`, {
+          headers: { cookie: await teamCookie(marcus) },
+          body: { staffId: dee },
+        })
+      ).status,
+    ).toBe(401);
   });
 });
