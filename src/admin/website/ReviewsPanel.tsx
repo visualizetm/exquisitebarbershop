@@ -8,6 +8,17 @@ import { ReviewsEditor } from './ReviewsEditor';
 
 type Settings = ReturnType<typeof settingsResponseSchema.parse>['settings'];
 
+/** The tab's own states before the editor shows: loading, or the settings did not arrive. Also on /kit. */
+export function ReviewsPanelState({ state }: { state: 'loading' | 'error' }) {
+  return state === 'error' ? (
+    <ErrorState title="The reviews did not load">
+      Check the connection and reload the page.
+    </ErrorState>
+  ) : (
+    <Status state="loading" message="Loading the reviews" />
+  );
+}
+
 /**
  * The Reviews tab of Website. Loads the settings, hands the reviews and the Google rating to the
  * editor, saves each change through `PUT /api/admin/reviews` and shows a toast. Owner only.
@@ -33,14 +44,8 @@ export function ReviewsPanel() {
     };
   }, []);
 
-  if (loadError) {
-    return (
-      <ErrorState title="The reviews did not load">
-        Check the connection and reload the page.
-      </ErrorState>
-    );
-  }
-  if (!settings) return <Status state="loading" message="Loading the reviews" />;
+  if (loadError) return <ReviewsPanelState state="error" />;
+  if (!settings) return <ReviewsPanelState state="loading" />;
 
   const staffNames =
     staff.status === 'ready'

@@ -44,6 +44,7 @@ import {
 import { BarView } from '@/components/ui/BottomBar';
 import { PriceOverrideEditor } from '@/admin/team/PriceOverrideEditor';
 import { ReviewsEditor } from '@/admin/website/ReviewsEditor';
+import { ReviewsPanelState } from '@/admin/website/ReviewsPanel';
 import { RatingLine } from '@/components/site/RatingLine';
 import { ReviewList } from '@/components/site/ReviewCard';
 import type { AdminServiceView } from '@shared/api/admin';
@@ -723,7 +724,8 @@ function Specimen() {
           dated Google review, an undated theCut one and a long one. Below, the Website, Reviews
           editor: change the rating to see Save turn on, type a letter to see the field error, hide
           or move a review to see it save. The second editor is refused by the server; the third has
-          no reviews and the section off.
+          no reviews and the section off. Last, the Website, Reviews tab (ReviewsPanel) while it
+          loads and when the settings do not arrive.
         </p>
         <RatingLine google={GOOGLE} />
         <RatingLine google={GOOGLE_UNRATED} />
@@ -755,6 +757,12 @@ function Specimen() {
             items={[]}
             onSave={() => Promise.resolve()}
           />
+        </div>
+        <div className="exq-panel">
+          <ReviewsPanelState state="loading" />
+        </div>
+        <div className="exq-panel">
+          <ReviewsPanelState state="error" />
         </div>
       </section>
 

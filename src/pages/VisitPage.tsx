@@ -10,6 +10,7 @@ import { ButtonAnchor, ErrorState, Reveal, SectionHead } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
+import { changePolicyLabel } from '@/lib/booking/policy';
 import { hoursLabel } from '@/lib/hours';
 import { addressLine, directionsUrl, todayKey } from '@/lib/shop';
 
@@ -114,7 +115,7 @@ export function VisitPage() {
               </h2>
               <ul className="exq-visit__policy-list">
                 <li>Walk-ins welcome when a chair is free.</li>
-                <li>Cancel or move your booking up to 2 hours before.</li>
+                <li>{changePolicyLabel(result.data.booking.cancelCutoffMinutes)}</li>
               </ul>
               <h3 className="exq-visit__subheading">Good to know</h3>
               <ul className="exq-visit__policy-list">

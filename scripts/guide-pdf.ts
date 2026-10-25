@@ -25,6 +25,31 @@ function inline(text: string): string {
     .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2">$1</a>');
 }
 
+/** A line that starts a block of its own: a heading, an image or a list item. */
+const BLOCK_START = /^(#{1,3} |!\[|\d+\. |- )/;
+
+/**
+ * Joins wrapped lines: the guide wraps at 80 columns, so a line that does not start a block
+ * continues the paragraph or the list item above it (its indent dropped).
+ */
+function unwrap(markdown: string): string[] {
+  const lines: string[] = [];
+  let open = false;
+  for (const raw of markdown.split('\n')) {
+    const text = raw.trim();
+    if (text === '') {
+      lines.push('');
+      open = false;
+    } else if (open && !BLOCK_START.test(text)) {
+      lines[lines.length - 1] = `${lines[lines.length - 1] ?? ''} ${text}`;
+    } else {
+      lines.push(raw.trimEnd());
+      open = !/^(#{1,3} |!\[)/.test(text);
+    }
+  }
+  return lines;
+}
+
 function toHtml(markdown: string): string {
   const out: string[] = [];
   let list: 'ul' | 'ol' | null = null;
@@ -32,12 +57,12 @@ function toHtml(markdown: string): string {
     if (list) out.push(`</${list}>`);
     list = null;
   };
-  for (const raw of markdown.split('\n')) {
-    const line = raw.trimEnd();
+  for (const line of unwrap(markdown)) {
     const heading = /^(#{1,3}) (.*)$/.exec(line);
     const image = /^!\[(.*?)\]\((.+?)\)$/.exec(line.trim());
-    const ordered = /^\d+\. (.*)$/.exec(line);
-    const bullet = /^- (.*)$/.exec(line);
+    const ordered = /^(\d+)\. (.*)$/.exec(line);
+    // An indented bullet (a choice under a numbered step) is shown as a plain bullet list.
+    const bullet = /^\s*- (.*)$/.exec(line);
     if (heading) {
       closeList();
       out.push(
@@ -53,9 +78,10 @@ function toHtml(markdown: string): string {
       if (list !== kind) {
         closeList();
         list = kind;
-        out.push(`<${kind}>`);
+        // A numbered list split by bullets carries on from its own number.
+        out.push(ordered ? `<ol start="${ordered[1] ?? '1'}">` : '<ul>');
       }
-      out.push(`<li>${inline((ordered ?? bullet)?.[1] ?? '')}</li>`);
+      out.push(`<li>${inline((ordered ? ordered[2] : bullet?.[1]) ?? '')}</li>`);
     } else if (line.trim() === '') {
       closeList();
     } else {

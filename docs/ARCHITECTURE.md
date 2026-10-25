@@ -113,6 +113,22 @@ timestamp is a BSON Date in UTC. Index definitions are the source of truth in
 
 Indexes: none beyond `_id`.
 
+`google` (prompt 12) is `{ placeId, rating, reviewCount, ratingCheckedOn }`. The place id builds the two links in
+`shared/lib/google.ts`: the Maps link every Directions button uses
+(`https://www.google.com/maps/search/?api=1&query=<shop name>&query_place_id=<placeId>`) and the write-a-review
+link (`https://search.google.com/local/writereview?placeid=<placeId>`); with no place id, Directions searches the
+address. The rating (0 to 5, one decimal), the count and the checked date are copied by hand from the Google
+profile in Website, Reviews (Google has no free feed) and are never written in code. The place id is set by the
+seed and is not editable in the dashboard.
+
+`reviews` (prompt 12) is `{ enabled, items }`: at most 30 items, each `{ id, name, text (up to 600), stars (1 to
+5), source ('google' or 'thecut'), date (YYYY-MM-DD, optional), staffId (string or null), show, sortOrder }`.
+The seed copies them word for word from `docs/content/exquisite-site-data.json` and resolves its `staffKey` to the
+chair's id. The one writer is `PUT /api/admin/reviews` (show, hide, order, the switch and the Google rating; never
+text, a new review or the place id); `PUT /api/admin/settings` strips `reviews`. A document written before either
+field reads with defaults (an empty Google block, `{ enabled: true, items: [] }`). Neither field reaches the
+JSON-LD: there is no `aggregateRating` (D12-66).
+
 ### staff
 
 | Field                       | Type                   | Notes                                                    |
@@ -226,7 +242,7 @@ in on a day they do not normally work, with the hours in startAt and endAt.
 | referenceCode        | "ABC-DEFG"                                                           | unique, alphabet without 0 O 1 I                        |
 | staffId              | string                                                               | the chair                                               |
 | staffRequested       | boolean                                                              | false when "first available" chose the chair            |
-| services             | [{ serviceId, name, group, priceCents, priceFrom, durationMinutes }] | snapshot at booking time                                |
+| services             | [{ serviceId, name, group, priceCents, priceFrom, durationMinutes }] | snapshot at booking time, at the assigned chair's price |
 | startAt, endAt       | Date                                                                 | UTC                                                     |
 | durationMinutes      | int                                                                  | sum of services                                         |
 | bufferMinutes        | int                                                                  | buffer applied after this booking, captured at creation |
@@ -411,6 +427,9 @@ conflict check of a schedule change and its commit. Indexes: `_id` only.
 | --------------- | -------------------------- | ------------------------------------ |
 | kind_live_order | kind, deletedAt, sortOrder | gallery and hero reads in order      |
 | by_staff_kind   | staffId, kind              | one chair's portrait and work photos |
+
+A seed photo's `_id` is `seedId('photo', <manifest file name>)`, so the loader knows a file it already stored
+without a lookup field: there is no `sourceKey` (D12-42). Uploaded photos get `newId()` like every other record.
 
 ### pendingUploads (prompt 5)
 
@@ -685,8 +704,11 @@ Algorithm, per shop-local day
 5. Busy: every booking that is not cancelled (each with its own captured
    buffer) and `block` time blocks. Completed and no-show bookings keep their
    slot locks, so they stay busy too.
-6. Total = sum of service durations + effective buffer, where the effective
-   buffer is the largest of each service's override or the shop default. Starts
+6. Total = sum of the chair's own service durations (its `servicePrices`
+   minutes where set, else the service's) + effective buffer, where the effective
+   buffer is the largest of each service's override or the shop default. Each
+   chair is quoted on its own times (prompt 12), so a start and its end can
+   differ from chair to chair. Starts
    step by `slotStepMinutes` from each working range start (rounded up to the
    grid); a start is kept only when the services (start + durations) end inside
    the range and start + total overlaps nothing busy. The cleanup buffer after
@@ -700,6 +722,25 @@ Algorithm, per shop-local day
    day, cancelled ones aside, then display order, then id) or `roundRobin` (rotating by slot index).
    Each slot carries the pick and every candidate, best first. The booking
    service uses that order for fallback when the pick's lock insert conflicts.
+
+Per barber prices and times (prompt 12)
+
+One pure helper, `shared/lib/servicePricing.ts`, decides every price and time a customer, an email or the owner
+sees, on the server and in the browser alike:
+
+- A chosen or assigned person: their `servicePrices` entry for a service (price, and minutes when set), else the
+  service's own price and time. Several services add up for that one person.
+- First available, or nobody chosen yet: the lowest total among the people who could be assigned (online
+  bookable and doing every chosen service; ties by total minutes, then display order, then id), shown as "From
+  $x" when the people differ or a service is flagged `priceFrom`. The minutes are that same person's.
+- The price list (`/services`, Home's menu): per service, the lowest price among the people who offer it, "from"
+  when they differ; a chair page shows only that person's prices and minutes.
+- The booking stores the resolved lines, total and minutes of the person it lands on, inside the same
+  transaction as its slot locks. Walk-ins and phone bookings do the same. A reschedule on the same chair keeps
+  the stored prices; a move to another chair re-resolves them for the new chair. Emails, the ticket, the manage
+  page and the admin views read the stored snapshot, so a later price edit never changes a booking.
+- Writes: `servicePrices` is validated with zod on the staff create and update routes (whole cents, minutes a
+  multiple of 5, one entry per service, only services in `serviceIds`) and audited as `staff.prices.update`.
 
 Settings (`shopSettings.booking`, owner-editable)
 

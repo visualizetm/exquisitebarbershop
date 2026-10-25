@@ -554,3 +554,26 @@ commit, and what is still open.
   the route in `authz.test.ts`, and the JSON-LD test now passes reviews in. `tests/e2e/kit.spec.ts` lists the
   new section (not run: no Playwright in this milestone). Decisions D12-56 to D12-66.
 - Open for Dontrise: permission to use the reviews, and whether "Mike" in two of Nelly's reviews is fine.
+
+### M5: copy sweep, guides and docs (part A)
+
+- Copy sweep over `src`, `server` (with the email templates), `shared`, `seed`, `scripts`, `tests/helpers` and
+  the living docs: no old stand-in phone, no personal number, no made up barber names, no em dashes, no emoji in
+  code or copy. Two written-in numbers fixed: the Visit page's "2 hours" and the manage page's "1 hours" now
+  read the cutoff setting through `src/lib/booking/policy.ts`. The copy rules unit test now covers `server`,
+  `scripts`, `tests/helpers` and the living docs, and fails on the old names and numbers in the copy and guides.
+- Gallery tab: crediting a photo and saving its alt text now show a toast, like every other save.
+- `docs/OWNER-GUIDE.md`: Team, Prices; Website, Reviews (show, hide, order, the switch); the Google rating
+  fields; crediting gallery photos to a barber; a "Check before the real launch" section listing every
+  PLACEHOLDER for Dontrise. `docs/OWNER-GUIDE.pdf` re-rendered with `scripts/guide-pdf.ts`, which now keeps
+  wrapped lines together and list numbers right. `docs/BARBER-GUIDE.md`: the walk-in list and photo credits.
+- `docs/ARCHITECTURE.md` (google and reviews settings, the pricing rule, the booking snapshot, the seed photo
+  id), `docs/DESIGN-SYSTEM.md` (ReviewsPanel, photo rules), `docs/DEPLOY.md` section 11 (what the seed holds,
+  Reset after deploy, Cloudinary for a real launch), `docs/SITE-REPORT.md` (prompt 12 additions, open items).
+- `/kit`: ReviewsPanel's loading and error states (`ReviewsPanelState`) join the Reviews block;
+  `tests/e2e/kit.spec.ts` checks the states of RatingLine, ReviewCard, PriceOverrideEditor, ReviewsEditor and
+  ReviewsPanel, and finds kit blocks by class (not run: Playwright waits for the milestone 5 captures).
+- Tests: new `tests/unit/bookingPolicy.test.ts`; `copyRules.test.ts` and `pii.test.ts` updated. Full vitest
+  613 passed in 82 files; typecheck, lint, build and format:check green. Decisions D12-67 to D12-74.
+- Left for part B: screenshots at 390 and 1280, Lighthouse and axe, recapturing the owner guide screens (they
+  still show the sample barbers from prompt 11) and re-rendering the PDF, and the report.

@@ -89,6 +89,7 @@ white mark always shows.
 | PriceOverrideEditor (`src/admin/team`)             | staffName, services (the barber's menu), saved, onSave, onChooseServices                       | see "Barber prices" below                               |
 | Stars, RatingLine, ReviewCard, ReviewList          | value, size; google, shopName; review; reviews                                                 | see "Reviews" below                                     |
 | ReviewsEditor (`src/admin/website`)                | enabled, google, items, staffNames, onSave                                                     | see "Reviews" below                                     |
+| ReviewsPanel (`src/admin/website`)                 | none (loads the settings itself)                                                               | loading, error, then the ReviewsEditor states           |
 
 ## Motion
 
@@ -225,3 +226,35 @@ Each section is left out when the section is off or no review is shown, so there
 
 Every save shows a toast, and `PUT /api/admin/reviews` writes the audit entry `settings.reviews.update` with the
 switch, the rating and each review's place and visibility, before and after.
+
+**ReviewsPanel** is the Website, Reviews tab: it loads the settings and the team (for "about Drew"), hands them to
+ReviewsEditor and saves each change through `PUT /api/admin/reviews` with the toast line the editor names. Its own
+states are the kit's: `Status` "Loading the reviews" while it loads and an `ErrorState` ("The reviews did not
+load") when the settings do not arrive; without the team it still works, with no "about" names. It is not on
+`/kit` because it only fetches and saves; the editor it wraps is, in every state.
+
+## Photos (prompt 12)
+
+The shop's real photos (`seed/photos`, WebP, about 1600px on the long edge) and any the owner uploads follow
+the same rules. Every rule here holds with any photo, so a new upload never breaks a layout.
+
+- Every image has alt text (required on upload; the manifest's line for a seed photo) and its width and height,
+  so nothing shifts while it loads (CLS 0). Frames have a fixed ratio (`PhotoFrame` 4:5, 1:1 or 16:9) and crop
+  with `object-fit: cover`.
+- The Home hero photo is the LCP image: eager, `fetchpriority="high"`, `sizes` for its slot, never inside a
+  reveal. Below 1024px it fills the ink hero behind the text under `--scrim-photo`, cropped `85% 30%` (where the
+  faces are); from 1024px it stands in its own 4:5 column. Without a photo the hero is text only.
+- Everything below the fold is `loading="lazy"` with `sizes` for its grid (`PhotoGrid`). Gallery and work tiles
+  crop square toward the upper middle (`50% 35%`), so heads and the cut stay in frame. These crops were checked on
+  a contact sheet of all 15 seed photos.
+- Home, "The work": the photos marked for Home first. Six show as two by three on a phone and three by two from
+  768px; three to five show as one row of three; under three the section stays out (`src/lib/workPhotos.ts`),
+  with a "See the gallery" link under it.
+- Gallery: every gallery photo. The barber filter chips show only once a photo is credited to someone.
+- A chair page's work strip: the photos credited to that chair. With none it shows up to three shop photos
+  under the label "From the shop"; with no shop photos either, the strip is left out. Never an empty strip.
+- A chair with no portrait (`photoUrl: null`, every chair today) shows the `PhotoFrame` placeholder: an ink panel
+  with a faint stripe and the shears, never a blank box.
+- No text sits on a photo except the hero over its scrim; names and prices sit under photos.
+- Visit has no storefront photo yet, so it has no photo slot at all (no placeholder in its place).
+- The old circular barber pole logo is never used, in any form.

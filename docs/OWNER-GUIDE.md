@@ -5,8 +5,9 @@ happens at **yoursite/admin** (the address Visualize gave you). It works on a
 phone and on a laptop; the pictures below are the laptop view unless they say
 phone. If something looks wrong, the last section says who to call.
 
-The screens in this guide were taken from the demo with sample names. Your own
-clients will show in their place.
+The screens in this guide were taken from the demo before your real team,
+prices and photos were loaded, so they show sample barbers and clients. Your
+own team and clients show in their place.
 
 ## 1. Sign in
 
@@ -16,7 +17,7 @@ clients will show in their place.
    more, not a word people could guess.
 
 Barbers do not sign in here. They use their own page, **yoursite/team**
-(see section 13).
+(see section 11 and the Barber guide).
 
 ![The sign in screen](screens/p11/guide/o01-sign-in.png)
 
@@ -154,7 +155,7 @@ A short recording of this is in `docs/screens/p11/recordings/owner-resolves-aler
 
 **Team** has a card per barber. The **In today** and **Off today** switch takes a
 barber off the booking page for the day. Tap a name for Profile, Services,
-Working hours, Time off and Access.
+Prices, Working hours, Time off and Access.
 
 In **Profile**, **Takes online bookings** is for someone who books some other way, like
 Iniya. Turn it off and their card and page say **Book through Instagram** (or
@@ -164,6 +165,23 @@ services ticked under **Services**, so the booking page, your New booking panel 
 the barber's walk-in form only list those.
 
 ![The team](screens/p11/guide/o15-team.png)
+
+To set a barber's own prices (barbers can charge different prices for the same
+cut):
+
+1. Open the barber, tap **Prices**. Every service they do is listed with the
+   shop's price and time under its name.
+2. Type a price only where this barber charges a different amount, and minutes
+   only where they take longer or shorter (steps of 5). Leave a box empty to use
+   the shop's price or time.
+3. Tap **Save prices**. A message confirms it.
+
+**Use shop price** empties a row; tap **Save prices** after it. A service missing from the list is not
+on their menu yet: tick it under **Services** first. The barber's page shows
+their own prices and times. The Services page and Home show the lowest price
+as **From $x** when barbers charge different amounts. A booking with this barber
+uses their price and time, in the total, the confirmation email, the ticket and
+your Bookings. Bookings already made keep the price they were booked at.
 
 To give a barber their login:
 
@@ -181,15 +199,58 @@ see a PIN.
 
 ## 12. Website and Settings
 
-**Website** has five tabs, each with **View on site**:
+**Website** has six tabs, each with **View on site**:
 
 1. **Hours**: weekly hours, closed days and special days.
 2. **Announcement**: the strip across the top of the site.
 3. **Services**: add, edit, hide and reorder (arrows or drag). Prices are in
-   dollars and stored as cents.
+   dollars and stored as cents. This is the shop's price; a barber who charges
+   differently gets their own price in Team, **Prices** (section 11).
 4. **Home photo**: choose a photo; you see how it crops on a phone and a computer.
 5. **Gallery**: add several photos, write what is in each (required, it is read
-   aloud to people who cannot see), tag the barber, reorder, edit, remove.
+   aloud to people who cannot see), credit the barber, reorder, edit, remove.
+6. **Reviews**: the reviews on Home and the barber pages, and the Google rating.
+
+To credit a gallery photo to a barber:
+
+1. Open **Website**, **Gallery**.
+2. Under the photo, pick the barber in **Credit the work to**. It saves right
+   away and a message confirms it. When you add new photos, you can pick the
+   barber before you tap **Upload**.
+3. The photo now also shows on that barber's page, and the gallery gets a
+   button per barber so visitors can see one barber's work.
+
+Pick **Nobody in particular** to take the credit off; the photo stays in the
+gallery. A barber with no credited photos shows up to three shop photos on
+their page, under **From the shop**.
+
+To show, hide or order the reviews:
+
+1. Open **Website**, **Reviews**.
+2. Tap **Hide** next to a review to take it off the site; **Show** puts it back.
+3. Tap the up and down arrows to change the order.
+
+Each tap saves right away and a message confirms it. Home shows the first three
+that are shown (they carry an **On Home** tag); a barber's page shows up to three
+about that barber. To take every review off the site, untick **Show reviews on
+Home and the chair pages** and tap **Save**.
+
+You cannot type or change a review here. Every review on the site is copied
+word for word from Google or theCut, so it stays real. To add a new one, send
+it to Visualize.
+
+To update the Google rating (Google does not send it to the site, so it changes
+only when you save it; once a month is enough):
+
+1. Open the shop's Google profile and note the rating and the number of reviews.
+2. In **Website**, **Reviews**, type them in **Google rating** (for example 4.7)
+   and **Number of reviews**, and set **Checked on** to today.
+3. Read the line under the boxes. It shows what the site will say, for example
+   "4.7 on Google from 15 reviews".
+4. Tap **Save**. A message confirms it.
+
+With the number of reviews at 0 the rating line is left off the site; **Read
+them on Google** and **Leave a review** stay.
 
 ![Hours](screens/p11/guide/o17-website-hours.png)
 
@@ -197,10 +258,12 @@ see a PIN.
 
 ![Gallery](screens/p11/guide/o17-website-gallery.png)
 
-**Settings** has Shop info (address, phone, and the Instagram, TikTok and
+**Settings** has Shop info (address, phone, email, and the Instagram, TikTok and
 Facebook links; a link shows in the website footer only when you fill it in),
 Booking rules, Account (change email or password, light or dark, sign out
-everywhere) and Email.
+everywhere) and Email. The shop email stays off the website until you replace
+the stand-in address with a real one. The cancel time you set in Booking rules
+is also what the Visit page and the booking confirmation say.
 
 ![Shop info](screens/p11/guide/o18-settings-shop.png)
 
@@ -208,7 +271,27 @@ everywhere) and Email.
 
 ![Account](screens/p11/guide/o18-settings-account.png)
 
-## 13. Who to call when something is wrong
+## 13. Check before the real launch
+
+The address, phone, hours, team, services, prices, reviews and photos come from
+the shop's Google profile, your Squire menu, Drew's and Nelly's theCut menus and
+Instagram. A few things were not public, so they hold a stand-in until you
+confirm them:
+
+- Lee's services, prices and profile text. He has no public menu, so he has the
+  shop prices and no profile text for now. Change them in Team, Lee (Services,
+  Prices, Profile).
+- Your, Lee's and Nelly's working hours (the shop hours for now; Drew's are his
+  theCut hours). Change them in Team, Working hours.
+- How soon someone can book (1 hour ahead), how far ahead (30 days) and the
+  cancel time (2 hours). Change them in Settings, Booking rules.
+- The shop email and the email that gets new booking alerts (Settings, Shop
+  info), and the email you sign in with (Settings, Account).
+- The chair numbers (1 to 5 for now), the 10 minute cleanup gap after each
+  appointment, the reply-to address on emails and the website address. Send
+  these to Visualize.
+
+## 14. Who to call when something is wrong
 
 Tell Visualize first: **contact@visualizeclients.com**. Include what you tapped,
 what you expected and what happened, and a screenshot if you can. If the site is

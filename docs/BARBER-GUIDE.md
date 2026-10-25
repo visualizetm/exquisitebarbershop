@@ -46,6 +46,7 @@ never see a phone number or email: tap **Call shop** if you need one.
 
 1. Tap **Walk-in** (top right of Today).
 2. Type the name and a phone number (the shop keeps it for their records), and tick the services.
+   Only the services you do are listed, at your own prices.
 3. Tap **Start now**. The chair shows busy for that time.
 
 ![Walk-in](screens/p11/guide/b05-walk-in.png)
@@ -80,7 +81,8 @@ A short recording of this flow is in `docs/screens/p11/recordings/barber-flow.we
 
 Tap **Me**. **Change PIN** asks for your current PIN first. You can switch light
 or dark. **Sign out** ends your session on this phone. Photos are the owner's job:
-ask Dontrise.
+send your best work to Dontrise. A gallery photo he credits to you shows on your
+page too.
 
 ![Me](screens/p11/guide/b10-me.png)
 

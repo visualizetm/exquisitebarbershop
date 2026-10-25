@@ -40,27 +40,31 @@ Last commit: see the bottom of this file.
 
 ## Routes and sections
 
-| Route         | Sections                                                                                                                     | Status                                      |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| /             | hero text and info row, hero photo (only if uploaded), today's chairs, the menu (ink), the work, visit, ink CTA band, footer | prompt 10                                   |
-| /services     | ink page: label, heading, group chips with counts, price rows with Book links                                                | prompt 10                                   |
-| /chairs       | "Pick your chair": chair cards with CHAIR number, name, specialty, next open                                                 | prompt 10                                   |
-| /chairs/:slug | portrait, name, specialty, next 3 openings, services with prices, work strip, Instagram, BOOK [NAME] in the phone bar        | prompt 10                                   |
-| /gallery      | heading, barber filter chips, 2 and 3 column grid, swipeable lightbox                                                        | prompt 10                                   |
-| /visit        | hours with today marked, address, directions, call, policies, parking                                                        | prompt 10                                   |
-| /book         | four part step bar, numbered steps, option cards, day strip, times by part of day, details, confirm, ticket                  | prompt 10                                   |
-| /manage       | ticket, reschedule, cancel sheet                                                                                             | prompt 10                                   |
-| /admin/\*     | sign in, today, schedule, bookings, new booking, block time, who's in, customers, settings, photos, audit, outbox, account   | prompt 3; new tokens and scale in prompt 10 |
-| /kit          | every kit component in every state                                                                                           | development builds only                     |
-| /sitemap.xml  | public routes plus one entry per listed chair, from the API                                                                  | milestone 5                                 |
-| /setup        | setup secret field, Run doctor, Run setup, checklist; exists only while BOOTSTRAP_SECRET is set; noindex                     | prompt 5                                    |
+| Route         | Sections                                                                                                                                                                                                                               | Status                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| /             | hero (the real photo behind a scrim on phones, its own column from 1024px), today's chairs, the menu (ink, "From" prices), the work (six Home photos), "What clients say" (rating line and three reviews), visit, ink CTA band, footer | prompt 10; real content prompt 12                           |
+| /services     | ink page: label, heading, group chips with counts, price rows ("From $x" where barbers differ) with Book links                                                                                                                         | prompt 10; prices prompt 12                                 |
+| /chairs       | "Pick your chair": chair cards with CHAIR number, name, specialty, next open; Iniya's says "Book through Instagram"                                                                                                                    | prompt 10; real team prompt 12                              |
+| /chairs/:slug | portrait (placeholder for now), name, title, specialty, bio, next 3 openings, that barber's own prices and minutes, up to three reviews about them, their work (or "From the shop"), Instagram, BOOK [NAME] in the phone bar           | prompt 10; prompt 12                                        |
+| /gallery      | heading, barber filter chips (only once a photo is credited), 2 and 3 column grid, swipeable lightbox                                                                                                                                  | prompt 10; real photos prompt 12                            |
+| /visit        | hours with today marked, address with Suite F, Directions (Google Maps place link), Call (610) 609-0786, policies, good to know, parking                                                                                               | prompt 10; real facts prompt 12                             |
+| /book         | four part step bar, numbered steps, option cards, day strip, times by part of day, details, confirm, ticket                                                                                                                            | prompt 10                                                   |
+| /manage       | ticket, reschedule, cancel sheet                                                                                                                                                                                                       | prompt 10                                                   |
+| /admin/\*     | Overview, Bookings, Schedule, Customers, Team (with Prices), Website (with Reviews), Settings, search, quick actions                                                                                                                   | prompt 3; prompt 11 dashboard; prompt 12 Prices and Reviews |
+| /kit          | every kit component in every state                                                                                                                                                                                                     | development builds only                                     |
+| /sitemap.xml  | public routes plus one entry per listed chair, from the API                                                                                                                                                                            | milestone 5                                                 |
+| /setup        | setup secret field, Run doctor, Run setup, checklist; exists only while BOOTSTRAP_SECRET is set; noindex                                                                                                                               | prompt 5                                                    |
 
 ## Component inventory
 
 See `docs/DESIGN-SYSTEM.md` for the kit table (name, props, states, where used).
 Site pieces built from the kit: `src/components/site/TodaysChairs.tsx`
 (staff, linkTo, layout), `ServiceRows.tsx` (services, limit, showDescription),
-`PhotoGrid.tsx` (photos, columns, firstPriority), `HoursTable.tsx` (hours).
+`PhotoGrid.tsx` (photos, columns, firstPriority), `HoursTable.tsx` (hours), and
+from prompt 12 `Stars.tsx`, `RatingLine.tsx`, `ReviewCard.tsx` (ReviewCard,
+ReviewList); dashboard pieces `src/admin/team/PriceOverrideEditor.tsx` (Team,
+Prices) and `src/admin/website/ReviewsEditor.tsx` with `ReviewsPanel.tsx`
+(Website, Reviews).
 Booking and admin pieces: `src/components/booking/*` (ServicePicker, StaffPicker,
 DayPicker, TimePicker, CustomerForm, IcsDownload, StepHeading, BookingSummary),
 `src/admin/components/*` (AdminNav with the tab bar and side nav, PhotoManager,
@@ -105,7 +109,12 @@ Public: `GET /api/shop`, `/api/services`, `/api/staff`, `/api/staff/:slug`,
 `/api/availability/next`, `/api/staff/:slug/openings`, `/api/gallery`,
 `POST /api/bookings`, `/api/bookings/manage` (GET, cancel, reschedule),
 `/api/sitemap.xml` (rewritten from `/sitemap.xml`). `/api/shop` is fetched once
-per page load in the public layout and shared through `ShopContext`. Staff
+per page load in the public layout and shared through `ShopContext`; from
+prompt 12 it also carries `google` (place id, rating, count, checked date) and
+the shown `reviews`, `/api/staff` carries each person's `servicePrices`, and
+`/api/gallery?home=true` lists the photos picked for Home first. The owner saves
+reviews and the rating through `PUT /api/admin/reviews` and a barber's prices
+through `PATCH /api/admin/staff/:id`. Staff
 and owner routes, including photos, are listed in `docs/ARCHITECTURE.md`
 section 5. Photos are stored on Cloudflare R2 (local disk in development) and
 read through public URLs.
@@ -131,11 +140,19 @@ MAINTENANCE_MODE.
 
 ## Embeds
 
-None. Directions use the shop's own Google Maps page, built from the place id in the settings, as a plain link (with no place id it searches the address). Instagram is a link.
+None. Directions use the shop's own Google Maps page, built from the place id in the settings, as a plain link (with no place id it searches the address). "Read them on Google" uses the same link and "Leave a review" Google's write-a-review link. Instagram is a link.
 
 ## Known bugs and TODOs
 
-- The Visit policies and parking lines are placeholders until confirmed.
+- The Visit policies and parking lines are placeholders until confirmed, except "Kids welcome" and
+  "Wheelchair accessible parking lot" (from the Google profile); the cancel line reads the setting.
+- Every value still marked PLACEHOLDER in `seed/shop.ts` (chair numbers, Lee's menu and bio, three people's
+  hours, the booking rules, the emails and the website address) waits for Dontrise; the owner guide, section 13,
+  lists them in his words.
+- The owner guide's screenshots (`docs/screens/p11/guide/`) were taken before the real team was loaded, so they
+  show sample barbers and clients; the text is current.
+- No storefront photo exists, so Visit has no photo slot.
+- The Google rating and count are copied by hand (Website, Reviews); nothing updates them.
 - The OG image URL and the robots Sitemap line come from APP_BASE_URL at build
   time; set it in Vercel before the first production build.
 - The owner's own password can only be reset from a shell (`npm run user:reset`)
@@ -181,9 +198,29 @@ None. Directions use the shop's own Google Maps page, built from the place id in
   public pages, 170 by 40 phone logo.
 - Docs: `OWNER-GUIDE.md`, `BARBER-GUIDE.md` with screens in `docs/screens/p11/guide/`.
 
+## Prompt 12 additions
+
+- Real shop content from `docs/content/exquisite-site-data.json` (Google profile, Squire, theCut, Instagram,
+  2026-10-25): address with Suite F, phone (610) 609-0786, hours (closed Monday, 10:00 to 19:00 Tuesday to
+  Sunday), the announcement "Walk-ins welcome", the five real people (Iniya shown, booked through Instagram,
+  never bookable online), 15 real services. The placeholder email never reaches a public page.
+- Per barber prices and times (`staff.servicePrices`, `shared/lib/servicePricing.ts`): "From" prices on the
+  menu, each chair's own prices on its page, bookings, emails and admin views at the assigned chair's price;
+  Team, Prices to edit them.
+- The 15 real photos (`seed/photos`, loaded by `server/services/seedPhotos.ts` on demo setup and Reset, or
+  `npm run photos:seed`): the hero, Home's six, the gallery, chair pages with "From the shop".
+- 18 real reviews (`settings.reviews`), word for word: Home "What clients say" with the Google rating line, up to
+  three on a chair page, Website, Reviews to show, hide and order them and to update the rating. No review markup
+  in the JSON-LD.
+- JSON-LD BarberShop with the phone, Suite F, the opening hours and the Instagram page.
+- Docs: `OWNER-GUIDE.md` and its PDF (prices, gallery credits, reviews, the Google rating, what to check before
+  launch), `BARBER-GUIDE.md`, `DESIGN-SYSTEM.md` (reviews, prices, photo rules), `ARCHITECTURE.md`,
+  `DEPLOY.md` section 11. The live showcase shows all of it only after Settings, Demo data, Reset.
+
 ## Last commit
 
-Prompt 11, 2026-10-18: the owner dashboard, the barber PIN portal, the demo notice, icons and social links. Before it, prompt 10, 2026-10-18: the Shop Sign redesign (tokens, kit and /kit, frame, pages, booking, admin), the
+Prompt 12, 2026-10-25: the shop's real content (facts, team, services and per barber prices, photos, reviews)
+and the docs and copy pass. Before it, prompt 11, 2026-10-18: the owner dashboard, the barber PIN portal, the demo notice, icons and social links. Before it, prompt 10, 2026-10-18: the Shop Sign redesign (tokens, kit and /kit, frame, pages, booking, admin), the
 motion system, the phone bottom bar and Cloudinary photos. Before it, prompt 9, 2026-10-18: the function runs under plain Node on Vercel (bundle, `api/index.js`, rewrite),
 with `npm run test:vercel-function` in CI. Before it, prompt 8, 2026-10-18: the showcase demo (auto setup, demo sign-in, GridFS photos, noindex,
 down-screen details), the hero and sign-in logo fixes, the showcase production-like run and

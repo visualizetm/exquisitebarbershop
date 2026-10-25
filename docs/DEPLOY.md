@@ -298,9 +298,11 @@ load the shop's real photos from `seed/photos` (the WebP files named in
 hero, the gallery, and the ones picked for Home. A file the manifest names that
 is not in the folder is skipped, with one warning in the log that lists them.
 
-- After a deploy that changes the seed (the team, the prices, the photos), the
-  live showcase only shows it after **Reset demo data**: the database it set up
-  earlier keeps what it had. Reset, then check `/api/health`.
+- After a deploy that changes the seed (the shop facts, the team, the prices,
+  the reviews, the photos), the live showcase only shows it after **Reset demo
+  data**: the database it set up earlier keeps what it had. Reset, then check
+  `/api/health`. Prompt 12 is such a deploy: until the Reset, the showcase still
+  shows the old sample barbers, services and phone number.
 - Photos delivered: all 15 in the manifest (the hero and 14 gallery photos;
   `exq-15-part-taper` was dropped as a copy of `exq-12-hard-part`). To add or
   replace one later: put the WebP in `seed/photos/` (1600px on the long edge,
@@ -311,14 +313,25 @@ is not in the folder is skipped, with one warning in the log that lists them.
   order. With fewer than three gallery photos it stays out, and with three to
   five it shows one row of three.
 
+### What the seed holds (prompt 12)
+
+`seed/shop.ts` now holds the shop's real facts, collected from its Google profile, Squire, theCut and
+Instagram on 2026-10-25 (`docs/content/exquisite-site-data.json`): the address with Suite F, the phone
+(610) 609-0786, the hours (closed Monday, 10:00 to 19:00 Tuesday to Sunday), the five people (Iniya shows
+on the site but books through Instagram), the 15 services with each barber's own prices and times, the
+18 reviews word for word and the Google rating block. The demo's setup and Reset, and `/setup`'s Run setup
+on a real database, load all of it. Values that were not public are still marked PLACEHOLDER there (the
+owner guide, section 13, lists them for Dontrise).
+
 ### Leaving the showcase for a real launch
 
 The demo database holds sample data, a demo owner and the demo photos. Do not
 reuse it. Either point MONGODB_DB_NAME at a new, empty database and follow
 sections 2 to 6, or clear this one:
 
-1. Set DEMO_MODE to `false` (or delete it). Set STORAGE_DRIVER to `r2` with the
-   R2 variables (section 10) or to `none` with STORAGE_DISABLED_ACK=true. Add
+1. Set DEMO_MODE to `false` (or delete it). Set STORAGE_DRIVER to `cloudinary`
+   with its variables (section 10b, the way photos are meant to run), to `r2`
+   with the R2 variables (section 10) or to `none` with STORAGE_DISABLED_ACK=true. Add
    BOOTSTRAP_SECRET, SEED_OWNER_EMAIL and SEED_OWNER_PASSWORD (the real owner), and
    the email choice (section 8, or EMAIL_DISABLED_ACK=true). Redeploy.
 2. Open `/setup`, paste BOOTSTRAP_SECRET. Tick "I understand this deletes the
@@ -328,8 +341,11 @@ sections 2 to 6, or clear this one:
 3. Press **Run setup** (it creates the real owner from SEED_OWNER_*), then **Run
    doctor**. Until step 2 is done, Run setup answers "This database still holds
    demo data".
-4. Delete SEED_OWNER_PASSWORD and BOOTSTRAP_SECRET, redeploy, sign in, change
-   the password, and fill in the real phone, address, hours and prices.
+4. Delete SEED_OWNER_PASSWORD and BOOTSTRAP_SECRET, redeploy, sign in and change
+   the password. The phone, address, hours, team, services, prices, reviews and
+   Google rating came from the seed: check them with Dontrise, and fill in what
+   is still a stand-in (the owner guide, section 13). Update the Google rating
+   in Website, Reviews whenever it changes.
 
 Photos stored in GridFS do not move to R2 by themselves: switching
 STORAGE_DRIVER only changes where new photos go, and clearing the demo data
@@ -341,7 +357,8 @@ every file that is there through the storage driver, prints what it added, what
 was already there and which files are still missing, and is safe to run again:
 a photo already on record is kept (also one the owner deleted), and the hero is
 only added while the site has no home photo. Run it again after more photos are
-added to the folder. Then upload anything else in Website, Photos.
+added to the folder. Then upload anything else in Website, Gallery (and Home
+photo), and credit each photo to its barber there.
 
 ## 12. How the function is built, and how it is checked
 

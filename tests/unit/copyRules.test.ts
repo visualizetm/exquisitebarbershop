@@ -18,15 +18,42 @@ const sources = [
   'seed/shop.ts',
 ];
 
+/** What a customer, the owner or a barber reads: the source above plus the two guides. */
+const copy = [...sources, 'docs/OWNER-GUIDE.md', 'docs/BARBER-GUIDE.md'];
+
+/** The rest of the code and the living docs (not the reports, which are history). */
+const everythingElse = [
+  ...files('server', /\.ts$/),
+  ...files('scripts', /\.(ts|mjs)$/),
+  ...files('tests/helpers', /\.ts$/),
+  ...readdirSync('docs')
+    .filter((name) => name.endsWith('.md'))
+    .map((name) => join('docs', name)),
+];
+
 describe('copy rules (CLAUDE.md rule 8)', () => {
   it('has no em dash and no emoji anywhere in the source', () => {
     const offenders: string[] = [];
-    for (const file of sources) {
+    for (const file of [...sources, ...everythingElse]) {
       const text = readFileSync(file, 'utf8');
       if (text.includes('—')) offenders.push(`${file}: em dash`);
       if (/\p{Extended_Pictographic}/u.test(text.replace(/[©®™]/g, ''))) {
         offenders.push(`${file}: emoji`);
       }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('names only the real team and the real shop number', () => {
+    const offenders: string[] = [];
+    for (const file of copy) {
+      const text = readFileSync(file, 'utf8');
+      // The five made up barbers the seed had before the real team.
+      const old = /\b(Marcus|Dee|Tre|Jay|Kris)\b/.exec(text);
+      if (old) offenders.push(`${file}: ${old[0]}`);
+      // The old stand-in shop number, and Dontrise's personal text line, which is never published.
+      if (/610\D{0,2}555\D?0100/.test(text)) offenders.push(`${file}: the fake shop phone`);
+      if (/560\D?9806/.test(text)) offenders.push(`${file}: the personal number`);
     }
     expect(offenders).toEqual([]);
   });

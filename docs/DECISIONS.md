@@ -1084,3 +1084,47 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
 - D12-66 No `aggregateRating` or any review markup in the JSON-LD: Google ignores self-served review markup
   for a local business, and the rating is copied by hand. `shopJsonLd` already left it out; its unit test now
   passes reviews in and checks that none reach the structured data.
+- D12-67 Copy sweep (milestone 5): searched `src`, `server` (with the email templates), `shared`, `seed`,
+  `scripts`, `tests/helpers` and the living docs for the old stand-in phone, Dontrise's personal number, the
+  five made up barbers, em dashes, emoji and written-in numbers. Code and copy were clean of the first four.
+  Two numbers were written in: the Visit page said "up to 2 hours before" whatever the setting, and the manage
+  page printed the cutoff as `minutes / 60` ("1 hours", "1.5 hours"). Both now read the setting through
+  `src/lib/booking/policy.ts` (`cutoffSpan`, `cancelPolicyLabel`, `changePolicyLabel`), which the booking card
+  already used. The masking unit test's sample number was the old shop number; it is now another 555 number.
+  Left as they are: the reports, `docs/content`, older DECISIONS and PROGRESS entries and the p6 audit capture
+  (history), the two tests that assert the old numbers never appear, and the `/kit` samples (real shop data or
+  a 555 number).
+- D12-68 The copy rules unit test now covers more: em dashes and emoji also across `server`, `scripts`,
+  `tests/helpers` and every top-level `docs/*.md`, and a new case fails if the site source, the email templates,
+  the seed or either guide names one of the five made up barbers, the old stand-in number or the personal
+  number. Rejected: a grep step in CI (one more place to keep in sync; the unit suite already runs everywhere).
+- D12-69 The Gallery tab's alt text Save and its "Credit the work to" choice saved without a word; they now show a
+  toast ("Credited to Drew. It now shows on Drew's page too.", "Credit removed...", "Alt text saved."), as the
+  design rules ask of every save and as the owner guide now describes. No other behaviour changed.
+- D12-70 The owner guide PDF converter (`scripts/guide-pdf.ts`) joins wrapped lines: a line that does not
+  start a heading, image or list item continues the paragraph or item above it, and a numbered list keeps its
+  number (`<ol start>`) after bullets break it. Before, every wrapped line became its own paragraph and the
+  steps after a wrapped line restarted at 1. Rejected: a Markdown library (a new dependency for one file).
+- D12-71 Owner guide: Team, Prices (step by step), Website gains Reviews (show, hide, order, the section
+  switch) and the Google rating fields, Gallery explains crediting a photo to a barber, Settings says the
+  placeholder email stays off the site and that the Visit page and confirmation read the cancel time, and a new
+  section 13 lists every value still marked PLACEHOLDER in Dontrise's words with where he changes it (chair
+  numbers, the cleanup gap, the reply-to address and the website address have no dashboard field, so they go
+  to Visualize). Its p11 screenshots stay for now with a note that they show sample barbers; recapturing them
+  needs Playwright, which this part does not run. The PDF is re-rendered.
+- D12-72 Barber guide: two lines. The walk-in list shows only the barber's own services at their own prices,
+  and a gallery photo the owner credits to a barber shows on that barber's page. No names changed.
+- D12-73 `/kit` already showed RatingLine (rated, unrated), ReviewCard (dated, undated), PriceOverrideEditor
+  (saved entries, refused, no services) and ReviewsEditor (normal, refused, empty and off). ReviewsPanel only
+  loads and saves, so it is not rendered whole; its two own states are now one exported `ReviewsPanelState`
+  (loading, error) that the panel and the kit both render, so their copy cannot drift. `tests/e2e/kit.spec.ts`
+  checks each state and the field error, saving, toast and refused paths of both editors, and finds the kit
+  blocks by their class: the reviews editor's own section is a region named "Reviews", so the M4 check by role
+  and name would have counted four. Not run in this part (no Playwright until the milestone 5 captures).
+- D12-74 Docs: ARCHITECTURE.md gains the `google` and `reviews` settings (links, hand-copied rating, the one
+  writer, defaults for old documents, no JSON-LD rating), the per barber pricing rule next to the availability
+  rules (each chair quoted on its own minutes, first available as the lowest total, the booking snapshot), the
+  booking snapshot note and the seed photo id (`seedId('photo', file)`, no `sourceKey`, D12-42).
+  DESIGN-SYSTEM.md gains ReviewsPanel and a photo rules section. DEPLOY.md section 11 says what the seed now
+  holds, that the live showcase needs Demo data, Reset after this deploy, that Cloudinary is a real launch
+  storage choice, and where to credit photos. SITE-REPORT.md gains the prompt 12 additions and open items.
