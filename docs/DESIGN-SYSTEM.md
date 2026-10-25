@@ -30,7 +30,9 @@ Semantic surfaces (also in tokens.css) derive from the palette: `--bg`, `--card`
 `--band-line`, `--scrim`. `.exq-dark` scopes an ink band inside any page; it stays ink in both
 themes. `--scrim-photo` (ink at 80%) sits between a photo and the text on it, the Home hero on
 phones and tablets: even over a pure white photo, white text keeps 10.2:1, `--line` 7.2:1 and the
-red display line 3.3:1 (large text); small red labels on a photo turn white.
+red display line 3.3:1 (large text); small red labels on a photo turn white. The hero sets its own text
+color (`color: var(--fg)`), so the title and facts follow the band, never the page around it. Measured on the
+shop's real hero photo, the red line is 3.99:1 at 390 (D12-80).
 
 The Home hero has two states. `data-state="text"`: no photo, the text stands alone on the page.
 `data-state="photo"`: an ink band (`.exq-dark`); below 1024px the photo fills the hero behind the
@@ -148,7 +150,8 @@ has shrunk by more than 150px (the keyboard), and returns when they end.
 
 Icons come only from `@untitled-ui/icons-react` (deep imports). Rules: none on headings, at most one per
 button, `aria-hidden` beside a text label, and an icon-only button has an `aria-label` plus the desktop
-tooltip (`IconButton`). The one exception is `SocialIcon` (Instagram, TikTok, Facebook), because Untitled UI
+tooltip (`IconButton`). A label that names its item can pass a
+shorter `tip` (the gallery rows: Move up, Move down, Remove), so the tooltip stays on screen. The one exception is `SocialIcon` (Instagram, TikTok, Facebook), because Untitled UI
 has no brand glyphs; see D11-37. Where icons appear: the bottom bar (Call, Book now), hero and Visit facts,
 the booking step bar ticks, the ticket rows (Chair, Day, Time, Services, For, Notes), toast tones, and the
 owner dashboard buttons and tiles.

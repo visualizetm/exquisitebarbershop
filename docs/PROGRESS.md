@@ -577,3 +577,22 @@ commit, and what is still open.
   613 passed in 82 files; typecheck, lint, build and format:check green. Decisions D12-67 to D12-74.
 - Left for part B: screenshots at 390 and 1280, Lighthouse and axe, recapturing the owner guide screens (they
   still show the sample barbers from prompt 11) and re-rendering the PDF, and the report.
+
+### M5: screenshots, axe and Lighthouse (part B)
+
+- Screens: `tests/e2e/p12-capture.ts` (demo build on 4176 after Demo data, Reset; reads only) saved Home, Gallery,
+  Services, Drew, Iniya and Visit at 390 and 1280 in light and dark (first screen `-top` and full page), the
+  owner's Website, Reviews, Home photo and Gallery tabs and Team, Prices (Drew) at 390 and 1280, and montages,
+  in `docs/screens/p12/`. Real state only: all 15 photos are delivered, so no fixture set (D12-75).
+- Fixed from the screenshots: the hero title and info values were ink on the ink photo band in the light theme
+  at every width (D12-76); the Website, Gallery tab scrolled sideways at 1280 because the row tooltips carried
+  the full alt text (`IconButton` `tip`, D12-77). No public page overflows at 390 or 1280.
+- Axe and the design rules: `tests/e2e/rules.spec.ts` adds Drew's and Iniya's pages and a "with the shop
+  photos" group (stubbed real photos, D12-78): axe at 390 and 1280 in light and dark, alt text and sizes, the
+  hero first screen with the photo and the colors over it. 17 passed in one run.
+- Lighthouse mobile once on the demo build with the photos: Home 81, Gallery 74, Drew 93, accessibility 100,
+  CLS 0 (D12-79, `docs/screens/p12/lighthouse.json`). Home and Gallery miss the 85 target because the GridFS
+  photos are served full size; not fixed here.
+- The red display line over the hero photo measures 3.99:1 at 390 (large text passes 3:1, the checklist asks
+  4.5:1); left for Rob (D12-80).
+- Not done in this part: the owner guide screens (still the prompt 11 sample barbers) and the report.

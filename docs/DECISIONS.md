@@ -1128,3 +1128,40 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   DESIGN-SYSTEM.md gains ReviewsPanel and a photo rules section. DEPLOY.md section 11 says what the seed now
   holds, that the live showcase needs Demo data, Reset after this deploy, that Cloudinary is a real launch
   storage choice, and where to credit photos. SITE-REPORT.md gains the prompt 12 additions and open items.
+- D12-75 The prompt 12 screenshots show the real state only, with no FIXTURE set. All 15 manifest photos are
+  in `seed/photos/` now (the lead's UPDATE 2), so Home already shows its six marked photos, the gallery all 14
+  and the chair strips three, which is the "more photos" layout the fixture set was meant to show. Rejected:
+  generated fixture images (they would only repeat what the real photos show, and could be mistaken for them).
+  The capture script is `tests/e2e/p12-capture.ts` (demo build on 4176, Demo data, Reset first, reads only).
+- D12-76 The Home hero sets its own text color (`.exq-hero { color: var(--fg) }`). With a photo the hero is an
+  ink band (`.exq-dark`), but the title lines and the three info values had no color of their own and
+  inherited the body's ink in the light theme: "Gifted hands." and "cuts." were black on the scrim at 390 and
+  black on ink at 1280, which the first capture showed. Rejected: a color on each child (the next child added
+  would miss it again). `tests/e2e/rules.spec.ts` now checks the computed colors over the photo.
+- D12-77 `IconButton` takes an optional `tip`, a shorter tooltip for a label that names its item. The Website,
+  Gallery rows use "Move up", "Move down" and "Remove" as tooltips while their accessible names keep the
+  photo's alt text. The full labels ("Move Full beard and fade, client leaning back in the chair down"),
+  centered and unwrapped, ran past the right edge and gave that tab a 25px sideways scroll at 1280.
+  Rejected: wrapping the tooltip (a 14rem tooltip still runs off near the edge from 1024 to about 1100).
+- D12-78 Axe and the image rules on the photo states run in `tests/e2e/rules.spec.ts` with the shop's real
+  photos stubbed into `/api/shop` and `/api/gallery` in the browser (the dev e2e server stores no photos):
+  the hero photo behind the text, Home's six, the gallery with a Drew chip, Drew's own strip (two photos
+  credited to him) and Lee's "From the shop" strip, light and dark, 390 and 1280. `/chairs/drew` and
+  `/chairs/iniya` join the page lists for axe, type sizes, tap targets and alt text. Rejected: uploading
+  photos to the dev server (state leaks into later specs when a cleanup step fails) and running the rules
+  against the demo build (not part of the dev config the gate runs).
+- D12-79 Lighthouse ran once (13.5.0, mobile, simulated throttling) on the demo build, the only local profile
+  that serves photos (GridFS, brotli like Vercel): Home 81, Gallery 74, Drew's page 93 for performance,
+  accessibility 100 and CLS 0 on all three, SEO 63 because the showcase is noindex
+  (`docs/screens/p12/lighthouse.json`). Home's LCP is the hero photo (3.6s: its URL is known only after
+  `/api/shop`); Gallery's is 7.6s with 900 KB of images, because the GridFS driver serves the 1200 to 1600px
+  files into 180px tiles (Lighthouse estimates 781 KiB of savings). Not fixed in this part: the fix is
+  resized copies at seed and upload time, or Cloudinary for the real launch (its `srcset` already asks for
+  400px tiles). Rejected: a resize step on the server in a capture pass (a new image pipeline, not a visual
+  fix).
+- D12-80 The red display line on the hero photo stays as designed (D12-52). Measured on the real photo with the
+  text hidden, the brightest pixel under each line gives white 11.9:1 or more, the grey sub line 8.3:1 and the
+  red "Exquisite" 3.99:1 at 390 and 3.67:1 at 768: WCAG AA for large text (3:1, the line is 52px bold), short
+  of the checklist's 4.5:1. The two ways to reach 4.5:1 change the look (the scrim at about 88% ink hides most
+  of the photo; a white accent line drops the red), so that is Rob's call. Rejected: changing the brand look in
+  a capture pass.

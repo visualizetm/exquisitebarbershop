@@ -23,6 +23,8 @@
 /* Home: the hero --------------------------------------------------------------------- */
 .exq-hero {
   background: var(--bg);
+  /* Set here, not inherited from body, so the title and facts turn white inside the photo band. */
+  color: var(--fg);
   padding-block: var(--s5) var(--s7);
 }
 .exq-hero__grid {

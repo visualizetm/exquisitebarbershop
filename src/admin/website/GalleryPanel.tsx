@@ -353,6 +353,7 @@ export function GalleryPanel() {
               <div className="exq-svc__actions">
                 <IconButton
                   label={`Move ${p.alt} up`}
+                  tip="Move up"
                   icon={<ArrowUp aria-hidden="true" />}
                   disabled={index === 0}
                   onClick={() => {
@@ -361,6 +362,7 @@ export function GalleryPanel() {
                 />
                 <IconButton
                   label={`Move ${p.alt} down`}
+                  tip="Move down"
                   icon={<ArrowDown aria-hidden="true" />}
                   disabled={index === shown.length - 1}
                   onClick={() => {
@@ -369,6 +371,7 @@ export function GalleryPanel() {
                 />
                 <IconButton
                   label={`Remove ${p.alt}`}
+                  tip="Remove"
                   icon={<Trash01 aria-hidden="true" />}
                   onClick={() => {
                     setRemoving(p);
