@@ -87,6 +87,8 @@ white mark always shows.
 | Footer                                             | shop                                                                                           | loading, ready                                          |
 | ThemeMenu, ThemeSwitch, Mark, DemoBanner, SiteDown | as before                                                                                      |                                                         |
 | PriceOverrideEditor (`src/admin/team`)             | staffName, services (the barber's menu), saved, onSave, onChooseServices                       | see "Barber prices" below                               |
+| Stars, RatingLine, ReviewCard, ReviewList          | value, size; google, shopName; review; reviews                                                 | see "Reviews" below                                     |
+| ReviewsEditor (`src/admin/website`)                | enabled, google, items, staffNames, onSave                                                     | see "Reviews" below                                     |
 
 ## Motion
 
@@ -181,3 +183,45 @@ shows its loading state, every field is disabled), and `empty` (the barber has n
 typed. A save shows a toast and writes the audit entry `staff.prices.update` with the list before and after.
 Focus is the kit's input focus ring; every field is labelled "Price in dollars for X" and "Minutes for X" for screen
 readers.
+
+## Reviews (prompt 12)
+
+Real reviews only, word for word from Google and theCut (`settings.reviews`, seeded from
+`docs/content/exquisite-site-data.json`). The owner shows, hides and orders them; nobody types one. All four
+pieces are in `/kit`, section "Reviews". Classes `exq-stars*`, `exq-ratingline*`, `exq-review*` (in `pages.css`)
+and `exq-reviewsedit*`, `exq-reviewlist`, `exq-reviewrow*` (in `dashboard.css`), tokens only.
+
+**Stars.** Five `Star01` icons from the icon set: outlines underneath, filled ones on top clipped to the value
+(`--fill`, so 4.7 fills 94%). Red (`--accent-text`: #C8102E on paper, #FF5470 on ink). Sizes `md` (20px) and `sm`
+(16px). States: `full`, `partial`. Always `aria-hidden`; the rating sits next to them in words.
+
+**RatingLine.** The stars, "4.7 on Google from 15 reviews" (from the settings, never written in code; "1 review"
+for one) and two quiet links, "Read them on Google" (the Maps link) and "Leave a review" (the write-a-review link),
+both new tabs that say so to screen readers. States: `rated`; `unrated` (no rating or count yet: the links alone).
+With neither a rating nor a place id it renders nothing.
+
+**ReviewCard and ReviewList.** A `Card` list item holding a `figure`: the review's stars with "Rated 5 out of 5"
+for screen readers, the quote in a `blockquote` at body size, then the name (bold) and the source with the month
+and year in the 13px label size, for example "Google, November 2025". theCut gives no exact date, so the card says
+"theCut" alone. States on the figure: `dated`, `undated`. ReviewList lays them out one per row on a phone and up to
+three across where they fit (each at least 260px); `data-count` carries how many.
+
+Where they show: Home, "What clients say", after "The work": the RatingLine, then the first three shown reviews.
+A chair page, under the menu: up to three shown reviews about that chair, no rating line (the rating is the shop's).
+Each section is left out when the section is off or no review is shown, so there is never an empty frame.
+
+**ReviewsEditor** (Website, Reviews, owner only). Built from `Checkbox`, `Input`, `Button`, `IconButton`,
+`EmptyState`, the status chips and the panel classes. Two parts:
+
+- "On the site": the switch for the whole section, the Google rating, the number of reviews and the day it was
+  checked, and a line that prints what the site will say. Form states: `idle` (Save disabled), `changed`,
+  `invalid` (the field shows its error, Save disabled), `saving` (fields disabled, Save loading). A refused save
+  shows `ErrorNote` and keeps what was typed.
+- "Reviews": one row per review with the name, the source, the month, the chair it is about and the full quote,
+  a "Hidden" chip on a hidden one and "On Home" on the three Home shows. The arrows move a review up or down and
+  Show or Hide toggles it; each saves at once, the list is `data-busy` while it saves and every action is disabled.
+  Row states: `shown`, `hidden` (muted text). List states: `on`, `off` (the section is off; a line says nothing
+  shows), `empty` (no reviews; it explains they come with the shop data and cannot be typed in).
+
+Every save shows a toast, and `PUT /api/admin/reviews` writes the audit entry `settings.reviews.update` with the
+switch, the rating and each review's place and visibility, before and after.

@@ -527,3 +527,30 @@ commit, and what is still open.
 - Known gaps for milestone 5: no screenshots yet of the new hero, Home work and chair strips (Rob's rule: no
   Playwright until milestone 5); Website, Home photo still previews the phone hero as a 4:5 frame while phones
   now show the photo behind the text; the owner cannot change the Home pick in the dashboard yet.
+
+### M4: reviews
+
+- Shipped: `settings.reviews` (`{ enabled, items }`, zod in `shared/schemas/shopSettings.ts`: at most 30,
+  text up to 600, stars 1 to 5, source google or thecut, optional YYYY-MM-DD date, `staffId`, show, sort
+  order), backfilled as empty for older documents; `shared/lib/reviews.ts` (which reviews show, a chair's
+  three, the month label, the "4.7 on Google from 15 reviews" line). The seed holds the 18 real reviews word
+  for word from `reviews_for_site` (Google without Wesley T., Lamont I. short, Dontrise's three on his chair,
+  Drew's five and Nelly's four from theCut with no date), all shown, Home's three first.
+- Server: `PUT /api/admin/reviews` (owner only, strict: show, hide and order every stored review, the
+  section switch, and the Google rating, count and date; no text, no new review, no place id), one
+  transaction, audit `settings.reviews.update`. `PUT /api/admin/settings` strips `reviews`, so a save that
+  omits them keeps them and one that carries them changes nothing. `/api/shop` serves only the shown
+  reviews, none while the section is off.
+- Client: Home "What clients say" after the work (the rating line with "Read them on Google" and "Leave a
+  review", then the first three shown: Unique D., Ricardo E., Routine Life Fitness); a chair page shows up to
+  three of its own under the menu; both hide when nothing would show. New `Stars`, `RatingLine`, `ReviewCard`
+  and `ReviewList` (`src/components/site`) and `ReviewsEditor` with the Website, Reviews tab
+  (`ReviewsPanel`): loading, error and empty states, a toast on every save. All in `/kit` (section "Reviews")
+  and `DESIGN-SYSTEM.md`. JSON-LD still has no rating markup.
+- Tests: `tests/unit/reviews.test.ts` (schema limits, stars, sources, text length, date format, the strict
+  request, which reviews show), `tests/integration/reviews.test.ts` (seeded content equals the data file,
+  the public API sends only shown reviews, show, hide, reorder and the rating through the route, validation
+  and conflict errors change nothing, owner only, the audit entry, the settings save keeps the reviews),
+  the route in `authz.test.ts`, and the JSON-LD test now passes reviews in. `tests/e2e/kit.spec.ts` lists the
+  new section (not run: no Playwright in this milestone). Decisions D12-56 to D12-66.
+- Open for Dontrise: permission to use the reviews, and whether "Mike" in two of Nelly's reviews is fine.

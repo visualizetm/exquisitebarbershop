@@ -7,12 +7,14 @@ import {
   publicStaffResponseSchema,
   staffOpeningsQuerySchema,
   staffOpeningsResponseSchema,
+  type PublicReview,
   type PublicService,
   type PublicStaff,
 } from '../../../shared/api/public';
 import { publicEmail } from '../../../shared/lib/email';
+import { shownReviews } from '../../../shared/lib/reviews';
 import { shopDateOf } from '../../../shared/lib/time';
-import { announcementIsLive } from '../../../shared/schemas/shopSettings';
+import { announcementIsLive, type ReviewItem } from '../../../shared/schemas/shopSettings';
 import type { ServiceDocument } from '../../../shared/schemas/service';
 import type { StaffDocument } from '../../../shared/schemas/staff';
 import { getEnv } from '../../env';
@@ -64,6 +66,19 @@ export function toPublicStaff(doc: StaffDocument): PublicStaff {
   };
 }
 
+/** Only what a review card prints. Whether it shows and its order are already applied. */
+export function toPublicReview(item: ReviewItem): PublicReview {
+  return {
+    id: item.id,
+    name: item.name,
+    text: item.text,
+    stars: item.stars,
+    source: item.source,
+    date: item.date ?? null,
+    staffId: item.staffId,
+  };
+}
+
 const EMPTY_WEEK = { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] };
 
 export const publicRoutes: RouteDefinition[] = [
@@ -102,6 +117,8 @@ export const publicRoutes: RouteDefinition[] = [
         },
         social: settings.social,
         google: settings.google,
+        // Hidden reviews, and every review while the section is off, never leave the server.
+        reviews: shownReviews(settings.reviews).map(toPublicReview),
         heroPhoto: hero,
         maintenance: getEnv().MAINTENANCE_MODE === 'true',
         demo: demoEnabled(),

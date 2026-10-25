@@ -7,7 +7,9 @@ import {
   staffOpeningsResponseSchema,
 } from '@shared/api/public';
 import { priceLabel } from '@shared/lib/money';
+import { chairReviews } from '@shared/lib/reviews';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
+import { ReviewList } from '@/components/site/ReviewCard';
 import {
   ButtonAnchor,
   ButtonLink,
@@ -109,6 +111,8 @@ export function ChairPage() {
   // This person's own menu: their price and time where they set them, the shop's otherwise.
   const offered = services.status === 'ready' ? chairServices(services.data.services, staff) : [];
   const open = openings.status === 'ready' ? openings.data : null;
+  // Up to three of the shown reviews that are about this chair, in the owner's order.
+  const reviews = chairReviews(shop.status === 'ready' ? (shop.data.reviews ?? []) : [], staff.id);
   const badge =
     staff.chairNumber !== null ? `Chair ${String(staff.chairNumber).padStart(2, '0')}` : null;
 
@@ -227,6 +231,16 @@ export function ChairPage() {
               ))}
             </ul>
           </div>
+        </section>
+      ) : null}
+
+      {reviews.length > 0 ? (
+        <section
+          className="exq-wrap exq-section exq-chair__reviews"
+          aria-labelledby="exq-chair-reviews"
+        >
+          <SectionHead label="Reviews" title="What clients say" id="exq-chair-reviews" />
+          <ReviewList reviews={reviews} />
         </section>
       ) : null}
 

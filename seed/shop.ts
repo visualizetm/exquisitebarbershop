@@ -7,12 +7,175 @@
  *
  * Ids are deterministic (seedId) so running the seed twice never duplicates rows.
  */
-import { seedId } from '../server/lib/ids';
+import { newId, seedId } from '../server/lib/ids';
 import { PLACEHOLDER_SHOP_EMAIL } from '../shared/lib/email';
 import type { WeekHours } from '../shared/schemas/common';
 import type { ServiceInput } from '../shared/schemas/service';
-import type { ShopSettingsInput } from '../shared/schemas/shopSettings';
+import type { ReviewItem, ReviewSource, ShopSettingsInput } from '../shared/schemas/shopSettings';
 import type { ServicePrice, StaffInput } from '../shared/schemas/staff';
+
+/** A review as the seed holds it: `staffKey` names the chair it is about and becomes its id. */
+export interface ReviewSeed {
+  name: string;
+  source: ReviewSource;
+  stars: number;
+  /** theCut shows no exact date, so its reviews have none. */
+  date?: string;
+  staffKey?: string;
+  text: string;
+}
+
+/**
+ * The reviews on the site, copied word for word from docs/content/exquisite-site-data.json
+ * (`reviews_for_site`): every Google review there except Wesley T. (it calls Lee the owner), then
+ * Drew's and Nelly's theCut reviews. Spelling is left as written and nothing is added. Lamont I. is
+ * the short version. The Google reviews that name Dontrise are about his chair. Nelly's real name is
+ * Mike, so two of his reviews say Mike. The first three are the ones Home shows. Dontrise confirms
+ * the shop may use them before the real launch.
+ */
+export const reviewsSeed: ReviewSeed[] = [
+  {
+    name: 'Unique D.',
+    source: 'google',
+    stars: 5,
+    date: '2025-11-25',
+    text: 'Great environment been getting my haircut there for a while now and always feel welcomed when I come in for a haircut. The environment is very clean and the music is always good.',
+  },
+  {
+    name: 'Ricardo E.',
+    source: 'google',
+    stars: 5,
+    date: '2025-07-30',
+    text: 'Great place! I walked in without an appointment and was helped right away. I loved the haircut, and the prices were very affordable. I’ll definitely be coming back!',
+  },
+  {
+    name: 'Routine Life Fitness',
+    source: 'google',
+    stars: 5,
+    date: '2024-09-24',
+    staffKey: 'dontrise',
+    text: '10/10!! This was my first time here and I will definitely be returning. Dontrise was professional, patient and very knowledgeable and communicative. My cut was super sharp!! One of the best cuts I’ve gotten in a min.',
+  },
+  {
+    name: 'Daniel M.',
+    source: 'google',
+    stars: 5,
+    date: '2024-10-26',
+    staffKey: 'dontrise',
+    text: 'First time customer, Dontrise cut my son’s hair(9yo). I have no complaints. He was thorough,professional and made sure he was cutting to my son and I’s liking multiple times. Clean shop. I’m not easily pleased but this was a good experience as a first time customer. They also offer wash and dry services also.',
+  },
+  {
+    name: 'Lamont I.',
+    source: 'google',
+    stars: 5,
+    date: '2024-10-24',
+    staffKey: 'dontrise',
+    text: 'Great barbershop. Dontrise is phenomenal barber. ... Patience and his attention to detail is everything. Great customer service.',
+  },
+  {
+    name: 'Shamarr M.',
+    source: 'google',
+    stars: 5,
+    date: '2025-09-14',
+    text: 'Soon as I sat in the chair I felt at home this is officially my go to.',
+  },
+  {
+    name: 'Basil S.',
+    source: 'google',
+    stars: 5,
+    date: '2026-10-16',
+    text: 'Amazing haircut’s the entire shop is sharp',
+  },
+  {
+    name: 'Frankie',
+    source: 'google',
+    stars: 5,
+    date: '2024-10-02',
+    text: 'best barber around 10/10 cut and a got me in as soon as i walked in the door',
+  },
+  {
+    name: 'Margaret A.',
+    source: 'google',
+    stars: 5,
+    date: '2026-02-14',
+    text: 'Love this place already!!!!',
+  },
+  {
+    name: 'Tom R.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'drew',
+    text: 'Attention to detail and communication skills already at an elite level stayed in constant dialogue every step of the cut. Sharpest I’ve been in years, definitely coming back',
+  },
+  {
+    name: 'Alexis M.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'drew',
+    text: 'It was our first time going to this barber, and my boys got some of the best haircuts they’ve had in a long time! They’re tender-headed, and the barber was very patient and gentle with them. We’ll definitely be back and highly recommend!',
+  },
+  {
+    name: 'Mark G.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'drew',
+    text: 'Drew has great communication, makes recommendations for your haircut but ultimately gives you exactly what you want. Will book again soon!',
+  },
+  {
+    name: 'Jourdan S.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'drew',
+    text: 'No cap Drew is one of the best barbers I have met. His attention to detail and the effort he puts into every single cut is unmatched.',
+  },
+  {
+    name: 'Mike R.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'drew',
+    text: 'Great atmosphere, great barber! Drew is very professional and considerate. Definitely will be going back',
+  },
+  {
+    name: 'Paul H.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'nelly',
+    text: 'Been getting haircuts by Mike since 2018 … he cuts me and my 4 year old routinely . Perfection everytime , I won’t let anybody else touch our heads',
+  },
+  {
+    name: 'Christian T.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'nelly',
+    text: 'I’ve been around the area for 4 years now. Buddy of mine suggested I go to Mike. I’m glad I listened because Mike has been my barber ever since. Hands down best barber I’ve had.',
+  },
+  {
+    name: 'Dylan M.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'nelly',
+    text: 'Nelly is reliable, and sharp. Definitely would recommend',
+  },
+  {
+    name: 'Jesse W.',
+    source: 'thecut',
+    stars: 5,
+    staffKey: 'nelly',
+    text: 'Sharp cut, super quick and cool dude.',
+  },
+];
+
+/** The stored reviews: a new id for each, the chair resolved from its key, all shown, in order. */
+export function seedReviewItems(): ReviewItem[] {
+  return reviewsSeed.map(({ staffKey, date, ...review }, index) => ({
+    id: newId(),
+    ...review,
+    ...(date === undefined ? {} : { date }),
+    staffId: staffKey ? staffSeedId(staffKey) : null,
+    show: true,
+    sortOrder: index * 10,
+  }));
+}
 
 export const shopSettingsSeed: ShopSettingsInput = {
   name: 'Exquisite Barber & Beauty Lounge',
@@ -79,6 +242,7 @@ export const shopSettingsSeed: ShopSettingsInput = {
     reviewCount: 15,
     ratingCheckedOn: '2026-10-25',
   },
+  reviews: { enabled: true, items: seedReviewItems() },
 };
 
 /**

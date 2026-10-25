@@ -5,8 +5,11 @@ import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import { galleryResponseSchema } from '@shared/api/photos';
 import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
+import { HOME_REVIEWS } from '@shared/lib/reviews';
 import { HoursTable } from '@/components/site/HoursTable';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
+import { RatingLine } from '@/components/site/RatingLine';
+import { ReviewList } from '@/components/site/ReviewCard';
 import { ServiceRows } from '@/components/site/ServiceRows';
 import { TodaysChairs } from '@/components/site/TodaysChairs';
 import {
@@ -49,6 +52,8 @@ export function HomePage() {
   const hero = data?.heroPhoto ?? null;
   const today = data ? data.hours[todayKey()] : null;
   const where = data ? `${data.address.city} ${data.address.state}` : 'Brookhaven PA';
+  // The server sends only shown reviews, in the owner's order, and none while the section is off.
+  const reviews = (data?.reviews ?? []).slice(0, HOME_REVIEWS);
 
   return (
     <article className="exq-home" data-state={shop.status}>
@@ -179,6 +184,17 @@ export function HomePage() {
             </Link>
           </SectionHead>
           <PhotoGrid photos={work} columns="work" />
+        </section>
+      ) : null}
+
+      {data && reviews.length > 0 ? (
+        <section
+          className="exq-wrap exq-section exq-home__reviews"
+          aria-labelledby="exq-home-reviews"
+        >
+          <SectionHead label="Reviews" title="What clients say" id="exq-home-reviews" />
+          {data.google ? <RatingLine google={data.google} shopName={data.name} /> : null}
+          <ReviewList reviews={reviews} />
         </section>
       ) : null}
 

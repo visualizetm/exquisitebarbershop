@@ -5,6 +5,7 @@ import { AnnouncementPanel } from '../panels/AnnouncementPanel';
 import { GalleryPanel } from './GalleryPanel';
 import { HomePhotoPanel } from './HomePhotoPanel';
 import { HoursPanel } from './HoursPanel';
+import { ReviewsPanel } from './ReviewsPanel';
 import { ServicesPanel } from './ServicesPanel';
 
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'services', label: 'Services', path: '/services' },
   { id: 'photo', label: 'Home photo', path: '/' },
   { id: 'gallery', label: 'Gallery', path: '/gallery' },
+  { id: 'reviews', label: 'Reviews', path: '/' },
 ] as const;
 
 /**
@@ -54,6 +56,7 @@ export function WebsitePage() {
         {current.id === 'services' ? <ServicesPanel /> : null}
         {current.id === 'photo' ? <HomePhotoPanel /> : null}
         {current.id === 'gallery' ? <GalleryPanel /> : null}
+        {current.id === 'reviews' ? <ReviewsPanel /> : null}
       </Tabs>
     </div>
   );

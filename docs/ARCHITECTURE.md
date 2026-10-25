@@ -107,6 +107,8 @@ timestamp is a BSON Date in UTC. Index definitions are the source of truth in
 | notifications        | { ownerAlertEmail, fromName, replyToEmail, customerConfirmationEmail, ownerNewBookingEmail, customerSms } |                       |
 | features             | { giftCards, rewards, smsReminders }                                                                      | all false until built |
 | permissions          | { barbersCanBlockTime }                                                                                   | default false         |
+| google               | { placeId, rating, reviewCount, ratingCheckedOn }                                                         | Website, Reviews      |
+| reviews              | { enabled, items: ReviewItem[] } at most 30; ReviewItem { id, name, text, stars, source, date?, staffId } | plus show, sortOrder  |
 | createdAt, updatedAt | Date                                                                                                      |                       |
 
 Indexes: none beyond `_id`.
@@ -599,7 +601,8 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 | GET, PUT      | /api/admin/hours                      | owner                    | PUT is the shop hours; conflict rule                                                                             |
 | GET, PUT      | /api/admin/closures                   | owner                    | upsert by date; conflict rule                                                                                    |
 | DELETE        | /api/admin/closures/:id               | owner                    | conflict rule (removing special hours)                                                                           |
-| GET, PUT      | /api/admin/settings                   | owner                    | full `shopSettingsInputSchema`                                                                                   |
+| GET, PUT      | /api/admin/settings                   | owner                    | full `shopSettingsInputSchema`; `google` optional; never writes `reviews`                                        |
+| PUT           | /api/admin/reviews                    | owner                    | `{ enabled?, google?, items? }`: show, hide, order, rating; strict, no review text; audited                      |
 | GET, POST     | /api/admin/users                      | owner                    | POST `{ email, staffId }` returns a one-time temporary password                                                  |
 | POST          | /api/admin/users/:id/reset-password   | owner                    | new temporary password; ends the login's sessions                                                                |
 | POST          | /api/admin/users/:id/disable, /enable | owner                    | disable ends every session                                                                                       |
@@ -642,7 +645,9 @@ environment (development, test, preview, production) needs.
 | GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus `/chairs/:slug`         |
 
 `/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
-`/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`.
+`/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`. `/api/shop` also carries
+`google` and `reviews`: only the shown reviews, in order, as `{ id, name, text, stars, source, date, staffId }`,
+and none while the section is off.
 `/api/internal/outbox/deliver` also purges deleted photo objects (`photosPurged`) and
 sweeps abandoned uploads (`uploadsSwept`). A confirm whose object does not match the
 ticket (size, type, or over 10 MB) deletes the object before answering 409.

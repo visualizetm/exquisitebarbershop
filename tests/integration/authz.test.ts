@@ -112,6 +112,7 @@ const EXPECTED: Record<string, AuthLevel | 'owner+'> = {
   'DELETE /api/admin/closures/:id': 'owner',
   'GET /api/admin/settings': 'owner',
   'PUT /api/admin/settings': 'owner',
+  'PUT /api/admin/reviews': 'owner',
   'GET /api/admin/audit': 'owner',
   'GET /api/admin/outbox': 'owner',
   'POST /api/admin/outbox/:id/retry': 'owner',

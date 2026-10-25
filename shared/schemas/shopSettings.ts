@@ -103,6 +103,19 @@ const ratingSchema = z
  * "Leave a review" links. The rating, count and date are copied by hand from the profile (Google
  * offers no free feed) and the owner edits them in Website, Reviews. Empty or zero means "not set".
  */
+const googleRatingFields = {
+  rating: ratingSchema,
+  reviewCount: z.int().min(0).max(100_000),
+  /** The shop date the rating was last read from Google, or empty. */
+  ratingCheckedOn: z.union([z.literal(''), isoDateSchema]),
+};
+const ratingNeedsCount = (g: { rating: number; reviewCount: number }) =>
+  g.reviewCount === 0 || g.rating >= 1;
+const ratingNeedsCountIssue = {
+  path: ['rating'],
+  message: 'Add the rating, or set the review count to 0',
+};
+
 export const googleSettingsSchema = z
   .object({
     placeId: z
@@ -110,22 +123,65 @@ export const googleSettingsSchema = z
       .trim()
       .max(200)
       .regex(/^[A-Za-z0-9_-]*$/, 'A place id has only letters, digits, hyphens and underscores'),
-    rating: ratingSchema,
-    reviewCount: z.int().min(0).max(100_000),
-    /** The shop date the rating was last read from Google, or empty. */
-    ratingCheckedOn: z.union([z.literal(''), isoDateSchema]),
+    ...googleRatingFields,
   })
-  .refine((g) => g.reviewCount === 0 || g.rating >= 1, {
-    path: ['rating'],
-    message: 'Add the rating, or set the review count to 0',
-  });
+  .refine(ratingNeedsCount, ratingNeedsCountIssue);
 export type GoogleSettings = z.infer<typeof googleSettingsSchema>;
+
+/**
+ * The part of the Google block the owner copies by hand: the rating, the count and the date. Strict,
+ * so a save that tries to change the place id (the Directions and review links) is refused.
+ */
+export const googleRatingSchema = z
+  .strictObject(googleRatingFields)
+  .refine(ratingNeedsCount, ratingNeedsCountIssue);
+export type GoogleRating = z.infer<typeof googleRatingSchema>;
 export const DEFAULT_GOOGLE: GoogleSettings = {
   placeId: '',
   rating: 0,
   reviewCount: 0,
   ratingCheckedOn: '',
 };
+
+export const REVIEW_SOURCES = ['google', 'thecut'] as const;
+export const reviewSourceSchema = z.enum(REVIEW_SOURCES);
+export type ReviewSource = z.infer<typeof reviewSourceSchema>;
+/** How many reviews the shop keeps, and the longest review text, in characters. */
+export const MAX_REVIEWS = 30;
+export const REVIEW_TEXT_MAX = 600;
+
+/**
+ * One real review, copied word for word from Google or theCut (no spelling fixed, nothing added).
+ * Reviews come from the seed only: the owner shows, hides and orders them, but never types one, so
+ * every quote on the site stays real. `staffId` is the chair the review is about, if it names one.
+ */
+export const reviewItemSchema = z.object({
+  id: idSchema,
+  /** First name and last initial, as the reviewer shows it. */
+  name: nonEmptyText(80),
+  text: nonEmptyText(REVIEW_TEXT_MAX),
+  stars: z.int().min(1).max(5),
+  source: reviewSourceSchema,
+  /** The day it was posted (shop date). theCut shows no exact date, so its reviews have none. */
+  date: isoDateSchema.optional(),
+  staffId: idSchema.nullable(),
+  show: z.boolean(),
+  sortOrder: z.int().min(0).max(10_000),
+});
+export type ReviewItem = z.infer<typeof reviewItemSchema>;
+
+/** The reviews on Home and the chair pages. Off hides every review on the site. */
+export const reviewsSettingsSchema = z
+  .object({
+    enabled: z.boolean(),
+    items: z.array(reviewItemSchema).max(MAX_REVIEWS),
+  })
+  .refine((r) => new Set(r.items.map((i) => i.id)).size === r.items.length, {
+    path: ['items'],
+    message: 'Each review needs its own id',
+  });
+export type ReviewsSettings = z.infer<typeof reviewsSettingsSchema>;
+export const DEFAULT_REVIEWS: ReviewsSettings = { enabled: true, items: [] };
 
 /** A link target: a path on this site or an https address. */
 const announcementLinkSchema = z
@@ -225,6 +281,7 @@ export const shopSettingsDocumentSchema = z
     announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
     social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
     google: googleSettingsSchema.default(DEFAULT_GOOGLE),
+    reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
     /** The service "next open" times are computed for. Null means each chair's shortest service. */
     nextOpenServiceId: idSchema.nullable().default(null),
   })
@@ -243,8 +300,13 @@ export type ShopSettingsInput = z.input<typeof shopSettingsInputSchema>;
  * What a settings save may carry. A group added after launch is optional here: a dashboard tab
  * opened before a deploy does not know it, and its save must leave the stored value alone instead
  * of resetting it to the empty default (which would wipe the place id and the rating).
+ *
+ * The reviews are not part of it at all: Website, Reviews saves them through its own route, which
+ * can only show, hide and order them. A settings save that carries them (every panel sends back
+ * the settings it loaded) has them stripped, so it can neither change a quote nor undo a Reviews
+ * save made in another tab.
  */
-export const shopSettingsUpdateSchema = shopSettingsInputSchema.extend({
+export const shopSettingsUpdateSchema = shopSettingsInputSchema.omit({ reviews: true }).extend({
   google: googleSettingsSchema.optional(),
 });
 export type ShopSettingsUpdate = z.input<typeof shopSettingsUpdateSchema>;

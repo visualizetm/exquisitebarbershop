@@ -16,7 +16,12 @@ import {
 } from '../schemas/common';
 import { outboxStatusSchema } from '../schemas/emailOutbox';
 import { serviceInputSchema, serviceUpdateSchema } from '../schemas/service';
-import { shopSettingsInputSchema, shopSettingsUpdateSchema } from '../schemas/shopSettings';
+import {
+  googleRatingSchema,
+  MAX_REVIEWS,
+  shopSettingsInputSchema,
+  shopSettingsUpdateSchema,
+} from '../schemas/shopSettings';
 import {
   servicePriceSchema,
   staffInputSchema,
@@ -529,6 +534,30 @@ export const closureResponseSchema = z
 
 export const settingsResponseSchema = z.object({ settings: shopSettingsInputSchema });
 export const settingsRequestSchema = shopSettingsUpdateSchema;
+
+/**
+ * Website, Reviews (`PUT /api/admin/reviews`, answered with the settings). Each part is optional,
+ * so the list and the rating save on their own. `items` lists every stored review once, in the
+ * new order, with whether it shows. It is strict and carries no text: a review can be shown,
+ * hidden and moved, never typed, changed or added, so every quote on the site stays real.
+ */
+export const reviewsRequestSchema = z
+  .strictObject({
+    /** Off hides the whole section on Home and the chair pages. */
+    enabled: z.boolean().optional(),
+    google: googleRatingSchema.optional(),
+    items: z
+      .array(z.strictObject({ id: idSchema, show: z.boolean() }))
+      .max(MAX_REVIEWS)
+      .refine((items) => new Set(items.map((i) => i.id)).size === items.length, {
+        message: 'A review is listed twice',
+      })
+      .optional(),
+  })
+  .refine((r) => r.enabled !== undefined || r.google !== undefined || r.items !== undefined, {
+    message: 'Nothing to save',
+  });
+export type ReviewsRequest = z.infer<typeof reviewsRequestSchema>;
 
 // ---------------------------------------------------------------------------
 // Overview

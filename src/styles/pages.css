@@ -268,6 +268,83 @@
   text-align: center;
 }
 
+/* Reviews: the Google rating line and the review cards --------------------------------------- */
+.exq-stars {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  color: var(--accent-text);
+  line-height: 0;
+}
+.exq-stars__row {
+  display: inline-flex;
+  gap: var(--s1);
+}
+.exq-stars svg {
+  width: 20px;
+  height: 20px;
+}
+.exq-stars[data-size='sm'] svg {
+  width: 16px;
+  height: 16px;
+}
+/* The filled stars sit on the outlines and are cut off at the rating (4.7 of 5 is 94%). */
+.exq-stars__row--fill {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 calc(100% - var(--fill, 100%)) 0 0);
+}
+.exq-stars__row--fill svg {
+  fill: currentColor;
+}
+.exq-ratingline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s5);
+  margin-bottom: var(--s5);
+}
+.exq-ratingline__score {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+}
+.exq-ratingline__text {
+  font-weight: 600;
+}
+.exq-ratingline__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s5);
+}
+.exq-reviews {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--s4);
+}
+.exq-review__figure {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--s3);
+  height: 100%;
+  margin: 0;
+}
+.exq-review__quote {
+  margin: 0;
+}
+.exq-review__by {
+  display: grid;
+  gap: var(--s1);
+}
+.exq-review__name {
+  font-weight: 700;
+}
+.exq-review__meta {
+  color: var(--fg-3);
+  font-size: var(--t-label);
+}
+
 /* Visit ----------------------------------------------------------------------------------- */
 .exq-visit__grid {
   display: grid;

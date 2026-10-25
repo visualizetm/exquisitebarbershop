@@ -1841,6 +1841,62 @@
   gap: var(--s1);
 }
 
+/* Website, Reviews: the switch and rating form, then one row per review */
+.exq-reviewsedit {
+  display: grid;
+  gap: var(--s6);
+}
+.exq-reviewsedit__preview {
+  color: var(--fg-2);
+}
+.exq-reviewsedit__preview[data-state='rated'] {
+  color: var(--fg);
+  font-weight: 600;
+}
+.exq-reviewlist {
+  display: grid;
+  gap: var(--s2);
+}
+.exq-reviewlist[data-busy='true'] {
+  cursor: progress;
+}
+.exq-reviewrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.exq-reviewrow[data-state='hidden'] {
+  color: var(--fg-3);
+}
+.exq-reviewrow__body {
+  display: grid;
+  flex: 1 1 260px;
+  gap: var(--s1);
+  min-width: 0;
+}
+.exq-reviewrow__meta {
+  color: var(--fg-2);
+  font-size: var(--t-label);
+}
+.exq-reviewrow[data-state='hidden'] .exq-reviewrow__meta {
+  color: var(--fg-3);
+}
+.exq-reviewrow__text {
+  max-width: 60em;
+}
+.exq-reviewrow__tags,
+.exq-reviewrow__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1);
+}
+
 /* Home photo and gallery */
 .exq-homephoto {
   display: flex;

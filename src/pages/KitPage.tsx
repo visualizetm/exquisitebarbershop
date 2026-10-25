@@ -43,7 +43,11 @@ import {
 } from '@/components/ui';
 import { BarView } from '@/components/ui/BottomBar';
 import { PriceOverrideEditor } from '@/admin/team/PriceOverrideEditor';
+import { ReviewsEditor } from '@/admin/website/ReviewsEditor';
+import { RatingLine } from '@/components/site/RatingLine';
+import { ReviewList } from '@/components/site/ReviewCard';
 import type { AdminServiceView } from '@shared/api/admin';
+import type { GoogleSettings, ReviewItem } from '@shared/schemas/shopSettings';
 import { usePageTitle } from '@/lib/usePageTitle';
 import '@/styles/dashboard.css';
 
@@ -81,6 +85,56 @@ const PRICE_SAVED = [
   { serviceId: '1'.repeat(24), priceCents: 5000, durationMinutes: 75 },
   { serviceId: '2'.repeat(24), priceCents: 3000, durationMinutes: 40 },
 ];
+
+/** Three of the shop's real reviews (a short Google one, an undated theCut one, a long one). */
+const REVIEWS: ReviewItem[] = [
+  {
+    id: 'a'.repeat(24),
+    name: 'Shamarr M.',
+    source: 'google',
+    stars: 5,
+    date: '2025-09-14',
+    text: 'Soon as I sat in the chair I felt at home this is officially my go to.',
+    staffId: null,
+    show: true,
+    sortOrder: 0,
+  },
+  {
+    id: 'b'.repeat(24),
+    name: 'Jesse W.',
+    source: 'thecut',
+    stars: 5,
+    text: 'Sharp cut, super quick and cool dude.',
+    staffId: '4'.repeat(24),
+    show: true,
+    sortOrder: 10,
+  },
+  {
+    id: 'c'.repeat(24),
+    name: 'Daniel M.',
+    source: 'google',
+    stars: 5,
+    date: '2024-10-26',
+    text: 'First time customer, Dontrise cut my son’s hair(9yo). I have no complaints. He was thorough,professional and made sure he was cutting to my son and I’s liking multiple times. Clean shop. I’m not easily pleased but this was a good experience as a first time customer. They also offer wash and dry services also.',
+    staffId: '5'.repeat(24),
+    show: false,
+    sortOrder: 20,
+  },
+];
+const REVIEW_CARDS = REVIEWS.map((r) => ({ ...r, date: r.date ?? null }));
+/** The shop's Google block as read on 2026-10-25, and one with only the place id. */
+const GOOGLE: GoogleSettings = {
+  placeId: 'ChIJISdW6zTpxokRzSBEJjMQU4M',
+  rating: 4.7,
+  reviewCount: 15,
+  ratingCheckedOn: '2026-10-25',
+};
+const GOOGLE_UNRATED: GoogleSettings = {
+  ...GOOGLE,
+  rating: 0,
+  reviewCount: 0,
+  ratingCheckedOn: '',
+};
 
 const PHOTO = { url: sample('4:5', 400, 500), width: 400, height: 500, alt: 'Sample portrait' };
 const LIGHTBOX: LightboxPhoto[] = [1, 2, 3].map((n) => ({
@@ -658,6 +712,48 @@ function Specimen() {
             saved={[]}
             onSave={() => Promise.resolve()}
             onChooseServices={() => undefined}
+          />
+        </div>
+      </section>
+
+      <section className="exq-kit__block" aria-label="Reviews">
+        <h2>Reviews</h2>
+        <p className="exq-muted">
+          The rating line with a rating, then with only the place id (the links alone). The cards: a
+          dated Google review, an undated theCut one and a long one. Below, the Website, Reviews
+          editor: change the rating to see Save turn on, type a letter to see the field error, hide
+          or move a review to see it save. The second editor is refused by the server; the third has
+          no reviews and the section off.
+        </p>
+        <RatingLine google={GOOGLE} />
+        <RatingLine google={GOOGLE_UNRATED} />
+        <ReviewList reviews={REVIEW_CARDS} />
+        <div className="exq-panel">
+          <ReviewsEditor
+            enabled
+            google={GOOGLE}
+            items={REVIEWS}
+            staffNames={{ ['4'.repeat(24)]: 'Nelly Cutz', ['5'.repeat(24)]: 'Dontrise' }}
+            onSave={async (_change, done) => {
+              await new Promise((resolve) => setTimeout(resolve, 900));
+              toast({ text: done, tone: 'ok' });
+            }}
+          />
+        </div>
+        <div className="exq-panel">
+          <ReviewsEditor
+            enabled
+            google={GOOGLE}
+            items={REVIEWS.slice(0, 1)}
+            onSave={() => Promise.reject(new Error('The reviews were not saved. Try again.'))}
+          />
+        </div>
+        <div className="exq-panel">
+          <ReviewsEditor
+            enabled={false}
+            google={GOOGLE_UNRATED}
+            items={[]}
+            onSave={() => Promise.resolve()}
           />
         </div>
       </section>

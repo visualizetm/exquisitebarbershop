@@ -1324,6 +1324,7 @@ __export(shopSettingsRepo_exports, {
   createShopSettingsIfMissing: () => createShopSettingsIfMissing,
   getShopSettings: () => getShopSettings,
   requireShopSettings: () => requireShopSettings,
+  updateReviewSettings: () => updateReviewSettings,
   updateShopSettings: () => updateShopSettings
 });
 
@@ -27789,22 +27790,53 @@ var featureFlagsSchema = external_exports.object({
 var ratingSchema = external_exports.number().min(0).max(5).refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, {
   message: "Use at most one decimal, for example 4.7"
 });
-var googleSettingsSchema = external_exports.object({
-  placeId: external_exports.string().trim().max(200).regex(/^[A-Za-z0-9_-]*$/, "A place id has only letters, digits, hyphens and underscores"),
+var googleRatingFields = {
   rating: ratingSchema,
   reviewCount: external_exports.int().min(0).max(1e5),
   /** The shop date the rating was last read from Google, or empty. */
   ratingCheckedOn: external_exports.union([external_exports.literal(""), isoDateSchema])
-}).refine((g) => g.reviewCount === 0 || g.rating >= 1, {
+};
+var ratingNeedsCount = (g) => g.reviewCount === 0 || g.rating >= 1;
+var ratingNeedsCountIssue = {
   path: ["rating"],
   message: "Add the rating, or set the review count to 0"
-});
+};
+var googleSettingsSchema = external_exports.object({
+  placeId: external_exports.string().trim().max(200).regex(/^[A-Za-z0-9_-]*$/, "A place id has only letters, digits, hyphens and underscores"),
+  ...googleRatingFields
+}).refine(ratingNeedsCount, ratingNeedsCountIssue);
+var googleRatingSchema = external_exports.strictObject(googleRatingFields).refine(ratingNeedsCount, ratingNeedsCountIssue);
 var DEFAULT_GOOGLE = {
   placeId: "",
   rating: 0,
   reviewCount: 0,
   ratingCheckedOn: ""
 };
+var REVIEW_SOURCES = ["google", "thecut"];
+var reviewSourceSchema = external_exports.enum(REVIEW_SOURCES);
+var MAX_REVIEWS = 30;
+var REVIEW_TEXT_MAX = 600;
+var reviewItemSchema = external_exports.object({
+  id: idSchema,
+  /** First name and last initial, as the reviewer shows it. */
+  name: nonEmptyText(80),
+  text: nonEmptyText(REVIEW_TEXT_MAX),
+  stars: external_exports.int().min(1).max(5),
+  source: reviewSourceSchema,
+  /** The day it was posted (shop date). theCut shows no exact date, so its reviews have none. */
+  date: isoDateSchema.optional(),
+  staffId: idSchema.nullable(),
+  show: external_exports.boolean(),
+  sortOrder: external_exports.int().min(0).max(1e4)
+});
+var reviewsSettingsSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  items: external_exports.array(reviewItemSchema).max(MAX_REVIEWS)
+}).refine((r) => new Set(r.items.map((i) => i.id)).size === r.items.length, {
+  path: ["items"],
+  message: "Each review needs its own id"
+});
+var DEFAULT_REVIEWS = { enabled: true, items: [] };
 var announcementLinkSchema = external_exports.string().trim().max(200).refine(
   (v) => v === "" || v.startsWith("/") && !v.startsWith("//") || v.startsWith("https://"),
   {
@@ -27876,6 +27908,7 @@ var shopSettingsDocumentSchema = external_exports.object({
   announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
   social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
   google: googleSettingsSchema.default(DEFAULT_GOOGLE),
+  reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
   nextOpenServiceId: idSchema.nullable().default(null)
 }).extend(timestampsSchema.shape);
@@ -27884,7 +27917,7 @@ var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   createdAt: true,
   updatedAt: true
 });
-var shopSettingsUpdateSchema = shopSettingsInputSchema.extend({
+var shopSettingsUpdateSchema = shopSettingsInputSchema.omit({ reviews: true }).extend({
   google: googleSettingsSchema.optional()
 });
 
@@ -28775,6 +28808,7 @@ function fill(doc) {
     nextOpenServiceId: stored.nextOpenServiceId ?? null,
     announcement: { ...DEFAULT_ANNOUNCEMENT, ...stored.announcement },
     google: { ...DEFAULT_GOOGLE, ...stored.google },
+    reviews: { ...DEFAULT_REVIEWS, ...stored.reviews },
     // Shops set up before the social links existed keep their Instagram link from the handle.
     social: stored.social ?? {
       ...DEFAULT_SOCIAL_LINKS,
@@ -28818,6 +28852,18 @@ async function updateShopSettings(input2, now2, options) {
   const updated = await col.findOneAndUpdate(
     { _id: SHOP_SETTINGS_ID },
     { $set: { ...parsed, ...google ? { google } : {}, updatedAt: now2 } },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
+  if (!updated) throw new AppError("NOT_FOUND", "Shop settings were not found");
+  return fill(updated);
+}
+async function updateReviewSettings(input2, now2, options) {
+  const reviews = reviewsSettingsSchema.parse(input2.reviews);
+  const google = googleSettingsSchema.parse(input2.google);
+  const col = await collection("shopSettings");
+  const updated = await col.findOneAndUpdate(
+    { _id: SHOP_SETTINGS_ID },
+    { $set: { reviews, google, updatedAt: now2 } },
     { returnDocument: "after", ...sessionOf(options) }
   );
   if (!updated) throw new AppError("NOT_FOUND", "Shop settings were not found");
@@ -31856,6 +31902,147 @@ function publicEmail(email3) {
 }
 
 // seed/shop.ts
+var reviewsSeed = [
+  {
+    name: "Unique D.",
+    source: "google",
+    stars: 5,
+    date: "2025-11-25",
+    text: "Great environment been getting my haircut there for a while now and always feel welcomed when I come in for a haircut. The environment is very clean and the music is always good."
+  },
+  {
+    name: "Ricardo E.",
+    source: "google",
+    stars: 5,
+    date: "2025-07-30",
+    text: "Great place! I walked in without an appointment and was helped right away. I loved the haircut, and the prices were very affordable. I\u2019ll definitely be coming back!"
+  },
+  {
+    name: "Routine Life Fitness",
+    source: "google",
+    stars: 5,
+    date: "2024-09-24",
+    staffKey: "dontrise",
+    text: "10/10!! This was my first time here and I will definitely be returning. Dontrise was professional, patient and very knowledgeable and communicative. My cut was super sharp!! One of the best cuts I\u2019ve gotten in a min."
+  },
+  {
+    name: "Daniel M.",
+    source: "google",
+    stars: 5,
+    date: "2024-10-26",
+    staffKey: "dontrise",
+    text: "First time customer, Dontrise cut my son\u2019s hair(9yo). I have no complaints. He was thorough,professional and made sure he was cutting to my son and I\u2019s liking multiple times. Clean shop. I\u2019m not easily pleased but this was a good experience as a first time customer. They also offer wash and dry services also."
+  },
+  {
+    name: "Lamont I.",
+    source: "google",
+    stars: 5,
+    date: "2024-10-24",
+    staffKey: "dontrise",
+    text: "Great barbershop. Dontrise is phenomenal barber. ... Patience and his attention to detail is everything. Great customer service."
+  },
+  {
+    name: "Shamarr M.",
+    source: "google",
+    stars: 5,
+    date: "2025-09-14",
+    text: "Soon as I sat in the chair I felt at home this is officially my go to."
+  },
+  {
+    name: "Basil S.",
+    source: "google",
+    stars: 5,
+    date: "2026-10-16",
+    text: "Amazing haircut\u2019s the entire shop is sharp"
+  },
+  {
+    name: "Frankie",
+    source: "google",
+    stars: 5,
+    date: "2024-10-02",
+    text: "best barber around 10/10 cut and a got me in as soon as i walked in the door"
+  },
+  {
+    name: "Margaret A.",
+    source: "google",
+    stars: 5,
+    date: "2026-02-14",
+    text: "Love this place already!!!!"
+  },
+  {
+    name: "Tom R.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "Attention to detail and communication skills already at an elite level stayed in constant dialogue every step of the cut. Sharpest I\u2019ve been in years, definitely coming back"
+  },
+  {
+    name: "Alexis M.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "It was our first time going to this barber, and my boys got some of the best haircuts they\u2019ve had in a long time! They\u2019re tender-headed, and the barber was very patient and gentle with them. We\u2019ll definitely be back and highly recommend!"
+  },
+  {
+    name: "Mark G.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "Drew has great communication, makes recommendations for your haircut but ultimately gives you exactly what you want. Will book again soon!"
+  },
+  {
+    name: "Jourdan S.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "No cap Drew is one of the best barbers I have met. His attention to detail and the effort he puts into every single cut is unmatched."
+  },
+  {
+    name: "Mike R.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "Great atmosphere, great barber! Drew is very professional and considerate. Definitely will be going back"
+  },
+  {
+    name: "Paul H.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "Been getting haircuts by Mike since 2018 \u2026 he cuts me and my 4 year old routinely . Perfection everytime , I won\u2019t let anybody else touch our heads"
+  },
+  {
+    name: "Christian T.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "I\u2019ve been around the area for 4 years now. Buddy of mine suggested I go to Mike. I\u2019m glad I listened because Mike has been my barber ever since. Hands down best barber I\u2019ve had."
+  },
+  {
+    name: "Dylan M.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "Nelly is reliable, and sharp. Definitely would recommend"
+  },
+  {
+    name: "Jesse W.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "Sharp cut, super quick and cool dude."
+  }
+];
+function seedReviewItems() {
+  return reviewsSeed.map(({ staffKey, date: date5, ...review }, index) => ({
+    id: newId(),
+    ...review,
+    ...date5 === void 0 ? {} : { date: date5 },
+    staffId: staffKey ? staffSeedId(staffKey) : null,
+    show: true,
+    sortOrder: index * 10
+  }));
+}
 var shopSettingsSeed = {
   name: "Exquisite Barber & Beauty Lounge",
   tagline: "Gifted Hands",
@@ -31929,7 +32116,8 @@ var shopSettingsSeed = {
     rating: 4.7,
     reviewCount: 15,
     ratingCheckedOn: "2026-10-25"
-  }
+  },
+  reviews: { enabled: true, items: seedReviewItems() }
 };
 var ownerLoginSeed = {
   email: "owner@exquisitebarberbeauty.com",
@@ -34032,6 +34220,16 @@ var closureUpsertRequestSchema = external_exports.intersection(
 var closureResponseSchema = external_exports.object({ closure: closureViewSchema }).extend(conflictOutcomeSchema.shape);
 var settingsResponseSchema = external_exports.object({ settings: shopSettingsInputSchema });
 var settingsRequestSchema = shopSettingsUpdateSchema;
+var reviewsRequestSchema = external_exports.strictObject({
+  /** Off hides the whole section on Home and the chair pages. */
+  enabled: external_exports.boolean().optional(),
+  google: googleRatingSchema.optional(),
+  items: external_exports.array(external_exports.strictObject({ id: idSchema, show: external_exports.boolean() })).max(MAX_REVIEWS).refine((items) => new Set(items.map((i) => i.id)).size === items.length, {
+    message: "A review is listed twice"
+  }).optional()
+}).refine((r) => r.enabled !== void 0 || r.google !== void 0 || r.items !== void 0, {
+  message: "Nothing to save"
+});
 var overviewStatSchema = external_exports.object({ value: external_exports.int(), compare: external_exports.int().nullable() });
 var activityKindSchema = external_exports.enum(["booked", "canceled", "rescheduled", "noShow", "walkIn"]);
 var activityEntrySchema = external_exports.object({
@@ -37472,6 +37670,63 @@ async function putSettings(principal, input2, meta3) {
   );
   return after;
 }
+function reviewsAuditView(reviews, google) {
+  return {
+    enabled: reviews.enabled,
+    google: {
+      rating: google.rating,
+      reviewCount: google.reviewCount,
+      ratingCheckedOn: google.ratingCheckedOn
+    },
+    items: reviews.items.map((r) => ({
+      id: r.id,
+      name: r.name,
+      show: r.show,
+      sortOrder: r.sortOrder
+    }))
+  };
+}
+async function putReviews(principal, input2, meta3) {
+  const { before, after } = await withTransaction(async (session) => {
+    const stored = await shopSettingsRepo_exports.requireShopSettings({ session });
+    let items = stored.reviews.items;
+    if (input2.items) {
+      const byId = new Map(items.map((r) => [r.id, r]));
+      const sameSet = input2.items.length === items.length && input2.items.every((i) => byId.has(i.id));
+      if (!sameSet) {
+        throw new AppError(
+          "CONFLICT",
+          "The reviews changed since this page was opened. Reload the page and try again."
+        );
+      }
+      items = input2.items.flatMap((entry, index) => {
+        const review = byId.get(entry.id);
+        return review ? [{ ...review, show: entry.show, sortOrder: index * 10 }] : [];
+      });
+    }
+    const updated = await shopSettingsRepo_exports.updateReviewSettings(
+      {
+        reviews: { enabled: input2.enabled ?? stored.reviews.enabled, items },
+        google: input2.google ? { ...stored.google, ...input2.google } : stored.google
+      },
+      meta3.now,
+      { session }
+    );
+    return { before: stored, after: updated };
+  });
+  await audit2(
+    principal,
+    {
+      action: "settings.reviews.update",
+      entityType: "shopSettings",
+      entityId: "shop",
+      before: reviewsAuditView(before.reviews, before.google),
+      after: reviewsAuditView(after.reviews, after.google)
+    },
+    meta3
+  );
+  return getSettings();
+}
 async function listAudit(query) {
   const before = cursors.decode(query.cursor, cursors.isTimeCursor);
   const page = await auditLogRepo_exports.listAuditPage(
@@ -38777,6 +39032,11 @@ var adminRoutes = [
     const input2 = await parseBody(ctx, settingsRequestSchema);
     return { body: settingsResponseSchema.parse(await putSettings(principal, input2, metaOf(ctx))) };
   }),
+  owner("PUT", "/api/admin/reviews", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, reviewsRequestSchema);
+    return { body: settingsResponseSchema.parse(await putReviews(principal, input2, metaOf(ctx))) };
+  }),
   // A barber's PIN access ---------------------------------------------------
   owner("GET", "/api/admin/staff/:id/access", async (ctx) => {
     ctxScope(ctx);
@@ -38833,6 +39093,17 @@ var adminRoutes = [
 ];
 
 // shared/api/public.ts
+var publicReviewSchema = external_exports.object({
+  id: idSchema,
+  name: external_exports.string(),
+  text: external_exports.string(),
+  stars: external_exports.int(),
+  source: reviewSourceSchema,
+  /** YYYY-MM-DD, or null when the source shows no exact date (theCut). */
+  date: external_exports.string().nullable(),
+  /** The chair the review is about, or null for the shop as a whole. */
+  staffId: idSchema.nullable()
+});
 var publicShopSchema = external_exports.object({
   name: external_exports.string(),
   tagline: external_exports.string(),
@@ -38858,6 +39129,8 @@ var publicShopSchema = external_exports.object({
   social: socialLinksSchema.optional(),
   /** The Google Business Profile: place id for the Maps and review links, plus the rating shown. */
   google: googleSettingsSchema.optional(),
+  /** The reviews to show, in order. Empty while the section is off or every review is hidden. */
+  reviews: external_exports.array(publicReviewSchema).max(30).optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
@@ -38942,6 +39215,12 @@ var changeEmailRequestSchema = external_exports.object({
 });
 var okResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
 var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
+
+// shared/lib/reviews.ts
+function shownReviews(reviews) {
+  if (!reviews.enabled) return [];
+  return reviews.items.map((item, index) => ({ item, index })).filter(({ item }) => item.show).sort((a, b) => a.item.sortOrder - b.item.sortOrder || a.index - b.index).map(({ item }) => item);
+}
 
 // server/services/nextOpening.ts
 var LOOKAHEAD_DAYS2 = 14;
@@ -39063,6 +39342,17 @@ function toPublicStaff(doc) {
     sortOrder: doc.sortOrder
   };
 }
+function toPublicReview(item) {
+  return {
+    id: item.id,
+    name: item.name,
+    text: item.text,
+    stars: item.stars,
+    source: item.source,
+    date: item.date ?? null,
+    staffId: item.staffId
+  };
+}
 var EMPTY_WEEK = { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] };
 var publicRoutes = [
   {
@@ -39100,6 +39390,8 @@ var publicRoutes = [
         },
         social: settings.social,
         google: settings.google,
+        // Hidden reviews, and every review while the section is off, never leave the server.
+        reviews: shownReviews(settings.reviews).map(toPublicReview),
         heroPhoto: hero,
         maintenance: getEnv2().MAINTENANCE_MODE === "true",
         demo: demoEnabled()

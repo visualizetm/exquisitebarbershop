@@ -24,6 +24,7 @@ test.describe('the /kit page (development builds only)', () => {
       'Feedback',
       'Dashboard',
       'Barber prices',
+      'Reviews',
       'Overlays',
       'Motion',
     ];

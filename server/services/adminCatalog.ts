@@ -6,12 +6,18 @@ import type {
   ConflictOutcome,
   ConflictResolution,
   OutboxMessageView,
+  ReviewsRequest,
 } from '../../shared/api/admin';
 import { pruneServicePrices } from '../../shared/lib/servicePricing';
 import { shopDayBounds } from '../../shared/lib/time';
 import type { EmailOutboxDocument } from '../../shared/schemas/emailOutbox';
 import type { ServiceDocument, ServiceInput, ServiceUpdate } from '../../shared/schemas/service';
-import type { ShopSettingsInput, ShopSettingsUpdate } from '../../shared/schemas/shopSettings';
+import type {
+  GoogleSettings,
+  ReviewsSettings,
+  ShopSettingsInput,
+  ShopSettingsUpdate,
+} from '../../shared/schemas/shopSettings';
 import type { StaffDocument, StaffInput, StaffUpdate } from '../../shared/schemas/staff';
 import { withTransaction } from '../db/transaction';
 import type { Principal } from '../http/types';
@@ -358,6 +364,73 @@ export async function putSettings(
     meta,
   );
   return after;
+}
+
+/** What the audit log keeps of a Reviews save: the switch, the rating and each review's place. */
+function reviewsAuditView(reviews: ReviewsSettings, google: GoogleSettings) {
+  return {
+    enabled: reviews.enabled,
+    google: {
+      rating: google.rating,
+      reviewCount: google.reviewCount,
+      ratingCheckedOn: google.ratingCheckedOn,
+    },
+    items: reviews.items.map((r) => ({
+      id: r.id,
+      name: r.name,
+      show: r.show,
+      sortOrder: r.sortOrder,
+    })),
+  };
+}
+
+/**
+ * Website, Reviews: show or hide each review, put them in order, switch the section, and copy the
+ * Google rating in. The list must name every stored review exactly once; text, names and stars are
+ * never taken from the request, so nothing typed in the dashboard can reach a quote.
+ */
+export async function putReviews(principal: Principal, input: ReviewsRequest, meta: ServiceMeta) {
+  const { before, after } = await withTransaction(async (session) => {
+    const stored = await shopSettingsRepo.requireShopSettings({ session });
+    let items = stored.reviews.items;
+    if (input.items) {
+      const byId = new Map(items.map((r) => [r.id, r]));
+      const sameSet =
+        input.items.length === items.length && input.items.every((i) => byId.has(i.id));
+      if (!sameSet) {
+        throw new AppError(
+          'CONFLICT',
+          'The reviews changed since this page was opened. Reload the page and try again.',
+        );
+      }
+      // The position in the list is the order on the site, 10 apart like the service menu.
+      items = input.items.flatMap((entry, index) => {
+        const review = byId.get(entry.id);
+        return review ? [{ ...review, show: entry.show, sortOrder: index * 10 }] : [];
+      });
+    }
+    const updated = await shopSettingsRepo.updateReviewSettings(
+      {
+        reviews: { enabled: input.enabled ?? stored.reviews.enabled, items },
+        google: input.google ? { ...stored.google, ...input.google } : stored.google,
+      },
+      meta.now,
+      { session },
+    );
+    return { before: stored, after: updated };
+  });
+  await audit(
+    principal,
+    {
+      action: 'settings.reviews.update',
+      entityType: 'shopSettings',
+      entityId: 'shop',
+      before: reviewsAuditView(before.reviews, before.google),
+      after: reviewsAuditView(after.reviews, after.google),
+    },
+    meta,
+  );
+  return getSettings();
 }
 
 // ---------------------------------------------------------------------------

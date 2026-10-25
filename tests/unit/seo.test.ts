@@ -133,10 +133,23 @@ describe('shopJsonLd', () => {
           reviewCount: 15,
           ratingCheckedOn: '2026-10-25',
         },
+        reviews: [
+          {
+            id: 'a'.repeat(24),
+            name: 'Unique D.',
+            text: 'Great environment.',
+            stars: 5,
+            source: 'google',
+            date: '2025-11-25',
+            staffId: null,
+          },
+        ],
       },
       'https://example.com',
     );
-    expect(JSON.stringify(data)).not.toMatch(/aggregateRating|ratingValue|reviewCount|"review"/);
+    expect(JSON.stringify(data)).not.toMatch(
+      /aggregateRating|ratingValue|reviewCount|"review"|Unique D|Great environment/,
+    );
   });
 
   it('never carries the owner personal number', () => {

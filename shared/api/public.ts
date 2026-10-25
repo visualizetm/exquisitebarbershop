@@ -5,10 +5,25 @@ import {
   addressSchema,
   announcementSchema,
   googleSettingsSchema,
+  reviewSourceSchema,
   socialLinksSchema,
 } from '../schemas/shopSettings';
 import { servicePriceSchema, staffRoleSchema } from '../schemas/staff';
 import { photoViewSchema } from './photos';
+
+/** A review as the public site gets it: only shown ones, already in the owner's order. */
+export const publicReviewSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  text: z.string(),
+  stars: z.int(),
+  source: reviewSourceSchema,
+  /** YYYY-MM-DD, or null when the source shows no exact date (theCut). */
+  date: z.string().nullable(),
+  /** The chair the review is about, or null for the shop as a whole. */
+  staffId: idSchema.nullable(),
+});
+export type PublicReview = z.infer<typeof publicReviewSchema>;
 
 /** Public shop information for the Visit page, the footer and SEO. */
 export const publicShopSchema = z.object({
@@ -36,6 +51,8 @@ export const publicShopSchema = z.object({
   social: socialLinksSchema.optional(),
   /** The Google Business Profile: place id for the Maps and review links, plus the rating shown. */
   google: googleSettingsSchema.optional(),
+  /** The reviews to show, in order. Empty while the section is off or every review is hidden. */
+  reviews: z.array(publicReviewSchema).max(30).optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */

@@ -1028,3 +1028,59 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
 - D12-55 Barber pole check: `scripts/brand-assets.ts` reads only the v2 marks, and `public/` holds the Q
   icon, the v2 emblems, the OG card and the favicons; no file draws a barber pole (the old `exq-pole` files
   were deleted in 32dbf82). Nothing to remove.
+- D12-56 Where the reviews live: `settings.reviews`, `{ enabled, items }`, on the shop settings document as
+  the prompt says, at most 30 items, text up to 600 characters. A stored review carries `staffId`, resolved
+  from the seed's `staffKey` with `staffSeedId`, not the key itself: the public API and the chair pages
+  match on ids like every other reference, and the key only exists in `seed/shop.ts`. Rejected: a reviews
+  collection (another repo, index, wipe step and route for at most 30 rows that are read with the settings).
+- D12-57 Review ids come from `newId()` when the seed module loads (the task names newId), so they are 24 hex
+  like every id. They are fixed once the settings document is created (`$setOnInsert`); Demo data, Reset
+  reseeds them with new ids, and a Reviews tab left open across a reset gets a 409 "reload the page" answer
+  instead of a wrong save. Rejected: `seedId` ids; they would work too, but the task asked for newId.
+- D12-58 The seed: all 18 reviews shown and the section on. Order: Unique D., Ricardo E. and Routine Life
+  Fitness first, then the other Google reviews in file order, then Drew's and Nelly's theCut reviews in file
+  order. Home shows the first three shown reviews in the owner's order instead of a separate "on Home" flag:
+  one rule, and the owner changes Home by moving a review up. Wesley T. is left out entirely, Lamont I. is the
+  short version, every review has 5 stars, theCut ones have no date, and the text is byte for byte the data
+  file's (a test compares them).
+- D12-59 Nelly's theCut reviews say "Mike". The data file's team entry says Mike is Nelly's own name
+  ("Reviews call him Mike"), so they are right, kept word for word and shown. Open item for Dontrise: confirm
+  Nelly is happy with "Mike" on the Nelly Cutz page, or hide those two in Website, Reviews.
+- D12-60 One writer for the reviews: `PUT /api/admin/reviews`, owner only, takes
+  `{ enabled?, google?, items? }`. `items` lists every stored review once, as id and show only, in the new
+  order (the position becomes `sortOrder`, 10 apart). The request is strict: a review with text, stars or a
+  name, an extra key such as a new review, a review listed twice or a place id is a 400; a list that does not
+  name exactly the stored reviews is a 409. So the dashboard can never type, change or add a quote, and every
+  review on the site stays real. The read and the write share one transaction. Rejected: saving the reviews through
+  `PUT /api/admin/settings` like the other panels (it would accept any text).
+- D12-61 `PUT /api/admin/settings` has `reviews` left out of its schema (`shopSettingsUpdateSchema`): zod
+  strips it, so a save that omits the group keeps it (the D12-22 rule) and a save that carries it (every
+  panel sends back the settings it loaded) changes nothing. This goes one step past the google rule (optional,
+  replaced when present) because a stale tab must neither undo a Reviews save nor change a quote. `google`
+  keeps its D12-22 rule.
+- D12-62 The Google rating, count and checked date are edited in Website, Reviews and saved through the same
+  route with `googleRatingSchema`, a strict part of the Google block: the place id (Directions and the review
+  links) cannot change there. The panel has two kinds of save: the section switch and the rating are a form
+  with one Save (off until something changed), and in the list each Show, Hide or arrow saves at once with a
+  toast, as Services and Gallery do. Rejected: one Save for everything (moving a review would take a second
+  click, unlike the other lists). No drag and drop: the arrows are enough for 18 rows and less code.
+- D12-63 Audit: one entry per Reviews save, action `settings.reviews.update`, entity `shopSettings/shop`,
+  before and after holding the switch, the rating, count and date, and each review's id, name, show and sort
+  order (no quote, since it never changes). Same helper as the other panels.
+- D12-64 `/api/shop` gains `reviews`: only the shown ones, in order, as
+  `{ id, name, text, stars, source, date, staffId }` (`date` null for theCut), and an empty list while the
+  section is off, so a hidden review never leaves the server. Home and the chair pages read it from the shop
+  answer every page already has, so there is no new request. A settings document written before the field
+  reads as `{ enabled: true, items: [] }`; the live showcase gets the reviews from Demo data, Reset, like the
+  rest of the new seed.
+- D12-65 Display. Home, "What clients say", after the work and before Visit: the rating line (only when a
+  rating and a count are set; "Read them on Google" and "Leave a review" need the place id) and the first
+  three shown reviews. A chair page: up to three shown reviews about that chair under its menu, with no rating
+  line (the rating is the shop's). Either section is left out when no review would show. Stars are `Star01`
+  from the icon set, a filled row clipped to the value over an outline row, hidden from screen readers with
+  the rating in words beside them (a card says "Rated 5 out of 5"). A card shows the month and year
+  ("November 2025"); a theCut card shows the source alone. Cards sit one per row on a phone and up to three
+  across from about 830px.
+- D12-66 No `aggregateRating` or any review markup in the JSON-LD: Google ignores self-served review markup
+  for a local business, and the rating is copied by hand. `shopJsonLd` already left it out; its unit test now
+  passes reviews in and checks that none reach the structured data.

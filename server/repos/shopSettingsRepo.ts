@@ -2,11 +2,16 @@ import { SHOP_SETTINGS_ID } from '../../shared/lib/constants';
 import {
   DEFAULT_ANNOUNCEMENT,
   DEFAULT_GOOGLE,
+  DEFAULT_REVIEWS,
   DEFAULT_SOCIAL_LINKS,
   DEFAULT_STAFF_PERMISSIONS,
+  googleSettingsSchema,
+  reviewsSettingsSchema,
   shopSettingsDocumentSchema,
   shopSettingsInputSchema,
   shopSettingsUpdateSchema,
+  type GoogleSettings,
+  type ReviewsSettings,
   type ShopSettingsDocument,
   type ShopSettingsInput,
   type ShopSettingsUpdate,
@@ -24,6 +29,7 @@ function fill(doc: ShopSettingsDocument): ShopSettingsDocument {
     nextOpenServiceId: stored.nextOpenServiceId ?? null,
     announcement: { ...DEFAULT_ANNOUNCEMENT, ...stored.announcement },
     google: { ...DEFAULT_GOOGLE, ...stored.google },
+    reviews: { ...DEFAULT_REVIEWS, ...stored.reviews },
     // Shops set up before the social links existed keep their Instagram link from the handle.
     social: stored.social ?? {
       ...DEFAULT_SOCIAL_LINKS,
@@ -73,7 +79,10 @@ export async function createShopSettingsIfMissing(
   return { created: result.upsertedCount === 1 };
 }
 
-/** Replaces the settings the save carries. A group the save leaves out (google) keeps its stored value. */
+/**
+ * Replaces the settings the save carries. A group the save leaves out (google) keeps its stored
+ * value, and the reviews are never written here (see updateReviewSettings).
+ */
 export async function updateShopSettings(
   input: ShopSettingsUpdate,
   now: Date,
@@ -84,6 +93,27 @@ export async function updateShopSettings(
   const updated = await col.findOneAndUpdate(
     { _id: SHOP_SETTINGS_ID },
     { $set: { ...parsed, ...(google ? { google } : {}), updatedAt: now } },
+    { returnDocument: 'after', ...sessionOf(options) },
+  );
+  if (!updated) throw new AppError('NOT_FOUND', 'Shop settings were not found');
+  return fill(updated);
+}
+
+/**
+ * The one writer of the reviews group, for Website, Reviews. It also takes the Google rating the
+ * owner copies by hand, which sits next to the reviews on the site. Both are validated again here.
+ */
+export async function updateReviewSettings(
+  input: { reviews: ReviewsSettings; google: GoogleSettings },
+  now: Date,
+  options?: RepoOptions,
+): Promise<ShopSettingsDocument> {
+  const reviews = reviewsSettingsSchema.parse(input.reviews);
+  const google = googleSettingsSchema.parse(input.google);
+  const col = await collection('shopSettings');
+  const updated = await col.findOneAndUpdate(
+    { _id: SHOP_SETTINGS_ID },
+    { $set: { reviews, google, updatedAt: now } },
     { returnDocument: 'after', ...sessionOf(options) },
   );
   if (!updated) throw new AppError('NOT_FOUND', 'Shop settings were not found');
