@@ -1,0 +1,21 @@
+{
+  "_note": "Real shop photos from the shop's Google Business Profile and Instagram (@exquisitebarberbeauty), collected 2026-10-25. Files are WebP, 1600px on the long edge. Never add the old circular barber pole logo. No photo is credited to a chair yet because the posts do not say who cut them; Dontrise can credit them in the dashboard.",
+  "photos": [
+    { "file": "exq-01-hero.webp", "kind": "hero", "alt": "A barber smiling beside his client in the chair at Exquisite", "source": "https://www.instagram.com/p/DQNa4GmgG-q/", "sortOrder": 0 },
+    { "file": "exq-02-waves-beard.webp", "kind": "gallery", "alt": "360 waves and a full beard, lined up sharp", "source": "https://www.instagram.com/p/DdR0g2JKydZ/", "home": true, "sortOrder": 10 },
+    { "file": "exq-03-skin-fade.webp", "kind": "gallery", "alt": "Skin fade with a clean lineup and beard", "source": "https://www.instagram.com/p/DWuNDUKCvdu/", "home": true, "sortOrder": 20 },
+    { "file": "exq-04-curly-top.webp", "kind": "gallery", "alt": "Curly top with a taper and a shaped beard", "source": "https://www.instagram.com/p/DR927JPgBr2/", "sortOrder": 30 },
+    { "file": "exq-05-afro-taper.webp", "kind": "gallery", "alt": "Afro taper with a sharp lineup and beard", "source": "https://www.instagram.com/p/DR7SEUDAHW8/", "home": true, "sortOrder": 40 },
+    { "file": "exq-06-beard-waves.webp", "kind": "gallery", "alt": "Full beard and waves from the side", "source": "https://www.instagram.com/p/DMdm5W9xvgR/", "sortOrder": 50 },
+    { "file": "exq-07-low-fade-part.webp", "kind": "gallery", "alt": "Low fade with a hard part", "source": "https://www.instagram.com/p/DN74lBWgIGC/", "sortOrder": 60 },
+    { "file": "exq-08-curly-taper.webp", "kind": "gallery", "alt": "Curly top with a taper fade", "source": "https://www.instagram.com/p/DARD0KhxoXZ/", "sortOrder": 70 },
+    { "file": "exq-09-color-waves.webp", "kind": "gallery", "alt": "Pink and purple color on short waves", "source": "https://www.instagram.com/p/DBJZvvYR3dj/", "home": true, "sortOrder": 80 },
+    { "file": "exq-10-kids-design.webp", "kind": "gallery", "alt": "Kids cut with a fade and a part design", "source": "https://www.instagram.com/p/C_zFM5CR5I5/", "home": true, "sortOrder": 90 },
+    { "file": "exq-11-kids-lightning.webp", "kind": "gallery", "alt": "Kids cut with a lightning bolt design", "source": "https://www.instagram.com/p/C_zFJl3RkQO/", "sortOrder": 100 },
+    { "file": "exq-12-hard-part.webp", "kind": "gallery", "alt": "Taper with a hard part line", "source": "https://www.instagram.com/p/C-GQG_fJyPn/", "sortOrder": 110 },
+    { "file": "exq-13-beard-fade.webp", "kind": "gallery", "alt": "Full beard and fade, client leaning back in the chair", "source": "Google Business Profile, owner photo", "sortOrder": 120 },
+    { "file": "exq-14-low-fade.webp", "kind": "gallery", "alt": "Low fade with a sharp lineup", "source": "Google Business Profile, owner photo", "home": true, "sortOrder": 130 },
+    { "file": "exq-15-part-taper.webp", "kind": "gallery", "alt": "Taper with a part line from the side", "source": "Google Business Profile, owner photo", "sortOrder": 140 },
+    { "file": "exq-16-curly-chairs.webp", "kind": "gallery", "alt": "Curly top with a taper, the shop's chairs behind", "source": "Google Business Profile, owner photo", "sortOrder": 150 }
+  ]
+}
