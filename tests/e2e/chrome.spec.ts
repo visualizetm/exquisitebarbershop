@@ -64,20 +64,21 @@ test.describe('icons', () => {
     const info = page.locator('.exq-hero__info');
     await expect(info.locator('dt svg')).toHaveCount(2);
     await page.goto('/visit');
-    await expect(page.locator('.exq-visit__fact svg')).toHaveCount(4);
+    // Hours, address and phone. The email line has no icon while the shop has no real address.
+    await expect(page.locator('.exq-visit__fact svg')).toHaveCount(3);
     await expect(page.getByRole('link', { name: 'Directions' }).locator('svg')).toHaveCount(1);
     // No icon sits on a heading.
     await expect(page.locator('h1 svg, h2 svg, h3 svg')).toHaveCount(0);
   });
 
   test('booking steps tick off, and the confirmation ticket names its facts', async ({ page }) => {
-    await bookPublicly(page, 'dee', { name: 'Icon Check' });
+    await bookPublicly(page, 'drew', { name: 'Icon Check' });
     const ticket = page.locator('.exq-ticket');
     await expect(ticket.locator('dt svg')).toHaveCount(5);
     await expect(ticket.locator('dt', { hasText: 'Day' })).toBeVisible();
     await expect(ticket.locator('dt', { hasText: 'Time' })).toBeVisible();
-    await page.goto('/book?barber=dee');
-    await page.getByLabel(/Classic Cut/).click();
+    await page.goto('/book?barber=drew');
+    await page.getByLabel(/^Haircut(?! and| with)/).click();
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(
       page.locator('.exq-stepbar__step[data-state="done"] .exq-stepbar__n svg').first(),

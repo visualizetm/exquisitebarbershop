@@ -23,14 +23,15 @@ const { db } = useTestDb();
 let server: TestServer;
 const WED = nextDate(3, 3);
 const THU = nextDate(4, 3);
-const SUN = nextDate(7, 3);
-const cutId = serviceSeedId('classic-cut');
-const beardId = serviceSeedId('beard-trim');
+// The shop is closed on Mondays.
+const MON = nextDate(1, 3);
+const cutId = serviceSeedId('haircut');
+const lineupId = serviceSeedId('lineup');
 
 function body(overrides: Record<string, unknown> = {}) {
   return {
     serviceIds: [cutId],
-    staff: 'marcus',
+    staff: 'lee',
     startAt: slotAt(WED, '10:00'),
     customer: { name: 'Sam Customer', phone: phone(), email: 'sam@example.com' },
     ...overrides,
@@ -54,13 +55,13 @@ afterAll(async () => {
 
 describe('POST /api/bookings', () => {
   it('happy path: creates the booking, its locks, audit entry, outbox rows and a manage link', async () => {
-    const res = await post(body({ serviceIds: [cutId, beardId], notes: 'Scissors please' }));
+    const res = await post(body({ serviceIds: [cutId, lineupId], notes: 'Scissors please' }));
     expect(res.status).toBe(201);
     const parsed = createBookingResponseSchema.parse(res.body);
     expect(parsed.booking.referenceCode).toMatch(/^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{4}$/);
-    expect(parsed.booking.staff.slug).toBe('marcus');
-    expect(parsed.booking.durationMinutes).toBe(45);
-    expect(parsed.booking.totalPriceCents).toBe(5000);
+    expect(parsed.booking.staff.slug).toBe('lee');
+    expect(parsed.booking.durationMinutes).toBe(65);
+    expect(parsed.booking.totalPriceCents).toBe(6000);
     expect(parsed.booking.customer.phone).toMatch(/^\+1215\d{7}$/);
     expect(parsed.managePath).toMatch(/^\/manage\?token=v1\./);
     expect(res.headers.get('idempotent-replayed')).toBe('false');
@@ -68,8 +69,8 @@ describe('POST /api/bookings', () => {
 
     const stored = await bookingsRepo.findBookingById(parsed.booking.id);
     expect(stored?.bufferMinutes).toBe(10);
-    // 45 minutes plus a 10 minute buffer: 10:00 to 10:55 locks four 15 minute blocks.
-    expect(await slotLocksRepo.listSlotLocksForHolder(parsed.booking.id)).toHaveLength(4);
+    // 65 minutes plus a 10 minute buffer: 10:00 to 11:15 locks five 15 minute blocks.
+    expect(await slotLocksRepo.listSlotLocksForHolder(parsed.booking.id)).toHaveLength(5);
     const outbox = await emailOutboxRepo.listOutboxForBooking(parsed.booking.id);
     expect(outbox.map((m) => m.template).sort()).toEqual(['bookingConfirmed', 'ownerNewBooking']);
     expect(outbox.every((m) => m.status === 'pending')).toBe(true);
@@ -83,7 +84,7 @@ describe('POST /api/bookings', () => {
   it('a customer without email gets no customer message, only the owner alert', async () => {
     const res = await post(
       body({
-        startAt: slotAt(WED, '11:00'),
+        startAt: slotAt(WED, '11:30'),
         customer: { name: 'No Mail', phone: phone(), email: null },
       }),
     );
@@ -123,15 +124,15 @@ describe('POST /api/bookings', () => {
   });
 
   it('closed day, unknown chair, chair that does not do the service, and beauty with "any"', async () => {
-    const closed = await post(body({ startAt: slotAt(SUN, '10:00') }));
+    const closed = await post(body({ startAt: slotAt(MON, '10:00') }));
     expect(apiErrorSchema.parse(closed.body).error.code).toBe('SHOP_CLOSED');
     const unknown = await post(body({ staff: 'nobody' }));
     expect(apiErrorSchema.parse(unknown.body).error.code).toBe('STAFF_UNAVAILABLE');
-    const beauty = await post(body({ serviceIds: [serviceSeedId('silk-press')], staff: 'marcus' }));
+    const beauty = await post(body({ serviceIds: [serviceSeedId('female-cut')], staff: 'lee' }));
     expect(apiErrorSchema.parse(beauty.body).error.code).toBe('STAFF_UNAVAILABLE');
     const anyBeauty = await post(
       body({
-        serviceIds: [serviceSeedId('silk-press')],
+        serviceIds: [serviceSeedId('female-cut')],
         staff: 'any',
         startAt: slotAt(WED, '12:00'),
       }),
@@ -167,23 +168,23 @@ describe('POST /api/bookings', () => {
           referenceCode: createBookingResponseSchema.parse(first.body).booking.referenceCode,
         }),
     ).toBe(1);
-    expect(await slotLocksRepo.listSlotLocksForHolder(id)).toHaveLength(3);
+    expect(await slotLocksRepo.listSlotLocksForHolder(id)).toHaveLength(4);
     const mismatch = await post({ ...payload, notes: 'different' }, { 'idempotency-key': key });
     expect(mismatch.status).toBe(422);
     expect(apiErrorSchema.parse(mismatch.body).error.code).toBe('IDEMPOTENCY_BODY_MISMATCH');
   });
 
   it('a conflict returns 409 SLOT_TAKEN with alternatives and writes nothing', async () => {
-    const taken = await post(body({ startAt: slotAt(WED, '15:00'), staff: 'kris' }));
+    const taken = await post(body({ startAt: slotAt(WED, '15:00'), staff: 'nelly' }));
     expect(taken.status).toBe(201);
     const outboxBefore = await db().collection('emailOutbox').countDocuments();
     const locksBefore = await db().collection('slotLocks').countDocuments();
-    const res = await post(body({ startAt: slotAt(WED, '15:15'), staff: 'kris' }));
+    const res = await post(body({ startAt: slotAt(WED, '15:15'), staff: 'nelly' }));
     expect(res.status).toBe(409);
     const err = apiErrorSchema.parse(res.body).error;
     expect(err.code).toBe('SLOT_TAKEN');
     expect(err.alternatives?.length).toBeGreaterThan(0);
-    expect(err.alternatives?.[0]?.staffId).toBe(staffSeedId('kris'));
+    expect(err.alternatives?.[0]?.staffId).toBe(staffSeedId('nelly'));
     expect(new Date(err.alternatives?.[0]?.startAt ?? 0).getTime()).toBeGreaterThan(
       new Date(slotAt(WED, '15:15')).getTime(),
     );
@@ -193,11 +194,11 @@ describe('POST /api/bookings', () => {
 
   it('the per-phone open booking limit stops a fourth upcoming booking', async () => {
     const myPhone = phone();
-    for (const time of ['09:00', '10:00', '11:00']) {
+    for (const time of ['10:00', '11:00', '12:00']) {
       const res = await post(
         body({
           startAt: slotAt(THU, time),
-          staff: 'marcus',
+          staff: 'lee',
           customer: { name: 'Repeat', phone: myPhone, email: null },
         }),
       );
@@ -205,8 +206,8 @@ describe('POST /api/bookings', () => {
     }
     const fourth = await post(
       body({
-        startAt: slotAt(THU, '12:00'),
-        staff: 'marcus',
+        startAt: slotAt(THU, '13:00'),
+        staff: 'lee',
         customer: { name: 'Repeat', phone: myPhone, email: null },
       }),
     );
@@ -218,7 +219,7 @@ describe('POST /api/bookings', () => {
     const ip = '203.0.113.77';
     let last = 0;
     for (let i = 0; i < 11; i += 1) {
-      const res = await post(body({ startAt: slotAt(SUN, '10:00') }), { 'x-forwarded-for': ip });
+      const res = await post(body({ startAt: slotAt(MON, '10:00') }), { 'x-forwarded-for': ip });
       last = res.status;
     }
     expect(last).toBe(429);
@@ -226,7 +227,7 @@ describe('POST /api/bookings', () => {
     for (let i = 0; i < 5; i += 1) {
       await post(
         body({
-          startAt: slotAt(SUN, '10:00'),
+          startAt: slotAt(MON, '10:00'),
           customer: { name: 'P', phone: limitedPhone, email: null },
         }),
         { 'x-forwarded-for': `198.51.100.${i + 1}` },
@@ -234,7 +235,7 @@ describe('POST /api/bookings', () => {
     }
     const sixth = await post(
       body({
-        startAt: slotAt(SUN, '10:00'),
+        startAt: slotAt(MON, '10:00'),
         customer: { name: 'P', phone: limitedPhone, email: null },
       }),
       { 'x-forwarded-for': '198.51.100.99' },
@@ -275,7 +276,7 @@ describe('POST /api/bookings', () => {
         post(
           body({
             startAt: start,
-            staff: 'kris',
+            staff: 'nelly',
             customer: { name: `Racer ${i}`, phone: phone(), email: null },
           }),
           { 'x-forwarded-for': `192.0.2.${i + 1}` },
@@ -285,15 +286,15 @@ describe('POST /api/bookings', () => {
     const statuses = results.map((r) => r.status);
     expect(statuses.filter((s) => s === 201)).toHaveLength(1);
     expect(statuses.filter((s) => s === 409)).toHaveLength(24);
-    const krisId = staffSeedId('kris');
-    const locks = await slotLocksRepo.listSlotLocksForStaff(krisId, {
+    const nellyId = staffSeedId('nelly');
+    const locks = await slotLocksRepo.listSlotLocksForStaff(nellyId, {
       start: new Date(start),
-      end: new Date(new Date(start).getTime() + 60 * 60_000),
+      end: new Date(new Date(start).getTime() + 90 * 60_000),
     });
-    expect(locks).toHaveLength(3);
+    expect(locks).toHaveLength(4);
     const winners = await bookingsRepo.listBookingsBetween(
       { start: new Date(start), end: new Date(new Date(start).getTime() + 60_000) },
-      { staffId: krisId },
+      { staffId: nellyId },
     );
     expect(winners).toHaveLength(1);
     for (const lock of locks) expect(lock.holderId).toBe(winners[0]?._id);
@@ -328,7 +329,7 @@ describe('manage link', () => {
   }
 
   it('GET returns the summary with cutoff flags', async () => {
-    const { parsed, token } = await book({ startAt: slotAt(WED, '16:00'), staff: 'dee' });
+    const { parsed, token } = await book({ startAt: slotAt(WED, '16:00'), staff: 'drew' });
     const res = await call(
       server.baseUrl,
       'GET',
@@ -344,7 +345,7 @@ describe('manage link', () => {
   });
 
   it('tampered, expired, unknown, superseded and cancelled tokens have distinct codes', async () => {
-    const { token } = await book({ startAt: slotAt(WED, '17:00'), staff: 'dee' });
+    const { token } = await book({ startAt: slotAt(WED, '17:00'), staff: 'drew' });
     const tampered = await call(
       server.baseUrl,
       'GET',
@@ -386,8 +387,8 @@ describe('manage link', () => {
   });
 
   it('cancel releases the locks in the same transaction and queues the cancel emails', async () => {
-    const { parsed, token } = await book({ startAt: slotAt(THU, '09:00'), staff: 'dee' });
-    expect(await slotLocksRepo.listSlotLocksForHolder(parsed.booking.id)).toHaveLength(3);
+    const { parsed, token } = await book({ startAt: slotAt(THU, '10:00'), staff: 'drew' });
+    expect(await slotLocksRepo.listSlotLocksForHolder(parsed.booking.id)).toHaveLength(4);
     const res = await call(server.baseUrl, 'POST', '/api/bookings/manage/cancel', {
       body: { token, reason: 'Sick' },
     });
@@ -410,15 +411,15 @@ describe('manage link', () => {
         .countDocuments({ entityId: parsed.booking.id, action: 'booking.cancel' }),
     ).toBe(1);
     // The slot is bookable again.
-    const rebook = await post(body({ startAt: slotAt(THU, '09:00'), staff: 'dee' }));
+    const rebook = await post(body({ startAt: slotAt(THU, '10:00'), staff: 'drew' }));
     expect(rebook.status).toBe(201);
   });
 
   it('reschedule into an overlapping time on the same chair works and invalidates the old link', async () => {
     const { parsed, token } = await book({
-      serviceIds: [cutId, beardId],
+      serviceIds: [cutId, lineupId],
       startAt: slotAt(THU, '11:00'),
-      staff: 'dee',
+      staff: 'drew',
     });
     const res = await call(server.baseUrl, 'POST', '/api/bookings/manage/reschedule', {
       body: { token, startAt: slotAt(THU, '11:15') },
@@ -427,13 +428,14 @@ describe('manage link', () => {
     const moved = createBookingResponseSchema.parse(res.body);
     expect(moved.booking.startAt).toBe(slotAt(THU, '11:15'));
     expect(moved.booking.sequence).toBe(2);
-    expect(moved.booking.staff.slug).toBe('dee');
+    expect(moved.booking.staff.slug).toBe('drew');
     const locks = await slotLocksRepo.listSlotLocksForHolder(parsed.booking.id);
     expect(locks.map((l) => l.slotStart.toISOString())).toEqual([
       slotAt(THU, '11:15'),
       slotAt(THU, '11:30'),
       slotAt(THU, '11:45'),
       slotAt(THU, '12:00'),
+      slotAt(THU, '12:15'),
     ]);
     const old = await call(
       server.baseUrl,
@@ -461,7 +463,7 @@ describe('manage link', () => {
       'ownerNewBooking',
     ]);
     // Moving onto someone else's time is refused and the booking stays put.
-    const blocker = await post(body({ startAt: slotAt(THU, '14:00'), staff: 'dee' }));
+    const blocker = await post(body({ startAt: slotAt(THU, '14:00'), staff: 'drew' }));
     expect(blocker.status).toBe(201);
     const refused = await call(server.baseUrl, 'POST', '/api/bookings/manage/reschedule', {
       body: { token: newToken, startAt: slotAt(THU, '14:00') },
@@ -471,7 +473,7 @@ describe('manage link', () => {
     expect((await bookingsRepo.findBookingById(parsed.booking.id))?.startAt.toISOString()).toBe(
       slotAt(THU, '11:15'),
     );
-    expect(await slotLocksRepo.listSlotLocksForHolder(parsed.booking.id)).toHaveLength(4);
+    expect(await slotLocksRepo.listSlotLocksForHolder(parsed.booking.id)).toHaveLength(5);
     const same = await call(server.baseUrl, 'POST', '/api/bookings/manage/reschedule', {
       body: { token: newToken, startAt: slotAt(THU, '11:15') },
     });
@@ -479,7 +481,7 @@ describe('manage link', () => {
   });
 
   it('reschedule can switch to "any" and lands on another chair', async () => {
-    const { token } = await book({ startAt: slotAt(THU, '13:00'), staff: 'marcus' });
+    const { token } = await book({ startAt: slotAt(THU, '13:00'), staff: 'lee' });
     const res = await call(server.baseUrl, 'POST', '/api/bookings/manage/reschedule', {
       body: { token, startAt: slotAt(THU, '13:00'), staff: 'any' },
     });
@@ -490,10 +492,10 @@ describe('manage link', () => {
   it('the cutoff blocks cancel and reschedule close to the start', async () => {
     const soon = new Date(Date.now() + 60 * 60_000);
     soon.setUTCMinutes(0, 0, 0);
-    const dee = await staffRepo.findStaffById(staffSeedId('dee'));
+    const drew = await staffRepo.findStaffById(staffSeedId('drew'));
     const doc = await bookingsRepo.insertBooking(
       bookingInput({
-        staffId: dee?._id ?? '',
+        staffId: drew?._id ?? '',
         startAt: soon,
         endAt: new Date(soon.getTime() + 30 * 60_000),
       }),

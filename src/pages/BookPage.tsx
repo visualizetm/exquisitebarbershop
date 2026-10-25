@@ -185,7 +185,14 @@ export function BookPage() {
   // An alias slug on a printed card resolves to the current slug and the address is corrected.
   useEffect(() => {
     if (staff.status !== 'ready' || !selection.staff || selection.staff === 'any') return;
-    if (staff.data.staff.some((s) => s.slug === selection.staff)) return;
+    const listed = staff.data.staff.find((s) => s.slug === selection.staff);
+    if (listed) {
+      // Someone who takes no online bookings (Iniya) cannot be picked here: book with anyone free.
+      if (!listed.acceptsOnlineBooking) {
+        setParams(writeSelection({ ...selection, staff: 'any' }), { replace: true });
+      }
+      return;
+    }
     const requested = selection.staff;
     apiRequest(`/api/staff/${encodeURIComponent(requested)}`, publicStaffResponseSchema)
       .then((result) => {

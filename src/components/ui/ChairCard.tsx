@@ -14,6 +14,8 @@ export interface ChairCardProps {
   statusLabel?: string | undefined;
   /** The whole card links here. */
   to?: string | undefined;
+  /** The whole card links to an outside page in a new tab (a chair that books on Instagram). */
+  href?: string | undefined;
   selected?: boolean;
   onSelect?: (() => void) | undefined;
   priority?: boolean;
@@ -36,6 +38,7 @@ export function ChairCard(props: ChairCardProps) {
     status = 'none',
     statusLabel,
     to,
+    href,
     selected = false,
     onSelect,
     priority = false,
@@ -62,6 +65,20 @@ export function ChairCard(props: ChairCardProps) {
     </>
   );
   const state = selected ? 'selected' : status;
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="exq-chaircard"
+        data-state={state}
+        aria-label={`${name}, ${badge ?? 'chair'}, ${statusLabel ?? 'opens in a new tab'}`}
+      >
+        {body}
+      </a>
+    );
+  }
   if (to) {
     return (
       <Link

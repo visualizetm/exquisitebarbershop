@@ -10,6 +10,7 @@ import {
   type PublicService,
   type PublicStaff,
 } from '../../../shared/api/public';
+import { publicEmail } from '../../../shared/lib/email';
 import { shopDateOf } from '../../../shared/lib/time';
 import { announcementIsLive } from '../../../shared/schemas/shopSettings';
 import type { ServiceDocument } from '../../../shared/schemas/service';
@@ -79,7 +80,7 @@ export const publicRoutes: RouteDefinition[] = [
         tagline: settings.tagline,
         address: settings.address,
         phone: settings.phone,
-        email: settings.email,
+        email: publicEmail(settings.email),
         instagramHandle: settings.instagramHandle,
         timezone: settings.timezone,
         hours: hours?.days ?? EMPTY_WEEK,
@@ -98,6 +99,7 @@ export const publicRoutes: RouteDefinition[] = [
           enabled: announcementIsLive(settings.announcement, shopDateOf(ctx.now)),
         },
         social: settings.social,
+        google: settings.google,
         heroPhoto: hero,
         maintenance: getEnv().MAINTENANCE_MODE === 'true',
         demo: demoEnabled(),

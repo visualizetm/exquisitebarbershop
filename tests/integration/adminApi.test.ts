@@ -34,15 +34,16 @@ process.env.OUTBOX_AFTER_RESPONSE = 'off';
 const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
-let marcusCookie: string;
-const cut = serviceSeedId('classic-cut');
-const cutPrice = servicesSeed.find((s) => s.key === 'classic-cut')?.input.priceCents ?? 0;
-const marcus = staffSeedId('marcus');
-const dee = staffSeedId('dee');
+let leeCookie: string;
+const cut = serviceSeedId('haircut');
+const cutPrice = servicesSeed.find((s) => s.key === 'haircut')?.input.priceCents ?? 0;
+const lee = staffSeedId('lee');
+const drew = staffSeedId('drew');
 // Different weekdays per area so the tests do not share chairs or times.
 const WED = nextDate(3, 3);
 const THU = nextDate(4, 3);
 const FRI = nextDate(5, 3);
+const SUN = nextDate(7, 3);
 
 function as(cookie: string) {
   return (method: string, path: string, body?: unknown) =>
@@ -52,8 +53,7 @@ function as(cookie: string) {
     });
 }
 const owner = (method: string, path: string, body?: unknown) => as(ownerCookie)(method, path, body);
-const barber = (method: string, path: string, body?: unknown) =>
-  as(marcusCookie)(method, path, body);
+const barber = (method: string, path: string, body?: unknown) => as(leeCookie)(method, path, body);
 const codeOf = (body: unknown) => apiErrorSchema.parse(body).error.code;
 
 beforeAll(async () => {
@@ -61,7 +61,7 @@ beforeAll(async () => {
   server = await startTestServer();
   const ownerLogin = await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') });
   ownerCookie = await sessionCookie(ownerLogin._id);
-  marcusCookie = await teamCookie(marcus);
+  leeCookie = await teamCookie(lee);
 });
 afterAll(async () => {
   await server.close();
@@ -70,7 +70,7 @@ afterAll(async () => {
 describe('status changes', () => {
   it('moves along the allowed paths, undoes back to confirmed, and audits each step', async () => {
     const b = await bookPublic(server.baseUrl, {
-      staff: 'marcus',
+      staff: 'lee',
       serviceIds: [cut],
       startAt: slotAt(WED, '10:00'),
     });
@@ -94,7 +94,7 @@ describe('status changes', () => {
 
   it('a completed or no-show booking still holds its time, so it is never offered again', async () => {
     const at = slotAt(WED, '16:00');
-    const b = await bookPublic(server.baseUrl, { staff: 'marcus', serviceIds: [cut], startAt: at });
+    const b = await bookPublic(server.baseUrl, { staff: 'lee', serviceIds: [cut], startAt: at });
     const offered = async () =>
       availabilityResponseSchema
         .parse(
@@ -102,7 +102,7 @@ describe('status changes', () => {
             await call(
               server.baseUrl,
               'GET',
-              `/api/availability?date=${WED}&serviceIds=${cut}&staff=marcus`,
+              `/api/availability?date=${WED}&serviceIds=${cut}&staff=lee`,
             )
           ).body,
         )
@@ -118,7 +118,7 @@ describe('status changes', () => {
 
   it('restores a cancelled booking, and refuses when the slot was taken meanwhile', async () => {
     const first = await bookPublic(server.baseUrl, {
-      staff: 'marcus',
+      staff: 'lee',
       serviceIds: [cut],
       startAt: slotAt(WED, '12:00'),
       email: 'restore@example.com',
@@ -139,7 +139,7 @@ describe('status changes', () => {
 
     await owner('POST', `/api/admin/bookings/${first.id}/cancel`, { notify: false });
     await bookPublic(server.baseUrl, {
-      staff: 'marcus',
+      staff: 'lee',
       serviceIds: [cut],
       startAt: slotAt(WED, '12:00'),
     });
@@ -152,7 +152,7 @@ describe('status changes', () => {
 
   it('a barber completes and marks no show on their own bookings, with undo, but never cancels', async () => {
     const b = await bookPublic(server.baseUrl, {
-      staff: 'marcus',
+      staff: 'lee',
       serviceIds: [cut],
       startAt: slotAt(WED, '14:00'),
     });
@@ -177,12 +177,12 @@ describe('status changes', () => {
 describe('today, schedule and who is in', () => {
   it('counts the day, sums revenue and shows who is next per chair', async () => {
     const a = await bookPublic(server.baseUrl, {
-      staff: 'marcus',
+      staff: 'lee',
       serviceIds: [cut],
       startAt: slotAt(THU, '10:00'),
     });
     await bookPublic(server.baseUrl, {
-      staff: 'dee',
+      staff: 'drew',
       serviceIds: [cut],
       startAt: slotAt(THU, '11:00'),
     });
@@ -194,9 +194,9 @@ describe('today, schedule and who is in', () => {
     expect(today.chairsBooked).toBe(2);
     expect(today.expectedRevenueCents).toBe(2 * cutPrice);
     expect(today.completedRevenueCents).toBe(cutPrice);
-    const deeNext = today.nextUp.find((n) => n.staff.id === dee);
-    expect(deeNext?.booking?.startAt).toBe(slotAt(THU, '11:00'));
-    expect(today.nextUp.find((n) => n.staff.id === marcus)?.booking).toBeNull();
+    const drewNext = today.nextUp.find((n) => n.staff.id === drew);
+    expect(drewNext?.booking?.startAt).toBe(slotAt(THU, '11:00'));
+    expect(today.nextUp.find((n) => n.staff.id === lee)?.booking).toBeNull();
     expect(today.whoIsIn.length).toBeGreaterThan(0);
   });
 
@@ -206,29 +206,29 @@ describe('today, schedule and who is in', () => {
     );
     expect(all.chairs.length).toBeGreaterThan(1);
     const one = scheduleResponseSchema.parse(
-      (await owner('GET', `/api/admin/schedule?date=${THU}&staffId=${dee}`)).body,
+      (await owner('GET', `/api/admin/schedule?date=${THU}&staffId=${drew}`)).body,
     );
-    expect(one.chairs.map((c) => c.staff.id)).toEqual([dee]);
+    expect(one.chairs.map((c) => c.staff.id)).toEqual([drew]);
     expect(one.chairs[0]?.bookings).toHaveLength(1);
   });
 
   it('who is in follows the weekly hours and the day toggle', async () => {
     const before = whoIsInResponseSchema.parse(
-      (await owner('GET', `/api/admin/whos-in?date=${THU}`)).body,
+      (await owner('GET', `/api/admin/whos-in?date=${SUN}`)).body,
     );
-    // Jay does not work Thursdays in the seed.
-    expect(before.entries.find((e) => e.staff.id === staffSeedId('jay'))?.status).toBe('out');
-    const extra = await owner('POST', `/api/admin/staff/${staffSeedId('jay')}/day`, {
-      date: THU,
+    // Drew works Tuesday to Saturday in the seed, so he is out on Sunday.
+    expect(before.entries.find((e) => e.staff.id === drew)?.status).toBe('out');
+    const extra = await owner('POST', `/api/admin/staff/${drew}/day`, {
+      date: SUN,
       status: 'in',
       start: '12:00',
       end: '16:00',
     });
     expect(extra.status).toBe(200);
     const after = whoIsInResponseSchema.parse(
-      (await owner('GET', `/api/admin/whos-in?date=${THU}`)).body,
+      (await owner('GET', `/api/admin/whos-in?date=${SUN}`)).body,
     );
-    expect(after.entries.find((e) => e.staff.id === staffSeedId('jay'))).toMatchObject({
+    expect(after.entries.find((e) => e.staff.id === drew)).toMatchObject({
       status: 'in',
       extraHours: true,
     });
@@ -238,10 +238,10 @@ describe('today, schedule and who is in', () => {
 describe('bookings list and detail', () => {
   it('filters, searches by name, phone and code, and pages with a cursor', async () => {
     const created = [];
-    for (const hhmm of ['09:00', '10:00', '11:00']) {
+    for (const hhmm of ['10:00', '11:00', '12:00']) {
       created.push(
         await bookPublic(server.baseUrl, {
-          staff: 'dee',
+          staff: 'drew',
           serviceIds: [cut],
           startAt: slotAt(FRI, hhmm),
           name: `Zelda Listing ${hhmm}`,
@@ -249,7 +249,8 @@ describe('bookings list and detail', () => {
       );
     }
     const page1 = bookingListResponseSchema.parse(
-      (await owner('GET', `/api/admin/bookings?from=${FRI}&to=${FRI}&staffId=${dee}&limit=2`)).body,
+      (await owner('GET', `/api/admin/bookings?from=${FRI}&to=${FRI}&staffId=${drew}&limit=2`))
+        .body,
     );
     expect(page1.bookings).toHaveLength(2);
     expect(page1.nextCursor).not.toBeNull();
@@ -257,7 +258,7 @@ describe('bookings list and detail', () => {
       (
         await owner(
           'GET',
-          `/api/admin/bookings?from=${FRI}&to=${FRI}&staffId=${dee}&limit=2&cursor=${page1.nextCursor ?? ''}`,
+          `/api/admin/bookings?from=${FRI}&to=${FRI}&staffId=${drew}&limit=2&cursor=${page1.nextCursor ?? ''}`,
         )
       ).body,
     );
@@ -276,9 +277,9 @@ describe('bookings list and detail', () => {
     const phone = byCode.bookings[0]?.customer.phone ?? '';
     // Seven digits from 2 to 9 also read as a reference code; the search tries both.
     const lookAlike = await bookPublic(server.baseUrl, {
-      staff: 'dee',
+      staff: 'drew',
       serviceIds: [cut],
-      startAt: slotAt(FRI, '12:00'),
+      startAt: slotAt(FRI, '13:00'),
       phone: '+12155552345',
     });
     const byDigits = bookingListResponseSchema.parse(
@@ -300,7 +301,7 @@ describe('bookings list and detail', () => {
 
   it('a new online booking is flagged until the owner opens it', async () => {
     const b = await bookPublic(server.baseUrl, {
-      staff: 'dee',
+      staff: 'drew',
       serviceIds: [cut],
       startAt: slotAt(FRI, '15:00'),
     });
@@ -324,7 +325,7 @@ describe('bookings list and detail', () => {
     expect(unseenAfter).toBe(unseenBefore - 1);
     // A barber opening their own booking does not clear the owner's flag.
     const mine = await bookPublic(server.baseUrl, {
-      staff: 'marcus',
+      staff: 'lee',
       serviceIds: [cut],
       startAt: slotAt(FRI, '16:00'),
     });
@@ -337,7 +338,7 @@ describe('bookings list and detail', () => {
 
   it('edits notes and looks up a customer by phone with history', async () => {
     const b = await bookPublic(server.baseUrl, {
-      staff: 'dee',
+      staff: 'drew',
       serviceIds: [cut],
       startAt: slotAt(FRI, '17:00'),
       name: 'History Person',
@@ -387,11 +388,11 @@ describe('catalog and settings', () => {
   });
 
   it('renames a slug and keeps the old one as an alias that still resolves', async () => {
-    const res = await owner('POST', `/api/admin/staff/${dee}/slug`, { slug: 'dee-styles' });
+    const res = await owner('POST', `/api/admin/staff/${drew}/slug`, { slug: 'drew-styles' });
     const staff = staffResponseSchema.parse(res.body).staff;
-    expect(staff.slug).toBe('dee-styles');
-    expect(staff.slugAliases).toContain('dee');
-    expect((await call(server.baseUrl, 'GET', '/api/staff/dee')).status).toBe(200);
+    expect(staff.slug).toBe('drew-styles');
+    expect(staff.slugAliases).toContain('drew');
+    expect((await call(server.baseUrl, 'GET', '/api/staff/drew')).status).toBe(200);
   });
 
   it('a barber blocks their own time through the team API, with no owner setting needed', async () => {
@@ -402,7 +403,7 @@ describe('catalog and settings', () => {
     });
     expect(res.status).toBe(201);
     expect((res.body as { timeBlock: { staffId: string; kind: string } }).timeBlock).toMatchObject({
-      staffId: marcus,
+      staffId: lee,
       kind: 'block',
     });
   });

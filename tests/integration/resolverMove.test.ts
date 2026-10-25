@@ -30,10 +30,10 @@ const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
 const THU = nextDate(4, 3);
-const marcus = staffSeedId('marcus');
-const dee = staffSeedId('dee');
-const tre = staffSeedId('tre');
-const cut = serviceSeedId('classic-cut');
+const lee = staffSeedId('lee');
+const drew = staffSeedId('drew');
+const nelly = staffSeedId('nelly');
+const cut = serviceSeedId('haircut');
 
 const asOwner = (method: string, path: string, body?: unknown) =>
   call(server.baseUrl, method, path, {
@@ -120,17 +120,17 @@ beforeEach(async () => {
 
 describe('the resolver: Move', () => {
   it('lists only chairs that do the service and are free the whole time', async () => {
-    const booking = await seedBooking(marcus, '12:00');
-    // Dee is busy at the same time, so she is not offered.
-    await seedBooking(dee, '12:00');
-    const conflict = await timeOff(marcus);
+    const booking = await seedBooking(lee, '12:00');
+    // Drew is busy at the same time, so she is not offered.
+    await seedBooking(drew, '12:00');
+    const conflict = await timeOff(lee);
     expect(conflict.status).toBe(409);
     const [affected] = apiErrorSchema.parse(conflict.body).error.affected ?? [];
     expect(affected?.bookingId).toBe(booking._id);
     const ids = (affected?.moveOptions ?? []).map((o) => o.staffId);
-    expect(ids).not.toContain(dee);
-    expect(ids).not.toContain(marcus);
-    expect(ids).toContain(tre);
+    expect(ids).not.toContain(drew);
+    expect(ids).not.toContain(lee);
+    expect(ids).toContain(nelly);
     // Every chair offered does the service.
     for (const id of ids) {
       expect((await staffRepo.findStaffById(id))?.serviceIds).toContain(cut);
@@ -138,20 +138,18 @@ describe('the resolver: Move', () => {
   });
 
   it('moves the booking, its locks and its audit trail in one change', async () => {
-    const booking = await seedBooking(marcus, '12:00');
-    const done = await timeOff(marcus, [
-      { bookingId: booking._id, action: 'move', toStaffId: tre },
-    ]);
+    const booking = await seedBooking(lee, '12:00');
+    const done = await timeOff(lee, [{ bookingId: booking._id, action: 'move', toStaffId: nelly }]);
     expect(done.status, JSON.stringify(done.body)).toBe(201);
     expect((done.body as { moved: string[] }).moved).toEqual([booking._id]);
     const after = await bookingsRepo.findBookingById(booking._id);
-    expect(after?.staffId).toBe(tre);
+    expect(after?.staffId).toBe(nelly);
     expect(after?.status).toBe('confirmed');
     // The time did not change, so the customer's link version did not either.
     expect(after?.manageTokenVersion).toBe(1);
     const locks = await slotLocksRepo.listSlotLocksForHolder(booking._id);
     expect(locks.length).toBeGreaterThan(0);
-    expect(new Set(locks.map((l) => l.staffId))).toEqual(new Set([tre]));
+    expect(new Set(locks.map((l) => l.staffId))).toEqual(new Set([nelly]));
     expect(
       await db()
         .collection('auditLog')
@@ -160,43 +158,43 @@ describe('the resolver: Move', () => {
   });
 
   it('refuses a chair that does not do the service, and changes nothing', async () => {
-    const booking = await seedBooking(marcus, '12:00');
+    const booking = await seedBooking(lee, '12:00');
     const all = await staffRepo.listStaff({ includeDeleted: false });
-    const other = all.find((s) => s._id !== marcus && !s.serviceIds.includes(cut));
+    const other = all.find((s) => s._id !== lee && !s.serviceIds.includes(cut));
     // Take the service away from a chair if the seed gives everyone the cut.
-    const target = other ?? all.find((s) => s._id === tre);
+    const target = other ?? all.find((s) => s._id === nelly);
     if (!other && target) await staffRepo.updateStaff(target._id, { serviceIds: [] }, new Date());
-    const refused = await timeOff(marcus, [
+    const refused = await timeOff(lee, [
       { bookingId: booking._id, action: 'move', toStaffId: target?._id },
     ]);
     expect(refused.status).toBe(409);
-    expect((await bookingsRepo.findBookingById(booking._id))?.staffId).toBe(marcus);
+    expect((await bookingsRepo.findBookingById(booking._id))?.staffId).toBe(lee);
     expect(await db().collection('timeBlocks').countDocuments({})).toBe(0);
     if (!other && target)
       await staffRepo.updateStaff(
         target._id,
-        { serviceIds: all.find((s) => s._id === tre)?.serviceIds ?? [] },
+        { serviceIds: all.find((s) => s._id === nelly)?.serviceIds ?? [] },
         new Date(),
       );
   });
 
   it('a move needs a chair, and a chair means a move', async () => {
-    const booking = await seedBooking(marcus, '12:00');
-    const bad = await timeOff(marcus, [{ bookingId: booking._id, action: 'move' }]);
+    const booking = await seedBooking(lee, '12:00');
+    const bad = await timeOff(lee, [{ bookingId: booking._id, action: 'move' }]);
     expect(bad.status).toBe(400);
-    const worse = await timeOff(marcus, [
-      { bookingId: booking._id, action: 'keep', toStaffId: tre },
+    const worse = await timeOff(lee, [
+      { bookingId: booking._id, action: 'keep', toStaffId: nelly },
     ]);
     expect(worse.status).toBe(400);
   });
 
   it('two changes moving into the same free time: one wins, the other is undone whole', async () => {
-    const a = await seedBooking(marcus, '12:00');
-    const b = await seedBooking(tre, '12:00');
-    // Both want Dee's 12:00. Her slot can be held by only one of them.
+    const a = await seedBooking(lee, '12:00');
+    const b = await seedBooking(nelly, '12:00');
+    // Both want Drew's 12:00. Her slot can be held by only one of them.
     const [first, second] = await Promise.all([
-      timeOff(marcus, [{ bookingId: a._id, action: 'move', toStaffId: dee }]),
-      timeOff(tre, [{ bookingId: b._id, action: 'move', toStaffId: dee }]),
+      timeOff(lee, [{ bookingId: a._id, action: 'move', toStaffId: drew }]),
+      timeOff(nelly, [{ bookingId: b._id, action: 'move', toStaffId: drew }]),
     ]);
     const statuses = [first.status, second.status].sort();
     expect(statuses[0]).toBe(201);
@@ -204,14 +202,14 @@ describe('the resolver: Move', () => {
     expect(statuses[1]).toBe(409);
     const winner = first.status === 201 ? a : b;
     const loser = first.status === 201 ? b : a;
-    expect((await bookingsRepo.findBookingById(winner._id))?.staffId).toBe(dee);
+    expect((await bookingsRepo.findBookingById(winner._id))?.staffId).toBe(drew);
     // The loser's whole change rolled back: still on its own chair, its time off never saved.
     expect((await bookingsRepo.findBookingById(loser._id))?.staffId).toBe(
-      loser._id === a._id ? marcus : tre,
+      loser._id === a._id ? lee : nelly,
     );
     expect(await db().collection('timeBlocks').countDocuments({})).toBe(1);
-    // Exactly one booking holds Dee's 12:00 locks.
-    const held = await slotLocksRepo.listSlotLocksForStaff(dee, {
+    // Exactly one booking holds Drew's 12:00 locks.
+    const held = await slotLocksRepo.listSlotLocksForStaff(drew, {
       start: new Date(slotAt(THU, '12:00')),
       end: new Date(slotAt(THU, '13:00')),
     });
@@ -219,29 +217,29 @@ describe('the resolver: Move', () => {
   });
 
   it('a barber may keep but not move (the rule holds even below the barber routes)', async () => {
-    const booking = await seedBooking(marcus, '12:00');
+    const booking = await seedBooking(lee, '12:00');
     const barber = {
-      userId: marcus,
+      userId: lee,
       role: 'barber' as const,
-      staffId: marcus,
+      staffId: lee,
       sessionId: newId(),
       email: '',
       mustChangePassword: false,
     };
     const error = await createTimeBlock(
       barber,
-      { kind: 'chair', staffId: marcus },
+      { kind: 'chair', staffId: lee },
       {
-        staffId: marcus,
+        staffId: lee,
         kind: 'timeOff',
         startAt: slotAt(THU, '08:00'),
         endAt: slotAt(THU, '21:00'),
-        resolutions: [{ bookingId: booking._id, action: 'move', toStaffId: tre }],
+        resolutions: [{ bookingId: booking._id, action: 'move', toStaffId: nelly }],
       },
       { requestId: 'test', now: new Date() },
     ).catch((e: unknown) => e);
     expect(error).toMatchObject({ code: 'FORBIDDEN' });
     expect((error as Error).message).toContain('cancel or move');
-    expect((await bookingsRepo.findBookingById(booking._id))?.staffId).toBe(marcus);
+    expect((await bookingsRepo.findBookingById(booking._id))?.staffId).toBe(lee);
   });
 });

@@ -82,14 +82,7 @@ describe('auto setup on an empty database', () => {
     const staff = publicStaffListResponseSchema.parse(
       (await call(server.baseUrl, 'GET', '/api/staff')).body,
     ).staff;
-    expect(staff.map((s) => s.slug).sort()).toEqual([
-      'dee',
-      'dontrise',
-      'jay',
-      'kris',
-      'marcus',
-      'tre',
-    ]);
+    expect(staff.map((s) => s.slug).sort()).toEqual(['dontrise', 'drew', 'iniya', 'lee', 'nelly']);
     expect((await call(server.baseUrl, 'GET', '/api/services')).status).toBe(200);
     expect(await usersRepo.findOwnerUser()).not.toBeNull();
 
@@ -115,8 +108,8 @@ describe('auto setup on an empty database', () => {
     expect(replies.every((r) => r.status === 200)).toBe(true);
     expect((await systemStateRepo.getBootstrapRecord())?.runs).toBe(1);
     expect((await systemStateRepo.getDemoRecord())?.runs).toBe(1);
-    expect(await db().collection('staff').countDocuments()).toBe(6);
-    expect(await db().collection('services').countDocuments()).toBe(13);
+    expect(await db().collection('staff').countDocuments()).toBe(5);
+    expect(await db().collection('services').countDocuments()).toBe(15);
     expect(await db().collection('users').countDocuments({ role: 'owner' })).toBe(1);
     // The lock is released, and a fresh request finds the shop ready without seeding again.
     expect(
@@ -330,7 +323,7 @@ describe('reset and clear', () => {
     });
     expect(reset.status).toBe(200);
 
-    expect(await db().collection('services').countDocuments()).toBe(13);
+    expect(await db().collection('services').countDocuments()).toBe(15);
     expect(await db().collection('media.files').countDocuments()).toBe(0);
     expect(await db().collection('photos').countDocuments()).toBe(0);
     expect(await db().collection('bookings').countDocuments()).toBeGreaterThanOrEqual(5);
@@ -368,11 +361,11 @@ describe('reset and clear', () => {
 });
 
 describe('barber PINs in the showcase', () => {
-  const marcusId = async () => {
+  const leeId = async () => {
     const staff = publicStaffListResponseSchema.parse(
       (await call(server.baseUrl, 'GET', '/api/staff')).body,
     ).staff;
-    return staff.find((s) => s.slug === 'marcus')?.id ?? '';
+    return staff.find((s) => s.slug === 'lee')?.id ?? '';
   };
   const signIn = (staffId: string, pin: string) =>
     call(server.baseUrl, 'POST', '/api/team/login', { body: { staffId, pin } });
@@ -380,9 +373,9 @@ describe('barber PINs in the showcase', () => {
   it('gives every barber the demo PIN on setup, and it signs them in', async () => {
     await wipeEverything();
     await call(server.baseUrl, 'GET', '/api/shop');
-    expect(await db().collection('staffPins').countDocuments()).toBe(6);
-    expect((await signIn(await marcusId(), DEMO_PIN)).status).toBe(200);
-    expect((await signIn(await marcusId(), '135790')).status).toBe(401);
+    expect(await db().collection('staffPins').countDocuments()).toBe(5);
+    expect((await signIn(await leeId(), DEMO_PIN)).status).toBe(200);
+    expect((await signIn(await leeId(), '135790')).status).toBe(401);
     // The stored hash is argon2id, never the PIN.
     const stored = await db().collection('staffPins').findOne({});
     expect(stored?.pinHash).toMatch(/^\$argon2id\$/);
@@ -395,10 +388,10 @@ describe('barber PINs in the showcase', () => {
     await db().collection('staffPins').deleteMany({});
     resetDemoReadyCache();
     await call(server.baseUrl, 'GET', '/api/shop');
-    expect(await db().collection('staffPins').countDocuments()).toBe(6);
+    expect(await db().collection('staffPins').countDocuments()).toBe(5);
 
     const cookie = await demoSignIn();
-    const id = await marcusId();
+    const id = await leeId();
     const link = await call(server.baseUrl, 'POST', `/api/admin/staff/${id}/setup-link`, {
       headers: { cookie },
       body: {},
@@ -406,7 +399,7 @@ describe('barber PINs in the showcase', () => {
     expect(link.status).toBe(201);
     resetDemoReadyCache();
     await call(server.baseUrl, 'GET', '/api/shop');
-    expect(await db().collection('staffPins').countDocuments()).toBe(5);
+    expect(await db().collection('staffPins').countDocuments()).toBe(4);
     expect((await signIn(id, DEMO_PIN)).status).toBe(401);
   });
 
@@ -420,7 +413,7 @@ describe('barber PINs in the showcase', () => {
       body: {},
     });
     expect(reset.status).toBe(200);
-    expect(await db().collection('staffPins').countDocuments()).toBe(6);
-    expect((await signIn(await marcusId(), DEMO_PIN)).status).toBe(200);
+    expect(await db().collection('staffPins').countDocuments()).toBe(5);
+    expect((await signIn(await leeId(), DEMO_PIN)).status).toBe(200);
   });
 });

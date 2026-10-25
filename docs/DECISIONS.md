@@ -762,3 +762,85 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D11-43 The capture script resets the demo data (the demo reset route) before every run, because the demo
   database outlives a server restart and earlier runs leave all-day hours behind that would show on the public
   pages.
+
+## Prompt 12: real shop content
+
+- D12-01 Address: `3309 Edgmont Ave, Suite F, Brookhaven, PA 19015`. The ZIP is confirmed. Google and Drew's
+  booking page say Suite F, Dontrise's Squire page says "Unit 4". Suite F wins until Dontrise says otherwise.
+- D12-02 Phone: `(610) 609-0786`, from the Google Business Profile. The number `(252) 560-9806` is Dontrise's
+  personal text line for Sunday appointments and is never published: it is in no seed value, no page and no
+  email. A test asserts it is absent from every public answer and from the home page source.
+- D12-03 The shop email stays a PLACEHOLDER and no public page shows it. The check is `isPlaceholderEmail` in
+  `shared/lib/email.ts`, which compares with the one stand-in address. `/api/shop` then sends an empty email,
+  the Visit page drops its Mail line, the JSON-LD leaves `email` out and the calendar file carries no
+  `ORGANIZER` line. A `showEmail` flag was rejected: it needs a settings field, an editor and a migration,
+  and the check turns itself off the moment Dontrise types a real address in Settings. The owner's own
+  settings screen still shows the stored value.
+- D12-04 Hours come from the Google Business Profile: Monday closed, Tuesday to Sunday 10:00 to 19:00. They
+  stay editable in the dashboard. Instagram posts and Dontrise's Squire page hint at other walk-in days and a
+  Sunday deposit, so the hours are an open question for Dontrise. Drew works Tuesday to Saturday, 10:00 to
+  18:00, from his own theCut schedule. Lee, Nelly and Dontrise use the shop hours (PLACEHOLDER). Iniya has no
+  online hours at all.
+- D12-05 The announcement is on with "Walk-ins welcome" and a "Book online" link to `/book`. The hyphen is
+  used everywhere the phrase appears (the strip, the default, the hero fact, the Visit policy list and the
+  no-script text), so the site never says it two ways.
+- D12-06 New settings field `google`: `{ placeId, rating, reviewCount, ratingCheckedOn }`. It is validated by
+  zod (at most one decimal, 0 to 5, a whole review count, a date or empty, a place id of letters, digits,
+  hyphens and underscores), defaults to "not set" so a settings document saved earlier still reads, and is
+  served on `/api/shop`. A count above zero needs a rating of at least 1. The rating is copied by hand from
+  the profile (Google has no free feed) and the owner edits it in Website, Reviews in milestone 4.
+- D12-07 The Maps and write-a-review links are built from the place id in `shared/lib/google.ts`. Every
+  Directions button (Home and Visit are the only two) uses the Maps link. With no place id set, Directions
+  falls back to a Maps search for the address instead of vanishing; the prompt says the link "replaces" the
+  search link, and this keeps that true whenever a place id exists.
+- D12-08 The JSON-LD stays a `BarberShop` with the phone, the address including Suite F, an
+  `openingHoursSpecification` per open range and `sameAs` from the Instagram URL in the social links (TikTok
+  and Facebook are added only when set). There is no `aggregateRating`: Google ignores self-served review
+  markup for a local business, the rating on the page is typed in by hand, and marking it up invites a manual
+  action for no gain. A test asserts the output contains no rating markup.
+- D12-09 The team is the owner plus four: Dontrise, Lee, Drew, Nelly Cutz and Iniya, with chairs 1 to 5 in
+  that order (PLACEHOLDER, the real chair numbers are unknown). Nelly is shown as "Nelly Cutz"; his theCut
+  reviews call him "Mike", and only the name he lists is used. Lee's bio and services are PLACEHOLDER because
+  no public menu or profile text was found; his services use the shop prices. A review calls Lee "the
+  owner", which conflicts with the brief, so Dontrise stays the owner and Lee is a barber until Dontrise says
+  how he wants it shown.
+- D12-10 Iniya is on the website (`showOnWebsite: true`) with `acceptsOnlineBooking: false` and no services.
+  The engine already skipped her: `staffQualifies` needs the flag, so first available, the booking picker
+  and named availability never include her, even when her menu is filled in (a test proves it). What was
+  missing is the client: her card said "Off today" (she has no hours here), the Home card linked to a booking
+  page that cannot book her, `/book?barber=iniya` ended on an empty calendar, and her page said "Walk-ins
+  only". Now her card says "Book through Instagram"; on Home it opens her Instagram in a new tab, on the
+  chairs page it opens her page; her page has a "Book through Instagram" button; `/book?barber=iniya` moves
+  to "Anyone available". The phone bottom bar keeps the shop-wide CALL and BOOK NOW on her page, because
+  that is booking with the shop, not with her. The availability API still answers 200 with
+  `noQualifiedStaff` for her slug (an existing contract), and a booking is refused with `STAFF_UNAVAILABLE`.
+- D12-11 `/chairs/iniya` stays in the sitemap. It is a real page with her title, bio and a working link to
+  where she books. Hiding it would need a new filter and would drop a page that has a purpose. The sitemap
+  test proves it is listed.
+- D12-12 The 15 services are the ones in Dontrise's Squire menu and Drew's and Nelly's theCut menus, at the
+  prices and times in the prompt; each barber's `serviceIds` is the "who" column. The five made up beauty
+  services are gone and there is no braids service (Iniya's, no public price). Female Haircut has an empty
+  description because the menu gave none. Service ids come from the key, so `lineup` and `kids-cut` keep the
+  ids they had. Until milestone 2 every chair shows the shop price, including where a barber charges more.
+- D12-13 `runSeed` never overwrites, so a database seeded before this prompt keeps the old shop and barbers
+  until Settings, Demo data, Reset runs on it. The report and DEPLOY.md say so.
+- D12-14 The demo sample bookings were re-planned on the real barbers and services (Dontrise, Lee, Drew and
+  Nelly; Iniya takes none). Days are counted as open days for that chair, so Monday and Drew's Sunday are
+  skipped on their own.
+- D12-15 The no-script text in `index.html` takes the address from the seed at build time (`%SHOP_ADDRESS%`),
+  the way it already took the phone, instead of repeating it by hand.
+- D12-16 Test migration: marcus became lee, dee drew, tre nelly. Jay became iniya where only a PIN or a
+  removal mattered (she cannot be booked) and dontrise or nelly where a booking was needed; kris became
+  dontrise or nelly the same way. Classic Cut (30 min, $30) became Haircut (45 min, $40), so lock counts and
+  totals were recomputed, and Silk Press (beauty, owner only) became Female Haircut. Sunday is a working day
+  now and Monday is closed, so "closed day" tests use Monday and a barber's day off is Drew's Sunday. The
+  end to end tests pick the service with `/^Haircut(?! and| with)/` because the name starts two others.
+- D12-17 The end to end team page test turns Dontrise's chair off for the day, so the random walk-in chair in
+  the dashboard test no longer includes him.
+- D12-18 `docs/content/exquisite-site-data.json` and `seed/photos/manifest.json` are listed in
+  `.prettierignore`. They arrived as delivered data, `npm run format:check` failed on both, and rewriting
+  the whitespace of the source of truth would only make its history harder to read.
+- D12-19 The owner's New booking panel and the barber's walk-in form list only the services the chosen chair
+  offers (the panel lists all of them for "first available"). With one shared menu that did not matter; now
+  that Nelly does three services and Iniya none, a click on a service the chair cannot do would end in a
+  refusal. A chair with no services says so instead of showing an empty box.

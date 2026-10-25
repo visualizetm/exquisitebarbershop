@@ -9,6 +9,7 @@ import {
 import { priceLabel } from '@shared/lib/money';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
 import {
+  ButtonAnchor,
   ButtonLink,
   Chips,
   ErrorState,
@@ -24,6 +25,7 @@ import {
 import { useShop } from '@/app/useShop';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
+import { offlineBooking } from '@/lib/offlineBooking';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 
@@ -90,6 +92,8 @@ export function ChairPage() {
   }
   const { staff } = result.data;
   const bookPath = `/book?barber=${encodeURIComponent(staff.slug)}`;
+  // Someone who takes no online bookings (Iniya) sends people to Instagram instead.
+  const away = offlineBooking(staff);
   const offered =
     services.status === 'ready'
       ? services.data.services.filter((s) => staff.serviceIds.includes(s.id))
@@ -132,8 +136,18 @@ export function ChairPage() {
               <ButtonLink to={bookPath} size="lg">
                 Book {staff.name}
               </ButtonLink>
+            ) : away?.href ? (
+              <ButtonAnchor
+                href={away.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="lg"
+                data-away="instagram"
+              >
+                {away.label}
+              </ButtonAnchor>
             ) : (
-              <span className="exq-chair__walk-in">Walk-ins only</span>
+              <span className="exq-chair__walk-in">{away?.label}</span>
             )}
           </p>
         </div>

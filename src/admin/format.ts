@@ -73,7 +73,7 @@ export function shopWhen(iso: string, today: string): string {
     : dt.toFormat('ccc, LLL d, h:mm a');
 }
 
-/** "Marcus Reed" becomes "Marcus R.", for lists where the full name is not needed. */
+/** "Sam Reed" becomes "Sam R.", for lists where the full name is not needed. */
 export function firstNameLastInitial(name: string): string {
   const [first = '', ...rest] = name.trim().split(/\s+/);
   const last = rest.at(-1);

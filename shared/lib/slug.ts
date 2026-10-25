@@ -14,7 +14,7 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   'all',
 ]);
 
-/** "Dee  Williams!" -> "dee-williams". Returns an empty string when nothing usable remains. */
+/** "Sam  Rivera!" -> "sam-rivera". Returns an empty string when nothing usable remains. */
 export function slugify(input: string): string {
   return input
     .normalize('NFKD')

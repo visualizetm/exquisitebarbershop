@@ -27786,6 +27786,25 @@ var featureFlagsSchema = external_exports.object({
   rewards: external_exports.boolean().default(false),
   smsReminders: external_exports.boolean().default(false)
 });
+var ratingSchema = external_exports.number().min(0).max(5).refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, {
+  message: "Use at most one decimal, for example 4.7"
+});
+var googleSettingsSchema = external_exports.object({
+  placeId: external_exports.string().trim().max(200).regex(/^[A-Za-z0-9_-]*$/, "A place id has only letters, digits, hyphens and underscores"),
+  rating: ratingSchema,
+  reviewCount: external_exports.int().min(0).max(1e5),
+  /** The shop date the rating was last read from Google, or empty. */
+  ratingCheckedOn: external_exports.union([external_exports.literal(""), isoDateSchema])
+}).refine((g) => g.reviewCount === 0 || g.rating >= 1, {
+  path: ["rating"],
+  message: "Add the rating, or set the review count to 0"
+});
+var DEFAULT_GOOGLE = {
+  placeId: "",
+  rating: 0,
+  reviewCount: 0,
+  ratingCheckedOn: ""
+};
 var announcementLinkSchema = external_exports.string().trim().max(200).refine(
   (v) => v === "" || v.startsWith("/") && !v.startsWith("//") || v.startsWith("https://"),
   {
@@ -27808,7 +27827,7 @@ var announcementSchema = external_exports.object({
 });
 var DEFAULT_ANNOUNCEMENT = {
   enabled: true,
-  text: "Walk ins welcome",
+  text: "Walk-ins welcome",
   linkLabel: "Book online",
   linkUrl: "/book",
   endsOn: ""
@@ -27856,6 +27875,7 @@ var shopSettingsDocumentSchema = external_exports.object({
   permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
   announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
   social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
+  google: googleSettingsSchema.default(DEFAULT_GOOGLE),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
   nextOpenServiceId: idSchema.nullable().default(null)
 }).extend(timestampsSchema.shape);
@@ -28746,6 +28766,7 @@ function fill(doc) {
     permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
     nextOpenServiceId: stored.nextOpenServiceId ?? null,
     announcement: { ...DEFAULT_ANNOUNCEMENT, ...stored.announcement },
+    google: { ...DEFAULT_GOOGLE, ...stored.google },
     // Shops set up before the social links existed keep their Instagram link from the handle.
     social: stored.social ?? {
       ...DEFAULT_SOCIAL_LINKS,
@@ -31727,22 +31748,32 @@ import { timingSafeEqual as timingSafeEqual3 } from "node:crypto";
 // server/services/demo.ts
 import { randomUUID } from "node:crypto";
 
+// shared/lib/email.ts
+var PLACEHOLDER_SHOP_EMAIL = "hello@exquisitebarberbeauty.com";
+function isPlaceholderEmail(email3) {
+  return !email3 || email3.trim().toLowerCase() === PLACEHOLDER_SHOP_EMAIL;
+}
+function publicEmail(email3) {
+  return isPlaceholderEmail(email3) ? "" : (email3 ?? "").trim();
+}
+
 // seed/shop.ts
 var shopSettingsSeed = {
   name: "Exquisite Barber & Beauty Lounge",
   tagline: "Gifted Hands",
+  // Suite F is on Google and on Drew's booking page. Squire says "Unit 4". Suite F wins until
+  // Dontrise says otherwise.
   address: {
     line1: "3309 Edgmont Ave",
-    line2: null,
+    line2: "Suite F",
     city: "Brookhaven",
     state: "PA",
     postalCode: "19015"
-    // PLACEHOLDER confirm ZIP
   },
-  phone: "(610) 555-0100",
-  // PLACEHOLDER
-  email: "hello@exquisitebarberbeauty.com",
-  // PLACEHOLDER
+  // The Google Business Profile number. Dontrise's personal text line is never published.
+  phone: "(610) 609-0786",
+  email: PLACEHOLDER_SHOP_EMAIL,
+  // PLACEHOLDER hidden on every public page while it is this value
   instagramHandle: "exquisitebarberbeauty",
   websiteUrl: null,
   // PLACEHOLDER final domain
@@ -31780,20 +31811,26 @@ var shopSettingsSeed = {
     rewards: false,
     smsReminders: false
   },
-  // PLACEHOLDER the owner edits this in Website, Announcement
   announcement: {
     enabled: true,
-    text: "Walk ins welcome",
+    text: "Walk-ins welcome",
     linkLabel: "Book online",
     linkUrl: "/book",
     endsOn: ""
   },
+  // TikTok and Facebook pages do not exist, so the footer shows only Instagram.
   social: {
     instagramUrl: "https://instagram.com/exquisitebarberbeauty",
     tiktokUrl: "",
-    // PLACEHOLDER
     facebookUrl: ""
-    // PLACEHOLDER
+  },
+  // Read from the Google Business Profile on 2026-10-25. The owner edits the rating and count in
+  // Website, Reviews; Google offers no free feed, so they are copied by hand.
+  google: {
+    placeId: "ChIJISdW6zTpxokRzSBEJjMQU4M",
+    rating: 4.7,
+    reviewCount: 15,
+    ratingCheckedOn: "2026-10-25"
   }
 };
 var ownerLoginSeed = {
@@ -31802,187 +31839,129 @@ var ownerLoginSeed = {
   staffKey: "dontrise"
 };
 var closed = [];
+var openDay = [{ start: "10:00", end: "19:00" }];
 var shopHoursSeed = {
   mon: closed,
-  tue: [{ start: "09:00", end: "19:00" }],
-  wed: [{ start: "09:00", end: "19:00" }],
-  thu: [{ start: "09:00", end: "19:00" }],
-  fri: [{ start: "09:00", end: "19:00" }],
-  sat: [{ start: "08:00", end: "17:00" }],
+  tue: openDay,
+  wed: openDay,
+  thu: openDay,
+  fri: openDay,
+  sat: openDay,
+  sun: openDay
+};
+var noOnlineHours = {
+  mon: closed,
+  tue: closed,
+  wed: closed,
+  thu: closed,
+  fri: closed,
+  sat: closed,
   sun: closed
 };
+function service(order, key, name, priceCents, priceFrom, durationMinutes, description, group = "Barber") {
+  return {
+    key,
+    input: {
+      name,
+      group,
+      description,
+      priceCents,
+      priceFrom,
+      durationMinutes,
+      sortOrder: order * 10,
+      isActive: true
+    }
+  };
+}
 var servicesSeed = [
-  {
-    key: "classic-cut",
-    input: {
-      name: "Classic Cut",
-      group: "Barber",
-      description: "Clipper or scissor cut with a clean lineup.",
-      priceCents: 3e3,
-      priceFrom: false,
-      durationMinutes: 30,
-      sortOrder: 10,
-      isActive: true
-    }
-  },
-  {
-    key: "skin-fade",
-    input: {
-      name: "Skin Fade",
-      group: "Barber",
-      description: "Fade down to the skin, blended and lined.",
-      priceCents: 3500,
-      priceFrom: false,
-      durationMinutes: 45,
-      sortOrder: 20,
-      isActive: true
-    }
-  },
-  {
-    key: "cut-and-beard",
-    input: {
-      name: "Cut and Beard",
-      group: "Barber",
-      description: "Haircut plus a shaped and lined beard.",
-      priceCents: 4500,
-      priceFrom: false,
-      durationMinutes: 45,
-      sortOrder: 30,
-      isActive: true
-    }
-  },
-  {
-    key: "beard-trim",
-    input: {
-      name: "Beard Trim and Lineup",
-      group: "Barber",
-      description: "Shape, trim and crisp edges.",
-      priceCents: 2e3,
-      priceFrom: false,
-      durationMinutes: 15,
-      sortOrder: 40,
-      isActive: true
-    }
-  },
-  {
-    key: "lineup",
-    input: {
-      name: "Lineup",
-      group: "Barber",
-      description: "Edge up only.",
-      priceCents: 1500,
-      priceFrom: false,
-      durationMinutes: 15,
-      sortOrder: 50,
-      isActive: true
-    }
-  },
-  {
-    key: "kids-cut",
-    input: {
-      name: "Kids Cut",
-      group: "Barber",
-      description: "Ages 12 and under.",
-      priceCents: 2500,
-      priceFrom: false,
-      durationMinutes: 30,
-      sortOrder: 60,
-      isActive: true
-    }
-  },
-  {
-    key: "hot-towel-shave",
-    input: {
-      name: "Hot Towel Shave",
-      group: "Barber",
-      description: "Straight razor shave with hot towels.",
-      priceCents: 3e3,
-      priceFrom: false,
-      durationMinutes: 30,
-      sortOrder: 70,
-      isActive: true
-    }
-  },
-  {
-    key: "hair-design",
-    input: {
-      name: "Hair Design",
-      group: "Barber",
-      description: "Custom parts and designs, priced by detail.",
-      priceCents: 1e3,
-      priceFrom: true,
-      durationMinutes: 15,
-      sortOrder: 80,
-      isActive: true
-    }
-  },
-  {
-    key: "silk-press",
-    input: {
-      name: "Silk Press",
-      group: "Beauty",
-      description: "Wash, blow dry and silk press.",
-      priceCents: 7500,
-      priceFrom: true,
-      durationMinutes: 90,
-      sortOrder: 110,
-      isActive: true
-    }
-  },
-  {
-    key: "wash-and-style",
-    input: {
-      name: "Wash and Style",
-      group: "Beauty",
-      description: "Shampoo, condition and style.",
-      priceCents: 5e3,
-      priceFrom: true,
-      durationMinutes: 60,
-      sortOrder: 120,
-      isActive: true
-    }
-  },
-  {
-    key: "twist-out",
-    input: {
-      name: "Natural Twist Out",
-      group: "Beauty",
-      description: "Defined twist out on natural hair.",
-      priceCents: 6500,
-      priceFrom: true,
-      durationMinutes: 75,
-      sortOrder: 130,
-      isActive: true
-    }
-  },
-  {
-    key: "braids",
-    input: {
-      name: "Braids",
-      group: "Beauty",
-      description: "Priced by style and length.",
-      priceCents: 12e3,
-      priceFrom: true,
-      durationMinutes: 180,
-      bufferMinutes: 20,
-      // PLACEHOLDER longer cleanup after braids
-      sortOrder: 140,
-      isActive: true
-    }
-  },
-  {
-    key: "locs-retwist",
-    input: {
-      name: "Locs Retwist",
-      group: "Beauty",
-      description: "Retwist and style.",
-      priceCents: 8500,
-      priceFrom: true,
-      durationMinutes: 120,
-      sortOrder: 150,
-      isActive: true
-    }
-  }
+  service(
+    1,
+    "haircut",
+    "Haircut",
+    4e3,
+    true,
+    45,
+    "Full haircut and lineup with a straight razor finish."
+  ),
+  service(
+    2,
+    "cut-beard",
+    "Haircut and Beard",
+    4500,
+    false,
+    45,
+    "Haircut plus beard trim and beard lineup."
+  ),
+  service(
+    3,
+    "cut-design",
+    "Haircut with Design",
+    5e3,
+    true,
+    60,
+    "Full haircut with a design of your choice."
+  ),
+  service(4, "kids-cut", "Kids Cut", 2e3, true, 30, "12 and under."),
+  service(
+    5,
+    "kids-design",
+    "Kids Cut with Design",
+    4e3,
+    false,
+    60,
+    "12 and under, with a design."
+  ),
+  service(6, "lineup", "Lineup", 2e3, true, 20, "Temple, forehead and neck. No cut, no fade."),
+  service(
+    7,
+    "hot-towel",
+    "Hot Towel and Steam",
+    2e3,
+    false,
+    15,
+    "Hot towel and steam to open the pores, then a cleanse and moisturizer. Add it to a cut."
+  ),
+  service(
+    8,
+    "steam-fade",
+    "Steam, Hot Towel and Fade",
+    6e3,
+    false,
+    60,
+    "A sharp fade finished with hot towel and steam."
+  ),
+  service(
+    9,
+    "big-chop",
+    "Big Chop",
+    5e3,
+    false,
+    75,
+    "For big changes where a lot of length comes off."
+  ),
+  service(
+    10,
+    "color-cut",
+    "Color and Cut",
+    6500,
+    true,
+    90,
+    "Permanent color with a full haircut. Dontrise asks for a $25 deposit before color."
+  ),
+  service(
+    11,
+    "perm-cut",
+    "Perm with Cut",
+    15e3,
+    false,
+    150,
+    "Full perm set, kit included, finished with a haircut."
+  ),
+  service(12, "eyebrows", "Eyebrows", 1e3, false, 15, "A quick trim and shape."),
+  // No description on Dontrise's menu, so none is invented.
+  service(13, "female-cut", "Female Haircut", 4500, false, 75, "", "Beauty"),
+  service(14, "father-son", "Father and Son", 7e3, false, 105, "Two cuts, booked together."),
+  service(15, "friends-cut", "Friends Cut", 11e3, false, 130, "Two people coming in together.")
 ];
 function serviceSeedId(key) {
   return seedId("service", key);
@@ -31990,37 +31969,51 @@ function serviceSeedId(key) {
 function staffSeedId(key) {
   return seedId("staff", key);
 }
-var barberServiceKeys = [
-  "classic-cut",
-  "skin-fade",
-  "cut-and-beard",
-  "beard-trim",
-  "lineup",
-  "kids-cut",
-  "hot-towel-shave",
-  "hair-design"
-];
-var beautyServiceKeys = ["silk-press", "wash-and-style", "twist-out", "braids", "locs-retwist"];
+var serviceKeysByStaff = {
+  dontrise: [
+    "haircut",
+    "cut-design",
+    "kids-cut",
+    "kids-design",
+    "lineup",
+    "color-cut",
+    "female-cut",
+    "father-son",
+    "friends-cut"
+  ],
+  // PLACEHOLDER Lee has no public menu, so he is given the services the shop prices.
+  lee: ["haircut", "cut-beard", "cut-design", "kids-cut", "lineup"],
+  drew: [
+    "haircut",
+    "cut-beard",
+    "cut-design",
+    "kids-cut",
+    "lineup",
+    "hot-towel",
+    "big-chop",
+    "color-cut",
+    "perm-cut",
+    "eyebrows"
+  ],
+  nelly: ["haircut", "kids-cut", "steam-fade"],
+  // Iniya takes bookings on Instagram, so nothing is bookable on this site.
+  iniya: []
+};
 var staffSeed = [
   {
     key: "dontrise",
     input: {
       slug: "dontrise",
       name: "Dontrise",
-      // owner, confirmed
       role: "owner",
-      title: "Owner and Master Barber",
-      // PLACEHOLDER
-      specialty: "Fades, beards and natural hair",
-      // PLACEHOLDER
-      bio: "Owner of Exquisite Barber & Beauty Lounge.",
-      // PLACEHOLDER
+      title: "Owner and Barber",
+      specialty: "Fades, designs and color",
+      bio: "Team barber for the New York Jets and a travel barber. Hair Unit and AKN certified.",
       chairNumber: 1,
       // PLACEHOLDER
-      serviceIds: [...barberServiceKeys, ...beautyServiceKeys].map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.dontrise.map(serviceSeedId),
       photoUrl: null,
-      instagramHandle: "exquisitebarberbeauty",
+      instagramHandle: "dontrisethebarber",
       sortOrder: 0,
       acceptsOnlineBooking: true,
       showOnWebsite: true
@@ -32029,139 +32022,96 @@ var staffSeed = [
     // PLACEHOLDER
   },
   {
-    key: "marcus",
+    key: "lee",
     input: {
-      slug: "marcus",
-      name: "Marcus",
-      // PLACEHOLDER
+      slug: "lee",
+      name: "Lee",
       role: "barber",
       title: "Barber",
-      // PLACEHOLDER
-      specialty: "Skin fades and designs",
-      // PLACEHOLDER
+      specialty: "Precision cuts",
       bio: "",
-      // PLACEHOLDER
+      // PLACEHOLDER no public profile text was found
       chairNumber: 2,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
+      serviceIds: serviceKeysByStaff.lee.map(serviceSeedId),
       // PLACEHOLDER
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "lee_dabarber_",
       sortOrder: 10,
       acceptsOnlineBooking: true,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, sat: [{ start: "08:00", end: "14:00" }] }
+    hours: shopHoursSeed
     // PLACEHOLDER
   },
   {
-    key: "dee",
+    key: "drew",
     input: {
-      slug: "dee",
-      name: "Dee",
-      // PLACEHOLDER
+      slug: "drew",
+      name: "Drew",
       role: "barber",
-      title: "Barber",
-      // PLACEHOLDER
-      specialty: "Classic cuts and hot towel shaves",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
+      title: "Barber, known as 2Sharp",
+      specialty: "Designs, color and perms",
+      bio: "PA licensed barber and certified sensory safe. Works with all hair types: designs, color, perms, big chops and hairline restoration.",
       chairNumber: 3,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.drew.map(serviceSeedId),
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "drew2sharp",
       sortOrder: 20,
       acceptsOnlineBooking: true,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, tue: closed }
-    // PLACEHOLDER
+    // Drew's own theCut schedule: Tuesday to Saturday, 10:00 to 18:00.
+    hours: {
+      ...noOnlineHours,
+      tue: [{ start: "10:00", end: "18:00" }],
+      wed: [{ start: "10:00", end: "18:00" }],
+      thu: [{ start: "10:00", end: "18:00" }],
+      fri: [{ start: "10:00", end: "18:00" }],
+      sat: [{ start: "10:00", end: "18:00" }]
+    }
   },
   {
-    key: "tre",
+    key: "nelly",
     input: {
-      slug: "tre",
-      name: "Tre",
-      // PLACEHOLDER
+      slug: "nelly",
+      name: "Nelly Cutz",
       role: "barber",
       title: "Barber",
-      // PLACEHOLDER
-      specialty: "Kids cuts and beards",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
+      specialty: "Fades and tapers",
+      bio: "Delaware County barber. Ask for the steam, hot towel and fade.",
       chairNumber: 4,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.nelly.map(serviceSeedId),
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "nellycutz_",
       sortOrder: 30,
       acceptsOnlineBooking: true,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, wed: closed }
+    hours: shopHoursSeed
     // PLACEHOLDER
   },
   {
-    key: "jay",
+    key: "iniya",
     input: {
-      slug: "jay",
-      name: "Jay",
-      // PLACEHOLDER
-      role: "barber",
-      title: "Barber",
-      // PLACEHOLDER
-      specialty: "Tapers and lineups",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
+      slug: "iniya",
+      name: "Iniya",
+      role: "stylist",
+      title: "Braider",
+      specialty: "Braids and wigs",
+      bio: "Braiding since 2020. Book through Instagram for now.",
       chairNumber: 5,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.iniya,
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "iniyathestylist",
       sortOrder: 40,
-      acceptsOnlineBooking: true,
+      acceptsOnlineBooking: false,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, thu: closed }
-    // PLACEHOLDER
-  },
-  {
-    key: "kris",
-    input: {
-      slug: "kris",
-      name: "Kris",
-      // PLACEHOLDER
-      role: "barber",
-      title: "Barber",
-      // PLACEHOLDER
-      specialty: "Fades and hair designs",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
-      chairNumber: 6,
-      // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
-      photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
-      sortOrder: 50,
-      acceptsOnlineBooking: true,
-      showOnWebsite: true
-    },
-    hours: { ...shopHoursSeed, fri: [{ start: "12:00", end: "19:00" }] }
-    // PLACEHOLDER
+    hours: noOnlineHours
   }
 ];
 
@@ -32510,13 +32460,13 @@ var UNSIGNABLE_HEADERS = /* @__PURE__ */ new Set([
   "connection"
 ]);
 var AwsClient = class {
-  constructor({ accessKeyId, secretAccessKey, sessionToken, service, region, cache: cache2, retries, initRetryMs }) {
+  constructor({ accessKeyId, secretAccessKey, sessionToken, service: service2, region, cache: cache2, retries, initRetryMs }) {
     if (accessKeyId == null) throw new TypeError("accessKeyId is a required option");
     if (secretAccessKey == null) throw new TypeError("secretAccessKey is a required option");
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
-    this.service = service;
+    this.service = service2;
     this.region = region;
     this.cache = cache2 || /* @__PURE__ */ new Map();
     this.retries = retries != null ? retries : 10;
@@ -32559,7 +32509,7 @@ var AwsClient = class {
   }
 };
 var AwsV4Signer = class {
-  constructor({ method, url: url2, headers, body, accessKeyId, secretAccessKey, sessionToken, service, region, cache: cache2, datetime: datetime3, signQuery, appendSessionToken, allHeaders, singleEncode }) {
+  constructor({ method, url: url2, headers, body, accessKeyId, secretAccessKey, sessionToken, service: service2, region, cache: cache2, datetime: datetime3, signQuery, appendSessionToken, allHeaders, singleEncode }) {
     if (url2 == null) throw new TypeError("url is a required option");
     if (accessKeyId == null) throw new TypeError("accessKeyId is a required option");
     if (secretAccessKey == null) throw new TypeError("secretAccessKey is a required option");
@@ -32571,10 +32521,10 @@ var AwsV4Signer = class {
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
     let guessedService, guessedRegion;
-    if (!service || !region) {
+    if (!service2 || !region) {
       [guessedService, guessedRegion] = guessServiceRegion(this.url, this.headers);
     }
-    this.service = service || guessedService || "";
+    this.service = service2 || guessedService || "";
     this.region = region || guessedRegion || "us-east-1";
     this.cache = cache2 || /* @__PURE__ */ new Map();
     this.datetime = datetime3 || (/* @__PURE__ */ new Date()).toISOString().replace(/[:-]|\.\d{3}/g, "");
@@ -32730,37 +32680,37 @@ function guessServiceRegion(url2, headers) {
     return match3 != null ? ["s3", match3[1] || ""] : ["", ""];
   }
   const match2 = hostname3.replace("dualstack.", "").match(/([^.]{1,63})\.(?:([^.]{0,63})\.)?amazonaws\.com(?:\.cn)?$/);
-  let service = match2 && match2[1] || "";
+  let service2 = match2 && match2[1] || "";
   let region = match2 && match2[2];
   if (region === "us-gov") {
     region = "us-gov-west-1";
   } else if (region === "s3" || region === "s3-accelerate") {
     region = "us-east-1";
-    service = "s3";
-  } else if (service === "iot") {
+    service2 = "s3";
+  } else if (service2 === "iot") {
     if (hostname3.startsWith("iot.")) {
-      service = "execute-api";
+      service2 = "execute-api";
     } else if (hostname3.startsWith("data.jobs.iot.")) {
-      service = "iot-jobs-data";
+      service2 = "iot-jobs-data";
     } else {
-      service = pathname === "/mqtt" ? "iotdevicegateway" : "iotdata";
+      service2 = pathname === "/mqtt" ? "iotdevicegateway" : "iotdata";
     }
-  } else if (service === "autoscaling") {
+  } else if (service2 === "autoscaling") {
     const targetPrefix = (headers.get("X-Amz-Target") || "").split(".")[0];
     if (targetPrefix === "AnyScaleFrontendService") {
-      service = "application-autoscaling";
+      service2 = "application-autoscaling";
     } else if (targetPrefix === "AnyScaleScalingPlannerFrontendService") {
-      service = "autoscaling-plans";
+      service2 = "autoscaling-plans";
     }
-  } else if (region == null && service.startsWith("s3-")) {
-    region = service.slice(3).replace(/^fips-|^external-1/, "");
-    service = "s3";
-  } else if (service.endsWith("-fips")) {
-    service = service.slice(0, -5);
-  } else if (region && /-\d$/.test(service) && !/-\d$/.test(region)) {
-    [service, region] = [region, service];
+  } else if (region == null && service2.startsWith("s3-")) {
+    region = service2.slice(3).replace(/^fips-|^external-1/, "");
+    service2 = "s3";
+  } else if (service2.endsWith("-fips")) {
+    service2 = service2.slice(0, -5);
+  } else if (region && /-\d$/.test(service2) && !/-\d$/.test(region)) {
+    [service2, region] = [region, service2];
   }
-  return [HOST_SERVICES[service] || service, region || ""];
+  return [HOST_SERVICES[service2] || service2, region || ""];
 }
 
 // server/storage/r2.ts
@@ -34919,17 +34869,17 @@ var SAMPLE_CUSTOMERS = [
   { name: "Quinn Notreal", phone: "+12155550109" }
 ];
 var PLAN = [
-  { chair: "marcus", service: "skin-fade", day: 0, hour: 15, source: "online", customer: 0 },
-  { chair: "dee", service: "classic-cut", day: 0, hour: 16, source: "online", customer: 1 },
-  { chair: "dontrise", service: "cut-and-beard", day: 0, hour: 14, source: "phone", customer: 2 },
-  { chair: "tre", service: "cut-and-beard", day: 1, hour: 10, source: "online", customer: 3 },
-  { chair: "marcus", service: "classic-cut", day: 1, hour: 13, source: "online", customer: 4 },
-  { chair: "jay", service: "kids-cut", day: 1, hour: 15, source: "phone", customer: 5 },
-  { chair: "kris", service: "skin-fade", day: 2, hour: 14, source: "online", customer: 6 },
-  { chair: "dee", service: "hot-towel-shave", day: 2, hour: 11, source: "online", customer: 7 },
-  { chair: "dontrise", service: "skin-fade", day: 3, hour: 12, source: "online", customer: 8 },
-  { chair: "tre", service: "classic-cut", day: 0, hour: 0, source: "walkIn", customer: 3 },
-  { chair: "jay", service: "lineup", day: 0, hour: 0, source: "walkIn", customer: 5 }
+  { chair: "lee", service: "haircut", day: 0, hour: 15, source: "online", customer: 0 },
+  { chair: "drew", service: "cut-beard", day: 0, hour: 16, source: "online", customer: 1 },
+  { chair: "dontrise", service: "cut-design", day: 0, hour: 14, source: "phone", customer: 2 },
+  { chair: "nelly", service: "steam-fade", day: 1, hour: 10, source: "online", customer: 3 },
+  { chair: "lee", service: "lineup", day: 1, hour: 13, source: "online", customer: 4 },
+  { chair: "dontrise", service: "kids-cut", day: 1, hour: 15, source: "phone", customer: 5 },
+  { chair: "drew", service: "haircut", day: 2, hour: 14, source: "online", customer: 6 },
+  { chair: "nelly", service: "haircut", day: 2, hour: 11, source: "online", customer: 7 },
+  { chair: "dontrise", service: "haircut", day: 3, hour: 12, source: "online", customer: 8 },
+  { chair: "nelly", service: "kids-cut", day: 0, hour: 0, source: "walkIn", customer: 3 },
+  { chair: "lee", service: "lineup", day: 0, hour: 0, source: "walkIn", customer: 5 }
 ];
 var LOOKAHEAD_DAYS = 14;
 async function openStart(plan, now2) {
@@ -34953,7 +34903,7 @@ async function workingNow(chair, now2) {
   const ctx = await loadAvailabilityContext({
     fromDate: today,
     toDate: today,
-    serviceIds: [serviceSeedId("classic-cut")],
+    serviceIds: [serviceSeedId("haircut")],
     now: now2
   });
   const { ranges } = workingRangesFor(staffSeedId(chair), today, ctx);
@@ -35114,10 +35064,10 @@ async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
     await weeklyHoursRepo_exports.setShopHours(shopHoursSeed, now2);
     summary.shopHoursCreated = true;
   }
-  for (const service of servicesSeed) {
-    const id = serviceSeedId(service.key);
+  for (const service2 of servicesSeed) {
+    const id = serviceSeedId(service2.key);
     if (await servicesRepo_exports.findServiceById(id)) continue;
-    await servicesRepo_exports.insertService(service.input, now2, { id });
+    await servicesRepo_exports.insertService(service2.input, now2, { id });
     summary.servicesCreated += 1;
   }
   for (const member of staffSeed) {
@@ -35810,7 +35760,7 @@ function buildIcs(input2) {
     `SUMMARY:${escapeIcsText(input2.summary)}`,
     `DESCRIPTION:${escapeIcsText(input2.description)}`,
     `LOCATION:${escapeIcsText(input2.location)}`,
-    `ORGANIZER;CN=${escapeIcsText(input2.organizerName)}:mailto:${input2.organizerEmail}`,
+    ...input2.organizerEmail ? [`ORGANIZER;CN=${escapeIcsText(input2.organizerName)}:mailto:${input2.organizerEmail}`] : [],
     `STATUS:${input2.method === "CANCEL" ? "CANCELLED" : "CONFIRMED"}`,
     ...input2.url ? [`URL:${input2.url}`] : [],
     "END:VEVENT",
@@ -35907,7 +35857,7 @@ function icsAttachment(p, method, env) {
     ].join(" "),
     location: p.shop.addressLines.join(", "),
     organizerName: p.shop.name,
-    organizerEmail: p.shop.email,
+    organizerEmail: publicEmail(p.shop.email),
     stamp: env.now,
     ...url2 ? { url: url2 } : {}
   });
@@ -36930,18 +36880,18 @@ async function listServices2() {
   return { services: (await servicesRepo_exports.listServices()).map(toServiceView) };
 }
 async function createService(principal, input2, meta3) {
-  const service = await servicesRepo_exports.insertService(input2, meta3.now);
+  const service2 = await servicesRepo_exports.insertService(input2, meta3.now);
   await audit2(
     principal,
-    { action: "service.create", entityType: "service", entityId: service._id, after: input2 },
+    { action: "service.create", entityType: "service", entityId: service2._id, after: input2 },
     meta3
   );
-  return { service: toServiceView(service) };
+  return { service: toServiceView(service2) };
 }
 async function updateService2(principal, id, patch, meta3) {
   const before = await servicesRepo_exports.findServiceById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
-  const service = await servicesRepo_exports.updateService(id, patch, meta3.now);
+  const service2 = await servicesRepo_exports.updateService(id, patch, meta3.now);
   await audit2(
     principal,
     {
@@ -36953,11 +36903,11 @@ async function updateService2(principal, id, patch, meta3) {
     },
     meta3
   );
-  return { service: toServiceView(service) };
+  return { service: toServiceView(service2) };
 }
 async function deleteService(principal, id, resolutions, meta3) {
-  const service = await servicesRepo_exports.findServiceById(id);
-  if (!service || service.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
+  const service2 = await servicesRepo_exports.findServiceById(id);
+  if (!service2 || service2.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
   const change = await applyScheduleChange({
     actor: actorOf2(principal),
     requestId: meta3.requestId,
@@ -38477,6 +38427,7 @@ var publicShopSchema = external_exports.object({
   tagline: external_exports.string(),
   address: addressSchema,
   phone: external_exports.string(),
+  /** Empty while the stored address is still the stand-in, so no public page prints it. */
   email: external_exports.string(),
   instagramHandle: external_exports.string(),
   timezone: external_exports.string(),
@@ -38494,6 +38445,8 @@ var publicShopSchema = external_exports.object({
   /** The line in the strip above the header. Absent from older responses; the client then shows none. */
   announcement: announcementSchema.optional(),
   social: socialLinksSchema.optional(),
+  /** The Google Business Profile: place id for the Maps and review links, plus the rating shown. */
+  google: googleSettingsSchema.optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
@@ -38612,11 +38565,11 @@ async function loadShared(now2) {
   const toDate = shopDayStart(today).plus({ days: windowDays }).toISODate() ?? today;
   return { ctx, services, today, toDate, preferred: settings.nextOpenServiceId };
 }
-function slotsFor(shared, staff, service, limit, now2) {
-  if (!service) return [];
+function slotsFor(shared, staff, service2, limit, now2) {
+  if (!service2) return [];
   const result = computeAvailability(
     { fromDate: shared.today, toDate: shared.toDate, staff: staff._id },
-    { ...shared.ctx, services: [service] }
+    { ...shared.ctx, services: [service2] }
   );
   return nextOpenSlots(result, now2, limit);
 }
@@ -38626,14 +38579,14 @@ async function nextOpenings(now2) {
   const chairs = staff.map((s2) => {
     const working = workingRangesFor(s2._id, shared.today, shared.ctx);
     const status = working.ranges.length > 0 ? "in" : working.reason === "closed" ? "closed" : "off";
-    const service = serviceForChair(s2, shared.services, shared.preferred);
-    const [slot] = slotsFor(shared, s2, service, 1, now2);
+    const service2 = serviceForChair(s2, shared.services, shared.preferred);
+    const [slot] = slotsFor(shared, s2, service2, 1, now2);
     return {
       staff: { id: s2._id, slug: s2.slug, name: s2.name },
       status,
       nextOpen: slot ? slot.startAt.toISOString() : null,
       nextOpenLabel: slot ? openingLabel(slot.startAt, now2) : null,
-      serviceId: service?._id ?? null
+      serviceId: service2?._id ?? null
     };
   });
   return { date: shared.today, chairs };
@@ -38644,8 +38597,8 @@ async function staffOpenings(slug, count, now2) {
     throw new AppError("NOT_FOUND", "That chair is no longer listed");
   }
   const shared = await loadShared(now2);
-  const service = serviceForChair(staff, shared.services, shared.preferred);
-  const openings = slotsFor(shared, staff, service, count, now2).map((slot) => ({
+  const service2 = serviceForChair(staff, shared.services, shared.preferred);
+  const openings = slotsFor(shared, staff, service2, count, now2).map((slot) => ({
     startAt: slot.startAt.toISOString(),
     endAt: slot.endAt.toISOString(),
     date: shopDateOf(slot.startAt),
@@ -38653,7 +38606,7 @@ async function staffOpenings(slug, count, now2) {
   }));
   return {
     staff: { id: staff._id, slug: staff.slug, name: staff.name },
-    service: service ? { id: service._id, name: service.name, durationMinutes: service.durationMinutes } : null,
+    service: service2 ? { id: service2._id, name: service2.name, durationMinutes: service2.durationMinutes } : null,
     openings
   };
 }
@@ -38709,7 +38662,7 @@ var publicRoutes = [
         tagline: settings.tagline,
         address: settings.address,
         phone: settings.phone,
-        email: settings.email,
+        email: publicEmail(settings.email),
         instagramHandle: settings.instagramHandle,
         timezone: settings.timezone,
         hours: hours?.days ?? EMPTY_WEEK,
@@ -38728,6 +38681,7 @@ var publicRoutes = [
           enabled: announcementIsLive(settings.announcement, shopDateOf(ctx.now))
         },
         social: settings.social,
+        google: settings.google,
         heroPhoto: hero,
         maintenance: getEnv2().MAINTENANCE_MODE === "true",
         demo: demoEnabled()

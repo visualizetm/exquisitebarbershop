@@ -18,7 +18,8 @@ export interface IcsEventInput {
   description: string;
   location: string;
   organizerName: string;
-  organizerEmail: string;
+  /** Left out while the shop has no real mailbox: the file then carries no ORGANIZER line. */
+  organizerEmail?: string;
   /** When the file was produced. */
   stamp: Date;
   url?: string;
@@ -110,7 +111,9 @@ export function buildIcs(input: IcsEventInput): string {
     `SUMMARY:${escapeIcsText(input.summary)}`,
     `DESCRIPTION:${escapeIcsText(input.description)}`,
     `LOCATION:${escapeIcsText(input.location)}`,
-    `ORGANIZER;CN=${escapeIcsText(input.organizerName)}:mailto:${input.organizerEmail}`,
+    ...(input.organizerEmail
+      ? [`ORGANIZER;CN=${escapeIcsText(input.organizerName)}:mailto:${input.organizerEmail}`]
+      : []),
     `STATUS:${input.method === 'CANCEL' ? 'CANCELLED' : 'CONFIRMED'}`,
     ...(input.url ? [`URL:${input.url}`] : []),
     'END:VEVENT',

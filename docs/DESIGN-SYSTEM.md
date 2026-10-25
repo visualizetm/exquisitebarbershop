@@ -64,7 +64,7 @@ white mark always shows.
 | Label, SectionHead                                 | label, title, level, aside                                                                     |                                                         |
 | PriceRow                                           | name, description, price, meta, to                                                             | row, link                                               |
 | PhotoFrame                                         | photo, name, ratio 4:5, 1:1, 16:9; sizes; priority                                             | loading, loaded, placeholder                            |
-| ChairCard, ChairCardSkeleton                       | name, specialty, chairNumber, photo, status, statusLabel, to, selected                         | next-open, in, off, closed, none, selected, loading     |
+| ChairCard, ChairCardSkeleton                       | name, specialty, chairNumber, photo, status, statusLabel, to, href, selected                   | next-open, in, off, closed, none, selected, loading     |
 | TimeChip, TimeChipLink                             | label, sub, selected, disabled, startAt                                                        | default, selected, disabled                             |
 | StepBar                                            | steps, current, onJump                                                                         | per step: done (red), current (ink), todo (gray)        |
 | Ticket                                             | code, heading, rows, total, actions, state                                                     | confirmed (check draws), cancelled, completed           |
@@ -112,7 +112,7 @@ Off limits: scroll jacking, parallax, pinned sections, cursor effects, looping d
 (the barber portal lives at `/team`, which is in `NO_BAR_PREFIXES`).
 Two equal halves, each 60px plus `env(safe-area-inset-bottom)` (the page declares
 `viewport-fit=cover`), a 2px red rule on top. Default: CALL (ink, `tel:`) and BOOK NOW (white, `/book`).
-Pages change it with `useBar`: BOOK MARCUS on a profile, BACK and CONTINUE (CONFIRM BOOKING on the
+Pages change it with `useBar`: BOOK LEE on a profile, BACK and CONTINUE (CONFIRM BOOKING on the
 last step) in booking, with a thin summary row above. The bar publishes its height as `--bar-h`; the
 page pads by it and toasts sit above it. It hides while a text field has focus or the visual viewport
 has shrunk by more than 150px (the keyboard), and returns when they end.

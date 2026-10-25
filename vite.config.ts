@@ -72,11 +72,14 @@ function headPlugin(): Plugin {
           });
         }
         const phone = shopSettingsSeed.phone;
+        const { line1, line2, city, state } = shopSettingsSeed.address;
+        const address = [[line1, line2].filter(Boolean).join(', '), city, state].join(', ');
         return {
           html: html
             .replaceAll('%SITE_URL%', resolveSiteUrl())
             .replaceAll('%SHOP_PHONE_TEL%', phone.replace(/[^\d+]/g, ''))
-            .replaceAll('%SHOP_PHONE%', phone),
+            .replaceAll('%SHOP_PHONE%', phone)
+            .replaceAll('%SHOP_ADDRESS%', address),
           tags,
         };
       },

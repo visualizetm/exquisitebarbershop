@@ -64,7 +64,7 @@ const LIGHTBOX: LightboxPhoto[] = [1, 2, 3].map((n) => ({
   width: 800,
   height: 600,
   alt: `Sample photo ${String(n)}`,
-  barber: { name: 'Marcus', slug: 'marcus' },
+  barber: { name: 'Lee', slug: 'lee' },
 }));
 
 /** Every component in every state, for one theme. */
@@ -77,7 +77,7 @@ function Specimen() {
   const [chip, setChip] = useState('all');
   const [time, setTime] = useState('10:00 AM');
   const [picked, setPicked] = useState<string[]>(['cut']);
-  const [chair, setChair] = useState('marcus');
+  const [chair, setChair] = useState('dontrise');
   const [step, setStep] = useState<(typeof STEPS)[number]['key']>('barber');
 
   return (
@@ -88,21 +88,21 @@ function Specimen() {
           <TopStrip
             announcement={{
               enabled: true,
-              text: 'Walk ins welcome',
+              text: 'Walk-ins welcome',
               linkLabel: 'Book online',
               linkUrl: '/book',
               endsOn: '',
             }}
             loading={false}
           />
-          <Header phone="+16105550100" />
+          <Header phone="+16106090786" />
         </div>
         <div className="exq-kit__frame" data-label="Bottom bar, default">
           <BarView
             state="shown"
             style={{ position: 'static' }}
             config={{
-              left: { label: 'Call', href: 'tel:+16105550100', tone: 'ink' },
+              left: { label: 'Call', href: 'tel:+16106090786', tone: 'ink' },
               right: { label: 'Book now', to: '/book', tone: 'paper' },
             }}
           />
@@ -115,8 +115,8 @@ function Specimen() {
               mode: 'booking',
               summary: (
                 <>
-                  <span>From $75</span>
-                  <span>45 min with Marcus</span>
+                  <span>From $40</span>
+                  <span>45 min with Lee</span>
                 </>
               ),
               left: { label: 'Back', onClick: () => undefined, tone: 'ink' },
@@ -196,7 +196,7 @@ function Specimen() {
           <Input label="Disabled" disabled defaultValue="Locked" />
           <Select label="Select" hint="First available picks the least booked chair">
             <option>First available</option>
-            <option>Marcus</option>
+            <option>Lee</option>
           </Select>
           <Textarea label="Textarea" placeholder="Anything we should know?" />
         </div>
@@ -252,8 +252,8 @@ function Specimen() {
         <h3>Option cards</h3>
         <div className="exq-grid" data-md="2">
           {[
-            { id: 'cut', name: 'Classic Cut', desc: 'Clipper or scissor cut.', price: '$30' },
-            { id: 'fade', name: 'Skin Fade', desc: 'Down to the skin.', price: '$35' },
+            { id: 'cut', name: 'Haircut', desc: 'Full haircut and lineup.', price: 'From $40' },
+            { id: 'fade', name: 'Lineup', desc: 'Temple, forehead and neck.', price: 'From $20' },
           ].map((o) => (
             <OptionCard
               key={o.id}
@@ -281,15 +281,15 @@ function Specimen() {
         <Label>The menu</Label>
         <SectionHead label="The crew" title="Pick your chair" />
         <p className="exq-display">Display</p>
-        <p className="exq-price">$35</p>
+        <p className="exq-price">$40</p>
         <div className="exq-kit__ink exq-dark">
           <PriceRow
-            name="Classic Cut"
-            description="Clipper or scissor cut with a clean lineup."
-            price="$30"
+            name="Haircut"
+            description="Full haircut and lineup with a straight razor finish."
+            price="From $40"
             to="/book"
           />
-          <PriceRow name="Skin Fade" description="Down to the skin, blended." price="From $35" />
+          <PriceRow name="Lineup" description="Temple, forehead and neck." price="From $20" />
         </div>
       </section>
 
@@ -308,38 +308,46 @@ function Specimen() {
         <h3>Chair cards</h3>
         <div className="exq-grid" data-cols="2" data-md="3" data-lg="4">
           <ChairCard
-            name="Marcus"
-            specialty="Fades and tapers"
+            name="Lee"
+            specialty="Precision cuts"
             chairNumber={1}
             photo={PHOTO}
             status="next-open"
             statusLabel="Next open 2:15 PM"
           />
           <ChairCard
-            name="Dee"
-            specialty="Braids"
+            name="Drew"
+            specialty="Designs, color and perms"
             chairNumber={2}
             photo={null}
             status="in"
             statusLabel="In today"
           />
           <ChairCard
-            name="Tre"
-            specialty="Color"
+            name="Nelly Cutz"
+            specialty="Fades and tapers"
             chairNumber={4}
             photo={null}
             status="off"
             statusLabel="Off today"
           />
           <ChairCard
-            name="Jay"
-            specialty="Cuts"
+            name="Dontrise"
+            specialty="Fades, designs and color"
+            chairNumber={1}
+            photo={null}
+            selected={chair === 'dontrise'}
+            onSelect={() => {
+              setChair(chair === 'dontrise' ? 'lee' : 'dontrise');
+            }}
+          />
+          <ChairCard
+            name="Iniya"
+            specialty="Braids and wigs"
             chairNumber={5}
             photo={null}
-            selected={chair === 'jay'}
-            onSelect={() => {
-              setChair(chair === 'jay' ? 'marcus' : 'jay');
-            }}
+            statusLabel="Book through Instagram"
+            href="https://instagram.com/iniyathestylist"
           />
           <ChairCardSkeleton />
         </div>
@@ -363,11 +371,11 @@ function Specimen() {
           code="K7M-4QX2"
           heading="You are booked"
           rows={[
-            { label: 'Chair', value: 'Marcus' },
+            { label: 'Chair', value: 'Lee' },
             { label: 'When', value: 'Thu, Oct 22, 2:15 PM' },
-            { label: 'Services', value: 'Classic Cut' },
+            { label: 'Services', value: 'Haircut' },
           ]}
-          total="$30"
+          total="$40"
           actions={<Button variant="outline">Manage this booking</Button>}
         />
       </section>
@@ -532,7 +540,7 @@ function Specimen() {
             state="ready"
             rows={[
               { id: '1', when: 'Today 10:00 AM', who: 'Sam Rivera' },
-              { id: '2', when: 'Today 11:00 AM', who: 'Lee Park' },
+              { id: '2', when: 'Today 11:00 AM', who: 'Pat Parker' },
             ]}
             rowKey={(r) => r.id}
             columns={[

@@ -2,6 +2,7 @@ import { nextOpeningsResponseSchema } from '@shared/api/availability';
 import type { PublicStaff } from '@shared/api/public';
 import { ChairCard, ChairCardSkeleton, Link, Reveal } from '@/components/ui';
 import { chairStatusOf, inChairOrder } from '@/lib/chairStatus';
+import { offlineBooking } from '@/lib/offlineBooking';
 import { useApi } from '@/lib/useApi';
 
 /**
@@ -41,13 +42,20 @@ export function TodaysChairs({
     <>
       <ul className="exq-strip exq-bare exq-chairs__list" data-state="ready" data-lg={columns}>
         {inChairOrder(staff).map((member, i) => {
-          const { status, label } = chairStatusOf(rows.find((r) => r.staff.id === member.id));
+          // A chair without online booking shows where to book instead of an open time.
+          const away = offlineBooking(member);
+          const { status, label } = away
+            ? { status: 'none' as const, label: away.label }
+            : chairStatusOf(rows.find((r) => r.staff.id === member.id));
+          const profile = `/chairs/${encodeURIComponent(member.slug)}`;
           return (
             <Reveal
               as="li"
               key={member.id}
               className="exq-chair-card"
-              data-state={member.acceptsOnlineBooking ? 'bookable' : 'walk-in'}
+              data-state={
+                member.acceptsOnlineBooking ? 'bookable' : away?.href ? 'instagram' : 'walk-in'
+              }
             >
               <ChairCard
                 name={member.name}
@@ -57,11 +65,14 @@ export function TodaysChairs({
                 status={status}
                 statusLabel={label}
                 priority={i < 2}
-                to={
-                  linkTo === 'book'
-                    ? `/book?barber=${encodeURIComponent(member.slug)}`
-                    : `/chairs/${encodeURIComponent(member.slug)}`
-                }
+                {...(linkTo === 'book' && away?.href
+                  ? { href: away.href }
+                  : {
+                      to:
+                        linkTo === 'book' && !away
+                          ? `/book?barber=${encodeURIComponent(member.slug)}`
+                          : profile,
+                    })}
               />
             </Reveal>
           );

@@ -6,3 +6,6 @@ test-results
 playwright-report
 .data
 server/bundle
+# Content collected from the shop's own pages and the photo manifest: kept exactly as delivered.
+docs/content
+seed/photos/manifest.json

@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { idSchema, slugSchema, weekHoursSchema } from '../schemas/common';
 import { serviceGroupSchema } from '../schemas/service';
-import { addressSchema, announcementSchema, socialLinksSchema } from '../schemas/shopSettings';
+import {
+  addressSchema,
+  announcementSchema,
+  googleSettingsSchema,
+  socialLinksSchema,
+} from '../schemas/shopSettings';
 import { staffRoleSchema } from '../schemas/staff';
 import { photoViewSchema } from './photos';
 
@@ -11,6 +16,7 @@ export const publicShopSchema = z.object({
   tagline: z.string(),
   address: addressSchema,
   phone: z.string(),
+  /** Empty while the stored address is still the stand-in, so no public page prints it. */
   email: z.string(),
   instagramHandle: z.string(),
   timezone: z.string(),
@@ -28,6 +34,8 @@ export const publicShopSchema = z.object({
   /** The line in the strip above the header. Absent from older responses; the client then shows none. */
   announcement: announcementSchema.optional(),
   social: socialLinksSchema.optional(),
+  /** The Google Business Profile: place id for the Maps and review links, plus the rating shown. */
+  google: googleSettingsSchema.optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */

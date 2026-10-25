@@ -23,7 +23,7 @@ describe('classifySearch', () => {
   it('keeps fewer than four digits and anything with letters as text', () => {
     expect(classifySearch('215')).toEqual({ kind: 'text', key: '215' });
     expect(classifySearch('KZT-7MQ4')).toEqual({ kind: 'text', key: 'kzt 7mq4' });
-    expect(classifySearch('Marcus')).toEqual({ kind: 'text', key: 'marcus' });
+    expect(classifySearch('Drew')).toEqual({ kind: 'text', key: 'drew' });
   });
 
   it('treats blank input as empty', () => {

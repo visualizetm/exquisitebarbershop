@@ -30,19 +30,19 @@ afterAll(async () => {
 
 describe('a barber removed from the schedule', () => {
   it('keeps the old address working: renamed slugs resolve, removed ones answer STAFF_REMOVED', async () => {
-    const id = staffSeedId('kris');
-    expect((await owner('POST', `/api/admin/staff/${id}/slug`, { slug: 'kristen' })).status).toBe(
+    const id = staffSeedId('iniya');
+    expect((await owner('POST', `/api/admin/staff/${id}/slug`, { slug: 'iniyah' })).status).toBe(
       200,
     );
     // The old slug still resolves, and says which one is current.
-    const old = await call(server.baseUrl, 'GET', '/api/staff/kris');
+    const old = await call(server.baseUrl, 'GET', '/api/staff/iniya');
     expect(old.status).toBe(200);
-    expect(old.body).toMatchObject({ canonical: false, staff: { slug: 'kristen' } });
+    expect(old.body).toMatchObject({ canonical: false, staff: { slug: 'iniyah' } });
 
     const removed = await owner('DELETE', `/api/admin/staff/${id}`, {});
     expect(removed.status).toBe(200);
     // Both the current slug and the alias now say "removed", never a 404 and never the profile.
-    for (const slug of ['kristen', 'kris']) {
+    for (const slug of ['iniyah', 'iniya']) {
       const res = await call(server.baseUrl, 'GET', `/api/staff/${slug}`);
       expect(res.status, slug).toBe(410);
       expect(apiErrorSchema.parse(res.body).error.code).toBe('STAFF_REMOVED');
@@ -52,6 +52,6 @@ describe('a barber removed from the schedule', () => {
     expect(unknown.status).toBe(404);
     // And the removed barber is gone from the public list.
     const list = await call(server.baseUrl, 'GET', '/api/staff');
-    expect(JSON.stringify(list.body)).not.toContain('kristen');
+    expect(JSON.stringify(list.body)).not.toContain('iniyah');
   });
 });

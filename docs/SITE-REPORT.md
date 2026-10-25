@@ -131,7 +131,7 @@ MAINTENANCE_MODE.
 
 ## Embeds
 
-None. Directions use a Google Maps search URL as a plain link. Instagram is a link.
+None. Directions use the shop's own Google Maps page, built from the place id in the settings, as a plain link (with no place id it searches the address). Instagram is a link.
 
 ## Known bugs and TODOs
 

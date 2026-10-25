@@ -69,10 +69,10 @@ test.describe('the /kit page (development builds only)', () => {
 
     await page.getByRole('button', { name: 'Open lightbox' }).first().click();
     const box = page.locator('dialog.exq-dialog[data-variant="lightbox"][open]');
-    await expect(box.getByRole('heading', { name: 'By Marcus' })).toBeVisible();
-    await expect(box.getByRole('link', { name: 'Book Marcus' })).toHaveAttribute(
+    await expect(box.getByRole('heading', { name: 'By Lee' })).toBeVisible();
+    await expect(box.getByRole('link', { name: 'Book Lee' })).toHaveAttribute(
       'href',
-      '/book?barber=marcus',
+      '/book?barber=lee',
     );
     // Swiping is scrolling the snap track one slide.
     const track = box.locator('.exq-lightbox__track');

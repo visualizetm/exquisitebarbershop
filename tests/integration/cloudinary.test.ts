@@ -29,8 +29,8 @@ const { db } = useTestDb();
 let server: TestServer;
 let fake: FakeCloudinary;
 let ownerCookie: string;
-const marcus = staffSeedId('marcus');
-const dee = staffSeedId('dee');
+const lee = staffSeedId('lee');
+const drew = staffSeedId('drew');
 const BYTES = Buffer.from('RIFF....WEBPVP8 ' + 'x'.repeat(300));
 
 const as = (cookie: string) => (method: string, path: string, body?: unknown) =>
@@ -143,9 +143,9 @@ describe('the signature', () => {
 
 describe('who can get a signature', () => {
   it('a barber signed in with a PIN cannot get a signature for anything', async () => {
-    const barberCookie = await teamCookie(marcus);
+    const barberCookie = await teamCookie(lee);
     for (const body of [
-      { kind: 'staff' as const, staffId: marcus },
+      { kind: 'staff' as const, staffId: lee },
       { kind: 'gallery' as const },
       { kind: 'hero' as const },
     ]) {
@@ -156,7 +156,7 @@ describe('who can get a signature', () => {
 
 describe('upload, confirm, show and delete', () => {
   it('saves a gallery photo after verifying the asset, shows it with exact sizes, and destroys it on delete', async () => {
-    const { issued, confirmed } = await addPhoto(ownerCookie, { kind: 'gallery', staffId: dee });
+    const { issued, confirmed } = await addPhoto(ownerCookie, { kind: 'gallery', staffId: drew });
     expect(confirmed.status).toBe(201);
     const photo = adminPhotoResponseSchema.parse(confirmed.body).photo;
     expect(photo.url).toBe(

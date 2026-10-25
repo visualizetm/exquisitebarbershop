@@ -147,11 +147,11 @@ test('every public page loads fully with placeholders and no console errors', as
   await expect(page.getByRole('heading', { name: 'Pick your chair' })).toBeVisible();
   const cards = page.locator('.exq-chaircard[data-state]:not([data-state="loading"])');
   await expect(cards.first()).toBeVisible();
-  expect(await cards.count()).toBeGreaterThanOrEqual(6);
+  expect(await cards.count()).toBe(5);
 
-  await page.goto('/chairs/marcus');
+  await page.goto('/chairs/lee');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Lee', exact: true })).toBeVisible();
   await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await expect(page.locator('.exq-chair__work')).toHaveCount(0);
 
@@ -170,10 +170,10 @@ test('every public page loads fully with placeholders and no console errors', as
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Manage your booking' })).toBeVisible();
 
-  await page.goto('/book?barber=marcus');
+  await page.goto('/book?barber=lee');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeFocused();
-  await page.getByLabel(/Classic Cut/).click();
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Pick a day' })).toBeFocused();
   await page.locator('.exq-day-option[data-state="available"] button').first().click();
@@ -181,7 +181,7 @@ test('every public page loads fully with placeholders and no console errors', as
   await page.locator('.exq-time-option button').first().click();
   await expect(page.getByRole('heading', { name: 'Your details' })).toBeFocused();
   await expect(page.locator('.exq-book-summary, .exq-booking-summary').first()).toContainText(
-    'Marcus',
+    'Lee',
   );
 
   // The security headers from vercel.json are on every response, pages and API alike.

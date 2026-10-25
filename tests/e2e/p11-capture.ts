@@ -100,10 +100,10 @@ async function samplePng(page: Page, text: string, color: string): Promise<Buffe
   return Buffer.from(base64, 'base64');
 }
 
-/** Books Classic Cut through the public page, as a customer would. */
+/** Books a Haircut through the public page, as a customer would. */
 async function book(page: Page, barber: string, name: string): Promise<void> {
   await page.goto(`${BASE}/book?barber=${barber}`);
-  await page.getByLabel(/Classic Cut/).click();
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.locator('.exq-day-option[data-state="available"] button').first().click();
   await page.locator('.exq-time-option button').first().click();
@@ -120,11 +120,9 @@ async function resetLimits(): Promise<void> {
 }
 
 const CLIENTS: [string, string][] = [
-  ['marcus', 'Terrence Wallace'],
-  ['dee', 'Imani Brooks'],
-  ['tre', 'Darnell Hughes'],
-  ['jay', 'Malik Johnson'],
-  ['kris', 'Andre Peterson'],
+  ['lee', 'Terrence Wallace'],
+  ['drew', 'Imani Brooks'],
+  ['nelly', 'Darnell Hughes'],
   ['dontrise', 'Calvin Rhodes'],
 ];
 
@@ -207,7 +205,7 @@ async function milestones(browser: Browser): Promise<void> {
     ]);
     await page.getByLabel('Alt text for a.png').fill('A skin fade, finished');
     await page.getByLabel('Alt text for b.png').fill('A tapered cut from the side');
-    await page.getByLabel('Credit the work to').first().selectOption({ label: 'Marcus' });
+    await page.getByLabel('Credit the work to').first().selectOption({ label: 'Lee' });
     await page.getByRole('button', { name: 'Upload 2 photos' }).click();
     await page.getByText('2 photos added to the gallery.').waitFor();
     await context.close();
@@ -247,7 +245,7 @@ async function milestones(browser: Browser): Promise<void> {
     await page.goto(`${BASE}/team`);
     await page.getByRole('heading', { name: 'Who is signing in?' }).waitFor();
     await shot(page, m5, `team-names-${theme}-390`);
-    await page.getByRole('button', { name: theme === 'light' ? /^Dee/ : /^Kris/ }).click();
+    await page.getByRole('button', { name: theme === 'light' ? /^Drew/ : /^Nelly/ }).click();
     await shot(page, m5, `team-pin-${theme}-390`);
     await pin(page, DEMO_PIN);
     await page.getByRole('heading', { name: 'Today', level: 1 }).waitFor();
@@ -256,7 +254,7 @@ async function milestones(browser: Browser): Promise<void> {
     await sheet.getByLabel('Name').fill('Jordan Ellis');
     await sheet.getByLabel('Mobile phone').fill(randomPhone());
     await shot(page, m5, `team-walkin-${theme}-390`);
-    await sheet.getByLabel(/^Classic Cut/).check();
+    await sheet.getByLabel(/^Haircut(?! and| with)/).check();
     await sheet.getByRole('button', { name: 'Start now' }).click();
     await page.getByText('Jordan Ellis is in your chair.').waitFor();
     await page.waitForTimeout(4500);
@@ -280,7 +278,7 @@ async function milestones(browser: Browser): Promise<void> {
     const page = await context.newPage();
     await ownerSignIn(page);
     await page.goto(`${BASE}/admin/team`);
-    await page.getByRole('link', { name: 'Kris', exact: true }).click();
+    await page.getByRole('link', { name: 'Dontrise', exact: true }).click();
     await page.getByRole('tab', { name: 'Access' }).click();
     await page.getByRole('button', { name: 'Copy setup link' }).waitFor();
     await shot(page, m5, `team-access-light-${String(size.width)}`);
@@ -308,19 +306,19 @@ async function openAllDay(page: Page, on: boolean): Promise<void> {
     };
     const week = (intervals: { start: string; end: string }[] | null) => ({
       mon: intervals ?? [],
-      tue: intervals ?? [{ start: '09:00', end: '19:00' }],
-      wed: intervals ?? [{ start: '09:00', end: '19:00' }],
-      thu: intervals ?? [{ start: '09:00', end: '19:00' }],
-      fri: intervals ?? [{ start: '09:00', end: '19:00' }],
-      sat: intervals ?? [{ start: '08:00', end: '17:00' }],
-      sun: intervals ?? [],
+      tue: intervals ?? [{ start: '10:00', end: '19:00' }],
+      wed: intervals ?? [{ start: '10:00', end: '19:00' }],
+      thu: intervals ?? [{ start: '10:00', end: '19:00' }],
+      fri: intervals ?? [{ start: '10:00', end: '19:00' }],
+      sat: intervals ?? [{ start: '10:00', end: '19:00' }],
+      sun: intervals ?? [{ start: '10:00', end: '19:00' }],
     });
     await send('/api/admin/hours', { days: week(day) });
     const staff = (await (await fetch('/api/admin/staff')).json()) as {
       staff: { id: string; name: string }[];
     };
     for (const member of staff.staff) {
-      if (!['Marcus', 'Dee', 'Tre'].includes(member.name)) continue;
+      if (!['Lee', 'Drew', 'Nelly Cutz'].includes(member.name)) continue;
       await send(`/api/admin/staff/${member.id}/hours`, { days: week(day) });
     }
   }, on);
@@ -330,7 +328,7 @@ async function recordings(browser: Browser): Promise<void> {
   const dir = join(OUT, 'recordings');
   mkdirSync(dir, { recursive: true });
 
-  // Prepare: all-day hours, and two of Marcus's clients today (the first slots after the lead time).
+  // Prepare: all-day hours, and two of Lee's clients today (the first slots after the lead time).
   const prep = await newContext(browser, DESKTOP);
   const prepPage = await prep.newPage();
   await ownerSignIn(prepPage);
@@ -338,9 +336,9 @@ async function recordings(browser: Browser): Promise<void> {
   const booker = await newContext(browser, DESKTOP);
   const bookerPage = await booker.newPage();
   await resetLimits();
-  await book(bookerPage, 'marcus', 'Terrence Wallace');
+  await book(bookerPage, 'lee', 'Terrence Wallace');
   await resetLimits();
-  await book(bookerPage, 'marcus', 'Jerome Patterson');
+  await book(bookerPage, 'lee', 'Jerome Patterson');
   await booker.close();
   await resetLimits();
 
@@ -351,7 +349,7 @@ async function recordings(browser: Browser): Promise<void> {
   await page.goto(`${BASE}/team`);
   await page.getByRole('heading', { name: 'Who is signing in?' }).waitFor();
   await page.waitForTimeout(900);
-  await page.getByRole('button', { name: /^Marcus/ }).click();
+  await page.getByRole('button', { name: /^Lee/ }).click();
   await page.waitForTimeout(700);
   for (const d of DEMO_PIN) {
     await page
@@ -451,7 +449,7 @@ async function guide(browser: Browser): Promise<void> {
     await context.close();
   }
 
-  // Working time and clients for today, then Marcus says he is out so there is an alert to show.
+  // Working time and clients for today, then Lee says he is out so there is an alert to show.
   const prep = await newContext(browser, DESKTOP);
   const prepPage = await prep.newPage();
   await ownerSignIn(prepPage);
@@ -459,10 +457,10 @@ async function guide(browser: Browser): Promise<void> {
   const booker = await newContext(browser, DESKTOP);
   const bookerPage = await booker.newPage();
   for (const [barber, name] of [
-    ['marcus', 'Terrence Wallace'],
-    ['marcus', 'Jerome Patterson'],
-    ['dee', 'Imani Brooks'],
-    ['tre', 'Darnell Hughes'],
+    ['lee', 'Terrence Wallace'],
+    ['lee', 'Jerome Patterson'],
+    ['drew', 'Imani Brooks'],
+    ['nelly', 'Darnell Hughes'],
   ] as [string, string][]) {
     await book(bookerPage, barber, name);
   }
@@ -474,7 +472,7 @@ async function guide(browser: Browser): Promise<void> {
   await bp.goto(`${BASE}/team`);
   await bp.getByRole('heading', { name: 'Who is signing in?' }).waitFor();
   await shot(bp, dir, 'b01-names');
-  await bp.getByRole('button', { name: /^Marcus/ }).click();
+  await bp.getByRole('button', { name: /^Lee/ }).click();
   await shot(bp, dir, 'b02-pin');
   await pin(bp, DEMO_PIN);
   await bp.getByRole('heading', { name: 'Today', level: 1 }).waitFor();
@@ -489,7 +487,7 @@ async function guide(browser: Browser): Promise<void> {
     const sheet = bp.getByRole('dialog', { name: 'Walk-in' });
     await sheet.getByLabel('Name').fill('Jordan Ellis');
     await sheet.getByLabel('Mobile phone').fill(randomPhone());
-    await sheet.getByLabel(/^Classic Cut/).check();
+    await sheet.getByLabel(/^Haircut(?! and| with)/).check();
     await shot(bp, dir, 'b05-walk-in');
     await bp.keyboard.press('Escape');
   });
@@ -601,7 +599,7 @@ async function guide(browser: Browser): Promise<void> {
     await page.goto(`${BASE}/admin/team`);
     await page.getByRole('heading', { level: 1 }).first().waitFor();
     await shot(page, dir, 'o15-team');
-    await page.getByRole('link', { name: 'Kris', exact: true }).click();
+    await page.getByRole('link', { name: 'Dontrise', exact: true }).click();
     await page.getByRole('tab', { name: 'Access' }).click();
     await page.getByRole('button', { name: 'Copy setup link' }).waitFor();
     await shot(page, dir, 'o16-team-access');

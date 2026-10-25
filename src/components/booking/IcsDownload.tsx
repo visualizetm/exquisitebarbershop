@@ -22,7 +22,8 @@ export function IcsDownload({
     description: `With ${booking.staff.name}. Reference ${booking.referenceCode}. Manage: ${manageUrl}`,
     location: `${shop.address.line1}, ${shop.address.city}, ${shop.address.state} ${shop.address.postalCode}`,
     organizerName: shop.name,
-    organizerEmail: shop.email,
+    // The public shop API sends an empty email while the shop has no real mailbox.
+    ...(shop.email ? { organizerEmail: shop.email } : {}),
     stamp: new Date(booking.createdAt),
     url: manageUrl,
   });

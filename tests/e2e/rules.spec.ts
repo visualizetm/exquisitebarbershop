@@ -5,7 +5,7 @@ const PAGES = [
   '/',
   '/services',
   '/chairs',
-  '/chairs/marcus',
+  '/chairs/lee',
   '/gallery',
   '/visit',
   '/book',
@@ -93,7 +93,7 @@ test('only the six type sizes appear on public pages', async ({ page }) => {
 });
 
 test('tap targets are 44px or larger on a phone', async ({ page }) => {
-  for (const path of ['/', '/services', '/chairs', '/chairs/marcus', '/visit', '/book']) {
+  for (const path of ['/', '/services', '/chairs', '/chairs/lee', '/visit', '/book']) {
     await open(page, path, 'light', 390, 844);
     const small = await page.evaluate(() => {
       const out: string[] = [];
@@ -157,11 +157,11 @@ for (const theme of ['light', 'dark'] as const) {
     const bar = page.locator('.exq-bar');
     await page.goto('/book');
     await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeVisible();
-    await page.getByLabel(/Classic Cut/).click();
+    await page.getByLabel(/^Haircut(?! and| with)/).click();
     await check('services');
     await bar.getByRole('button', { name: 'Continue' }).click();
     await expect(page.getByRole('heading', { name: 'Choose your chair' })).toBeVisible();
-    await page.getByLabel(/Marcus/).click();
+    await page.getByLabel(/Lee/).click();
     await check('barber');
     await bar.getByRole('button', { name: 'Continue' }).click();
     await expect(page.getByRole('heading', { name: 'Pick a day' })).toBeVisible();

@@ -28,8 +28,8 @@ process.env.OUTBOX_AFTER_RESPONSE = 'off';
 const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
-const cut = serviceSeedId('classic-cut');
-const marcus = staffSeedId('marcus');
+const cut = serviceSeedId('haircut');
+const lee = staffSeedId('lee');
 
 // Open around the clock every day, so tests about "now" behave the same whenever they run.
 const allDay = { start: '00:00', end: '23:59' };
@@ -75,7 +75,7 @@ function startIn(minutes: number): string {
 beforeAll(async () => {
   await runSeed(db(), NOW);
   await weeklyHoursRepo.setShopHours(ALWAYS, new Date());
-  for (const key of ['marcus', 'tre', 'dee', 'jay'])
+  for (const key of ['lee', 'nelly', 'drew', 'dontrise'])
     await weeklyHoursRepo.setStaffHours(staffSeedId(key), ALWAYS, new Date());
   server = await startTestServer();
   const owner = await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') });
@@ -87,7 +87,7 @@ afterAll(async () => {
 
 describe('phone bookings', () => {
   it('follow normal availability, are already seen, and email the customer but not the owner', async () => {
-    const res = await manual({ source: 'phone', staff: 'marcus', startAt: startIn(180) });
+    const res = await manual({ source: 'phone', staff: 'lee', startAt: startIn(180) });
     expect(res.status).toBe(201);
     const body = manualBookingResponseSchema.parse(res.body);
     expect(body.booking).toMatchObject({ source: 'phone', isNew: false, staffRequested: true });
@@ -105,10 +105,15 @@ describe('phone bookings', () => {
 
   it('inside the lead time: refused without the override, allowed and audited with it', async () => {
     const soon = startIn(20);
-    const refused = await manual({ source: 'phone', staff: 'tre', startAt: soon });
+    const refused = await manual({ source: 'phone', staff: 'nelly', startAt: soon });
     expect(refused.status).toBe(409);
     expect(apiErrorSchema.parse(refused.body).error.code).toBe('OUTSIDE_BOOKING_WINDOW');
-    const allowed = await manual({ source: 'phone', staff: 'tre', startAt: soon, override: true });
+    const allowed = await manual({
+      source: 'phone',
+      staff: 'nelly',
+      startAt: soon,
+      override: true,
+    });
     expect(allowed.status).toBe(201);
     const body = manualBookingResponseSchema.parse(allowed.body);
     expect(body.overrideUsed).toBe(true);
@@ -122,10 +127,10 @@ describe('phone bookings', () => {
     const far = shopDayStart(shopDateOf(new Date())).plus({ days: 45 }).toISODate() ?? '';
     const at = shopLocalToUtc(far, '10:00').toISOString();
     expect(
-      apiErrorSchema.parse((await manual({ source: 'phone', staff: 'dee', startAt: at })).body)
+      apiErrorSchema.parse((await manual({ source: 'phone', staff: 'drew', startAt: at })).body)
         .error.code,
     ).toBe('OUTSIDE_BOOKING_WINDOW');
-    const ok = await manual({ source: 'phone', staff: 'dee', startAt: at, override: true });
+    const ok = await manual({ source: 'phone', staff: 'drew', startAt: at, override: true });
     expect(ok.status).toBe(201);
     expect(manualBookingResponseSchema.parse(ok.body).overrideUsed).toBe(true);
   });
@@ -133,8 +138,8 @@ describe('phone bookings', () => {
   it('the override never takes a slot someone already holds', async () => {
     // A fixed open slot tomorrow: five hours from now can cross midnight late in the day.
     const at = slotAt(shopDateOf(new Date(Date.now() + 24 * 60 * 60_000)), '15:00');
-    await bookPublic(server.baseUrl, { staff: 'marcus', serviceIds: [cut], startAt: at });
-    const res = await manual({ source: 'phone', staff: 'marcus', startAt: at, override: true });
+    await bookPublic(server.baseUrl, { staff: 'lee', serviceIds: [cut], startAt: at });
+    const res = await manual({ source: 'phone', staff: 'lee', startAt: at, override: true });
     expect(res.status).toBe(409);
     expect(apiErrorSchema.parse(res.body).error.code).toBe('SLOT_TAKEN');
   });
@@ -145,7 +150,7 @@ describe('phone bookings', () => {
     // A fixed open slot tomorrow: seven hours from now can land after closing late in the day.
     const payload = {
       source: 'phone',
-      staff: 'marcus',
+      staff: 'lee',
       startAt: slotAt(shopDateOf(new Date(Date.now() + 24 * 60 * 60_000)), '12:00'),
       customer: { name: 'Same Caller', phone: phone(), email: null },
     };
@@ -154,7 +159,7 @@ describe('phone bookings', () => {
     expect(again.headers.get('idempotent-replayed')).toBe('true');
     expect(again.body).toEqual(first.body);
     expect((await asOwner('POST', '/api/admin/bookings', { source: 'phone' })).status).toBe(400);
-    const noTime = await manual({ source: 'phone', staff: 'marcus' });
+    const noTime = await manual({ source: 'phone', staff: 'lee' });
     expect(apiErrorSchema.parse(noTime.body).error.details?.[0]?.path).toBe('startAt');
   });
 });
@@ -163,7 +168,7 @@ describe('walk-ins', () => {
   it('start now, take slot locks, skip the email by default, and block online booking of that time', async () => {
     const res = await manual({
       source: 'walkIn',
-      staff: 'dee',
+      staff: 'drew',
       customer: { name: 'Walk In', phone: phone(), email: 'w@example.com' },
     });
     expect(res.status).toBe(201);
@@ -175,7 +180,7 @@ describe('walk-ins', () => {
       (await slotLocksRepo.listSlotLocksForHolder(body.booking.id)).length,
     ).toBeGreaterThanOrEqual(3);
     expect(await emailOutboxRepo.listOutboxForBooking(body.booking.id)).toEqual([]);
-    const overlap = await manual({ source: 'walkIn', staff: 'dee' });
+    const overlap = await manual({ source: 'walkIn', staff: 'drew' });
     expect(overlap.status).toBe(409);
     expect(apiErrorSchema.parse(overlap.body).error.code).toBe('SLOT_TAKEN');
   });
@@ -185,7 +190,7 @@ describe('walk-ins', () => {
     if (shopDateOf(new Date(later)) !== shopDateOf(new Date())) return; // too close to midnight to test today
     const res = await manual({
       source: 'walkIn',
-      staff: 'tre',
+      staff: 'nelly',
       startAt: later,
       notifyCustomer: true,
     });
@@ -202,7 +207,7 @@ describe('walk-ins', () => {
       .collection('timeBlocks')
       .insertOne({
         _id: '64a1f2c3d4e5f60718293abc',
-        staffId: marcus,
+        staffId: lee,
         kind: 'timeOff',
         startAt: addMinutes(from, -60),
         endAt: addMinutes(from, 120),
@@ -210,7 +215,7 @@ describe('walk-ins', () => {
         createdBy: { type: 'owner', userId: null, staffId: null },
         createdAt: from,
       } as never);
-    const res = await manual({ source: 'walkIn', staff: 'marcus' });
+    const res = await manual({ source: 'walkIn', staff: 'lee' });
     expect(res.status).toBe(201);
     expect(manualBookingResponseSchema.parse(res.body).outsideWorkingTime).toBe(true);
     await db()
@@ -221,18 +226,23 @@ describe('walk-ins', () => {
   it('needs a specific chair and a time today', async () => {
     expect((await manual({ source: 'walkIn', staff: 'any' })).status).toBe(400);
     const tomorrow = addMinutes(new Date(), 26 * 60).toISOString();
-    expect((await manual({ source: 'walkIn', staff: 'tre', startAt: tomorrow })).status).toBe(400);
+    expect((await manual({ source: 'walkIn', staff: 'nelly', startAt: tomorrow })).status).toBe(
+      400,
+    );
     expect((await manual({ source: 'walkIn', staff: 'nobody' })).status).toBe(409);
   });
 });
 
 describe('owner reschedule', () => {
   it('moves a booking, can override lead time, and notifies only when asked', async () => {
-    // Jay has no walk-ins from the tests above, so the early slot is free. Tomorrow
-    // at ten, rather than hours from now, so the booking never spills past midnight.
-    const tomorrow = shopDayStart(shopDateOf(new Date())).plus({ days: 1 }).toISODate() ?? '';
+    // Dontrise has no walk-ins from the tests above, so the early slot is free. Tomorrow
+    // at ten, rather than hours from now, so the booking never spills past midnight. The shop
+    // is closed on Mondays, so a Monday tomorrow moves to Tuesday.
+    let day = shopDayStart(shopDateOf(new Date())).plus({ days: 1 });
+    if (day.weekday === 1) day = day.plus({ days: 1 });
+    const tomorrow = day.toISODate() ?? '';
     const created = await bookPublic(server.baseUrl, {
-      staff: 'jay',
+      staff: 'dontrise',
       serviceIds: [cut],
       startAt: slotAt(tomorrow, '10:00'),
       email: 'move@example.com',

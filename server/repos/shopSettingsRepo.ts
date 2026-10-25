@@ -1,6 +1,7 @@
 import { SHOP_SETTINGS_ID } from '../../shared/lib/constants';
 import {
   DEFAULT_ANNOUNCEMENT,
+  DEFAULT_GOOGLE,
   DEFAULT_SOCIAL_LINKS,
   DEFAULT_STAFF_PERMISSIONS,
   shopSettingsDocumentSchema,
@@ -20,6 +21,7 @@ function fill(doc: ShopSettingsDocument): ShopSettingsDocument {
     permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
     nextOpenServiceId: stored.nextOpenServiceId ?? null,
     announcement: { ...DEFAULT_ANNOUNCEMENT, ...stored.announcement },
+    google: { ...DEFAULT_GOOGLE, ...stored.google },
     // Shops set up before the social links existed keep their Instagram link from the handle.
     social: stored.social ?? {
       ...DEFAULT_SOCIAL_LINKS,

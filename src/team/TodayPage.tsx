@@ -2,7 +2,11 @@ import { useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import Phone from '@untitled-ui/icons-react/build/esm/Phone';
 import Plus from '@untitled-ui/icons-react/build/esm/Plus';
-import { publicServicesResponseSchema, publicShopSchema } from '@shared/api/public';
+import {
+  publicServicesResponseSchema,
+  publicShopSchema,
+  publicStaffListResponseSchema,
+} from '@shared/api/public';
 import {
   teamDayResponseSchema,
   teamStatusResponseSchema,
@@ -29,7 +33,7 @@ import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { newIdempotencyKey, shopDateLabel, shopTime } from '@/admin/format';
 import { TeamError } from './TeamError';
-import { useTeamAction, useTeamApi } from './useTeamSession';
+import { useTeamAction, useTeamApi, useTeamMe } from './useTeamSession';
 
 /**
  * The barber's day: the next client as a big card with Done and No show, then the whole day.
@@ -369,7 +373,9 @@ function BookingActions({
 
 function WalkInForm({ onDone }: { onDone: (name: string) => void }) {
   const act = useTeamAction();
+  const me = useTeamMe();
   const services = useApi('/api/services', publicServicesResponseSchema);
+  const team = useApi('/api/staff', publicStaffListResponseSchema);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [chosen, setChosen] = useState<string[]>([]);
@@ -404,8 +410,15 @@ function WalkInForm({ onDone }: { onDone: (name: string) => void }) {
     }
   }
 
-  if (services.status === 'loading') return <Status state="loading" />;
+  if (services.status === 'loading' || team.status === 'loading') return <Status state="loading" />;
   if (services.status === 'error') return <Status state="error" />;
+  // Only the services on this barber's own menu: another chair's would be refused. If the menu
+  // cannot be read, every service is listed and the server decides.
+  const menu =
+    team.status === 'ready' ? team.data.staff.find((m) => m.id === me.staff.id)?.serviceIds : null;
+  const offered = menu
+    ? services.data.services.filter((s) => menu.includes(s.id))
+    : services.data.services;
   return (
     <form className="exq-team-form" onSubmit={(e) => void submit(e)}>
       <Input
@@ -432,7 +445,10 @@ function WalkInForm({ onDone }: { onDone: (name: string) => void }) {
       />
       <fieldset className="exq-fieldset">
         <legend>Services</legend>
-        {services.data.services.map((s) => (
+        {offered.length === 0 ? (
+          <p className="exq-muted">You have no services set up yet. Ask the owner to add them.</p>
+        ) : null}
+        {offered.map((s) => (
           <Checkbox
             key={s.id}
             label={`${s.name}, ${formatCents(s.priceCents)}`}

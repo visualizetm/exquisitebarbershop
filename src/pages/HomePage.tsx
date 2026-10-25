@@ -100,7 +100,7 @@ export function HomePage() {
                 <dd>{data?.address.line1 ?? ''}</dd>
               </div>
               <div>
-                <dt>Walk ins</dt>
+                <dt>Walk-ins</dt>
                 <dd>Welcome</dd>
               </div>
             </dl>
@@ -175,7 +175,7 @@ export function HomePage() {
               </address>
               <p className="exq-visit__actions">
                 <ButtonAnchor
-                  href={directionsUrl(data.address)}
+                  href={directionsUrl(data)}
                   variant="outline"
                   target="_blank"
                   rel="noopener noreferrer"

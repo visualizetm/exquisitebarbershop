@@ -19,7 +19,7 @@ process.env.OUTBOX_AFTER_RESPONSE = 'off';
 const { db } = useTestDb();
 let server: TestServer;
 let cookie: string;
-const cut = serviceSeedId('classic-cut');
+const cut = serviceSeedId('haircut');
 const get = (path: string) => call(server.baseUrl, 'GET', path, { headers: { cookie } });
 
 async function walkIn(chair: string, name: string) {
@@ -63,13 +63,13 @@ describe('GET /api/admin/overview', () => {
     expect(o.week.filter((d) => d.today)).toHaveLength(1);
     expect(o.activity).toEqual([]);
     expect(o.alerts).toEqual([]);
-    expect(o.chairs.length).toBeGreaterThanOrEqual(6);
+    expect(o.chairs.length).toBeGreaterThanOrEqual(5);
   });
 
   it('counts today from real bookings, and shows last week only when there is data', async () => {
-    const a = await walkIn('marcus', 'Walk In One');
-    await walkIn('dee', 'Walk In Two');
-    const c = await walkIn('jay', 'Walk In Three');
+    const a = await walkIn('lee', 'Walk In One');
+    await walkIn('drew', 'Walk In Two');
+    const c = await walkIn('dontrise', 'Walk In Three');
     // One cancelled and one no show.
     const cancelled = await call(server.baseUrl, 'POST', `/api/admin/bookings/${c.id}/cancel`, {
       headers: { cookie },
@@ -103,7 +103,7 @@ describe('GET /api/admin/overview', () => {
     for (const source of ['walkIn', 'online'] as const) {
       await bookingsRepo.insertBooking(
         bookingInput({
-          staffId: staffSeedId('marcus'),
+          staffId: staffSeedId('lee'),
           startAt: lastWeek,
           endAt: new Date(lastWeek.getTime() + 30 * 60_000),
           source,
@@ -127,10 +127,10 @@ describe('GET /api/admin/overview', () => {
 
   it('shows who is in the chair now and who is next', async () => {
     const o = overviewResponseSchema.parse((await get('/api/admin/overview')).body);
-    const jay = o.chairs.find((c) => c.staff.slug === 'jay');
-    expect(jay?.current).toBeNull();
-    const marcus = o.chairs.find((c) => c.staff.slug === 'marcus');
-    expect(marcus?.staff.name).toBe('Marcus');
+    const iniya = o.chairs.find((c) => c.staff.slug === 'iniya');
+    expect(iniya?.current).toBeNull();
+    const lee = o.chairs.find((c) => c.staff.slug === 'lee');
+    expect(lee?.staff.name).toBe('Lee');
   });
 });
 
@@ -141,7 +141,7 @@ describe('GET /api/admin/booking-table', () => {
       const startAt = new Date(base + i * 3600_000);
       await bookingsRepo.insertBooking(
         bookingInput({
-          staffId: staffSeedId(i % 2 === 0 ? 'marcus' : 'dee'),
+          staffId: staffSeedId(i % 2 === 0 ? 'lee' : 'drew'),
           startAt,
           endAt: new Date(startAt.getTime() + 30 * 60_000),
           customer: {
@@ -185,10 +185,10 @@ describe('GET /api/admin/booking-table', () => {
     expect(descNames).toEqual([...descNames].sort().reverse());
     expect((descNames[0] ?? '') > (names.at(-1) ?? '')).toBe(true);
 
-    const dee = bookingTableResponseSchema.parse(
-      (await get(`/api/admin/booking-table?range=upcoming&staffId=${staffSeedId('dee')}`)).body,
+    const drew = bookingTableResponseSchema.parse(
+      (await get(`/api/admin/booking-table?range=upcoming&staffId=${staffSeedId('drew')}`)).body,
     );
-    expect(dee.rows.every((r) => r.staff.slug === 'dee')).toBe(true);
+    expect(drew.rows.every((r) => r.staff.slug === 'drew')).toBe(true);
     const cancelled = bookingTableResponseSchema.parse(
       (await get('/api/admin/booking-table?range=upcoming&status=cancelled')).body,
     );
@@ -200,10 +200,10 @@ describe('GET /api/admin/booking-table', () => {
     const all = bookingTableResponseSchema.parse((await get('/api/admin/booking-table')).body);
     expect(all.counts.upcoming).toBeGreaterThanOrEqual(30);
     expect(all.counts.past).toBeGreaterThanOrEqual(2);
-    const dee = bookingTableResponseSchema.parse(
-      (await get(`/api/admin/booking-table?staffId=${staffSeedId('dee')}`)).body,
+    const drew = bookingTableResponseSchema.parse(
+      (await get(`/api/admin/booking-table?staffId=${staffSeedId('drew')}`)).body,
     );
-    expect(dee.counts.upcoming).toBeLessThan(all.counts.upcoming);
+    expect(drew.counts.upcoming).toBeLessThan(all.counts.upcoming);
     const past = bookingTableResponseSchema.parse(
       (await get('/api/admin/booking-table?range=past')).body,
     );
@@ -215,7 +215,7 @@ describe('GET /api/admin/booking-table', () => {
 
 describe('POST /api/admin/bookings/:id/resend', () => {
   it('needs an email on file, then queues one new confirmation each time', async () => {
-    const noEmail = await walkIn('tre', 'No Email');
+    const noEmail = await walkIn('nelly', 'No Email');
     const refused = await call(server.baseUrl, 'POST', `/api/admin/bookings/${noEmail.id}/resend`, {
       headers: { cookie },
       body: {},
@@ -227,7 +227,7 @@ describe('POST /api/admin/bookings/:id/resend', () => {
       body: {
         source: 'walkIn',
         serviceIds: [cut],
-        staff: 'kris',
+        staff: 'dontrise',
         customer: { name: 'Has Email', phone: '+12155550123', email: 'has@example.com' },
         notifyCustomer: false,
       },

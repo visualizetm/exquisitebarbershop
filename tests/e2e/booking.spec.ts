@@ -34,10 +34,10 @@ async function fillDetails(page: Page, email: string) {
 test('book from a chair link, then reschedule and cancel through the manage link', async ({
   page,
 }) => {
-  await page.goto('/book?barber=marcus');
+  await page.goto('/book?barber=lee');
   await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeFocused();
-  await page.getByLabel(/Classic Cut/).click();
-  await expect(page.getByLabel(/Classic Cut/)).toBeChecked();
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
+  await expect(page.getByLabel(/^Haircut(?! and| with)/)).toBeChecked();
   await expect(page.locator('.exq-service-picker__total')).toContainText('1 selected');
   await page.getByRole('button', { name: 'Continue' }).click();
 
@@ -46,7 +46,7 @@ test('book from a chair link, then reschedule and cancel through the manage link
   // reschedule cutoff whatever time the suite runs.
   await pickFirstDayAndTime(page, 1);
   await fillDetails(page, 'playwright@example.com');
-  await expect(page.locator('.exq-book-confirm .exq-booking-summary')).toContainText('Marcus');
+  await expect(page.locator('.exq-book-confirm .exq-booking-summary')).toContainText('Lee');
   await page.getByRole('button', { name: 'Confirm booking' }).click();
 
   await expect(page.getByRole('heading', { name: 'You are booked' })).toBeFocused();
@@ -88,9 +88,9 @@ test('book from a chair link, then reschedule and cancel through the manage link
 });
 
 test('a conflict shows fresh times inline and keeps the details', async ({ page, request }) => {
-  await page.goto('/book?barber=dee');
-  await page.getByLabel(/Beard Trim/).click();
-  await expect(page.getByLabel(/Beard Trim/)).toBeChecked();
+  await page.goto('/book?barber=drew');
+  await page.getByLabel(/^Lineup/).click();
+  await expect(page.getByLabel(/^Lineup/)).toBeChecked();
   await page.getByRole('button', { name: 'Continue' }).click();
   // The second open day, so the taken time has fresh alternatives whatever the clock says.
   const startAt = await pickFirstDayAndTime(page, 1);
@@ -105,9 +105,9 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
           (await (await request.get('/api/services')).json()) as {
             services: { name: string; id: string }[];
           }
-        ).services.find((s) => s.name === 'Beard Trim and Lineup')?.id,
+        ).services.find((s) => s.name === 'Lineup')?.id,
       ],
-      staff: 'dee',
+      staff: 'drew',
       startAt,
       customer: {
         name: 'Faster Customer',
@@ -122,8 +122,8 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
   // On a wide screen the summary card carries the only Confirm button.
   const card = page.getByRole('complementary', { name: 'Your booking' });
   await expect(card).toBeVisible();
-  await expect(card).toContainText('Beard Trim and Lineup');
-  await expect(card).toContainText(/With\s*Dee/);
+  await expect(card).toContainText('Lineup');
+  await expect(card).toContainText(/With\s*Drew/);
   await expect(card).toContainText('Pay in the chair. Free to cancel up to 2 hours before.');
   await page.getByRole('button', { name: 'Confirm booking' }).click();
   const conflict = page.locator('.exq-book-conflict');
@@ -142,28 +142,28 @@ test('a conflict shows fresh times inline and keeps the details', async ({ page,
 test('the summary card is disabled until the details step and hidden on a phone', async ({
   page,
 }) => {
-  await page.goto('/book?barber=marcus');
+  await page.goto('/book?barber=lee');
   const card = page.getByRole('complementary', { name: 'Your booking' });
   await expect(card).toBeVisible();
   await expect(card).toContainText('Pick a service to start.');
   await expect(card.getByRole('button', { name: 'Confirm booking' })).toBeDisabled();
-  await page.getByLabel(/Classic Cut/).click();
-  await expect(card).toContainText('Classic Cut');
-  await expect(card).toContainText(/With\s*Marcus/);
-  await expect(card).toContainText('$30');
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
+  await expect(card).toContainText('Haircut');
+  await expect(card).toContainText(/With\s*Lee/);
+  await expect(card).toContainText('$40');
   await expect(card.getByRole('button', { name: 'Confirm booking' })).toBeDisabled();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(card).toBeHidden();
-  await expect(page.locator('.exq-bar__summary')).toContainText('$30');
+  await expect(page.locator('.exq-bar__summary')).toContainText('$40');
 });
 
 test('on a phone the Continue bar stays after tapping a service and Confirm appears once', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/book?barber=marcus');
-  await page.getByLabel(/Classic Cut/).click();
+  await page.goto('/book?barber=lee');
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   // The checkbox keeps focus; the bar must not treat it as typing.
   await expect(page.locator('.exq-bar')).toHaveAttribute('data-state', 'shown');
   await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();

@@ -16,7 +16,7 @@ const WIDTHS = [
   { name: '390', width: 390, height: 844 },
   { name: '1280', width: 1280, height: 800 },
 ];
-const PUBLIC = ['/', '/services', '/chairs', '/chairs/marcus', '/gallery', '/visit', '/manage'];
+const PUBLIC = ['/', '/services', '/chairs', '/chairs/lee', '/gallery', '/visit', '/manage'];
 const ADMIN = [
   '/admin',
   '/admin/schedule',
@@ -81,14 +81,11 @@ async function shot(page: Page, name: string, theme: string, width: string): Pro
 async function bookSteps(page: Page, theme: string, width: string): Promise<void> {
   await page.goto(`${BASE}/book`, { waitUntil: 'networkidle' });
   await shot(page, 'book-1-services', theme, width);
-  await page.getByLabel(/Classic Cut/).click();
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   await pressContinue(page);
   await page.getByRole('heading', { name: 'Choose your chair' }).waitFor();
   await shot(page, 'book-2-chair', theme, width);
-  await page
-    .getByRole('button', { name: /Marcus/ })
-    .first()
-    .click();
+  await page.getByRole('button', { name: /Lee/ }).first().click();
   await page.getByRole('button', { name: 'Continue' }).first().click();
   await page.getByRole('heading', { name: 'Pick a day' }).waitFor();
   await page.locator('.exq-day-option[data-state="available"] button').first().waitFor();
@@ -244,7 +241,7 @@ async function main(): Promise<void> {
     }
   }
   const results: Facts[] = [];
-  for (const url of ['/', '/services', '/chairs', '/chairs/marcus', '/gallery', '/visit', '/book'])
+  for (const url of ['/', '/services', '/chairs', '/chairs/lee', '/gallery', '/visit', '/book'])
     results.push(await facts(browser, url, false));
   for (const url of ['/admin', '/admin/schedule', '/admin/website'])
     results.push(await facts(browser, url, true));

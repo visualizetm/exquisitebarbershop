@@ -63,6 +63,7 @@ export function Footer({ shop }: { shop: PublicShop | null }) {
             {shop ? (
               <address>
                 {shop.address.line1}
+                {shop.address.line2 ? <>, {shop.address.line2}</> : null}
                 <br />
                 {shop.address.city}, {shop.address.state} {shop.address.postalCode}
                 <br />

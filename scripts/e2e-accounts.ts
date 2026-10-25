@@ -9,7 +9,7 @@ export const E2E_OWNER = {
  * tests pick a chair at random, because a walk-in holds its chair for the next 40 minutes.
  */
 export const E2E_BARBER_PIN = '482915';
-export const E2E_BARBER_NAMES = ['Marcus', 'Dee', 'Tre', 'Jay', 'Kris'] as const;
+export const E2E_BARBER_NAMES = ['Lee', 'Drew', 'Nelly', 'Iniya', 'Dontrise'] as const;
 
 /**
  * The owner the production-like run creates through /setup, from

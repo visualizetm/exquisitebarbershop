@@ -39,12 +39,12 @@ test('the owner uploads a chair photo from the Team profile with the local drive
   await signInAsOwner(page);
   const png = await samplePng(page);
   // Unique per run, so a reused server with earlier uploads never matches twice.
-  const alt = `Tre at chair four ${Date.now()}`;
+  const alt = `Nelly at chair four ${Date.now()}`;
   await page.goto('/admin/team');
-  await page.getByRole('link', { name: 'Tre', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Photos of Tre' })).toBeVisible();
+  await page.getByRole('link', { name: 'Nelly Cutz', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Photos of Nelly Cutz' })).toBeVisible();
   await page.getByLabel('Choose a photo').setInputFiles({
-    name: 'tre.png',
+    name: 'nelly.png',
     mimeType: 'image/png',
     buffer: png,
   });
@@ -85,6 +85,9 @@ test('the owner uploads a chair photo from the Team profile with the local drive
   );
 
   // It is live on the site right away.
-  await page.goto('/chairs/tre');
-  await expect(page.locator('.exq-chair__photo img')).toHaveAttribute('alt', /^Tre at chair four/);
+  await page.goto('/chairs/nelly');
+  await expect(page.locator('.exq-chair__photo img')).toHaveAttribute(
+    'alt',
+    /^Nelly at chair four/,
+  );
 });

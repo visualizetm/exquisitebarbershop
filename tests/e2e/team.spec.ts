@@ -12,7 +12,7 @@ test.describe('schedule', () => {
     page,
     context,
   }) => {
-    const { startAt } = await bookPublicly(page, 'marcus', { name: 'Grid Customer' });
+    const { startAt } = await bookPublicly(page, 'lee', { name: 'Grid Customer' });
     await context.clearCookies();
     const local = DateTime.fromISO(startAt, { zone: ZONE });
     await page.setViewportSize(DESKTOP);
@@ -27,27 +27,29 @@ test.describe('schedule', () => {
     await page.keyboard.press('Escape');
 
     // The plus in a chair header opens New booking with that barber chosen.
-    await page.getByRole('button', { name: 'New booking for Dee' }).click();
+    await page.getByRole('button', { name: 'New booking for Drew' }).click();
     const panel = page.getByRole('dialog', { name: 'New booking' });
-    await expect(panel.getByLabel('Barber')).toHaveValue('dee');
+    await expect(panel.getByLabel('Barber')).toHaveValue('drew');
     await expect(panel.getByLabel('Time', { exact: true })).not.toHaveValue('');
     // A click on an empty slot of a chair does the same with the clicked time.
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'New booking' })).toHaveCount(0);
-    const col = page.locator('.exq-daygrid__col').nth(3);
-    const box = await col.boundingBox();
-    expect(box).not.toBeNull();
-    await page.mouse.click((box?.x ?? 0) + 20, (box?.y ?? 0) + 24 * 4 * 2 + 12);
+    // The fourth chair (Nelly Cutz), two hours down its column. Playwright scrolls that point into
+    // view first; a hand worked mouse position missed the grid once the page had scrolled.
+    await page
+      .locator('.exq-daygrid__col')
+      .nth(3)
+      .click({ position: { x: 20, y: 24 * 4 * 2 + 12 } });
     await expect(
       page.getByRole('dialog', { name: 'New booking' }).getByLabel('Barber'),
-    ).toHaveValue('tre');
+    ).toHaveValue('nelly');
   });
 
   test('draws a red line for now, and the week view counts and opens a day', async ({
     page,
     context,
   }) => {
-    const { startAt } = await bookPublicly(page, 'jay', { name: 'Week Customer' });
+    const { startAt } = await bookPublicly(page, 'lee', { name: 'Week Customer' });
     await context.clearCookies();
     const local = DateTime.fromISO(startAt, { zone: ZONE });
     // Pretend it is 11:30 on the booking's day, so the line sits inside the working hours.
@@ -61,7 +63,7 @@ test.describe('schedule', () => {
     await expect(page).toHaveURL(/view=week/);
     const table = page.locator('table.exq-weekgrid');
     const cell = table
-      .getByRole('button', { name: new RegExp(`^Jay, .*: [1-9]\\d* booking`) })
+      .getByRole('button', { name: new RegExp(`^Lee, .*: [1-9]\\d* booking`) })
       .first();
     await expect(cell).toBeVisible();
     await cell.click();
@@ -75,7 +77,7 @@ test.describe('customers', () => {
     page,
     context,
   }) => {
-    const { phone } = await bookPublicly(page, 'dee', { name: 'Zoë Customerson' });
+    const { phone } = await bookPublicly(page, 'drew', { name: 'Zoë Customerson' });
     await context.clearCookies();
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
@@ -99,7 +101,7 @@ test.describe('customers', () => {
     // A visit opens the booking panel on top.
     await page
       .getByRole('dialog', { name: 'Customer' })
-      .getByRole('button', { name: /Classic Cut with Dee/ })
+      .getByRole('button', { name: /Haircut with Drew/ })
       .first()
       .click();
     await expect(page.getByRole('dialog', { name: 'Booking' })).toBeVisible();
@@ -111,14 +113,14 @@ test.describe('team and the resolver', () => {
     page,
     context,
   }) => {
-    const { code, startAt } = await bookPublicly(page, 'tre', { name: 'Move Me' });
+    const { code, startAt } = await bookPublicly(page, 'nelly', { name: 'Move Me' });
     await context.clearCookies();
     const local = DateTime.fromISO(startAt, { zone: ZONE });
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
     await page.getByRole('button', { name: 'Block time' }).click();
     const panel = page.getByRole('dialog', { name: 'Block time' });
-    await panel.getByLabel('Barber').selectOption({ label: 'Tre' });
+    await panel.getByLabel('Barber').selectOption({ label: 'Nelly Cutz' });
     await panel.getByRole('button', { name: 'Time off', exact: true }).click();
     await panel.getByLabel('Day', { exact: true }).fill(local.toISODate() ?? '');
     await panel.getByLabel('From', { exact: true }).fill('06:00');
@@ -141,10 +143,10 @@ test.describe('team and the resolver', () => {
       else await items.nth(i).getByRole('radio', { name: /^Keep/ }).check({ force: true });
     }
     await expect(panel.getByText(`${String(count)} of ${String(count)} decided`)).toBeVisible();
-    // Only chairs that do the service and are free are offered, never Tre himself.
+    // Only chairs that do the service and are free are offered, never Nelly himself.
     const options = await panel.getByLabel('Move to').first().locator('option').allTextContents();
     expect(options.length).toBeGreaterThan(0);
-    expect(options).not.toContain('Tre');
+    expect(options).not.toContain('Nelly Cutz');
     await apply.click();
     await expect(page.getByText(/Time blocked\. .*moved/)).toBeVisible();
 
@@ -157,7 +159,7 @@ test.describe('team and the resolver', () => {
       page
         .getByRole('dialog', { name: 'Booking' })
         .locator('.exq-bsheet__fact', { hasText: 'Barber' }),
-    ).not.toContainText('Tre');
+    ).not.toContainText('Nelly');
   });
 
   test('adds a barber, shows them on the site, then removes them and the address still works', async ({
@@ -180,7 +182,7 @@ test.describe('team and the resolver', () => {
 
     // Tabs: profile, services, hours, time off. Show on site puts them on the public page.
     await page.getByRole('tab', { name: 'Services' }).click();
-    await expect(page.getByLabel(/Classic Cut/)).toBeChecked();
+    await expect(page.getByLabel(/^Haircut(?! and| with)/)).toBeChecked();
     await page.getByRole('tab', { name: 'Profile' }).click();
     await page.getByLabel('Show on site').check();
     await page.getByRole('button', { name: 'Save profile' }).click();
@@ -207,7 +209,7 @@ test.describe('team and the resolver', () => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
     await page.goto('/admin/team');
-    const card = page.locator('.exq-teamcard', { hasText: 'Kris' });
+    const card = page.locator('.exq-teamcard', { hasText: 'Dontrise' });
     const toggle = card.getByRole('switch');
     // The shop may be closed today (the switch is then disabled); only test when it is open.
     test.skip(await toggle.isDisabled(), 'the shop is closed today');
@@ -216,10 +218,10 @@ test.describe('team and the resolver', () => {
     const panel = page.getByRole('dialog', { name: 'Barber out' });
     await expect(panel.getByLabel('Barber')).toHaveValue(/[0-9a-f]{24}/);
     await panel.getByRole('button', { name: 'Mark out' }).click();
-    await expect(page.getByText(/Kris is out today/)).toBeVisible();
+    await expect(page.getByText(/Dontrise is out today/)).toBeVisible();
     await expect(card.getByRole('switch')).not.toBeChecked();
     await card.getByRole('switch').click();
-    await expect(page.getByText(/Kris is back in today/)).toBeVisible();
+    await expect(page.getByText(/Dontrise is back in today/)).toBeVisible();
     await expect(card.getByRole('switch')).toBeChecked();
   });
 });
@@ -229,7 +231,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     context,
   }) => {
-    const { startAt } = await bookPublicly(page, 'kris', { name: 'Axe Kris' });
+    const { startAt } = await bookPublicly(page, 'drew', { name: 'Axe Drew' });
     await context.clearCookies();
     await page.addInitScript((t) => {
       localStorage.setItem('exq-theme', t);

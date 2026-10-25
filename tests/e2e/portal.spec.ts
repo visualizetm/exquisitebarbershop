@@ -8,8 +8,8 @@ test.use({ viewport: PHONE, actionTimeout: 15_000 });
 
 /*
  * A walk-in holds its chair for the next 40 minutes, so every test that adds one has a barber of
- * its own: Marcus the barber's day, Dee and Tre the two axe runs. Jay signs in without adding
- * anything. Kris is kept for the setup and lockout tests, which change that barber's PIN.
+ * its own: Lee the barber's day, Drew and Nelly the two axe runs. Iniya signs in without adding
+ * anything. Dontrise is kept for the setup and lockout tests, which change that barber's PIN.
  */
 
 async function enterPin(page: Page, pin: string) {
@@ -30,7 +30,7 @@ async function walkIn(page: Page, name: string, phone: string) {
   const sheet = page.getByRole('dialog', { name: 'Walk-in' });
   await sheet.getByLabel('Name').fill(name);
   await sheet.getByLabel('Mobile phone').fill(phone);
-  await sheet.getByLabel(/^Classic Cut/).check();
+  await sheet.getByLabel(/^Haircut(?! and| with)/).check();
   await sheet.getByRole('button', { name: 'Start now' }).click();
   await expect(page.getByText(`${name} is in your chair.`)).toBeVisible();
 }
@@ -49,8 +49,8 @@ test.describe('signing in', () => {
       await expect(page.getByRole('button', { name: new RegExp(`^${n}`) })).toBeVisible();
     }
 
-    await page.getByRole('button', { name: /^Marcus/ }).click();
-    await expect(page.getByRole('heading', { name: 'Hi, Marcus' })).toBeVisible();
+    await page.getByRole('button', { name: /^Lee/ }).click();
+    await expect(page.getByRole('heading', { name: 'Hi, Lee' })).toBeVisible();
     await expect(page.getByText(/Demo PIN/)).toHaveCount(0);
     await expect(page.locator('.exq-pin__dot')).toHaveCount(6);
     // Keys are big enough for a thumb.
@@ -77,7 +77,7 @@ test.describe('signing in', () => {
   test('the barber cookie opens no dashboard page and the owner screens answer 401', async ({
     page,
   }) => {
-    await signInBarber(page, 'Jay');
+    await signInBarber(page, 'Iniya');
     await page.goto('/admin');
     await expect(page).toHaveURL(/\/admin\/login/);
     const statuses = await page.evaluate(async () => {
@@ -100,7 +100,7 @@ test.describe('a barber’s day at 390', () => {
   test('walk-in, next up, done and undo, a note, the week, time off, and sign out', async ({
     page,
   }) => {
-    const name = 'Marcus';
+    const name = 'Lee';
     const client = `Portal ${String(Date.now()).slice(-6)}`;
     const phone = randomPhone();
     await signInBarber(page, name);
@@ -213,7 +213,7 @@ test.describe('a barber’s day at 390', () => {
   });
 
   test('changing the PIN refuses a weak one and a wrong current one', async ({ page }) => {
-    await signInBarber(page, 'Jay');
+    await signInBarber(page, 'Iniya');
     await page.getByRole('link', { name: 'Me', exact: true }).click();
     await page.getByRole('button', { name: 'Change PIN' }).click();
     const sheet = page.getByRole('dialog', { name: 'Change PIN' });
@@ -253,12 +253,12 @@ test.describe('setup links and the lockout', () => {
     page,
     browser,
   }) => {
-    const link = await setupLinkFor(page, 'Kris');
+    const link = await setupLinkFor(page, 'Dontrise');
     expect(link).toMatch(/\/team\/setup\/[A-Za-z0-9_-]{43}$/);
     const phone = await (await browser.newContext({ viewport: PHONE })).newPage();
     try {
       await phone.goto(new URL(link).pathname);
-      await expect(phone.getByRole('heading', { name: 'Welcome, Kris' })).toBeVisible();
+      await expect(phone.getByRole('heading', { name: 'Welcome, Dontrise' })).toBeVisible();
       // Too easy: refused before anything is sent.
       await enterPin(phone, '123456');
       await expect(phone.getByText(/harder to guess/)).toBeVisible();
@@ -277,10 +277,10 @@ test.describe('setup links and the lockout', () => {
       await phone.goto(new URL(link).pathname);
       await expect(phone.getByText('This link does not work')).toBeVisible();
 
-      // The owner makes a new link to put Kris back on the shared test PIN: it signs the phone out.
-      const again = await setupLinkFor(page, 'Kris', true);
+      // The owner makes a new link to put Dontrise back on the shared test PIN: it signs the phone out.
+      const again = await setupLinkFor(page, 'Dontrise', true);
       await phone.goto('/team');
-      await phone.getByRole('button', { name: /^Kris/ }).click();
+      await phone.getByRole('button', { name: /^Dontrise/ }).click();
       await enterPin(phone, '290417');
       await expect(phone.getByText(/did not work|Too many/)).toBeVisible();
       await phone.goto(new URL(again).pathname);
@@ -300,7 +300,7 @@ test.describe('setup links and the lockout', () => {
     const phone = await (await browser.newContext({ viewport: PHONE })).newPage();
     try {
       await phone.goto('/team');
-      await phone.getByRole('button', { name: /^Kris/ }).click();
+      await phone.getByRole('button', { name: /^Dontrise/ }).click();
       for (let i = 0; i < 5; i += 1) {
         await enterPin(phone, `99911${String(i)}`);
         await expect(phone.getByText('That PIN did not work. Try again.')).toBeVisible();
@@ -311,14 +311,14 @@ test.describe('setup links and the lockout', () => {
       await signInOwner(page);
       await page.setViewportSize({ width: 1280, height: 800 });
       await page.goto('/admin/team');
-      await page.getByRole('link', { name: 'Kris', exact: true }).click();
+      await page.getByRole('link', { name: 'Dontrise', exact: true }).click();
       await page.getByRole('tab', { name: 'Access' }).click();
       await expect(page.getByText(/after 5 wrong tries/)).toBeVisible();
       await page.getByRole('button', { name: 'Unlock' }).click();
-      await expect(page.getByText('Kris can try again now.')).toBeVisible();
+      await expect(page.getByText('Dontrise can try again now.')).toBeVisible();
 
       await phone.goto('/team');
-      await phone.getByRole('button', { name: /^Kris/ }).click();
+      await phone.getByRole('button', { name: /^Dontrise/ }).click();
       await enterPin(phone, E2E_BARBER_PIN);
       await expect(phone.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
     } finally {
@@ -344,7 +344,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/team');
     await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
     await check('names');
-    const name = theme === 'light' ? 'Dee' : 'Tre';
+    const name = theme === 'light' ? 'Drew' : 'Nelly';
     await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
     await check('pin');
     await enterPin(page, E2E_BARBER_PIN);

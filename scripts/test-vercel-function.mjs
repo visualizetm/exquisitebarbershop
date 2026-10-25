@@ -177,15 +177,15 @@ async function suite(label, dir, dbName, replSet) {
     );
     const staff = await call('GET', '/api/staff');
     check(
-      `${p} demo env: six chairs were seeded`,
-      staff.json?.staff?.length === 6,
+      `${p} demo env: five chairs were seeded`,
+      staff.json?.staff?.length === 5,
       String(staff.json?.staff?.length),
     );
     // Vercel may add a query of its own to a rewritten request; the router must not mind.
-    const withQuery = await call('GET', '/api/staff/marcus?path=staff%2Fmarcus');
+    const withQuery = await call('GET', '/api/staff/lee?path=staff%2Flee');
     check(
       `${p} demo env: a nested path with an extra query works`,
-      withQuery.status === 200 && withQuery.json?.staff?.slug === 'marcus',
+      withQuery.status === 200 && withQuery.json?.staff?.slug === 'lee',
       String(withQuery.status),
     );
 
@@ -452,8 +452,8 @@ try {
       '/api',
       '/api/health',
       '/api/shop',
-      '/api/staff/marcus',
-      '/api/staff/marcus/openings',
+      '/api/staff/lee',
+      '/api/staff/lee/openings',
       '/api/auth/login',
       '/api/auth/demo-login',
       '/api/admin/bookings/abc/cancel',
@@ -476,7 +476,7 @@ try {
     for (const path of [
       '/',
       '/services',
-      '/chairs/marcus',
+      '/chairs/lee',
       '/book',
       '/manage',
       '/setup',

@@ -1,3 +1,4 @@
+import { publicEmail } from '../../../shared/lib/email';
 import { buildIcs, bookingIcsUid } from '../../../shared/lib/ics';
 import { formatCents } from '../../../shared/lib/money';
 import { formatUsPhone } from '../../../shared/lib/phone';
@@ -81,7 +82,7 @@ function icsAttachment(
     ].join(' '),
     location: p.shop.addressLines.join(', '),
     organizerName: p.shop.name,
-    organizerEmail: p.shop.email,
+    organizerEmail: publicEmail(p.shop.email),
     stamp: env.now,
     ...(url ? { url } : {}),
   });

@@ -76,7 +76,7 @@ describe('login', () => {
   it('a wrong password and an unknown email look the same: status, body and time', async () => {
     const barber = await createLogin({
       role: 'owner',
-      staffId: staffSeedId('marcus'),
+      staffId: staffSeedId('lee'),
       password: BARBER_PASSWORD,
     });
     const wrong = await login(barber.email, 'definitely-not-it-123');
@@ -112,7 +112,7 @@ describe('login', () => {
   it('disabled logins get the same generic answer', async () => {
     const disabled = await createLogin({
       role: 'owner',
-      staffId: staffSeedId('tre'),
+      staffId: staffSeedId('nelly'),
       password: BARBER_PASSWORD,
     });
     await usersRepo.setUserActive(disabled._id, false, new Date());
@@ -121,7 +121,7 @@ describe('login', () => {
   });
 
   it('a barber login is pointed to /team, but only after the right password', async () => {
-    const barber = await createLogin({ role: 'barber', staffId: staffSeedId('dee') });
+    const barber = await createLogin({ role: 'barber', staffId: staffSeedId('drew') });
     const wrong = await login(barber.email, 'definitely-not-it-123');
     expect(wrong.status).toBe(401);
     expect(apiErrorSchema.parse(wrong.body).error.code).toBe('INVALID_CREDENTIALS');
@@ -167,7 +167,7 @@ describe('login', () => {
   it('locks an email after five failures, longer each time, identically for unknown emails', async () => {
     const barber = await createLogin({
       role: 'owner',
-      staffId: staffSeedId('jay'),
+      staffId: staffSeedId('iniya'),
       password: BARBER_PASSWORD,
     });
     for (let i = 0; i < 5; i += 1)
@@ -228,7 +228,7 @@ describe('login', () => {
   it('a temporary password must be changed before anything else works', async () => {
     const barber = await createLogin({
       role: 'owner',
-      staffId: staffSeedId('kris'),
+      staffId: null,
       password: BARBER_PASSWORD,
       mustChangePassword: true,
     });

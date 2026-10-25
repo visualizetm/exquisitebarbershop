@@ -17,7 +17,7 @@ process.env.OUTBOX_AFTER_RESPONSE = 'off';
 const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
-const cut = serviceSeedId('classic-cut');
+const cut = serviceSeedId('haircut');
 const TUE = nextDate(3, 3);
 const search = async (q: string) =>
   searchResponseSchema.parse(
@@ -37,7 +37,7 @@ beforeAll(async () => {
     (await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') }))._id,
   );
   const b = await bookPublic(server.baseUrl, {
-    staff: 'marcus',
+    staff: 'lee',
     serviceIds: [cut],
     startAt: slotAt(TUE, '10:00'),
     name: 'José Álvarez',
@@ -45,7 +45,7 @@ beforeAll(async () => {
   });
   code = b.referenceCode;
   await bookPublic(server.baseUrl, {
-    staff: 'dee',
+    staff: 'drew',
     serviceIds: [cut],
     startAt: slotAt(TUE, '11:00'),
     name: 'Jon Smith',

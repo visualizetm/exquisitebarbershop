@@ -81,7 +81,20 @@ test('the first visit sets the shop up by itself and Home loads fully', async ({
   // The first request seeds the whole shop, so the very first paint of data can take a while.
   await expect(cards.first()).toBeVisible({ timeout: 40_000 });
   // Cards swap from loading to loaded one by one, so the count is polled rather than read once.
-  await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(6);
+  await expect.poll(() => cards.count()).toBe(5);
+  // The five real people, in chair order, and none of the made up barbers the first seed had.
+  await expect(cards.locator('.exq-chaircard__name')).toHaveText([
+    'Dontrise',
+    'Lee',
+    'Drew',
+    'Nelly Cutz',
+    'Iniya',
+  ]);
+  await expect(page.getByText(/Marcus|Kris|\bTre\b|\bJay\b/)).toHaveCount(0);
+  // Iniya books on Instagram, so her card says so instead of an open time.
+  await expect(page.locator('.exq-home__chairs li[data-state="instagram"]')).toContainText(
+    'Book through Instagram',
+  );
 
   // The sample shop asks not to be indexed: in the HTML, as a header, and in robots.txt.
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
@@ -115,11 +128,21 @@ test('every public page renders with intentional placeholders and no console err
     page.locator('.exq-chaircard .exq-photoframe[data-state="placeholder"]').first(),
   ).toBeVisible();
 
-  await page.goto('/chairs/marcus');
+  await page.goto('/chairs/lee');
   await expectUp(page);
-  await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Lee', exact: true })).toBeVisible();
   await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await expect(page.locator('.exq-chair__work')).toHaveCount(0);
+
+  // Iniya takes bookings on Instagram: her page says so and has no Book button.
+  await page.goto('/chairs/iniya');
+  await expectUp(page);
+  await expect(page.getByRole('heading', { name: 'Iniya', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Book through Instagram' })).toHaveAttribute(
+    'href',
+    'https://instagram.com/iniyathestylist',
+  );
+  await expect(page.getByRole('link', { name: /^Book Iniya/ })).toHaveCount(0);
 
   await page.goto('/gallery');
   await expectUp(page);
@@ -133,12 +156,12 @@ test('every public page renders with intentional placeholders and no console err
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Manage your booking' })).toBeVisible();
 
-  await page.goto('/book?barber=marcus');
+  await page.goto('/book?barber=lee');
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeFocused();
 
   // No broken image anywhere on the way: every image that is on a page decoded.
-  for (const path of ['/', '/chairs', '/chairs/marcus', '/visit']) {
+  for (const path of ['/', '/chairs', '/chairs/lee', '/chairs/iniya', '/visit']) {
     await page.goto(path);
     await expectUp(page);
     const broken = await page.evaluate(
@@ -152,9 +175,9 @@ test('every public page renders with intentional placeholders and no console err
 
 test('a booking completes end to end and shows its manage link on screen', async ({ page }) => {
   const errors = watchConsole(page);
-  await page.goto('/book?barber=marcus');
+  await page.goto('/book?barber=lee');
   await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeFocused();
-  await page.getByLabel(/Classic Cut/).click();
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   await page.getByRole('button', { name: 'Continue' }).click();
 
   // The second open day is never today, so the booking is always outside the reschedule cutoff.
@@ -209,29 +232,29 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
 
   // The real screen: pick a chair, pick a file, describe it, upload. Stored in MongoDB, no R2.
   await page.goto('/admin/team');
-  await page.getByRole('link', { name: 'Marcus', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Photos of Marcus' })).toBeVisible();
+  await page.getByRole('link', { name: 'Lee', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Photos of Lee' })).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles({
-    name: 'marcus.png',
+    name: 'lee.png',
     mimeType: 'image/png',
-    buffer: await pngBytes(page, 'MARCUS'),
+    buffer: await pngBytes(page, 'LEE'),
   });
   await page
     .getByLabel('Describe the photo (alt text)')
-    .fill('Marcus at his chair, showcase portrait');
+    .fill('Lee at his chair, showcase portrait');
   await page.getByRole('button', { name: 'Upload photo' }).click();
   await expect(
-    page.locator('.exq-adm-photos__item img[alt="Marcus at his chair, showcase portrait"]'),
+    page.locator('.exq-adm-photos__item img[alt="Lee at his chair, showcase portrait"]'),
   ).toBeVisible();
   const stored = await page.locator('.exq-adm-photos__item img').first().getAttribute('src');
   expect(stored).toMatch(/\/api\/media\/[0-9a-f-]{36}\.webp$/);
 
-  // A gallery photo credited to Marcus and a hero, through the same flow.
+  // A gallery photo credited to Lee and a hero, through the same flow.
   const ids = await staffIds(page);
   await uploadSamplePhoto(page, {
     kind: 'gallery',
-    staffId: ids.marcus ?? '',
-    alt: 'A skin fade by Marcus',
+    staffId: ids.lee ?? '',
+    alt: 'A skin fade by Lee',
     label: 'FADE',
     color: '#1F1F1F',
   });
@@ -244,14 +267,14 @@ test('a photo uploaded in the admin shows on the profile, in the gallery and as 
 
   // Public pages, signed out: the portrait, the gallery tile, the work strip and the hero.
   await page.context().clearCookies();
-  await page.goto('/chairs/marcus');
+  await page.goto('/chairs/lee');
   const arch = page.locator('.exq-chair .exq-photoframe[data-state="loaded"] img');
   await expect(arch).toHaveAttribute('src', /\/api\/media\//);
   expect(await arch.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await expect(page.locator('.exq-chair__work .exq-photo-grid__item').first()).toBeVisible();
 
   await page.goto('/gallery');
-  const tile = page.locator('.exq-photo-grid__button img[alt="A skin fade by Marcus"]');
+  const tile = page.locator('.exq-photo-grid__button img[alt="A skin fade by Lee"]');
   await expect(tile).toBeVisible();
   expect(await tile.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
@@ -272,9 +295,9 @@ test('the barber portal shows the demo PIN, and it opens the portal', async ({ p
   await page.goto('/team');
   await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
   await expect(page.getByText('Demo PIN: 246810')).toBeVisible();
-  await page.getByRole('button', { name: /^Marcus/ }).click();
+  await page.getByRole('button', { name: /^Lee/ }).click();
   await expect(page.getByText('Demo PIN: 246810')).toBeVisible();
-  const pad = page.getByRole('group', { name: 'PIN for Marcus' });
+  const pad = page.getByRole('group', { name: 'PIN for Lee' });
   // A wrong PIN is refused, the demo PIN opens Today.
   for (const digit of '135790') await pad.getByRole('button', { name: digit, exact: true }).click();
   await expect(page.getByText('That PIN did not work. Try again.')).toBeVisible();
@@ -433,7 +456,7 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
     /Pat Placeholder|Sam Sample|Terry Testcase|Jamie Demo/,
   );
   await page.context().clearCookies();
-  await page.goto('/chairs/marcus');
+  await page.goto('/chairs/lee');
   await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
   await page.goto('/gallery');
   await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();

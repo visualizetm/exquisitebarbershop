@@ -64,7 +64,7 @@ export function VisitPage() {
               </div>
               <p className="exq-visit__actions">
                 <ButtonAnchor
-                  href={directionsUrl(result.data.address)}
+                  href={directionsUrl(result.data)}
                   target="_blank"
                   rel="noopener noreferrer"
                   icon={<NavigationPointer01 aria-hidden="true" />}
@@ -88,10 +88,12 @@ export function VisitPage() {
                 <Phone01 aria-hidden="true" />
                 <a href={`tel:${result.data.phone}`}>{formatUsPhone(result.data.phone)}</a>
               </p>
-              <p className="exq-visit__fact">
-                <Mail01 aria-hidden="true" />
-                <a href={`mailto:${result.data.email}`}>{result.data.email}</a>
-              </p>
+              {result.data.email ? (
+                <p className="exq-visit__fact">
+                  <Mail01 aria-hidden="true" />
+                  <a href={`mailto:${result.data.email}`}>{result.data.email}</a>
+                </p>
+              ) : null}
               <p>
                 <a
                   href={`https://instagram.com/${result.data.instagramHandle}`}
@@ -108,11 +110,16 @@ export function VisitPage() {
               aria-labelledby="exq-visit-policies"
             >
               <h2 id="exq-visit-policies" className="exq-visit__heading">
-                Walk ins and changes
+                Walk-ins and changes
               </h2>
               <ul className="exq-visit__policy-list">
-                <li>Walk ins welcome when a chair is free.</li>
+                <li>Walk-ins welcome when a chair is free.</li>
                 <li>Cancel or move your booking up to 2 hours before.</li>
+              </ul>
+              <h3 className="exq-visit__subheading">Good to know</h3>
+              <ul className="exq-visit__policy-list">
+                <li>Kids welcome</li>
+                <li>Wheelchair accessible parking lot</li>
               </ul>
               <h3 className="exq-visit__subheading">Parking</h3>
               <p data-state="placeholder">Parking details coming soon.</p>

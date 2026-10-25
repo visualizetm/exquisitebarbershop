@@ -445,3 +445,23 @@ commit, and what is still open.
 - Captures: `tests/e2e/p11-capture.ts` (`milestones`, `guide`, `m6`, `recordings`); montages per milestone in
   `docs/screens/p11/m*/`; recordings in `docs/screens/p11/recordings/`.
 - Tests: `tests/e2e/chrome.spec.ts`, `outage.spec.ts`, the demo notice suite in `tests/e2e/demo/demo.spec.ts`.
+
+## Prompt 12
+
+### M1: shop facts, hours, the team and the Iniya rules
+
+- Shipped: the real address (Suite F), phone, hours (closed Monday, 10:00 to 19:00 Tuesday to Sunday),
+  announcement and Google block in `seed/shop.ts`; the five real people with their own menus and hours; the
+  15 real services (shop prices, no per barber overrides yet); `settings.google` (zod, backfilled for old
+  documents, served on `/api/shop`); `shared/lib/google.ts` (Maps and write-a-review links, used by every
+  Directions button); `shared/lib/email.ts` (the placeholder email never reaches a public page, the JSON-LD
+  or the calendar file); the JSON-LD with the phone, Suite F, hours and the Instagram page and no rating.
+- Iniya: the card says "Book through Instagram" and opens her Instagram (Home) or her page (Chairs); her page
+  has the same button and no Book button; `/book?barber=iniya` moves to anyone available; first available,
+  the picker and availability already skipped her and now have tests that prove it; her page stays in the
+  sitemap. The barber walk-in form and the owner's New booking panel list only the services the chosen chair
+  offers, because the menus are no longer the same for everyone.
+- Tests: the old barbers (marcus, dee, tre, jay, kris), services and fake phone were migrated across the
+  integration, unit and end to end suites, `scripts/` and the Kit; new `tests/integration/realShop.test.ts`,
+  `tests/unit/google.test.ts`, `tests/unit/offlineBooking.test.ts`, `tests/e2e/realshop.spec.ts`; the demo
+  spec expects the five real names.

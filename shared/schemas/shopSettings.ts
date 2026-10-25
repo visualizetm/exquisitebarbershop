@@ -89,6 +89,44 @@ export const featureFlagsSchema = z.object({
   smsReminders: z.boolean().default(false),
 });
 
+/** A rating is a whole or half-step number from 1 to 5 with at most one decimal, or 0 for "none yet". */
+const ratingSchema = z
+  .number()
+  .min(0)
+  .max(5)
+  .refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, {
+    message: 'Use at most one decimal, for example 4.7',
+  });
+
+/**
+ * The shop's Google Business Profile. The place id builds the Directions, "Read them on Google" and
+ * "Leave a review" links. The rating, count and date are copied by hand from the profile (Google
+ * offers no free feed) and the owner edits them in Website, Reviews. Empty or zero means "not set".
+ */
+export const googleSettingsSchema = z
+  .object({
+    placeId: z
+      .string()
+      .trim()
+      .max(200)
+      .regex(/^[A-Za-z0-9_-]*$/, 'A place id has only letters, digits, hyphens and underscores'),
+    rating: ratingSchema,
+    reviewCount: z.int().min(0).max(100_000),
+    /** The shop date the rating was last read from Google, or empty. */
+    ratingCheckedOn: z.union([z.literal(''), isoDateSchema]),
+  })
+  .refine((g) => g.reviewCount === 0 || g.rating >= 1, {
+    path: ['rating'],
+    message: 'Add the rating, or set the review count to 0',
+  });
+export type GoogleSettings = z.infer<typeof googleSettingsSchema>;
+export const DEFAULT_GOOGLE: GoogleSettings = {
+  placeId: '',
+  rating: 0,
+  reviewCount: 0,
+  ratingCheckedOn: '',
+};
+
 /** A link target: a path on this site or an https address. */
 const announcementLinkSchema = z
   .string()
@@ -122,7 +160,7 @@ export const announcementSchema = z
 export type Announcement = z.infer<typeof announcementSchema>;
 export const DEFAULT_ANNOUNCEMENT: Announcement = {
   enabled: true,
-  text: 'Walk ins welcome',
+  text: 'Walk-ins welcome',
   linkLabel: 'Book online',
   linkUrl: '/book',
   endsOn: '',
@@ -186,6 +224,7 @@ export const shopSettingsDocumentSchema = z
     permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
     announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
     social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
+    google: googleSettingsSchema.default(DEFAULT_GOOGLE),
     /** The service "next open" times are computed for. Null means each chair's shortest service. */
     nextOpenServiceId: idSchema.nullable().default(null),
   })
