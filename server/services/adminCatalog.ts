@@ -10,7 +10,7 @@ import type {
 import { shopDayBounds } from '../../shared/lib/time';
 import type { EmailOutboxDocument } from '../../shared/schemas/emailOutbox';
 import type { ServiceDocument, ServiceInput, ServiceUpdate } from '../../shared/schemas/service';
-import type { ShopSettingsInput } from '../../shared/schemas/shopSettings';
+import type { ShopSettingsInput, ShopSettingsUpdate } from '../../shared/schemas/shopSettings';
 import type { StaffDocument, StaffInput, StaffUpdate } from '../../shared/schemas/staff';
 import { withTransaction } from '../db/transaction';
 import type { Principal } from '../http/types';
@@ -306,13 +306,15 @@ export async function getSettings(): Promise<{ settings: ShopSettingsInput }> {
 
 export async function putSettings(
   principal: Principal,
-  input: ShopSettingsInput,
+  input: ShopSettingsUpdate,
   meta: ServiceMeta,
 ) {
   const before = await getSettings();
   await withTransaction(async (session) => {
     await shopSettingsRepo.updateShopSettings(input, meta.now, { session });
   });
+  // The audit records what is stored now, which keeps any group the save left out.
+  const after = await getSettings();
   await audit(
     principal,
     {
@@ -320,11 +322,11 @@ export async function putSettings(
       entityType: 'shopSettings',
       entityId: 'shop',
       before: before.settings,
-      after: input,
+      after: after.settings,
     },
     meta,
   );
-  return getSettings();
+  return after;
 }
 
 // ---------------------------------------------------------------------------

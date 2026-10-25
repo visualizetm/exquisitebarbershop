@@ -3,7 +3,7 @@ import { PLACEHOLDER_SHOP_EMAIL, isPlaceholderEmail, publicEmail } from '../../s
 import { googleMapsUrl, googleReviewUrl } from '../../shared/lib/google';
 import { DEFAULT_GOOGLE, googleSettingsSchema } from '../../shared/schemas/shopSettings';
 import { shopSettingsSeed } from '../../seed/shop';
-import { directionsUrl } from '../../src/lib/shop';
+import { addressLine, directionsUrl } from '../../src/lib/shop';
 
 const PLACE_ID = 'ChIJISdW6zTpxokRzSBEJjMQU4M';
 
@@ -45,6 +45,24 @@ describe('Google links', () => {
     expect(fallback).toContain('query=3309%20Edgmont%20Ave%2C%20Suite%20F%2C%20Brookhaven');
     expect(fallback).not.toContain('query_place_id');
     expect(directionsUrl(shop)).toBe(fallback);
+  });
+});
+
+describe('addressLine', () => {
+  const address = {
+    line1: '3309 Edgmont Ave',
+    line2: 'Suite F' as string | null,
+    city: 'Brookhaven',
+    state: 'PA',
+    postalCode: '19015',
+  };
+
+  it('puts the suite between the street and the town, for the calendar file and the page text', () => {
+    expect(addressLine(address)).toBe('3309 Edgmont Ave, Suite F, Brookhaven, PA 19015');
+  });
+
+  it('leaves the suite out when there is none', () => {
+    expect(addressLine({ ...address, line2: null })).toBe('3309 Edgmont Ave, Brookhaven, PA 19015');
   });
 });
 

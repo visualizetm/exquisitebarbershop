@@ -29,6 +29,7 @@ import {
 } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
+import { offeredServices } from '@/lib/booking/offered';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { newIdempotencyKey, shopDateLabel, shopTime } from '@/admin/format';
@@ -416,9 +417,7 @@ function WalkInForm({ onDone }: { onDone: (name: string) => void }) {
   // cannot be read, every service is listed and the server decides.
   const menu =
     team.status === 'ready' ? team.data.staff.find((m) => m.id === me.staff.id)?.serviceIds : null;
-  const offered = menu
-    ? services.data.services.filter((s) => menu.includes(s.id))
-    : services.data.services;
+  const offered = offeredServices(services.data.services, menu);
   return (
     <form className="exq-team-form" onSubmit={(e) => void submit(e)}>
       <Input

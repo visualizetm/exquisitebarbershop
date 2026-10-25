@@ -24,7 +24,7 @@ import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
 import { hoursLabel } from '@/lib/hours';
-import { directionsUrl, todayKey } from '@/lib/shop';
+import { addressLine, directionsUrl, todayKey } from '@/lib/shop';
 
 export function HomePage() {
   const shop = useShop();
@@ -32,7 +32,7 @@ export function HomePage() {
     title: null,
     description:
       shop.status === 'ready'
-        ? `${shop.data.tagline}. Barbers and stylists under one roof at ${shop.data.address.line1}, ${shop.data.address.city}, ${shop.data.address.state}. Pick your chair and book online in under a minute.`
+        ? `${shop.data.tagline}. Barbers and stylists under one roof at ${addressLine(shop.data.address)}. Pick your chair and book online in under a minute.`
         : undefined,
   });
   const staff = useApi('/api/staff', publicStaffListResponseSchema);

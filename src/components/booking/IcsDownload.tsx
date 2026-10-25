@@ -1,6 +1,7 @@
 import type { BookingView } from '@shared/api/bookings';
 import type { PublicShop } from '@shared/api/public';
 import { bookingIcsUid, buildIcs } from '@shared/lib/ics';
+import { addressLine } from '@/lib/shop';
 
 /** Offers the same calendar file that the confirmation email attaches. */
 export function IcsDownload({
@@ -20,7 +21,7 @@ export function IcsDownload({
     endAt: new Date(booking.endAt),
     summary: `${shop.name}: ${booking.services.map((s) => s.name).join(', ')}`,
     description: `With ${booking.staff.name}. Reference ${booking.referenceCode}. Manage: ${manageUrl}`,
-    location: `${shop.address.line1}, ${shop.address.city}, ${shop.address.state} ${shop.address.postalCode}`,
+    location: addressLine(shop.address),
     organizerName: shop.name,
     // The public shop API sends an empty email while the shop has no real mailbox.
     ...(shop.email ? { organizerEmail: shop.email } : {}),

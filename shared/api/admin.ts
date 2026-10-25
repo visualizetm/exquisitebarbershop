@@ -15,7 +15,7 @@ import {
 } from '../schemas/common';
 import { outboxStatusSchema } from '../schemas/emailOutbox';
 import { serviceInputSchema, serviceUpdateSchema } from '../schemas/service';
-import { shopSettingsInputSchema } from '../schemas/shopSettings';
+import { shopSettingsInputSchema, shopSettingsUpdateSchema } from '../schemas/shopSettings';
 import { staffInputSchema, staffUpdateSchema } from '../schemas/staff';
 import { actorTypeSchema, timeBlockKindSchema } from '../schemas/timeBlock';
 import { staffSelectorSchema } from './availability';
@@ -503,7 +503,7 @@ export const closureResponseSchema = z
   .extend(conflictOutcomeSchema.shape);
 
 export const settingsResponseSchema = z.object({ settings: shopSettingsInputSchema });
-export const settingsRequestSchema = shopSettingsInputSchema;
+export const settingsRequestSchema = shopSettingsUpdateSchema;
 
 // ---------------------------------------------------------------------------
 // Overview

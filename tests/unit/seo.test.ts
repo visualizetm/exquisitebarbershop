@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PublicShop } from '../../shared/api/public';
-import { shopJsonLd } from '../../src/lib/seo';
+import { chairDescription, shopJsonLd } from '../../src/lib/seo';
 
 const shop: PublicShop = {
   name: 'Exquisite Barber & Beauty Lounge',
@@ -141,5 +141,42 @@ describe('shopJsonLd', () => {
 
   it('never carries the owner personal number', () => {
     expect(JSON.stringify(shopJsonLd(shop, 'https://example.com'))).not.toContain('5609806');
+  });
+});
+
+describe('chairDescription', () => {
+  const member = {
+    name: 'Drew',
+    title: 'Barber, known as 2Sharp',
+    specialty: 'Designs, color and perms',
+    acceptsOnlineBooking: true,
+    instagramHandle: 'drew2sharp' as string | null,
+  };
+
+  it('invites a chair that books online to see the next openings', () => {
+    expect(chairDescription(member)).toBe(
+      'Drew, Barber, known as 2Sharp at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Designs, color and perms. See the next openings and book online.',
+    );
+  });
+
+  it('does not promise openings for a chair that books through Instagram', () => {
+    const text = chairDescription({
+      ...member,
+      name: 'Iniya',
+      title: 'Braider',
+      specialty: 'Braids and wigs',
+      acceptsOnlineBooking: false,
+      instagramHandle: 'iniyathestylist',
+    });
+    expect(text).toBe(
+      'Iniya, Braider at Exquisite Barber & Beauty Lounge in Brookhaven, PA. Braids and wigs. Book through Instagram.',
+    );
+    expect(text).not.toMatch(/openings|book online/);
+  });
+
+  it('says walk-ins only for a chair with no online booking and no Instagram', () => {
+    expect(
+      chairDescription({ ...member, acceptsOnlineBooking: false, instagramHandle: null }),
+    ).toMatch(/Walk-ins only\.$/);
   });
 });

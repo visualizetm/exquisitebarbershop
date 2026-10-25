@@ -30,6 +30,7 @@ import { StaffPicker } from '@/components/booking/StaffPicker';
 import { StepHeading } from '@/components/booking/StepHeading';
 import { TimePicker } from '@/components/booking/TimePicker';
 import { ApiRequestError, apiRequest } from '@/lib/api';
+import { offeredServices } from '@/lib/booking/offered';
 import {
   clearIdempotencyKey,
   idempotencyKeyFor,
@@ -187,8 +188,9 @@ export function BookPage() {
     if (staff.status !== 'ready' || !selection.staff || selection.staff === 'any') return;
     const listed = staff.data.staff.find((s) => s.slug === selection.staff);
     if (listed) {
-      // Someone who takes no online bookings (Iniya) cannot be picked here: book with anyone free.
-      if (!listed.acceptsOnlineBooking) {
+      // Someone who takes no online bookings (Iniya), or has nothing on the menu yet, cannot be
+      // picked here: book with anyone free.
+      if (!listed.acceptsOnlineBooking || listed.serviceIds.length === 0) {
         setParams(writeSelection({ ...selection, staff: 'any' }), { replace: true });
       }
       return;
@@ -222,6 +224,16 @@ export function BookPage() {
   }
 
   const allServices = services.data.services;
+  // A chair chosen already (a printed card, a Book button on its page) only does its own menu, and
+  // another chair's service would end on an empty calendar. So its menu is all that is listed.
+  const preselected =
+    selection.staff && selection.staff !== 'any'
+      ? staff.data.staff.find((s) => s.slug === selection.staff)
+      : undefined;
+  const chairMenu =
+    preselected?.acceptsOnlineBooking && preselected.serviceIds.length > 0
+      ? preselected.serviceIds
+      : null;
   const chosenServices = selection.serviceIds
     .map((id) => allServices.find((s) => s.id === id))
     .filter((s) => s !== undefined);
@@ -350,7 +362,12 @@ export function BookPage() {
       case 'services':
         return (
           <ServicePicker
-            services={allServices}
+            services={offeredServices(allServices, chairMenu)}
+            chairName={chairMenu ? preselected?.name : undefined}
+            onShowAll={() => {
+              // Any chair: the services stay chosen and the calendar then looks at every chair.
+              update({ staff: 'any' }, 'services');
+            }}
             selected={selection.serviceIds}
             max={shop.data.booking.maxServicesPerBooking}
             onChange={(ids) => {

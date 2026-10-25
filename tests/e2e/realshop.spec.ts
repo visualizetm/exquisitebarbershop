@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { E2E_BARBER_PIN } from '../../scripts/e2e-accounts';
+import { resetRateLimits, signInOwner } from './owner';
 
 /*
  * The real shop facts (address, phone, hours, Directions) and the one person who takes bookings
@@ -200,6 +202,115 @@ test.describe('Iniya takes bookings on Instagram', () => {
   test('her page is in the sitemap', async ({ page }) => {
     const sitemap = await (await page.request.get('/sitemap.xml')).text();
     expect(sitemap).toContain('/chairs/iniya</loc>');
+  });
+});
+
+/*
+ * Nelly does three services, Lee five, Dontrise nine, Iniya none. A chair that is already chosen
+ * must only offer its own menu, or a click on someone else's service ends on an empty calendar.
+ */
+const NELLY_MENU = ['Haircut', 'Kids Cut', 'Steam, Hot Towel and Fade'];
+
+test.describe('a chair only lists the services it does', () => {
+  test('/book?barber=nelly (a printed card) lists her three, and each one leads to open days', async ({
+    page,
+  }) => {
+    await page.goto('/book?barber=nelly');
+    await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeVisible();
+    const picker = page.locator('.exq-service-picker');
+    await expect(picker.locator('.exq-service-option')).toHaveCount(NELLY_MENU.length);
+    for (const name of NELLY_MENU) {
+      await expect(picker.locator('.exq-service-option', { hasText: name }), name).toHaveCount(1);
+    }
+    await expect(picker.getByText('Eyebrows')).toHaveCount(0);
+    await expect(picker.getByText('Showing what Nelly Cutz offers.')).toBeVisible();
+
+    await picker.getByLabel(/^Steam, Hot Towel and Fade/).click();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByRole('heading', { name: 'Pick a day' })).toBeVisible();
+    await expect(page.locator('.exq-day-option[data-state="available"]').first()).toBeVisible();
+    await expect(page.getByText(/Nothing is open in the next/)).toHaveCount(0);
+  });
+
+  test('See every service lists all fifteen, and the chosen services stay chosen', async ({
+    page,
+  }) => {
+    await page.goto('/book?barber=nelly');
+    const picker = page.locator('.exq-service-picker');
+    await picker.getByLabel(/^Kids Cut(?! with)/).click();
+    await picker.getByRole('button', { name: 'See every service' }).click();
+    await expect(picker.locator('.exq-service-option')).toHaveCount(15);
+    await expect(picker.getByText('Eyebrows')).toBeVisible();
+    await expect(picker.getByRole('button', { name: 'See every service' })).toHaveCount(0);
+    await expect(picker.getByLabel(/^Kids Cut(?! with)/)).toBeChecked();
+  });
+
+  test('with no chair chosen, or anyone available, every service is listed', async ({ page }) => {
+    for (const path of ['/book', '/book?barber=any']) {
+      await page.goto(path);
+      await expect(page.locator('.exq-service-picker .exq-service-option'), path).toHaveCount(15);
+      await expect(page.getByText(/Showing what .* offers\./)).toHaveCount(0);
+    }
+  });
+
+  test('the owner New booking panel narrows to the chosen barber, and says so for a barber with none', async ({
+    page,
+  }) => {
+    await signInOwner(page);
+    await page.getByRole('button', { name: 'Walk-in', exact: true }).click();
+    const panel = page.getByRole('dialog', { name: 'New booking' });
+    const services = panel.locator('fieldset', { hasText: 'Services' });
+
+    await panel.getByLabel('Barber').selectOption({ label: 'Nelly Cutz' });
+    await expect(services.getByRole('checkbox')).toHaveCount(NELLY_MENU.length);
+    for (const name of NELLY_MENU) {
+      // The label is the name, then the length and price as a hint.
+      await expect(services.getByLabel(new RegExp(`^${name}`)), name).toBeVisible();
+    }
+    await expect(services.getByLabel('Eyebrows')).toHaveCount(0);
+
+    // A phone booking can go to first available, which shows the whole menu.
+    await panel.getByRole('button', { name: 'Phone booking' }).click();
+    await panel.getByLabel('Barber').selectOption({ label: 'First available' });
+    await expect(services.getByRole('checkbox')).toHaveCount(15);
+
+    // A barber with no menu: a plain sentence, no boxes, and nothing to submit.
+    await panel.getByLabel('Barber').selectOption({ label: 'Iniya' });
+    await expect(services.getByRole('checkbox')).toHaveCount(0);
+    await expect(
+      panel.getByText('Iniya has no services yet. Add some under Team, Services.'),
+    ).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Book it' })).toBeDisabled();
+  });
+
+  async function openPortalWalkIn(page: Page, name: string) {
+    await resetRateLimits();
+    await page.goto('/team');
+    await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+    const pad = page.getByRole('group', { name: /^PIN for/ });
+    for (const digit of E2E_BARBER_PIN)
+      await pad.getByRole('button', { name: digit, exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+    await page.getByRole('button', { name: 'Walk-in', exact: true }).click();
+    return page.getByRole('dialog', { name: 'Walk-in' });
+  }
+
+  test("a barber's walk-in form lists only that barber's own services", async ({ page }) => {
+    const sheet = await openPortalWalkIn(page, 'Nelly');
+    const boxes = sheet.locator('fieldset', { hasText: 'Services' }).getByRole('checkbox');
+    await expect(boxes).toHaveCount(NELLY_MENU.length);
+    for (const name of NELLY_MENU) {
+      await expect(sheet.getByLabel(new RegExp(`^${name},`)), name).toBeVisible();
+    }
+    await expect(sheet.getByLabel(/^Eyebrows/)).toHaveCount(0);
+  });
+
+  test('a barber with no menu is told so instead of seeing an empty box', async ({ page }) => {
+    const sheet = await openPortalWalkIn(page, 'Iniya');
+    await expect(
+      sheet.getByText('You have no services set up yet. Ask the owner to add them.'),
+    ).toBeVisible();
+    await expect(sheet.getByRole('checkbox')).toHaveCount(0);
   });
 });
 

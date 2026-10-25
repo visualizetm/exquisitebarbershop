@@ -1,10 +1,27 @@
-import type { PublicShop } from '@shared/api/public';
+import type { PublicShop, PublicStaff } from '@shared/api/public';
 import { DAY_KEYS } from '@shared/lib/time';
+import { offlineBooking } from './offlineBooking';
 import { DAY_NAMES } from './shop';
 
 export const SITE_NAME = 'Exquisite Barber & Beauty Lounge';
 export const SITE_DESCRIPTION =
   'Barbers and stylists under one roof in Brookhaven, PA. Gifted Hands. Pick your chair and book online in under a minute.';
+
+/**
+ * The search snippet for a chair page. A chair that books through Instagram says so instead of
+ * promising openings it does not have.
+ */
+export function chairDescription(
+  member: Pick<
+    PublicStaff,
+    'name' | 'title' | 'specialty' | 'acceptsOnlineBooking' | 'instagramHandle'
+  >,
+): string {
+  const lead = `${member.name}, ${member.title} at ${SITE_NAME} in Brookhaven, PA. ${member.specialty}.`;
+  if (member.acceptsOnlineBooking) return `${lead} See the next openings and book online.`;
+  const away = offlineBooking(member);
+  return away ? `${lead} ${away.label}.` : lead;
+}
 
 /** The pages the shop runs on social networks, for sameAs. Instagram always, the others when set. */
 function sameAsLinks(shop: PublicShop): string[] {

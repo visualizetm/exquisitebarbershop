@@ -6,8 +6,10 @@ import {
   DEFAULT_STAFF_PERMISSIONS,
   shopSettingsDocumentSchema,
   shopSettingsInputSchema,
+  shopSettingsUpdateSchema,
   type ShopSettingsDocument,
   type ShopSettingsInput,
+  type ShopSettingsUpdate,
 } from '../../shared/schemas/shopSettings';
 import { collection } from '../db/collections';
 import { AppError } from '../lib/errors';
@@ -71,16 +73,17 @@ export async function createShopSettingsIfMissing(
   return { created: result.upsertedCount === 1 };
 }
 
+/** Replaces the settings the save carries. A group the save leaves out (google) keeps its stored value. */
 export async function updateShopSettings(
-  input: ShopSettingsInput,
+  input: ShopSettingsUpdate,
   now: Date,
   options?: RepoOptions,
 ): Promise<ShopSettingsDocument> {
-  const parsed = shopSettingsInputSchema.parse(input);
+  const { google, ...parsed } = shopSettingsUpdateSchema.parse(input);
   const col = await collection('shopSettings');
   const updated = await col.findOneAndUpdate(
     { _id: SHOP_SETTINGS_ID },
-    { $set: { ...parsed, updatedAt: now } },
+    { $set: { ...parsed, ...(google ? { google } : {}), updatedAt: now } },
     { returnDocument: 'after', ...sessionOf(options) },
   );
   if (!updated) throw new AppError('NOT_FOUND', 'Shop settings were not found');

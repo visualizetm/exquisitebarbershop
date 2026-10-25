@@ -767,9 +767,10 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 
 - D12-01 Address: `3309 Edgmont Ave, Suite F, Brookhaven, PA 19015`. The ZIP is confirmed. Google and Drew's
   booking page say Suite F, Dontrise's Squire page says "Unit 4". Suite F wins until Dontrise says otherwise.
-- D12-02 Phone: `(610) 609-0786`, from the Google Business Profile. The number `(252) 560-9806` is Dontrise's
-  personal text line for Sunday appointments and is never published: it is in no seed value, no page and no
-  email. A test asserts it is absent from every public answer and from the home page source.
+- D12-02 Phone: `(610) 609-0786`, from the Google Business Profile. The owner's personal text line for Sunday
+  appointments (listed in `docs/content/exquisite-site-data.json`) is never published: it is in no seed
+  value, no page and no email. A test asserts it is absent from every public answer and from the home page
+  source. This file does not repeat the number because the repository is public.
 - D12-03 The shop email stays a PLACEHOLDER and no public page shows it. The check is `isPlaceholderEmail` in
   `shared/lib/email.ts`, which compares with the one stand-in address. `/api/shop` then sends an empty email,
   the Visit page drops its Mail line, the JSON-LD leaves `email` out and the calendar file carries no
@@ -844,3 +845,39 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   offers (the panel lists all of them for "first available"). With one shared menu that did not matter; now
   that Nelly does three services and Iniya none, a click on a service the chair cannot do would end in a
   refusal. A chair with no services says so instead of showing an empty box.
+- D12-20 Review fix-up for M1, public booking. A chair chosen before the services (`/book?barber=<slug>` from
+  a printed card, a Lightbox credit or the Book button on a chair page) now lists only that chair's menu, as
+  the owner panel and the walk-in form already did (D12-19); picking Eyebrows after choosing Nelly used to
+  end on "Nothing is open in the next 31 days". A line says "Showing what Nelly Cutz offers." with a "See
+  every service" button, which sets the chair to anyone available and keeps the chosen services. The
+  alternative, routing to the chair step when the chosen services do not fit, was rejected: that step cannot
+  be reached before any service is chosen, and it would drop the chair the customer came for without a word.
+  A chair that takes online bookings but has an empty menu is treated like Iniya: `/book?barber=` that chair
+  moves to anyone available. The three pickers share `offeredServices` in `src/lib/booking/offered.ts`
+  (its own file so the node type check, which has no JSX setting, can import it from a test).
+- D12-21 Review fix-up, address in the calendar file. The "Add to calendar" download on the confirmation page
+  now puts Suite F in LOCATION, like the emailed file, through `addressLine` in `src/lib/shop.ts`, which the
+  Visit and Home meta descriptions use too. The short "Find us" fact in the Home hero stays street only: it
+  is a compact label and the full address with the suite sits in the same section.
+- D12-22 Review fix-up, settings save. The `PUT /api/admin/settings` request schema
+  (`shopSettingsUpdateSchema`) makes `google` optional, and `updateShopSettings` leaves a group the save
+  does not carry as it is. Before, a dashboard tab opened before a deploy (its response schema strips the
+  unknown `google` key) would save the settings back without it and reset the place id and the rating to
+  empty. The audit entry now records the settings as stored after the save. A group added after launch
+  follows the same rule, so `reviews` in milestone 4 must be optional on the request in the same way.
+- D12-23 Review fix-up, small things. Iniya's page title and description no longer promise "next openings";
+  `chairDescription` in `src/lib/seo.ts` ends with her away label ("Book through Instagram."). The
+  new-tab Instagram links (the chair card and the button on her page) say "opens in a new tab" to screen
+  readers; the card's label used to drop that when it had a status. The Kit's disabled sample option is
+  Hot Towel and Steam at $20 instead of the old made up shave.
+- D12-24 "Takes online bookings" is a general switch, not an Iniya special case: any chair with it off shows
+  "Book through Instagram" when it has a handle and "Walk-ins only" when it has none, and is left out of
+  online booking and first available. The checkbox in Team, Profile now says so, and the owner guide too.
+- D12-25 Review claims checked and left as they are. (a) The sitemap keeps `/chairs/iniya` (D12-11): the
+  prompt's "skip her cleanly" is read as "without errors" for the sitemap, because her page is a real public
+  page with a working link to where she books; excluding her needs one filter and one changed test if the
+  lead reads it the other way. (b) The emailed calendar file has no `ORGANIZER` line while the shop email is
+  the placeholder (D12-03): a stand-in address would be an invented mailbox, the state ends the moment
+  Dontrise types a real address in Settings, and no calendar client was tested either way. (c) The personal
+  number stays out of every file this prompt wrote; the tests that assert its absence match a short
+  fragment, and the lead's data file still carries it.

@@ -269,9 +269,9 @@ function Specimen() {
           <OptionCard
             selected={false}
             disabled
-            title="Hot Towel Shave"
+            title="Hot Towel and Steam"
             description="Unavailable today."
-            meta={<span className="exq-price">$40</span>}
+            meta={<span className="exq-price">$20</span>}
           />
         </div>
       </section>

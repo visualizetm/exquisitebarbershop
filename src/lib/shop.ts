@@ -17,6 +17,18 @@ export function directionsUrl(shop: Pick<PublicShop, 'address' | 'name' | 'googl
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
+/** The street address on one line, suite included: "3309 Edgmont Ave, Suite F, Brookhaven, PA 19015". */
+export function addressLine(address: PublicShop['address']): string {
+  return [
+    address.line1,
+    address.line2,
+    address.city,
+    `${address.state} ${address.postalCode}`.trim(),
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
 /** Today's key in shop time, so the hours table highlights the right row for every visitor. */
 export function todayKey(now: Date = new Date()): DayKey {
   const weekday = DateTime.fromJSDate(now).setZone(SHOP_TIMEZONE).weekday; // 1 is Monday

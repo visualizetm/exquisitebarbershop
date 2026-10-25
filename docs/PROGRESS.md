@@ -465,3 +465,11 @@ commit, and what is still open.
   integration, unit and end to end suites, `scripts/` and the Kit; new `tests/integration/realShop.test.ts`,
   `tests/unit/google.test.ts`, `tests/unit/offlineBooking.test.ts`, `tests/e2e/realshop.spec.ts`; the demo
   spec expects the five real names.
+- Review fix-up: the public booking flow lists only the preselected chair's services (with a "See every
+  service" button), the calendar download carries Suite F, a settings save without `google` keeps the stored
+  value, Iniya's page snippet no longer promises openings, the new-tab links say so to screen readers, and the
+  hollow Iniya flag test now has hours and a menu so it fails if the flag is ignored. New tests:
+  `tests/unit/offeredServices.test.ts`, `chairDescription` and `addressLine` unit cases, the settings and Iniya
+  integration cases, and a "a chair only lists the services it does" group in `tests/e2e/realshop.spec.ts`
+  (public flow, owner New booking panel, barber walk-in form). Decisions D12-20 to D12-25. The owner guide PDF
+  is re-rendered in milestone 5.

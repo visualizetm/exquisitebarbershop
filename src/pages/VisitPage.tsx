@@ -11,7 +11,7 @@ import { Status } from '@/components/Status';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
 import { hoursLabel } from '@/lib/hours';
-import { directionsUrl, todayKey } from '@/lib/shop';
+import { addressLine, directionsUrl, todayKey } from '@/lib/shop';
 
 /** One sentence about today, above the table of the whole week. */
 function todayHoursLine(hours: PublicShop['hours']): string {
@@ -25,7 +25,7 @@ export function VisitPage() {
     title: 'Visit',
     description:
       result.status === 'ready'
-        ? `Hours, address and phone for ${result.data.name} at ${result.data.address.line1}, ${result.data.address.city}, ${result.data.address.state} ${result.data.address.postalCode}.`
+        ? `Hours, address and phone for ${result.data.name} at ${addressLine(result.data.address)}.`
         : undefined,
   });
   return (

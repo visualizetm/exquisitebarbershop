@@ -238,3 +238,13 @@ export const shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   updatedAt: true,
 });
 export type ShopSettingsInput = z.input<typeof shopSettingsInputSchema>;
+
+/**
+ * What a settings save may carry. A group added after launch is optional here: a dashboard tab
+ * opened before a deploy does not know it, and its save must leave the stored value alone instead
+ * of resetting it to the empty default (which would wipe the place id and the rating).
+ */
+export const shopSettingsUpdateSchema = shopSettingsInputSchema.extend({
+  google: googleSettingsSchema.optional(),
+});
+export type ShopSettingsUpdate = z.input<typeof shopSettingsUpdateSchema>;

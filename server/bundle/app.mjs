@@ -27884,6 +27884,9 @@ var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   createdAt: true,
   updatedAt: true
 });
+var shopSettingsUpdateSchema = shopSettingsInputSchema.extend({
+  google: googleSettingsSchema.optional()
+});
 
 // server/db/client.ts
 import { MongoClient } from "mongodb";
@@ -28805,11 +28808,11 @@ async function createShopSettingsIfMissing(input2, now2, options) {
   return { created: result.upsertedCount === 1 };
 }
 async function updateShopSettings(input2, now2, options) {
-  const parsed = shopSettingsInputSchema.parse(input2);
+  const { google, ...parsed } = shopSettingsUpdateSchema.parse(input2);
   const col = await collection("shopSettings");
   const updated = await col.findOneAndUpdate(
     { _id: SHOP_SETTINGS_ID },
-    { $set: { ...parsed, updatedAt: now2 } },
+    { $set: { ...parsed, ...google ? { google } : {}, updatedAt: now2 } },
     { returnDocument: "after", ...sessionOf(options) }
   );
   if (!updated) throw new AppError("NOT_FOUND", "Shop settings were not found");
@@ -33860,7 +33863,7 @@ var closureUpsertRequestSchema = external_exports.intersection(
 );
 var closureResponseSchema = external_exports.object({ closure: closureViewSchema }).extend(conflictOutcomeSchema.shape);
 var settingsResponseSchema = external_exports.object({ settings: shopSettingsInputSchema });
-var settingsRequestSchema = shopSettingsInputSchema;
+var settingsRequestSchema = shopSettingsUpdateSchema;
 var overviewStatSchema = external_exports.object({ value: external_exports.int(), compare: external_exports.int().nullable() });
 var activityKindSchema = external_exports.enum(["booked", "canceled", "rescheduled", "noShow", "walkIn"]);
 var activityEntrySchema = external_exports.object({
@@ -37049,6 +37052,7 @@ async function putSettings(principal, input2, meta3) {
   await withTransaction(async (session) => {
     await shopSettingsRepo_exports.updateShopSettings(input2, meta3.now, { session });
   });
+  const after = await getSettings();
   await audit2(
     principal,
     {
@@ -37056,11 +37060,11 @@ async function putSettings(principal, input2, meta3) {
       entityType: "shopSettings",
       entityId: "shop",
       before: before.settings,
-      after: input2
+      after: after.settings
     },
     meta3
   );
-  return getSettings();
+  return after;
 }
 async function listAudit(query) {
   const before = cursors.decode(query.cursor, cursors.isTimeCursor);

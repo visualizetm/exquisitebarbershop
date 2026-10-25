@@ -21,7 +21,7 @@ import {
 } from '../../shared/api/public';
 import { apiErrorSchema } from '../../shared/api/errors';
 import { googleMapsUrl, googleReviewUrl } from '../../shared/lib/google';
-import { shopSettingsRepo, staffRepo } from '../../server/repos';
+import { shopSettingsRepo, staffRepo, weeklyHoursRepo } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
 import { createLogin, sessionCookie } from '../helpers/auth';
 import { call, idemKey, nextDate, phone, slotAt, startTestServer } from '../helpers/bookingApi';
@@ -330,21 +330,39 @@ describe('Iniya takes bookings on Instagram', () => {
     expect(stored?.staffId).not.toBe(iniya);
   });
 
-  it('stays out of first available even when her menu is filled in, because the flag says no', async () => {
+  it('is kept out by the online booking flag itself, not by her empty menu or her closed hours', async () => {
     const all = servicesSeed.map((s) => serviceSeedId(s.key));
+    const hours = await weeklyHoursRepo.getStaffHours(iniya);
+    // Give her what every other chair has: a full menu and the shop's hours.
     await staffRepo.updateStaff(iniya, { serviceIds: all }, NOW);
+    await weeklyHoursRepo.setStaffHours(iniya, shopHoursSeed, NOW);
     try {
       const wed = nextDate(3, 5);
-      const any = availabilityResponseSchema.parse(
-        (await get(`/api/availability?date=${wed}&serviceIds=${haircut}&staff=any`)).body,
-      );
-      expect(any.slots.some((s) => s.staffId === iniya)).toBe(false);
-      const named = availabilityResponseSchema.parse(
-        (await get(`/api/availability?date=${wed}&serviceIds=${haircut}&staff=iniya`)).body,
-      );
-      expect(named.slots).toEqual([]);
+      const query = (staff: string) =>
+        get(`/api/availability?date=${wed}&serviceIds=${haircut}&staff=${staff}`);
+      const slotsOf = async (staff: string) =>
+        availabilityResponseSchema.parse((await query(staff)).body).slots;
+
+      // Control: with the flag on and nothing else changed she has times, by name.
+      await staffRepo.updateStaff(iniya, { acceptsOnlineBooking: true }, NOW);
+      const open = await slotsOf('iniya');
+      expect(open.length).toBeGreaterThan(0);
+
+      // The flag off, and nothing else changed: no times, and a booking at a time that was open
+      // a moment ago is refused.
+      await staffRepo.updateStaff(iniya, { acceptsOnlineBooking: false }, NOW);
+      expect(await slotsOf('iniya')).toEqual([]);
+      expect((await slotsOf('any')).some((s) => s.staffId === iniya)).toBe(false);
+      const refused = await post({
+        serviceIds: [haircut],
+        staff: 'iniya',
+        startAt: open[0]?.startAt ?? '',
+      });
+      expect(apiErrorSchema.parse(refused.body).error.code).toBe('STAFF_UNAVAILABLE');
+      expect(await db().collection('bookings').countDocuments({ staffId: iniya })).toBe(0);
     } finally {
-      await staffRepo.updateStaff(iniya, { serviceIds: [] }, NOW);
+      await staffRepo.updateStaff(iniya, { serviceIds: [], acceptsOnlineBooking: false }, NOW);
+      if (hours) await weeklyHoursRepo.setStaffHours(iniya, hours.days, NOW);
     }
   });
 
@@ -417,6 +435,23 @@ describe('the Google block in the owner settings', () => {
       expect(res.status, JSON.stringify(bad)).toBe(400);
     }
     expect((await current()).google).toEqual(settings.google);
+  });
+
+  it('a save that leaves google out keeps the stored place id and rating', async () => {
+    // An older dashboard tab does not know the group, so its save does not carry it.
+    const { google: _google, ...withoutGoogle } = await current();
+    const res = await put(withoutGoogle);
+    expect(res.status).toBe(200);
+    expect((await current()).google).toEqual(shopSettingsSeed.google);
+    expect(publicShopSchema.parse((await get('/api/shop')).body).google).toEqual(
+      shopSettingsSeed.google,
+    );
+    // A save that does carry it still replaces it.
+    const settings = await current();
+    await put({ ...settings, google: { ...settings.google, reviewCount: 16 } });
+    expect((await current()).google.reviewCount).toBe(16);
+    await put(settings);
+    expect((await current()).google).toEqual(shopSettingsSeed.google);
   });
 
   it('is owner only', async () => {

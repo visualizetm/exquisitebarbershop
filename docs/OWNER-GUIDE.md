@@ -156,6 +156,13 @@ A short recording of this is in `docs/screens/p11/recordings/owner-resolves-aler
 barber off the booking page for the day. Tap a name for Profile, Services,
 Working hours, Time off and Access.
 
+In **Profile**, **Takes online bookings** is for someone who books some other way, like
+Iniya. Turn it off and their card and page say **Book through Instagram** (or
+**Walk-ins only** if you have not given an Instagram handle). They are left out of
+online booking and of "Anyone available". A barber can only be booked for the
+services ticked under **Services**, so the booking page, your New booking panel and
+the barber's walk-in form only list those.
+
 ![The team](screens/p11/guide/o15-team.png)
 
 To give a barber their login:

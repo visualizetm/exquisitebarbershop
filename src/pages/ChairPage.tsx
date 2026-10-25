@@ -26,6 +26,7 @@ import { useShop } from '@/app/useShop';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
 import { offlineBooking } from '@/lib/offlineBooking';
+import { chairDescription } from '@/lib/seo';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 
@@ -58,9 +59,7 @@ export function ChairPage() {
   );
   usePageMeta({
     title: profile?.name ?? 'The chairs',
-    description: profile
-      ? `${profile.name}, ${profile.title} at Exquisite Barber & Beauty Lounge in Brookhaven, PA. ${profile.specialty}. See the next openings and book online.`
-      : undefined,
+    description: profile ? chairDescription(profile) : undefined,
   });
 
   // An old slug (from a printed card) resolves, then the address is replaced with the current one.
@@ -145,6 +144,7 @@ export function ChairPage() {
                 data-away="instagram"
               >
                 {away.label}
+                <span className="exq-visually-hidden"> (opens in a new tab)</span>
               </ButtonAnchor>
             ) : (
               <span className="exq-chair__walk-in">{away?.label}</span>

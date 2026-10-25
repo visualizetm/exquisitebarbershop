@@ -73,7 +73,7 @@ export function ChairCard(props: ChairCardProps) {
         rel="noopener noreferrer"
         className="exq-chaircard"
         data-state={state}
-        aria-label={`${name}, ${badge ?? 'chair'}, ${statusLabel ?? 'opens in a new tab'}`}
+        aria-label={`${name}, ${badge ?? 'chair'}${statusLabel ? `, ${statusLabel}` : ''}, opens in a new tab`}
       >
         {body}
       </a>
