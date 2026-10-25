@@ -24,6 +24,8 @@ export const galleryQuerySchema = z.object({
   staff: z.string().min(1).max(60).optional(),
   cursor: z.string().max(200).optional(),
   limit: z.coerce.number().int().min(1).max(60).default(24),
+  /** The Home order: the photos the shop picked for Home first, then the rest of the gallery. */
+  home: z.stringbool().optional(),
 });
 export const galleryResponseSchema = z.object({
   photos: z.array(galleryPhotoSchema),

@@ -30,6 +30,7 @@ import { offlineBooking } from '@/lib/offlineBooking';
 import { chairDescription } from '@/lib/seo';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
+import { chairWork, SHOP_WORK_MAX } from '@/lib/workPhotos';
 
 export function ChairPage() {
   const { slug = '' } = useParams();
@@ -42,6 +43,17 @@ export function ChairPage() {
   );
   const services = useApi('/api/services', publicServicesResponseSchema);
   const work = useApi(slug ? `/api/gallery?staff=${encoded}&limit=6` : null, galleryResponseSchema);
+  // Nobody credited a photo to this chair yet: the shop's own photos stand in, labeled as such.
+  const shopWork = useApi(
+    work.status === 'ready' && work.data.photos.length === 0
+      ? `/api/gallery?home=true&limit=${String(SHOP_WORK_MAX)}`
+      : null,
+    galleryResponseSchema,
+  );
+  const strip = chairWork(
+    work.status === 'ready' ? work.data.photos : null,
+    shopWork.status === 'ready' ? shopWork.data.photos : null,
+  );
   const profile = result.status === 'ready' ? result.data.staff : null;
   const shop = useShop();
   const phone = (shop.status === 'ready' ? shop.data.phone : __SHOP_PHONE__).replace(/[^\d+]/g, '');
@@ -218,14 +230,29 @@ export function ChairPage() {
         </section>
       ) : null}
 
-      {work.status === 'ready' && work.data.photos.length > 0 ? (
-        <section className="exq-wrap exq-section exq-chair__work" aria-labelledby="exq-chair-work">
-          <SectionHead label="The work" title={`${staff.name}'s work`} id="exq-chair-work">
-            <Link className="exq-link-row" to={`/gallery?staff=${encodeURIComponent(staff.slug)}`}>
-              See all
-            </Link>
-          </SectionHead>
-          <PhotoGrid photos={work.data.photos} columns="work" />
+      {strip ? (
+        <section
+          className="exq-wrap exq-section exq-chair__work"
+          aria-labelledby="exq-chair-work"
+          data-state={strip.source}
+        >
+          {strip.source === 'own' ? (
+            <SectionHead label="The work" title={`${staff.name}'s work`} id="exq-chair-work">
+              <Link
+                className="exq-link-row"
+                to={`/gallery?staff=${encodeURIComponent(staff.slug)}`}
+              >
+                See all
+              </Link>
+            </SectionHead>
+          ) : (
+            <SectionHead label="From the shop" title="The work" id="exq-chair-work">
+              <Link className="exq-link-row" to="/gallery">
+                See the gallery
+              </Link>
+            </SectionHead>
+          )}
+          <PhotoGrid photos={strip.photos} columns="work" />
         </section>
       ) : null}
     </article>

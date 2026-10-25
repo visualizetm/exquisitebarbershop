@@ -21,6 +21,11 @@
   --info: #1f5fad;
   /* gray text on ink: 7.6:1 on --ink */
   --mute-on-dark: #a8a8a8;
+  /*
+   * The scrim between a photo and the text on it (the hero on phones). Even over a pure white
+   * photo, white text keeps 10.2:1, --line 7.2:1 and the red display line (--red-on-dark) 3.3:1.
+   */
+  --scrim-photo: color-mix(in srgb, var(--ink) 80%, transparent);
 
   --font: 'Jost Variable', 'Jost', system-ui, sans-serif;
 

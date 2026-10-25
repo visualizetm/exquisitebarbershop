@@ -493,3 +493,37 @@ commit, and what is still open.
   `tests/integration/barberPrices.test.ts` (override price and time on the booking, emails, admin and manage
   views, first available, reschedule, validation, owner only), `tests/e2e/prices.spec.ts`; the Prices tab is in
   the Team axe run and `/kit` lists the new section. Decisions D12-26 to D12-40.
+
+### M3: seed photos
+
+- Shipped: `server/services/seedPhotos.ts` loads `seed/photos/manifest.json` (or SEED_PHOTOS_DIR) through the
+  active storage driver as normal photo records (kind, alt, sortOrder and the new optional `home` flag from the
+  manifest, no chair, width and height from the WebP header via `server/lib/webpSize.ts`, no new dependency). It
+  is idempotent (`_id = seedId('photo', file)`; an existing record, even a deleted one, is kept, and the hero
+  only fills an empty slot), skips missing files with one warning that names them, and never throws for a
+  missing file, manifest or storage. Object keys come from the database, the file and its bytes. Server writes
+  go through `storePhotoBytes` (shared with photos:migrate; Cloudinary gets the signed form).
+- Hooks: bootstrap's demo branch runs it, so the first visit setup and Demo data, Reset both load the photos;
+  `npm run photos:seed` (`scripts/photos-seed.ts`) does it for a real launch. DEPLOY.md section 11 says how,
+  and that the live showcase needs a Reset after deploy.
+- Bundle: `vercel.json` `includeFiles` is `{server/bundle/**,seed/photos/**}`; the loader reads the folder at
+  run time. `test:vercel-function` copies the `includeFiles` set into the nft shape, reads Vercel's
+  `filePathMap` for the `vercel build` shape (that is where `vercel build` lists included files), and proves
+  in both that setup serves `exq-01-hero.webp` byte for byte and seeds every delivered gallery photo.
+- Placements: the hero with a photo is an ink band; on phones and tablets the photo fills it behind
+  `--scrim-photo` (new token, contrast worked out in DESIGN-SYSTEM.md) and the small labels turn white; from
+  1024px it sits in its own column. The hero photo lost its reveal wrapper (LCP). Home "the work" asks
+  `/api/gallery?home=true` (marked photos first) and shows six, or one row of three with three to five, or
+  nothing under three. A chair page shows its credited work, else up to three shop photos labeled "From the
+  shop", else nothing. Gallery chips already hide while nobody is credited. Crops: hero `85% 30%`, tiles
+  `50% 35%` (checked on a contact sheet of all 15 photos). Visit has no storefront slot (open item).
+- Photos: the milestone started with 3 of 16; the lead added the rest during it (a83d278) and dropped
+  exq-15 (b25a294), so all 15 manifest photos load now and Home shows the six marked photos.
+- Tests: `tests/unit/webpSize.test.ts`, `tests/unit/workPhotos.test.ts`, `tests/integration/seedPhotos.test.ts`
+  (stores, sizes, idempotent, keeps deleted and owner heroes, picks up a new file, one warning, never throws,
+  the public API in manifest and Home order), demo setup and reset cases in `tests/integration/demo.test.ts`
+  (fixture folder), and the demo e2e now reads the manifest for what to expect (not run in this milestone).
+  Full vitest 579 passed; build and `test:vercel-function` (97 passed) green. Decisions D12-41 to D12-55.
+- Known gaps for milestone 5: no screenshots yet of the new hero, Home work and chair strips (Rob's rule: no
+  Playwright until milestone 5); Website, Home photo still previews the phone hero as a 4:5 frame while phones
+  now show the photo behind the text; the owner cannot change the Home pick in the dashboard yet.

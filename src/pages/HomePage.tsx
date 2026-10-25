@@ -21,6 +21,7 @@ import {
   SectionHead,
 } from '@/components/ui';
 import { menuServices } from '@/lib/menuPrices';
+import { HOME_WORK_MAX, homeWork } from '@/lib/workPhotos';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
@@ -38,7 +39,12 @@ export function HomePage() {
   });
   const staff = useApi('/api/staff', publicStaffListResponseSchema);
   const services = useApi('/api/services', publicServicesResponseSchema);
-  const gallery = useApi('/api/gallery?limit=6', galleryResponseSchema);
+  // Home order: the photos the shop picked for Home first, then the rest of the gallery.
+  const gallery = useApi(
+    `/api/gallery?home=true&limit=${String(HOME_WORK_MAX)}`,
+    galleryResponseSchema,
+  );
+  const work = gallery.status === 'ready' ? homeWork(gallery.data.photos) : [];
   const data = shop.status === 'ready' ? shop.data : null;
   const hero = data?.heroPhoto ?? null;
   const today = data ? data.hours[todayKey()] : null;
@@ -46,8 +52,10 @@ export function HomePage() {
 
   return (
     <article className="exq-home" data-state={shop.status}>
+      {/* With a photo the hero is an ink band: on phones the photo fills it behind a scrim, from
+          1024px it sits in its own column. Without one the text stands alone on the page. */}
       <section
-        className="exq-hero exq-home__hero"
+        className={`exq-hero exq-home__hero${hero ? ' exq-dark' : ''}`}
         data-state={hero ? 'photo' : 'text'}
         aria-labelledby="exq-hero-title"
       >
@@ -107,14 +115,16 @@ export function HomePage() {
             </dl>
           </div>
           {hero ? (
-            <Reveal kind="wipe" className="exq-hero__photo">
+            // The LCP image: eager, fetchpriority high, its own width and height, never hidden by
+            // a reveal.
+            <div className="exq-hero__photo">
               <PhotoFrame
                 photo={hero}
                 name="The shop"
                 priority
                 sizes="(min-width: 1024px) 480px, 100vw"
               />
-            </Reveal>
+            </div>
           ) : null}
         </div>
       </section>
@@ -157,14 +167,18 @@ export function HomePage() {
         </div>
       </section>
 
-      {gallery.status === 'ready' && gallery.data.photos.length > 0 ? (
-        <section className="exq-wrap exq-section exq-home__work" aria-labelledby="exq-home-work">
+      {work.length > 0 ? (
+        <section
+          className="exq-wrap exq-section exq-home__work"
+          aria-labelledby="exq-home-work"
+          data-count={String(work.length)}
+        >
           <SectionHead label="The work" title="Fresh from the chairs" id="exq-home-work">
             <Link className="exq-link-row" to="/gallery">
               See the gallery
             </Link>
           </SectionHead>
-          <PhotoGrid photos={gallery.data.photos} columns="work" />
+          <PhotoGrid photos={work} columns="work" />
         </section>
       ) : null}
 

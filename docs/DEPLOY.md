@@ -290,6 +290,27 @@ the manage link on screen (no email is sent); the daily backup is skipped
 (photos and data live in the same database); photos are limited to 3 MB after
 the browser resize and are served by the site itself.
 
+### The shop's real photos (seed/photos)
+
+The setup on the first visit and Settings, Demo data, **Reset demo data** both
+load the shop's real photos from `seed/photos` (the WebP files named in
+`seed/photos/manifest.json`, shipped with the function) as normal photos: the
+hero, the gallery, and the ones picked for Home. A file the manifest names that
+is not in the folder is skipped, with one warning in the log that lists them.
+
+- After a deploy that changes the seed (the team, the prices, the photos), the
+  live showcase only shows it after **Reset demo data**: the database it set up
+  earlier keeps what it had. Reset, then check `/api/health`.
+- Photos delivered: all 15 in the manifest (the hero and 14 gallery photos;
+  `exq-15-part-taper` was dropped as a copy of `exq-12-hard-part`). To add or
+  replace one later: put the WebP in `seed/photos/` (1600px on the long edge,
+  under 3 MB), add or keep its line in `manifest.json`, commit, deploy, then
+  Reset demo data (or run `npm run photos:seed`, below). A replaced file only
+  shows after a Reset: the loader keeps a photo it already recorded.
+- Home's "the work" shows the six photos marked `"home": true`, in manifest
+  order. With fewer than three gallery photos it stays out, and with three to
+  five it shows one row of three.
+
 ### Leaving the showcase for a real launch
 
 The demo database holds sample data, a demo owner and the demo photos. Do not
@@ -312,7 +333,15 @@ sections 2 to 6, or clear this one:
 
 Photos stored in GridFS do not move to R2 by themselves: switching
 STORAGE_DRIVER only changes where new photos go, and clearing the demo data
-removes the old ones. Upload the real photos again once R2 is on.
+removes the old ones. Load the shop's photos into the new storage with
+`npm run photos:seed`, from a computer with the production variables in `.env`
+(MONGODB_URI, MONGODB_DB_NAME, MANAGE_LINK_SECRET, APP_BASE_URL, STORAGE_DRIVER
+and that driver's variables). It reads `seed/photos` (or SEED_PHOTOS_DIR), stores
+every file that is there through the storage driver, prints what it added, what
+was already there and which files are still missing, and is safe to run again:
+a photo already on record is kept (also one the owner deleted), and the hero is
+only added while the site has no home photo. Run it again after more photos are
+added to the folder. Then upload anything else in Website, Photos.
 
 ## 12. How the function is built, and how it is checked
 
@@ -327,10 +356,14 @@ a file extension. So nothing under `server/` ships as separate files:
   cannot load, it answers JSON `FUNCTION_LOAD_FAILED` instead of Vercel's error page.
 - `vercel.json` rewrites `/api/(.*)` to the function (Vercel's own routing sends only one-segment
   paths to a catch-all file), rewrites everything else to `index.html`, and includes the bundle
-  in the function.
+  and the shop's seed photos in the function (`includeFiles`:
+  `{server/bundle/**,seed/photos/**}`). The seed photo loader reads `seed/photos` from the
+  function's working directory at run time, so adding a photo needs no bundle rebuild.
 - After changing anything in `server/`, `shared/` or `seed/`, run `npm run build:api` and commit
   `server/bundle/app.mjs`. CI rebuilds it and fails if the committed copy differs.
 - `npm run test:vercel-function` runs the function under plain `node` from a directory holding
-  only what Vercel would ship (the traced files, and the output of `vercel build`), calls
-  `/api/health`, the demo flow and the upload path, and replays Vercel's routing table. It is a
+  only what Vercel would ship (the traced files plus `includeFiles`, and the output of
+  `vercel build`), calls `/api/health`, the demo flow (including the seeded hero photo, byte for
+  byte, from `seed/photos/exq-01-hero.webp`) and the upload path, and replays Vercel's routing
+  table. It is a
   required CI step. If it fails, the site would have been down.

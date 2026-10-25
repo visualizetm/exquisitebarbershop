@@ -1,6 +1,16 @@
+import { existsSync, readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { staffIds, uploadSamplePhoto } from '../photos';
+
+/** The seed photos that were delivered to seed/photos: demo setup and Reset load exactly these. */
+const SEED = (
+  JSON.parse(readFileSync('seed/photos/manifest.json', 'utf8')) as {
+    photos: { file: string; kind: string; alt: string }[];
+  }
+).photos.filter((photo) => existsSync(`seed/photos/${photo.file}`));
+const SEED_HERO = SEED.find((photo) => photo.kind === 'hero') ?? null;
+const SEED_GALLERY = SEED.filter((photo) => photo.kind === 'gallery').length;
 
 /**
  * The showcase on a production-like build: https, the Vercel headers, production rules, an EMPTY
@@ -114,9 +124,14 @@ test('every public page renders with intentional placeholders and no console err
   const errors = watchConsole(page);
   await page.goto('/');
   await expectUp(page);
-  // No photos yet: the text hero stands alone, and the work section is hidden.
-  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
-  await expect(page.locator('.exq-home__work')).toHaveCount(0);
+  // The delivered seed photos: the hero shows its photo, and "the work" waits for three photos.
+  await expect(
+    page.locator(`.exq-hero[data-state="${SEED_HERO ? 'photo' : 'text'}"]`),
+  ).toBeVisible();
+  if (SEED_HERO) {
+    await expect(page.locator('.exq-hero__photo img')).toHaveAttribute('alt', SEED_HERO.alt);
+  }
+  await expect(page.locator('.exq-home__work')).toHaveCount(SEED_GALLERY >= 3 ? 1 : 0);
 
   await page.goto('/services');
   await expectUp(page);
@@ -132,7 +147,13 @@ test('every public page renders with intentional placeholders and no console err
   await expectUp(page);
   await expect(page.getByRole('heading', { name: 'Lee', exact: true })).toBeVisible();
   await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
-  await expect(page.locator('.exq-chair__work')).toHaveCount(0);
+  // Nothing is credited to Lee, so the shop's photos stand in, labeled "From the shop".
+  await expect(page.locator('.exq-chair__work[data-state="shop"]')).toHaveCount(
+    SEED_GALLERY > 0 ? 1 : 0,
+  );
+  if (SEED_GALLERY > 0) {
+    await expect(page.locator('.exq-chair__work')).toContainText('From the shop');
+  }
 
   // Iniya takes bookings on Instagram: her page says so and has no Book button.
   await page.goto('/chairs/iniya');
@@ -146,7 +167,13 @@ test('every public page renders with intentional placeholders and no console err
 
   await page.goto('/gallery');
   await expectUp(page);
-  await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();
+  if (SEED_GALLERY > 0) {
+    await expect(page.locator('.exq-photo-grid__item')).toHaveCount(Math.min(SEED_GALLERY, 30));
+    // Nobody is credited yet, so there are no barber filter chips.
+    await expect(page.locator('.exq-gallery .exq-chips')).toHaveCount(0);
+  } else {
+    await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();
+  }
 
   await page.goto('/visit');
   await expectUp(page);
@@ -458,10 +485,20 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
   await page.context().clearCookies();
   await page.goto('/chairs/lee');
   await expect(page.locator('.exq-chair .exq-photoframe[data-state="placeholder"]')).toBeVisible();
+  // The uploads are gone and the seed photos are back.
   await page.goto('/gallery');
-  await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();
+  await expect(page.locator('.exq-photo-grid__button img[alt="A skin fade by Lee"]')).toHaveCount(
+    0,
+  );
+  if (SEED_GALLERY === 0)
+    await expect(page.locator('.exq-state[data-state="empty"]')).toBeVisible();
   await page.goto('/');
-  await expect(page.locator('.exq-hero[data-state="text"]')).toBeVisible();
+  await expect(
+    page.locator(`.exq-hero[data-state="${SEED_HERO ? 'photo' : 'text'}"]`),
+  ).toBeVisible();
+  if (SEED_HERO) {
+    await expect(page.locator('.exq-hero__photo img')).toHaveAttribute('alt', SEED_HERO.alt);
+  }
   await expectUp(page);
   expect(errors).toEqual([]);
 });

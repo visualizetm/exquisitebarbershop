@@ -40,7 +40,10 @@ export interface StorageDriver {
   /** Null when the object does not exist. */
   head(key: string): Promise<StoredObject | null>;
   delete(key: string): Promise<void>;
-  /** Server-side write, for backups and the doctor. Photos never go through here. */
+  /**
+   * Server-side write, for backups, the doctor and the seed photo loader. Uploads from the dashboard
+   * never go through here. Cloudinary rejects it (see storePhotoBytes).
+   */
   put(key: string, bytes: Uint8Array, contentType: string): Promise<void>;
   /** Null when the object does not exist. */
   get(key: string): Promise<Uint8Array | null>;

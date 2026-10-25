@@ -3,15 +3,22 @@ import { resetEnvCache } from '../../server/env';
 import { COLLECTIONS } from '../../server/db/indexes';
 import { systemStateRepo, usersRepo } from '../../server/repos';
 import { resetDemoReadyCache } from '../../server/services/demo';
+import { seedPhotoId } from '../../server/services/seedPhotos';
 import { resetStorageCache } from '../../server/storage';
 import { MONGO_MAX_BYTES } from '../../server/storage/mongo';
 import { apiErrorSchema } from '../../shared/api/errors';
 import { DEMO_PIN } from '../../shared/lib/pin';
 import { meResponseSchema } from '../../shared/api/auth';
-import { adminPhotoResponseSchema, uploadUrlResponseSchema } from '../../shared/api/photos';
+import {
+  adminPhotoListResponseSchema,
+  adminPhotoResponseSchema,
+  galleryResponseSchema,
+  uploadUrlResponseSchema,
+} from '../../shared/api/photos';
 import { publicShopSchema, publicStaffListResponseSchema } from '../../shared/api/public';
 import { call, startTestServer, type TestServer } from '../helpers/bookingApi';
 import { useTestDb } from '../helpers/db';
+import { makeSeedPhotoDir } from '../helpers/seedPhotoFixtures';
 
 /**
  * Showcase mode on an empty database: no seed script, no setup page. The first request sets
@@ -20,6 +27,27 @@ import { useTestDb } from '../helpers/db';
 const CRON = 'test-cron-secret-0123456789abcdef0123456789';
 process.env.CRON_SECRET = CRON;
 process.env.OUTBOX_AFTER_RESPONSE = 'off';
+// The shop's photos come from a fixture folder: a hero and a Home photo, and one file not delivered.
+process.env.SEED_PHOTOS_DIR = makeSeedPhotoDir([
+  { file: 'exq-01-hero.webp', kind: 'hero', alt: 'The shop', sortOrder: 0, size: [1200, 1600] },
+  {
+    file: 'exq-02-waves.webp',
+    kind: 'gallery',
+    alt: 'Waves',
+    sortOrder: 10,
+    home: true,
+    size: null,
+  },
+  {
+    file: 'exq-09-color.webp',
+    kind: 'gallery',
+    alt: 'Color',
+    sortOrder: 80,
+    home: true,
+    size: [1290, 1290],
+  },
+]);
+const SEEDED = [seedPhotoId('exq-01-hero.webp'), seedPhotoId('exq-09-color.webp')].sort();
 const { db } = useTestDb();
 let server: TestServer;
 
@@ -59,6 +87,7 @@ beforeAll(async () => {
   demoEnv(true);
 });
 afterAll(async () => {
+  Reflect.deleteProperty(process.env, 'SEED_PHOTOS_DIR');
   process.env.DEMO_MODE = 'false';
   process.env.STORAGE_DRIVER = 'local';
   resetEnvCache();
@@ -98,6 +127,18 @@ describe('auto setup on an empty database', () => {
     expect(locks).toBeGreaterThan(bookings.length);
     expect(new Set(bookings.map((b) => b.source as string))).toContain('online');
     expect((await systemStateRepo.getDemoRecord())?.runs).toBe(1);
+
+    // The seed photos that exist were loaded into GridFS and show on the site; the missing one is skipped.
+    const photos = await db().collection('photos').find({}).toArray();
+    expect(photos.map((p) => p._id as unknown as string).sort()).toEqual(SEEDED);
+    expect(await db().collection('media.files').countDocuments()).toBe(2);
+    const hero = publicShopSchema.parse(shop.body).heroPhoto;
+    expect(hero).toMatchObject({ id: seedPhotoId('exq-01-hero.webp'), width: 1200, height: 1600 });
+    expect((await fetch(hero?.url ?? '')).status).toBe(200);
+    const gallery = galleryResponseSchema.parse(
+      (await call(server.baseUrl, 'GET', '/api/gallery?home=true')).body,
+    );
+    expect(gallery.photos.map((p) => p.alt)).toEqual(['Color']);
   });
 
   it('seeds exactly once when several cold starts arrive together', async () => {
@@ -198,8 +239,14 @@ describe('photos in MongoDB (GridFS)', () => {
     const { photo } = await uploadHero(cookie, bytes);
     expect(photo.url).toMatch(/\/api\/media\/[0-9a-f-]{36}\.webp$/);
 
+    // The seeded hero stays first until the Home photo panel removes it after a replace.
     const shop = publicShopSchema.parse((await call(server.baseUrl, 'GET', '/api/shop')).body);
-    expect(shop.heroPhoto?.url).toBe(photo.url);
+    expect(shop.heroPhoto?.id).toBe(seedPhotoId('exq-01-hero.webp'));
+    const heroes = adminPhotoListResponseSchema.parse(
+      (await call(server.baseUrl, 'GET', '/api/admin/photos?kind=hero', { headers: { cookie } }))
+        .body,
+    ).photos;
+    expect(heroes.map((p) => p.url)).toContain(photo.url);
 
     const media = await fetch(photo.url);
     expect(media.status).toBe(200);
@@ -227,6 +274,7 @@ describe('photos in MongoDB (GridFS)', () => {
 
   it('refuses anything over 3 MB, bad signatures, and bytes that are not an image', async () => {
     const cookie = await demoSignIn();
+    const storedBefore = await db().collection('media.files').countDocuments();
     const tooBig = await call(server.baseUrl, 'POST', '/api/admin/photos/upload-url', {
       headers: { cookie },
       body: { kind: 'hero', contentType: 'image/webp', size: MONGO_MAX_BYTES + 1 },
@@ -262,7 +310,7 @@ describe('photos in MongoDB (GridFS)', () => {
     });
     expect(huge.status).toBe(413);
     // Nothing was stored for any of them.
-    expect(await db().collection('media.files').countDocuments()).toBe(0);
+    expect(await db().collection('media.files').countDocuments()).toBe(storedBefore);
   });
 
   it('skips the backup in the daily job and says so in the doctor', async () => {
@@ -314,7 +362,7 @@ describe('reset and clear', () => {
       headers: { 'content-type': 'application/octet-stream', origin: server.baseUrl },
       body: webp(),
     });
-    expect(await db().collection('media.files').countDocuments()).toBe(1);
+    expect(await db().collection('media.files').countDocuments()).toBe(3);
     const before = await systemStateRepo.getDemoRecord();
 
     const reset = await call(server.baseUrl, 'POST', '/api/admin/demo/reset', {
@@ -324,8 +372,10 @@ describe('reset and clear', () => {
     expect(reset.status).toBe(200);
 
     expect(await db().collection('services').countDocuments()).toBe(15);
-    expect(await db().collection('media.files').countDocuments()).toBe(0);
-    expect(await db().collection('photos').countDocuments()).toBe(0);
+    // The upload is gone; the seed photos were loaded again.
+    expect(await db().collection('media.files').countDocuments()).toBe(2);
+    const photos = await db().collection('photos').find({}).toArray();
+    expect(photos.map((p) => p._id as unknown as string).sort()).toEqual(SEEDED);
     expect(await db().collection('bookings').countDocuments()).toBeGreaterThanOrEqual(5);
     expect((await systemStateRepo.getDemoRecord())?.runs).toBe((before?.runs ?? 0) + 1);
     // Still signed in as the same owner.

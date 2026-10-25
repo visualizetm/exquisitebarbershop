@@ -25,6 +25,10 @@ import { MongoMemoryReplSet } from 'mongodb-memory-server';
  *      deploy whose bundle cannot load (JSON FUNCTION_LOAD_FAILED, never a crash).
  *   4. Replays Vercel's generated routing table (.vercel/output/config.json) for page and API
  *      paths of every depth: all of /api must reach the function, everything else index.html.
+ *
+ * The shop's seed photos (seed/photos, read at run time by the seed photo loader) ship through
+ * vercel.json `includeFiles`. Vercel's build honors it; nft does not trace data files, so the nft
+ * shape copies the same files in, and both shapes prove the demo setup loads a real photo.
  */
 const ROOT = process.cwd();
 const ENTRY = 'api/index.js';
@@ -39,6 +43,9 @@ const FORBIDDEN = [
   '@vercel/nft',
 ];
 const SITE = 'https://exquisitebarbershop.visualizeclients.com';
+/** The only files under seed/ allowed to ship: the photos and their manifest, which are data. */
+const SEED_PHOTO_FILE = /^\/?seed\/photos\/(?:[a-z0-9-]+\.webp|manifest\.json)$/;
+const HERO_FILE = 'seed/photos/exq-01-hero.webp';
 const results = [];
 
 function check(name, ok, detail = '') {
@@ -171,6 +178,31 @@ async function suite(label, dir, dbName, replSet) {
       shop.json?.name ?? shop.json?.error?.code,
     );
     check(`${p} demo env: the shop says demo`, shop.json?.demo === true);
+    // The setup loaded the real seed photos that ship with the function.
+    const seededHero = shop.json?.heroPhoto ?? null;
+    check(
+      `${p} demo env: the seeded hero photo is in the shop answer`,
+      seededHero?.url?.startsWith(`${SITE}/api/media/`) &&
+        seededHero.width === 1200 &&
+        seededHero.height === 1600,
+      seededHero ? `${String(seededHero.width)}x${String(seededHero.height)}` : 'none',
+    );
+    const heroBytes = await call('GET', (seededHero?.url ?? '').replace(SITE, ''));
+    check(
+      `${p} demo env: the seeded hero serves the bytes of ${HERO_FILE}`,
+      heroBytes.status === 200 && heroBytes.buffer.equals(await readFile(join(ROOT, HERO_FILE))),
+      `${String(heroBytes.status)} ${String(heroBytes.buffer.length)} bytes`,
+    );
+    const manifest = JSON.parse(await readFile(join(ROOT, 'seed/photos/manifest.json'), 'utf8'));
+    const delivered = manifest.photos.filter(
+      (photo) => photo.kind === 'gallery' && existsSync(join(ROOT, 'seed/photos', photo.file)),
+    ).length;
+    const gallery = await call('GET', '/api/gallery?limit=60');
+    check(
+      `${p} demo env: every delivered gallery photo was seeded`,
+      gallery.status === 200 && gallery.json?.total === delivered,
+      `${String(gallery.json?.total)} of ${String(delivered)}`,
+    );
     check(
       `${p} demo env: the answer says noindex`,
       shop.headers.get('x-robots-tag') === 'noindex, nofollow',
@@ -239,10 +271,9 @@ async function suite(label, dir, dbName, replSet) {
       confirmed.status === 201,
       String(confirmed.status),
     );
-    const shop2 = await call('GET', '/api/shop');
-    const photoUrl = shop2.json?.heroPhoto?.url ?? '';
+    const photoUrl = confirmed.json?.photo?.url ?? '';
     check(
-      `${p} demo env: the hero photo is in the shop answer`,
+      `${p} demo env: the upload has a public address`,
       photoUrl.startsWith(`${SITE}/api/media/`),
       photoUrl,
     );
@@ -334,6 +365,26 @@ function route(config, has, pathname) {
   return { kind: 'none', path };
 }
 
+/**
+ * What vercel.json `includeFiles` adds to the function. Vercel's build honors it and nft does not,
+ * so the nft shape copies these in too. Only the shape this project uses is understood: a brace
+ * list of "<folder>/**".
+ */
+async function includedFiles() {
+  const config = JSON.parse(await readFile(join(ROOT, 'vercel.json'), 'utf8'));
+  const pattern = config.functions?.[ENTRY]?.includeFiles ?? '';
+  const out = [];
+  for (const glob of pattern
+    .replace(/^\{|\}$/g, '')
+    .split(',')
+    .filter(Boolean)) {
+    const folder = /^([\w./-]+)\/\*\*$/.exec(glob)?.[1];
+    if (!folder) throw new Error(`includeFiles pattern this test does not understand: ${glob}`);
+    if (existsSync(join(ROOT, folder))) out.push(...(await filesUnder(ROOT, folder)));
+  }
+  return out;
+}
+
 async function filesUnder(dir, prefix = '') {
   const out = [];
   for (const entry of await readdir(join(dir, prefix), { withFileTypes: true })) {
@@ -361,8 +412,17 @@ try {
   check('trace: includes the argon2 native binary', argon.length > 0, argon[0] ?? 'none');
   const dev = files.filter((f) => FORBIDDEN.some((name) => f.startsWith(`node_modules/${name}/`)));
   check('trace: includes no dev-only package', dev.length === 0, dev.slice(0, 3).join(', '));
-  const source = files.filter(
-    (f) => /^(server|shared|seed|src)\//.test(f) && !f.startsWith('server/bundle/'),
+  const included = await includedFiles();
+  check(
+    'trace: vercel.json includeFiles adds the seed photos',
+    included.includes('seed/photos/manifest.json') && included.includes(HERO_FILE),
+    `${String(included.filter((f) => f.startsWith('seed/')).length)} seed files`,
+  );
+  const source = [...files, ...included].filter(
+    (f) =>
+      /^(server|shared|seed|src)\//.test(f) &&
+      !f.startsWith('server/bundle/') &&
+      !SEED_PHOTO_FILE.test(f),
   );
   check('trace: no loose source file ships', source.length === 0, source.slice(0, 3).join(', '));
   const data = files.filter((f) => f.startsWith('.data/'));
@@ -375,7 +435,7 @@ try {
 
   const traced = await mkdtemp(join(tmpdir(), 'exq-vercel-nft-'));
   cleanup.push(traced);
-  for (const file of new Set([...files, 'package.json'])) {
+  for (const file of new Set([...files, ...included, 'package.json'])) {
     const target = join(traced, file);
     await mkdir(dirname(target), { recursive: true });
     await cp(join(ROOT, file), target, { dereference: true });
@@ -424,7 +484,14 @@ try {
       vcConfig.handler === ENTRY && /^nodejs22/.test(vcConfig.runtime),
       `${vcConfig.handler} ${vcConfig.runtime}`,
     );
-    const shipped = await filesUnder(fn);
+    // `vercel build` does not copy `includeFiles` into the function directory: the Build Output API
+    // lists them in .vc-config.json `filePathMap` (function path to source path), and the deploy
+    // uploads them from there. Count them as shipped and copy them in the same way below.
+    const filePathMap = vcConfig.filePathMap ?? {};
+    const shipped = [
+      ...(await filesUnder(fn)),
+      ...Object.keys(filePathMap).map((file) => `/${file}`),
+    ];
     check('vercel build: the bundle ships', shipped.includes('/server/bundle/app.mjs'));
     check(
       'vercel build: no local upload data ships',
@@ -437,8 +504,15 @@ try {
     check(
       'vercel build: no loose source ships',
       !shipped.some(
-        (f) => /^\/(server|shared|seed|src)\//.test(f) && !f.startsWith('/server/bundle/'),
+        (f) =>
+          /^\/(server|shared|seed|src)\//.test(f) &&
+          !f.startsWith('/server/bundle/') &&
+          !SEED_PHOTO_FILE.test(f),
       ),
+    );
+    check(
+      'vercel build: the seed photos ship (includeFiles)',
+      shipped.includes('/seed/photos/manifest.json') && shipped.includes(`/${HERO_FILE}`),
     );
 
     // 4. Vercel's routing table for page and API paths of every depth.
@@ -505,6 +579,10 @@ try {
     const copy = await mkdtemp(join(tmpdir(), 'exq-vercel-out-'));
     cleanup.push(copy);
     await cp(fn, copy, { recursive: true, dereference: true });
+    for (const [file, from] of Object.entries(filePathMap)) {
+      await mkdir(dirname(join(copy, file)), { recursive: true });
+      await cp(join(ROOT, from), join(copy, file), { dereference: true });
+    }
     await addInvoker(copy);
     await suite('vercel build', copy, 'exquisite_production_vc', replSet);
   }

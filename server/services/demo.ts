@@ -291,7 +291,8 @@ export async function ensureDemoReady(
 
 /**
  * "Reset demo data": wipes the shop, photos and sample bookings and loads the seed
- * again from scratch. The owner login (and its session) stays, so the person who
+ * again from scratch, the photos in seed/photos included (bootstrap runs the seed photo
+ * loader). The owner login (and its session) stays, so the person who
  * pressed the button is still signed in.
  */
 export async function resetDemoData(

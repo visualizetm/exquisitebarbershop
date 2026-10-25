@@ -971,8 +971,8 @@ var require_db_connections = __commonJS({
         clearTimeout(idleTimeout);
         idleTimeoutResolve();
       }
-      const promise2 = new Promise((resolve2) => {
-        idleTimeoutResolve = resolve2;
+      const promise2 = new Promise((resolve3) => {
+        idleTimeoutResolve = resolve3;
       });
       const deadline = (0, import_deadline.getDeadline)();
       const remainingDuration = deadline ? deadline.getTime() - Date.now() - 1e3 : maximumDuration;
@@ -1196,7 +1196,7 @@ var require_websocket = __commonJS({
         noServer: true,
         maxPayload: options.maxPayload ?? DEFAULT_MAX_PAYLOAD
       });
-      const ws = await new Promise((resolve2, reject) => {
+      const ws = await new Promise((resolve3, reject) => {
         const cleanup = () => {
           socket.removeListener("error", onError);
           socket.removeListener("close", onClose);
@@ -1213,7 +1213,7 @@ var require_websocket = __commonJS({
         };
         const resolveUpgrade = (ws2) => {
           cleanup();
-          resolve2(ws2);
+          resolve3(ws2);
         };
         const onError = (err) => rejectUpgrade(err);
         const onClose = () => rejectUpgrade(
@@ -6401,7 +6401,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve2) {
+function isRecursive(inst, stack, resolve3) {
   const cached4 = recursive.get(inst);
   if (cached4 !== void 0)
     return cached4 ? PROVEN : NONE;
@@ -6411,7 +6411,7 @@ function isRecursive(inst, stack, resolve2) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve2);
+      const answer = isRecursive(child, stack, resolve3);
       if (answer > result)
         result = answer;
     }
@@ -6422,7 +6422,7 @@ function isRecursive(inst, stack, resolve2) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve2) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve3) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -6486,7 +6486,7 @@ function isRecursive(inst, stack, resolve2) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve2 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve3 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -27934,6 +27934,11 @@ var photoDocumentSchema = external_exports.object({
   height: external_exports.int().min(1).max(1e4),
   alt: external_exports.string().trim().min(1).max(200),
   sortOrder: external_exports.int().min(0),
+  /**
+   * Gallery photos the shop picked for the Home page ("the work"). Set by the seed photo loader
+   * from the manifest; photos without it still fill Home after the picked ones.
+   */
+  home: external_exports.boolean().optional(),
   createdBy: actorSchema,
   createdAt: external_exports.date(),
   /** Soft delete. The object is removed from storage afterwards (purgedAt). */
@@ -30577,7 +30582,7 @@ __export(photosRepo_exports, {
 });
 async function insertPhoto(input2, now2, options) {
   const doc = photoDocumentSchema.parse({
-    _id: newId(),
+    _id: options?.id ?? newId(),
     ...input2,
     createdAt: now2,
     deletedAt: null,
@@ -32353,13 +32358,13 @@ async function writeMedia(key, bytes, contentType) {
   const bucket = bucketOf(db);
   for (const old of await findFiles(db, { filename: key })) await bucket.delete(old._id);
   const mediaId = mediaIdOf(key);
-  await new Promise((resolve2, reject) => {
+  await new Promise((resolve3, reject) => {
     const stream = bucket.openUploadStream(key, {
       metadata: { contentType, ...mediaId ? { mediaId } : {} }
     });
     stream.on("error", reject);
     stream.on("finish", () => {
-      resolve2();
+      resolve3();
     });
     stream.end(Buffer.from(bytes));
   });
@@ -32622,7 +32627,7 @@ var AwsClient = class {
       if (res.status < 500 && res.status !== 429) {
         return res;
       }
-      await new Promise((resolve2) => setTimeout(resolve2, Math.random() * this.initRetryMs * Math.pow(2, i)));
+      await new Promise((resolve3) => setTimeout(resolve3, Math.random() * this.initRetryMs * Math.pow(2, i)));
     }
     throw new Error("An unknown error occurred, ensure retries is not negative");
   }
@@ -33577,7 +33582,9 @@ var galleryQuerySchema = external_exports.object({
   /** A staff slug or alias. */
   staff: external_exports.string().min(1).max(60).optional(),
   cursor: external_exports.string().max(200).optional(),
-  limit: external_exports.coerce.number().int().min(1).max(60).default(24)
+  limit: external_exports.coerce.number().int().min(1).max(60).default(24),
+  /** The Home order: the photos the shop picked for Home first, then the rest of the gallery. */
+  home: external_exports.stringbool().optional()
 });
 var galleryResponseSchema = external_exports.object({
   photos: external_exports.array(galleryPhotoSchema),
@@ -35205,7 +35212,7 @@ async function seedWithLock(setup, now2) {
     if (Date.now() > deadline) {
       throw new AppError("CONFIG_ERROR", "The demo is still setting itself up. Please retry.");
     }
-    await new Promise((resolve2) => setTimeout(resolve2, POLL_MS));
+    await new Promise((resolve3) => setTimeout(resolve3, POLL_MS));
   }
 }
 async function ensureDemoReady(setup, now2 = /* @__PURE__ */ new Date()) {
@@ -35235,6 +35242,194 @@ async function clearDemoData() {
   await db.collection(COLLECTIONS.systemState).deleteMany({});
   resetDemoReadyCache();
   return { cleared: true };
+}
+
+// server/services/seedPhotos.ts
+import { readFile as readFile2 } from "node:fs/promises";
+import { join as join2, resolve as resolve2 } from "node:path";
+
+// server/lib/webpSize.ts
+function webpSize(bytes) {
+  const at = (i) => bytes[i] ?? 0;
+  const tag = (i) => String.fromCharCode(at(i), at(i + 1), at(i + 2), at(i + 3));
+  if (bytes.length < 30 || tag(0) !== "RIFF" || tag(8) !== "WEBP") return null;
+  let size = null;
+  const chunk = tag(12);
+  if (chunk === "VP8 ") {
+    if (at(23) === 157 && at(24) === 1 && at(25) === 42) {
+      size = {
+        width: (at(26) | at(27) << 8) & 16383,
+        height: (at(28) | at(29) << 8) & 16383
+      };
+    }
+  } else if (chunk === "VP8L") {
+    if (at(20) === 47) {
+      const bits = (at(21) | at(22) << 8 | at(23) << 16 | at(24) << 24) >>> 0;
+      size = { width: (bits & 16383) + 1, height: (bits >>> 14 & 16383) + 1 };
+    }
+  } else if (chunk === "VP8X") {
+    size = {
+      width: (at(24) | at(25) << 8 | at(26) << 16) + 1,
+      height: (at(27) | at(28) << 8 | at(29) << 16) + 1
+    };
+  }
+  return size && size.width > 0 && size.height > 0 ? size : null;
+}
+
+// server/storage/serverUpload.ts
+async function storePhotoBytes(storage, key, bytes, contentType) {
+  if (storage.name !== "cloudinary") {
+    await storage.put(key, bytes, contentType);
+    return;
+  }
+  const upload = await storage.presignUpload({
+    key,
+    contentType,
+    size: bytes.length,
+    expiresInSeconds: 300
+  });
+  if (upload.method !== "POST") throw new Error("Unexpected upload method");
+  const form = new FormData();
+  for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
+  form.append("file", new Blob([bytes], { type: contentType }), "photo.webp");
+  const res = await fetch(upload.url, { method: "POST", body: form });
+  if (!res.ok) throw new Error(`Cloudinary answered ${String(res.status)}`);
+}
+
+// server/services/seedPhotos.ts
+var SYSTEM4 = { type: "system", userId: null, staffId: null };
+var seedPhotoEntrySchema = external_exports.object({
+  file: external_exports.string().regex(/^[a-z0-9][a-z0-9-]*\.webp$/, "A lowercase .webp file name"),
+  kind: external_exports.enum(["hero", "gallery"]),
+  alt: external_exports.string().trim().min(1).max(200),
+  home: external_exports.boolean().optional(),
+  sortOrder: external_exports.int().min(0)
+});
+var seedPhotoManifestSchema = external_exports.object({
+  photos: external_exports.array(seedPhotoEntrySchema).max(200)
+});
+function seedPhotosDir() {
+  return resolve2(process.cwd(), process.env.SEED_PHOTOS_DIR ?? "seed/photos");
+}
+function seedPhotoId(file2) {
+  return seedId("photo", file2);
+}
+function seedPhotoUuid(file2, bytes) {
+  const h = sha256Hex(`seed-photo:${getEnv2().MONGODB_DB_NAME}:${file2}:${sha256Hex(bytes)}`);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+async function readManifest(dir) {
+  let text;
+  try {
+    text = await readFile2(join2(dir, "manifest.json"), "utf8");
+  } catch {
+    return "no-manifest";
+  }
+  try {
+    const parsed = seedPhotoManifestSchema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data.photos : "bad-manifest";
+  } catch {
+    return "bad-manifest";
+  }
+}
+async function readOptional(path) {
+  try {
+    return await readFile2(path);
+  } catch {
+    return null;
+  }
+}
+async function loadSeedPhotos(now2, options = {}) {
+  const dir = options.dir ?? seedPhotosDir();
+  const summary = {
+    dir,
+    added: [],
+    existing: [],
+    missing: [],
+    failed: [],
+    skipped: null
+  };
+  if (!storageEnabled()) {
+    summary.skipped = "storage-off";
+    return summary;
+  }
+  const manifest = await readManifest(dir);
+  if (typeof manifest === "string") {
+    summary.skipped = manifest;
+    logger.warn(
+      manifest === "no-manifest" ? "seed photos: no manifest.json, nothing loaded" : "seed photos: manifest.json is not valid, nothing loaded",
+      { dir }
+    );
+    return summary;
+  }
+  const storage = getStorage();
+  for (const entry of manifest) {
+    const id = seedPhotoId(entry.file);
+    const heroTaken = entry.kind === "hero" && (await photosRepo_exports.listPhotos({ kind: "hero" })).length > 0;
+    if (heroTaken || await photosRepo_exports.findPhotoById(id)) {
+      summary.existing.push(entry.file);
+      continue;
+    }
+    const bytes = await readOptional(join2(dir, entry.file));
+    if (!bytes) {
+      summary.missing.push(entry.file);
+      continue;
+    }
+    const size = webpSize(bytes);
+    if (!size) {
+      summary.failed.push(entry.file);
+      logger.warn("seed photos: not a WebP file, skipped", { file: entry.file });
+      continue;
+    }
+    try {
+      const key = newPhotoKey(entry.kind, null, seedPhotoUuid(entry.file, bytes));
+      await storePhotoBytes(storage, key, bytes, "image/webp");
+      await photosRepo_exports.insertPhoto(
+        {
+          kind: entry.kind,
+          staffId: null,
+          key,
+          width: size.width,
+          height: size.height,
+          alt: entry.alt,
+          sortOrder: entry.sortOrder,
+          ...entry.home ? { home: true } : {},
+          createdBy: SYSTEM4
+        },
+        now2,
+        { id }
+      );
+      summary.added.push(entry.file);
+    } catch (error62) {
+      summary.failed.push(entry.file);
+      logger.warn("seed photos: could not store a photo", {
+        file: entry.file,
+        reason: error62 instanceof Error ? error62.message : "unknown"
+      });
+    }
+  }
+  if (summary.missing.length > 0) {
+    logger.warn(
+      `seed photos: ${String(summary.missing.length)} of ${String(manifest.length)} files are not in the folder yet, skipped`,
+      { dir, missing: summary.missing }
+    );
+  }
+  if (summary.added.length > 0) {
+    await auditLogRepo_exports.appendAuditEntry(
+      {
+        actor: SYSTEM4,
+        action: "photo.seed",
+        entityType: "photo",
+        entityId: "seed",
+        before: null,
+        after: { added: summary.added },
+        meta: { missing: summary.missing.length, failed: summary.failed.length },
+        requestId: options.requestId ?? null
+      },
+      now2
+    );
+  }
+  return summary;
 }
 
 // server/services/seedService.ts
@@ -35285,7 +35480,7 @@ async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
 }
 
 // server/services/bootstrap.ts
-var SYSTEM4 = { type: "system", userId: null, staffId: null };
+var SYSTEM5 = { type: "system", userId: null, staffId: null };
 async function bootstrap(input2, now2) {
   const env = getEnv2();
   const demo = env.DEMO_MODE === "true";
@@ -35316,6 +35511,7 @@ async function bootstrap(input2, now2) {
   }
   const created = { ...summary, indexes: true };
   if (demo && !demoRecord) {
+    created.seedPhotos = (await loadSeedPhotos(now2, { requestId: input2.requestId })).added.length;
     created.sampleBookings = await seedSampleBookings(now2);
     created.demoPins = await seedDemoPins(now2);
     await systemStateRepo_exports.recordDemoSeed(now2);
@@ -35324,7 +35520,7 @@ async function bootstrap(input2, now2) {
   const record2 = await systemStateRepo_exports.recordBootstrap(created, now2);
   await auditLogRepo_exports.appendAuditEntry(
     {
-      actor: SYSTEM4,
+      actor: SYSTEM5,
       action: "system.bootstrap",
       entityType: "system",
       entityId: "bootstrap",
@@ -37894,7 +38090,8 @@ async function galleryPage(query) {
   ) : [];
   const counts = /* @__PURE__ */ new Map();
   for (const p of all) if (p.staffId) counts.set(p.staffId, (counts.get(p.staffId) ?? 0) + 1);
-  const filtered = only ? all.filter((p) => p.staffId === only) : all;
+  const chosen = only ? all.filter((p) => p.staffId === only) : all;
+  const filtered = query.home ? [...chosen.filter((p) => p.home === true), ...chosen.filter((p) => p.home !== true)] : chosen;
   const after = cursors.decode(query.cursor, isOrderCursor);
   const start = after ? filtered.findIndex((p) => p._id === after.i) + 1 : 0;
   const page = filtered.slice(start, start + query.limit);

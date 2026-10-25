@@ -5,6 +5,7 @@ import { getEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { auditLogRepo, systemStateRepo } from '../repos';
 import { ensureDemoReady, resetDemoData, seedDemoPins, seedSampleBookings } from './demo';
+import { loadSeedPhotos } from './seedPhotos';
 import { runSeed } from './seedService';
 
 const SYSTEM: Actor = { type: 'system', userId: null, staffId: null };
@@ -20,7 +21,8 @@ export interface BootstrapResult {
  * login from SEED_OWNER_EMAIL and SEED_OWNER_PASSWORD when no owner exists.
  * Runs once; a second call needs force=true. Every run is audited.
  *
- * In demo mode the same code also loads the sample bookings and, when no owner
+ * In demo mode the same code also loads the shop's seed photos (seed/photos) and the
+ * sample bookings and, when no owner
  * password was given, creates the owner with a random one nobody needs: the demo
  * sign-in button opens the dashboard without it. A database the demo seeded is
  * refused once demo mode is off, until "Clear demo data" has emptied it.
@@ -59,6 +61,8 @@ export async function bootstrap(
   }
   const created: Record<string, boolean | number | string> = { ...summary, indexes: true };
   if (demo && !demoRecord) {
+    // The shop's real photos, so the showcase always shows them. Nothing happens without storage.
+    created.seedPhotos = (await loadSeedPhotos(now, { requestId: input.requestId })).added.length;
     created.sampleBookings = await seedSampleBookings(now);
     created.demoPins = await seedDemoPins(now);
     await systemStateRepo.recordDemoSeed(now);

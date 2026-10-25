@@ -396,9 +396,10 @@ conflict check of a schedule change and its commit. Indexes: `_id` only.
 | kind          | staff, gallery, hero |                                                                                      |
 | staffId       | string or null       | the chair for staff photos and credited gallery photos                               |
 | key           | string               | server generated: staff/<staffId>/<uuid>.webp, gallery/<uuid>.webp, hero/<uuid>.webp |
-| width, height | int                  | from the browser after the resize                                                    |
+| width, height | int                  | from the browser after the resize (seed photos: from the WebP header)                |
 | alt           | string               | required                                                                             |
 | sortOrder     | int                  | display order within a kind (and chair)                                              |
+| home          | boolean, optional    | gallery photos picked for Home (seed manifest); `?home=true` lists them first        |
 | createdBy     | actor                |                                                                                      |
 | createdAt     | Date                 |                                                                                      |
 | deletedAt     | Date or null         | soft delete                                                                          |
@@ -629,16 +630,16 @@ environment (development, test, preview, production) needs.
 
 ### Prompt 4: photos, next opening, gallery
 
-| Method        | Path                         | Auth               | Notes                                                                                 |
-| ------------- | ---------------------------- | ------------------ | ------------------------------------------------------------------------------------- |
-| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId |
-| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service               |
-| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`; photos with per chair counts        |
-| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                 |
-| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket    |
-| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201           |
-| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal              |
-| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus `/chairs/:slug`        |
+| Method        | Path                         | Auth               | Notes                                                                                  |
+| ------------- | ---------------------------- | ------------------ | -------------------------------------------------------------------------------------- |
+| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId  |
+| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service                |
+| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`, `home`; photos with per chair counts |
+| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                  |
+| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket     |
+| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201            |
+| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal               |
+| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus `/chairs/:slug`         |
 
 `/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
 `/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`.
@@ -827,6 +828,15 @@ signed `destroy` call, run by the daily purge; the daily job also sweeps assets 
 cropped to each frame (`shared/lib/cloudinary.ts`). The driver keeps no backups (images only), so the
 daily job skips them as it does for `mongo`. `npm run photos:migrate` copies GridFS or local photos
 over and rewrites their records.
+
+Seed photos (prompt 12): `server/services/seedPhotos.ts` reads `seed/photos/manifest.json` (or
+SEED_PHOTOS_DIR) and stores each WebP that exists through the active driver (`storePhotoBytes`: `put`,
+or the signed form for Cloudinary) as a normal photo record with `_id = seedId('photo', file)`, kind,
+alt, sortOrder and `home` from the manifest, no chair, and width and height from the WebP header
+(`server/lib/webpSize.ts`). Existing records are skipped (also deleted ones), the hero only fills an
+empty slot, and missing files are skipped with one warning. Demo setup and Demo data, Reset run it from
+bootstrap; `npm run photos:seed` runs it for a real launch. The files reach the Vercel function through
+`includeFiles` in vercel.json.
 
 Storage is a port (`server/storage/types.ts`) with two drivers chosen by
 STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,

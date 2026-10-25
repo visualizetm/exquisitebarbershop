@@ -961,3 +961,70 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   overwrites), so they have no per barber prices until the owner enters them in Team, Prices or runs Demo
   data, Reset, which wipes and reloads the seed with the overrides. Said in the report next to the other
   post deploy step.
+- D12-41 Seed photo sizes without a dependency: a 30 line WebP header reader (`server/lib/webpSize.ts`, lossy
+  VP8, lossless VP8L and extended VP8X) gives width and height. Rejected: sharp or image-size (a new
+  dependency, and sharp is native and heavy in a Vercel function) and ImageMagick (not on Vercel). Every
+  manifest file is WebP; a file that is not is reported and skipped.
+- D12-42 Seed photo idempotency by a deterministic id: `_id = seedId('photo', file)`, the helper staff and
+  services already use, so there is no `sourceKey` field. A run skips every file whose record exists, deleted
+  or not, so a seed photo the owner deleted stays deleted, and the hero entry is skipped while any hero
+  exists, so a home photo the owner chose wins. Rejected: a `sourceKey` field (a schema field and a lookup
+  for the same result).
+- D12-43 Seed photo object keys: the uuid in the key is derived from the database name, the file name and the
+  bytes. Running again after a crash rewrites the same object instead of leaving an orphan; two deployments
+  sharing a bucket never share an object (a demo reset can never delete production's photo); a file replaced
+  under the same name gets a new address, so the year long immutable media cache never serves the old
+  picture. Rejected: random uuids (an orphan per crash) and a uuid from the file name alone (shared across
+  deployments).
+- D12-44 A manifest entry whose file is missing is skipped with one warning per run that names every missing
+  file; nothing throws for a missing file. A missing or invalid manifest is one warning and nothing loaded;
+  with STORAGE_DRIVER=none the loader does nothing. Demo setup and reset always finish. The milestone was
+  started with 3 of 16 files present; the lead added the rest while it was built (a83d278) and dropped
+  exq-15 as a copy of exq-12 (b25a294), so all 15 manifest files exist now and the warning is silent.
+- D12-45 Where the loader runs: in bootstrap's demo branch, which both the first visit setup and Demo data,
+  Reset go through, plus `npm run photos:seed` for a real launch. Rejected: a per request check like the
+  demo PINs one (the live showcase needs a Reset for the new team and prices anyway, and it would cost a
+  query a minute). A run that added photos writes one `photo.seed` audit entry. SEED_PHOTOS_DIR points the
+  loader at another folder (tests and fixture captures); it is read from the process environment like
+  EXQ_LOCAL_UPLOADS_DIR, not the validated env schema, since no deployment sets it.
+- D12-46 Server side photo writes go through one helper, `storePhotoBytes`: a plain `put` for R2, the local
+  disk and GridFS, and the signed upload form posted from the server for Cloudinary (whose `put` refuses).
+  `photos:migrate` now uses it too instead of its own copy.
+- D12-47 The photos reach the Vercel function through `includeFiles` (`{server/bundle/**,seed/photos/**}`)
+  and are read from `process.cwd()/seed/photos` at run time, so adding a photo needs no bundle rebuild.
+  Rejected: embedding the WebPs in the esbuild bundle (the committed bundle would grow by every photo, and a
+  missing file would break the build). `test:vercel-function` copies the `includeFiles` set into the nft
+  shape (nft does not trace data files), lets the photos and the manifest past the "no loose source" check
+  in both shapes, and proves the demo setup serves `exq-01-hero.webp` byte for byte.
+- D12-48 The Home pick is an optional `home` flag on the photo record, set from the manifest.
+  `/api/gallery?home=true` returns the picked photos first, in manifest order, then the rest of the gallery,
+  so Home still fills from photos the owner uploads. With every photo delivered (15 since b25a294) that is
+  exactly the six marked photos (exq-02, 03, 05, 09, 10, 14). Rejected: returning only marked photos (a launch without the seed would never show its uploaded
+  work on Home). The owner cannot change the pick yet; deleting or adding photos is the lever for now.
+- D12-49 Home's "the work" renders with at least three photos and shows one row of three (three to five
+  photos) or the full six, so the grid never ends on a half row. With the 15 delivered photos Home shows the
+  six marked ones; the minimum covers a shop with fewer photos (a real launch before photos:seed). A work grid
+  of exactly three photos is one row of three at every width.
+- D12-50 A chair page's work strip shows the photos credited to that chair; with none, up to three shop
+  photos in Home order under the label "From the shop" with a "See the gallery" link; with no shop photos,
+  no section. A shop photo credited to another barber may appear there (the lightbox names whose work it
+  is); rejected a separate uncredited only query. Iniya's page gets the same strip.
+- D12-51 Gallery needed no change: the barber filter chips already render only when a photo is credited to a
+  public chair, so with the seed (nobody credited) they stay hidden and come back with the first credit.
+- D12-52 With a photo, the Home hero is an ink band (`.exq-dark`). Below 1024px the photo fills the hero
+  behind the text under a new token, `--scrim-photo` (ink at 80%): over a pure white photo white text keeps
+  10.2:1, `--line` 7.2:1 and the red display line 3.3:1 (large text), and the 13px red labels turn white on
+  the photo. From 1024px the photo sits in its own 4:5 column with no scrim. The text sets the height, so
+  the title and the BOOK action stay in the first screen and nothing shifts when the photo loads. Rejected:
+  a gradient scrim (the copy rules allow one gradient, the placeholder stripe) and a photo band above the
+  text (it pushes BOOK below the first screen at 390). The hero photo is no longer wrapped in a reveal, so
+  the LCP image is never clipped. Checked in screenshots in milestone 5 (no Playwright in this milestone).
+- D12-53 Crops: the hero uses `object-position: 85% 30%` (both faces in exq-01 sit in the upper right) and
+  gallery tiles `50% 35%` (head and cut sit in the upper middle of a portrait photo); a contact sheet of
+  the square crops of all 15 delivered photos keeps every face and cut. Rejected: a per photo focal point
+  (a schema field, the API and an admin control); revisit if a later photo crops badly. Tile `sizes` now say 33vw from 768px, where the grid has three columns.
+- D12-54 Visit gets no storefront photo slot: none was delivered, and a placeholder would look like one. Open
+  item for Dontrise: a storefront photo.
+- D12-55 Barber pole check: `scripts/brand-assets.ts` reads only the v2 marks, and `public/` holds the Q
+  icon, the v2 emblems, the OG card and the favicons; no file draws a barber pole (the old `exq-pole` files
+  were deleted in 32dbf82). Nothing to remove.

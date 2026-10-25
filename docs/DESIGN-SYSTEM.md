@@ -28,7 +28,17 @@ Semantic surfaces (also in tokens.css) derive from the palette: `--bg`, `--card`
 (red text: #C8102E on paper, #FF5470 on ink), `--accent-soft`, `--on-accent`, `--solid-bg` and
 `--solid-fg` (the "ink" button and the selected card: ink in light, paper in dark), `--solid-fg-2`,
 `--band-line`, `--scrim`. `.exq-dark` scopes an ink band inside any page; it stays ink in both
-themes.
+themes. `--scrim-photo` (ink at 80%) sits between a photo and the text on it, the Home hero on
+phones and tablets: even over a pure white photo, white text keeps 10.2:1, `--line` 7.2:1 and the
+red display line 3.3:1 (large text); small red labels on a photo turn white.
+
+The Home hero has two states. `data-state="text"`: no photo, the text stands alone on the page.
+`data-state="photo"`: an ink band (`.exq-dark`); below 1024px the photo fills the hero behind the
+text under `--scrim-photo`, cropped toward the upper right (`object-position: 85% 30%`, where the
+faces are in the shop's hero photo); from 1024px it sits in its own 4:5 column with no scrim. The
+photo is the LCP image (eager, `fetchpriority="high"`, width and height set, no reveal). Gallery
+tiles crop square toward the upper middle (`object-position: 50% 35%`). A "work" grid of exactly
+three photos is one row of three at every width.
 
 ## Themes
 
