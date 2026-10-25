@@ -25,6 +25,7 @@ import {
 import { useShop } from '@/app/useShop';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
+import { chairServices } from '@/lib/menuPrices';
 import { offlineBooking } from '@/lib/offlineBooking';
 import { chairDescription } from '@/lib/seo';
 import { useApi } from '@/lib/useApi';
@@ -93,10 +94,8 @@ export function ChairPage() {
   const bookPath = `/book?barber=${encodeURIComponent(staff.slug)}`;
   // Someone who takes no online bookings (Iniya) sends people to Instagram instead.
   const away = offlineBooking(staff);
-  const offered =
-    services.status === 'ready'
-      ? services.data.services.filter((s) => staff.serviceIds.includes(s.id))
-      : [];
+  // This person's own menu: their price and time where they set them, the shop's otherwise.
+  const offered = services.status === 'ready' ? chairServices(services.data.services, staff) : [];
   const open = openings.status === 'ready' ? openings.data : null;
   const badge =
     staff.chairNumber !== null ? `Chair ${String(staff.chairNumber).padStart(2, '0')}` : null;

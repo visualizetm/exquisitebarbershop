@@ -1,8 +1,10 @@
 import type { Filter } from 'mongodb';
+import { servicePriceIssues } from '../../shared/lib/servicePricing';
 import {
   staffDocumentSchema,
   staffInputSchema,
   staffUpdateSchema,
+  type ServicePrice,
   type StaffDocument,
   type StaffInput,
   type StaffUpdate,
@@ -22,12 +24,28 @@ function slugTaken(slug: string, cause: unknown): AppError {
   return new AppError('SLUG_TAKEN', `The slug "${slug}" is already in use`, { cause });
 }
 
+/** One price per service, and only for services the person offers. */
+export function assertPricesMatchMenu(
+  serviceIds: readonly string[],
+  prices: readonly ServicePrice[],
+): void {
+  const issues = servicePriceIssues(serviceIds, prices);
+  if (issues.length === 0) return;
+  throw new AppError('VALIDATION_ERROR', 'Prices must match the services this person offers', {
+    details: issues.map((i) => ({
+      path: ['servicePrices', ...i.path].join('.'),
+      message: i.message,
+    })),
+  });
+}
+
 export async function insertStaff(
   input: StaffInput,
   now: Date,
   options?: RepoOptions & { id?: string },
 ): Promise<StaffDocument> {
   const parsed = staffInputSchema.parse(input);
+  assertPricesMatchMenu(parsed.serviceIds, parsed.servicePrices ?? []);
   const doc = staffDocumentSchema.parse({
     _id: options?.id ?? newId(),
     ...parsed,

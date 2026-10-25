@@ -28822,6 +28822,7 @@ async function updateShopSettings(input2, now2, options) {
 // server/repos/staffRepo.ts
 var staffRepo_exports = {};
 __export(staffRepo_exports, {
+  assertPricesMatchMenu: () => assertPricesMatchMenu,
   findStaffById: () => findStaffById,
   findStaffByIds: () => findStaffByIds,
   findStaffBySlug: () => findStaffBySlug,
@@ -28833,8 +28834,109 @@ __export(staffRepo_exports, {
   updateStaff: () => updateStaff
 });
 
+// shared/lib/servicePricing.ts
+function isCents(value) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+function isMinutes(value) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+function offersService(staff, serviceId) {
+  return staff.serviceIds.includes(serviceId);
+}
+function overrideFor(staff, serviceId) {
+  return staff.servicePrices?.find((p) => p.serviceId === serviceId && isCents(p.priceCents));
+}
+function resolveServiceForStaff(service2, staff) {
+  const own2 = overrideFor(staff, service2.id);
+  return {
+    serviceId: service2.id,
+    priceCents: own2 ? own2.priceCents : service2.priceCents,
+    durationMinutes: isMinutes(own2?.durationMinutes) ? own2.durationMinutes : service2.durationMinutes,
+    priceFrom: service2.priceFrom,
+    overridden: own2 !== void 0
+  };
+}
+function quoteForStaff(services, staff) {
+  if (!services.every((s2) => offersService(staff, s2.id))) return null;
+  const lines = services.map((s2) => resolveServiceForStaff(s2, staff));
+  return {
+    staffId: staff.id,
+    lines,
+    totalCents: lines.reduce((sum, l2) => sum + l2.priceCents, 0),
+    totalMinutes: lines.reduce((sum, l2) => sum + l2.durationMinutes, 0),
+    from: lines.some((l2) => l2.priceFrom)
+  };
+}
+function servicePriceIssues(serviceIds, prices) {
+  const issues = [];
+  const seen = /* @__PURE__ */ new Set();
+  prices.forEach((entry, index) => {
+    if (seen.has(entry.serviceId)) {
+      issues.push({ path: [index, "serviceId"], message: "Only one price per service" });
+    }
+    seen.add(entry.serviceId);
+    if (!serviceIds.includes(entry.serviceId)) {
+      issues.push({
+        path: [index, "serviceId"],
+        message: "This person does not offer that service"
+      });
+    }
+  });
+  return issues;
+}
+function pruneServicePrices(serviceIds, prices) {
+  return prices.filter((p) => serviceIds.includes(p.serviceId));
+}
+
+// shared/schemas/service.ts
+var serviceGroupSchema = external_exports.enum(["Barber", "Beauty"]);
+var serviceDurationSchema = external_exports.int().min(5).max(8 * 60).multipleOf(5);
+var serviceDocumentSchema = external_exports.object({
+  _id: idSchema,
+  name: nonEmptyText(80),
+  group: serviceGroupSchema,
+  description: external_exports.string().trim().max(500),
+  priceCents: centsSchema,
+  /** When true the price is a starting point and the UI shows "From $x". */
+  priceFrom: external_exports.boolean(),
+  durationMinutes: serviceDurationSchema,
+  /** Cleanup gap after this service. Null means use the shop default buffer. */
+  bufferMinutes: external_exports.int().min(0).max(60).multipleOf(5).nullable().default(null),
+  sortOrder: external_exports.int().min(0),
+  /** Temporarily hidden from booking without deleting. */
+  isActive: external_exports.boolean(),
+  deletedAt: external_exports.date().nullable()
+}).extend(timestampsSchema.shape);
+var serviceInputSchema = serviceDocumentSchema.omit({
+  _id: true,
+  deletedAt: true,
+  createdAt: true,
+  updatedAt: true
+});
+var serviceUpdateSchema = serviceInputSchema.partial();
+
 // shared/schemas/staff.ts
 var staffRoleSchema = external_exports.enum(["owner", "barber", "stylist"]);
+var SERVICE_PRICES_MAX = 100;
+var servicePriceSchema = external_exports.object({
+  serviceId: idSchema,
+  priceCents: centsSchema,
+  durationMinutes: serviceDurationSchema.optional()
+});
+var servicePricesSchema = external_exports.array(servicePriceSchema).max(SERVICE_PRICES_MAX).superRefine((list, ctx) => {
+  const seen = /* @__PURE__ */ new Set();
+  list.forEach((entry, index) => {
+    if (seen.has(entry.serviceId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [index, "serviceId"],
+        message: "Only one price per service"
+      });
+    }
+    seen.add(entry.serviceId);
+  });
+});
 var staffDocumentSchema = external_exports.object({
   _id: idSchema,
   /** Current public slug used in /chairs/:slug and /book?barber=. */
@@ -28855,6 +28957,11 @@ var staffDocumentSchema = external_exports.object({
   bio: external_exports.string().trim().max(2e3),
   chairNumber: external_exports.int().min(1).max(99).nullable(),
   serviceIds: external_exports.array(idSchema),
+  /**
+   * Per person prices and times that differ from the shop's. Optional: documents written
+   * before the field existed have none, which reads the same as an empty list.
+   */
+  servicePrices: servicePricesSchema.optional(),
   photoUrl: external_exports.url().nullable(),
   instagramHandle: external_exports.string().regex(/^[A-Za-z0-9._]{1,30}$/).nullable(),
   sortOrder: external_exports.int().min(0),
@@ -28897,8 +29004,19 @@ function slugKeysOf(slug, aliases) {
 function slugTaken(slug, cause) {
   return new AppError("SLUG_TAKEN", `The slug "${slug}" is already in use`, { cause });
 }
+function assertPricesMatchMenu(serviceIds, prices) {
+  const issues = servicePriceIssues(serviceIds, prices);
+  if (issues.length === 0) return;
+  throw new AppError("VALIDATION_ERROR", "Prices must match the services this person offers", {
+    details: issues.map((i) => ({
+      path: ["servicePrices", ...i.path].join("."),
+      message: i.message
+    }))
+  });
+}
 async function insertStaff(input2, now2, options) {
   const parsed = staffInputSchema.parse(input2);
+  assertPricesMatchMenu(parsed.serviceIds, parsed.servicePrices ?? []);
   const doc = staffDocumentSchema.parse({
     _id: options?.id ?? newId(),
     ...parsed,
@@ -29007,34 +29125,6 @@ __export(servicesRepo_exports, {
   softDeleteService: () => softDeleteService,
   updateService: () => updateService
 });
-
-// shared/schemas/service.ts
-var serviceGroupSchema = external_exports.enum(["Barber", "Beauty"]);
-var serviceDocumentSchema = external_exports.object({
-  _id: idSchema,
-  name: nonEmptyText(80),
-  group: serviceGroupSchema,
-  description: external_exports.string().trim().max(500),
-  priceCents: centsSchema,
-  /** When true the price is a starting point and the UI shows "From $x". */
-  priceFrom: external_exports.boolean(),
-  durationMinutes: external_exports.int().min(5).max(8 * 60).multipleOf(5),
-  /** Cleanup gap after this service. Null means use the shop default buffer. */
-  bufferMinutes: external_exports.int().min(0).max(60).multipleOf(5).nullable().default(null),
-  sortOrder: external_exports.int().min(0),
-  /** Temporarily hidden from booking without deleting. */
-  isActive: external_exports.boolean(),
-  deletedAt: external_exports.date().nullable()
-}).extend(timestampsSchema.shape);
-var serviceInputSchema = serviceDocumentSchema.omit({
-  _id: true,
-  deletedAt: true,
-  createdAt: true,
-  updatedAt: true
-});
-var serviceUpdateSchema = serviceInputSchema.partial();
-
-// server/repos/servicesRepo.ts
 async function insertService(input2, now2, options) {
   const parsed = serviceInputSchema.parse(input2);
   const doc = serviceDocumentSchema.parse({
@@ -32002,6 +32092,27 @@ var serviceKeysByStaff = {
   // Iniya takes bookings on Instagram, so nothing is bookable on this site.
   iniya: []
 };
+var servicePriceKeysByStaff = {
+  dontrise: {
+    haircut: [5e3, 75],
+    "cut-design": [7e3],
+    "kids-cut": [3e3, 45],
+    "kids-design": [4e3, 90],
+    lineup: [3e3, 40],
+    "color-cut": [1e4, 180]
+  },
+  drew: { "kids-cut": [2500] },
+  nelly: { haircut: [4500] }
+};
+function servicePricesFor(staffKey) {
+  return Object.entries(servicePriceKeysByStaff[staffKey] ?? {}).map(
+    ([serviceKey, [price, minutes]]) => ({
+      serviceId: serviceSeedId(serviceKey),
+      priceCents: price,
+      ...minutes === void 0 ? {} : { durationMinutes: minutes }
+    })
+  );
+}
 var staffSeed = [
   {
     key: "dontrise",
@@ -32015,6 +32126,7 @@ var staffSeed = [
       chairNumber: 1,
       // PLACEHOLDER
       serviceIds: serviceKeysByStaff.dontrise.map(serviceSeedId),
+      servicePrices: servicePricesFor("dontrise"),
       photoUrl: null,
       instagramHandle: "dontrisethebarber",
       sortOrder: 0,
@@ -32038,6 +32150,7 @@ var staffSeed = [
       // PLACEHOLDER
       serviceIds: serviceKeysByStaff.lee.map(serviceSeedId),
       // PLACEHOLDER
+      servicePrices: servicePricesFor("lee"),
       photoUrl: null,
       instagramHandle: "lee_dabarber_",
       sortOrder: 10,
@@ -32059,6 +32172,7 @@ var staffSeed = [
       chairNumber: 3,
       // PLACEHOLDER
       serviceIds: serviceKeysByStaff.drew.map(serviceSeedId),
+      servicePrices: servicePricesFor("drew"),
       photoUrl: null,
       instagramHandle: "drew2sharp",
       sortOrder: 20,
@@ -32087,6 +32201,7 @@ var staffSeed = [
       chairNumber: 4,
       // PLACEHOLDER
       serviceIds: serviceKeysByStaff.nelly.map(serviceSeedId),
+      servicePrices: servicePricesFor("nelly"),
       photoUrl: null,
       instagramHandle: "nellycutz_",
       sortOrder: 30,
@@ -32108,6 +32223,7 @@ var staffSeed = [
       chairNumber: 5,
       // PLACEHOLDER
       serviceIds: serviceKeysByStaff.iniya,
+      servicePrices: servicePricesFor("iniya"),
       photoUrl: null,
       instagramHandle: "iniyathestylist",
       sortOrder: 40,
@@ -32852,6 +32968,35 @@ function staffQualifies(staff, services) {
 function serviceMinutesOf(services) {
   return services.reduce((sum, s2) => sum + s2.durationMinutes, 0);
 }
+function pricedService(service2) {
+  return {
+    id: service2._id,
+    priceCents: service2.priceCents,
+    priceFrom: service2.priceFrom,
+    durationMinutes: service2.durationMinutes
+  };
+}
+function pricedStaff(staff) {
+  return {
+    id: staff._id,
+    sortOrder: staff.sortOrder,
+    serviceIds: staff.serviceIds,
+    servicePrices: staff.servicePrices ?? []
+  };
+}
+function quoteStaff(staff, services, settings, keepMinutes) {
+  const price = quoteForStaff(services.map(pricedService), pricedStaff(staff));
+  if (!price) return null;
+  const serviceMinutes = keepMinutes ?? price.totalMinutes;
+  const bufferMinutes = effectiveBufferMinutes(services, settings);
+  return {
+    staffId: staff._id,
+    serviceMinutes,
+    bufferMinutes,
+    totalMinutes: serviceMinutes + bufferMinutes,
+    price
+  };
+}
 function effectiveBufferMinutes(services, settings) {
   return services.reduce(
     (max, s2) => Math.max(max, s2.bufferMinutes ?? settings.bufferMinutes),
@@ -32956,7 +33101,7 @@ function isWithinWorkingTime(booking, staff, source) {
   );
 }
 function computeStaffDay(input2) {
-  const { staff, date: date5, dayKey, dayBounds, shopRanges, ctx, totalMinutes } = input2;
+  const { staff, date: date5, dayKey, dayBounds, shopRanges, ctx, quote } = input2;
   const working = chairRanges(staff._id, date5, dayKey, dayBounds, shopRanges, ctx);
   if (working.length === 0) return { staffId: staff._id, starts: [], reason: "dayOff" };
   const blocks = ctx.timeBlocks.filter(
@@ -32975,8 +33120,8 @@ function computeStaffDay(input2) {
   let freeBeforeLead = 0;
   for (const range of working) {
     for (let t = ceilToStep(range.start, step); ; t = addMinutes(t, step)) {
-      if (addMinutes(t, input2.serviceMinutes).getTime() > range.end.getTime()) break;
-      const candidate = { start: t, end: addMinutes(t, totalMinutes) };
+      if (addMinutes(t, quote.serviceMinutes).getTime() > range.end.getTime()) break;
+      const candidate = { start: t, end: addMinutes(t, quote.totalMinutes) };
       if (busy.some((b) => overlaps(b, candidate))) continue;
       if (t.getTime() < earliest.getTime()) {
         freeBeforeLead += 1;
@@ -33020,12 +33165,15 @@ function summarizeReason(byStaff) {
   return "outsideWindow";
 }
 function computeAvailability(request, ctx) {
-  const serviceMinutes = serviceMinutesOf(ctx.services);
-  const bufferMinutes = effectiveBufferMinutes(ctx.services, ctx.settings);
-  const totalMinutes = serviceMinutes + bufferMinutes;
   const selected = request.staff === "any" ? null : resolveStaffSelector(ctx.staff, request.staff);
   const pool = request.staff === "any" ? ctx.staff : selected ? [selected] : [];
   const qualified = pool.filter((s2) => staffQualifies(s2, ctx.services));
+  const quotes = /* @__PURE__ */ new Map();
+  for (const staff of qualified) {
+    const keep = request.keep?.staffId === staff._id ? request.keep.serviceMinutes : void 0;
+    const quote = quoteStaff(staff, ctx.services, ctx.settings, keep);
+    if (quote) quotes.set(staff._id, quote);
+  }
   const days = [];
   let cursor = shopDayStart(request.fromDate);
   const endDate = request.toDate;
@@ -33053,20 +33201,21 @@ function computeAvailability(request, ctx) {
       continue;
     }
     const dayBounds = shopDayBounds(date5);
-    const staffDays = qualified.map((staff) => ({
-      staff,
-      day: computeStaffDay({
+    const staffDays = qualified.flatMap((staff) => {
+      const quote = quotes.get(staff._id);
+      if (!quote) return [];
+      const day = computeStaffDay({
         staff,
         date: date5,
         dayKey,
         dayBounds,
         shopRanges,
         ctx,
-        totalMinutes,
-        serviceMinutes,
+        quote,
         excludeBookingId: request.excludeBookingId
-      })
-    }));
+      });
+      return [{ staff, day }];
+    });
     const byStaff = staffDays.map((sd) => sd.day);
     const byStart = /* @__PURE__ */ new Map();
     for (const { staff, day } of staffDays) {
@@ -33087,9 +33236,10 @@ function computeAvailability(request, ctx) {
       );
       slotIndex += 1;
       const startAt = new Date(time3);
+      const firstMinutes = quotes.get(ranked[0]._id)?.serviceMinutes ?? 0;
       return {
         startAt,
-        endAt: addMinutes(startAt, serviceMinutes),
+        endAt: addMinutes(startAt, firstMinutes),
         staffId: ranked[0]._id,
         candidates: ranked.map((s2) => s2._id)
       };
@@ -33101,7 +33251,7 @@ function computeAvailability(request, ctx) {
       slots
     });
   }
-  return { serviceMinutes, bufferMinutes, totalMinutes, staff: qualified, days };
+  return { quotes, staff: qualified, days };
 }
 function findSlot(result, startAt) {
   const date5 = shopDateOf(startAt);
@@ -33824,6 +33974,7 @@ var adminStaffViewSchema = external_exports.object({
   bio: external_exports.string(),
   chairNumber: external_exports.int().nullable(),
   serviceIds: external_exports.array(idSchema),
+  servicePrices: external_exports.array(servicePriceSchema).default([]),
   photoUrl: external_exports.string().nullable(),
   instagramHandle: external_exports.string().nullable(),
   sortOrder: external_exports.int(),
@@ -33833,8 +33984,18 @@ var adminStaffViewSchema = external_exports.object({
 });
 var staffListResponseSchema = external_exports.object({ staff: external_exports.array(adminStaffViewSchema) });
 var staffResponseSchema = external_exports.object({ staff: adminStaffViewSchema });
-var staffCreateRequestSchema = staffInputSchema;
-var staffUpdateRequestSchema = staffUpdateSchema.omit({ slug: true }).extend({ resolutions: resolutionsSchema });
+function checkPricesAgainstMenu(value, ctx) {
+  if (!value.serviceIds || !value.servicePrices) return;
+  for (const issue2 of servicePriceIssues(value.serviceIds, value.servicePrices)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["servicePrices", ...issue2.path],
+      message: issue2.message
+    });
+  }
+}
+var staffCreateRequestSchema = staffInputSchema.superRefine(checkPricesAgainstMenu);
+var staffUpdateRequestSchema = staffUpdateSchema.omit({ slug: true }).extend({ resolutions: resolutionsSchema }).superRefine(checkPricesAgainstMenu);
 var staffSlugRequestSchema = external_exports.object({ slug: slugSchema });
 var staffMutationResponseSchema = staffResponseSchema.extend(conflictOutcomeSchema.shape);
 var hoursResponseSchema = external_exports.object({
@@ -34122,7 +34283,13 @@ async function alternativesAfter(input2, now2) {
     now: now2
   });
   const ctx = input2.override ? { ...loaded, settings: relaxed(loaded.settings) } : loaded;
-  const request = input2.excludeBookingId ? { fromDate, toDate, staff: input2.staff, excludeBookingId: input2.excludeBookingId } : { fromDate, toDate, staff: input2.staff };
+  const request = {
+    fromDate,
+    toDate,
+    staff: input2.staff,
+    ...input2.excludeBookingId ? { excludeBookingId: input2.excludeBookingId } : {},
+    ...input2.keep ? { keep: input2.keep } : {}
+  };
   const result = computeAvailability(request, ctx);
   return nextOpenSlots(result, input2.startAt, ALTERNATIVE_LIMIT).map(toApiSlot);
 }
@@ -34217,15 +34384,18 @@ var ONLINE_POLICY = {
   audience: { customer: true, owner: true },
   ownerSeenAt: null
 };
-function serviceSnapshots(ctx) {
-  return ctx.services.map((s2) => ({
-    serviceId: s2._id,
-    name: s2.name,
-    group: s2.group,
-    priceCents: s2.priceCents,
-    priceFrom: s2.priceFrom,
-    durationMinutes: s2.durationMinutes
-  }));
+function serviceSnapshots(services, quote) {
+  return services.map((s2) => {
+    const line = quote.lines.find((l2) => l2.serviceId === s2._id);
+    return {
+      serviceId: s2._id,
+      name: s2.name,
+      group: s2.group,
+      priceCents: line?.priceCents ?? s2.priceCents,
+      priceFrom: line?.priceFrom ?? s2.priceFrom,
+      durationMinutes: line?.durationMinutes ?? s2.durationMinutes
+    };
+  });
 }
 function cleanNotes(notes) {
   return notes?.trim() ? notes.trim() : null;
@@ -34244,7 +34414,8 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
   const staffId = slot.candidates.find((id) => !tried.has(id));
   if (!staffId) throw new AppError("SLOT_TAKEN", "That time is no longer available");
   const staff = result.staff.find((s2) => s2._id === staffId);
-  if (!staff) throw new AppError("SLOT_TAKEN", "That time is no longer available");
+  const quote = staff ? result.quotes.get(staff._id) : void 0;
+  if (!staff || !quote) throw new AppError("SLOT_TAKEN", "That time is no longer available");
   const overrideUsed = policy.override && findSlot(
     computeAvailability({ fromDate: date5, toDate: date5, staff: input2.staff }, strict),
     startAt
@@ -34261,18 +34432,18 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
       );
     }
   }
-  const endAt = addMinutes(startAt, result.serviceMinutes);
+  const endAt = addMinutes(startAt, quote.serviceMinutes);
   const booking = await bookingsRepo_exports.insertBooking(
     {
       referenceCode,
       staffId: staff._id,
       staffRequested: input2.staff !== "any",
-      services: serviceSnapshots(ctx),
+      services: serviceSnapshots(ctx.services, quote.price),
       startAt,
       endAt,
-      durationMinutes: result.serviceMinutes,
-      bufferMinutes: result.bufferMinutes,
-      totalPriceCents: ctx.services.reduce((sum, s2) => sum + s2.priceCents, 0),
+      durationMinutes: quote.serviceMinutes,
+      bufferMinutes: quote.bufferMinutes,
+      totalPriceCents: quote.price.totalCents,
       customer: input2.customer,
       status: "confirmed",
       source: policy.source,
@@ -34287,7 +34458,7 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
   );
   await slotLocksRepo_exports.acquireSlotLocks(
     staff._id,
-    { start: startAt, end: addMinutes(endAt, result.bufferMinutes) },
+    { start: startAt, end: addMinutes(endAt, quote.bufferMinutes) },
     { holderType: "booking", holderId: booking._id },
     meta3.now,
     { session }
@@ -34407,12 +34578,12 @@ async function placeWalkIn(input2, startAt, referenceCode, meta3, actor, idempot
   const staff = resolveStaffSelector(ctx.staff, input2.staff);
   if (staff?.deletedAt !== null)
     throw new AppError("STAFF_UNAVAILABLE", "That chair was not found");
-  if (!ctx.services.every((s2) => staff.serviceIds.includes(s2._id))) {
+  const quote = quoteStaff(staff, ctx.services, ctx.settings);
+  if (!quote) {
     throw new AppError("STAFF_UNAVAILABLE", `${staff.name} does not offer every chosen service`);
   }
   await scheduleGuardsRepo_exports.bumpScheduleGuards([staff._id], meta3.now, { session });
-  const serviceMinutes = serviceMinutesOf(ctx.services);
-  const bufferMinutes = effectiveBufferMinutes(ctx.services, ctx.settings);
+  const { serviceMinutes, bufferMinutes } = quote;
   const endAt = addMinutes(startAt, serviceMinutes);
   const outsideWorkingTime = !isWithinWorkingTime(
     { staffId: staff._id, startAt, endAt },
@@ -34424,12 +34595,12 @@ async function placeWalkIn(input2, startAt, referenceCode, meta3, actor, idempot
       referenceCode,
       staffId: staff._id,
       staffRequested: true,
-      services: serviceSnapshots(ctx),
+      services: serviceSnapshots(ctx.services, quote.price),
       startAt,
       endAt,
       durationMinutes: serviceMinutes,
       bufferMinutes,
-      totalPriceCents: ctx.services.reduce((sum, s2) => sum + s2.priceCents, 0),
+      totalPriceCents: quote.price.totalCents,
       customer: input2.customer,
       status: "confirmed",
       source: "walkIn",
@@ -34617,6 +34788,7 @@ async function cancelInTransaction(booking, staff, settings, policy, now2, sessi
 async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
   const { startAt, selector } = input2;
   const serviceIds = booking.services.map((s2) => s2.serviceId);
+  const keep = { staffId: booking.staffId, serviceMinutes: booking.durationMinutes };
   const tried = /* @__PURE__ */ new Set();
   let lastConflict = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -34629,21 +34801,29 @@ async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
         );
         const ctx = policy.override ? { ...strict, settings: relaxed(strict.settings) } : strict;
         const result = computeAvailability(
-          { fromDate: date5, toDate: date5, staff: selector, excludeBookingId: booking._id },
+          {
+            fromDate: date5,
+            toDate: date5,
+            staff: selector,
+            excludeBookingId: booking._id,
+            keep
+          },
           ctx
         );
         const slot = findSlot(result, startAt);
         if (!slot) throw reasonError(result, startAt, ctx);
         const staffId = slot.candidates.find((id) => !tried.has(id));
         const staff = staffId ? result.staff.find((s2) => s2._id === staffId) : void 0;
-        if (!staffId || !staff)
+        const quote = staffId ? result.quotes.get(staffId) : void 0;
+        if (!staffId || !staff || !quote)
           throw new AppError("SLOT_TAKEN", "That time is no longer available");
         await scheduleGuardsRepo_exports.bumpScheduleGuards([staff._id], now2, { session });
-        const endAt = addMinutes(startAt, result.serviceMinutes);
+        const sameChair = staff._id === booking.staffId;
+        const endAt = addMinutes(startAt, quote.serviceMinutes);
         await slotLocksRepo_exports.releaseSlotLocks(booking._id, { session });
         await slotLocksRepo_exports.acquireSlotLocks(
           staff._id,
-          { start: startAt, end: addMinutes(endAt, result.bufferMinutes) },
+          { start: startAt, end: addMinutes(endAt, quote.bufferMinutes) },
           { holderType: "booking", holderId: booking._id },
           now2,
           { session }
@@ -34661,7 +34841,12 @@ async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
             staffRequested: selector !== "any",
             startAt,
             endAt,
-            bufferMinutes: result.bufferMinutes
+            bufferMinutes: quote.bufferMinutes,
+            ...sameChair ? {} : {
+              services: serviceSnapshots(ctx.services, quote.price),
+              durationMinutes: quote.serviceMinutes,
+              totalPriceCents: quote.price.totalCents
+            }
           },
           now2,
           { session }
@@ -34716,6 +34901,7 @@ async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
       staff: selector,
       startAt,
       excludeBookingId: booking._id,
+      keep,
       override: policy.override
     },
     now2,
@@ -36941,6 +37127,8 @@ function toStaffView(s2) {
     bio: s2.bio,
     chairNumber: s2.chairNumber,
     serviceIds: s2.serviceIds,
+    // Read with a default: staff documents written before per person prices have no field.
+    servicePrices: s2.servicePrices ?? [],
     photoUrl: s2.photoUrl,
     instagramHandle: s2.instagramHandle,
     sortOrder: s2.sortOrder,
@@ -36962,9 +37150,17 @@ async function createStaff(principal, input2, meta3) {
   return { staff: toStaffView(staff) };
 }
 async function updateStaff2(principal, id, input2, meta3) {
-  const { resolutions, ...patch } = input2;
+  const { resolutions, ...requested } = input2;
   const before = await staffRepo_exports.findStaffById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
+  const patch = { ...requested };
+  const beforePrices = before.servicePrices ?? [];
+  if (patch.servicePrices !== void 0) {
+    staffRepo_exports.assertPricesMatchMenu(patch.serviceIds ?? before.serviceIds, patch.servicePrices);
+  } else if (patch.serviceIds) {
+    const kept = pruneServicePrices(patch.serviceIds, beforePrices);
+    if (kept.length !== beforePrices.length) patch.servicePrices = kept;
+  }
   const removed = patch.serviceIds ? before.serviceIds.filter((s2) => !patch.serviceIds?.includes(s2)) : [];
   const change = await applyScheduleChange({
     actor: actorOf2(principal),
@@ -36984,6 +37180,20 @@ async function updateStaff2(principal, id, input2, meta3) {
       (b) => b.staffId === id && b.services.some((s2) => removed.includes(s2.serviceId))
     )
   });
+  const afterPrices = change.result.servicePrices ?? [];
+  if (JSON.stringify(afterPrices) !== JSON.stringify(beforePrices)) {
+    await audit2(
+      principal,
+      {
+        action: "staff.prices.update",
+        entityType: "staff",
+        entityId: id,
+        before: { servicePrices: beforePrices },
+        after: { servicePrices: afterPrices }
+      },
+      meta3
+    );
+  }
   return {
     body: {
       staff: toStaffView(change.result),
@@ -38479,6 +38689,8 @@ var publicStaffSchema = external_exports.object({
   bio: external_exports.string(),
   chairNumber: external_exports.int().nullable(),
   serviceIds: external_exports.array(idSchema),
+  /** This person's own prices and times, where they differ from the shop's. Public on the menu. */
+  servicePrices: external_exports.array(servicePriceSchema).default([]),
   photoUrl: external_exports.string().nullable(),
   instagramHandle: external_exports.string().nullable(),
   acceptsOnlineBooking: external_exports.boolean(),
@@ -38545,12 +38757,15 @@ function openingLabel(startAt, now2) {
   if (day === tomorrow) return `Tomorrow ${time3}`;
   return `${toShopTime(startAt).toFormat("ccc")} ${time3}`;
 }
+function minutesOnChair(staff, service2) {
+  return resolveServiceForStaff(pricedService(service2), pricedStaff(staff)).durationMinutes;
+}
 function serviceForChair(staff, services, preferredId) {
   const offered = services.filter((s2) => staff.serviceIds.includes(s2._id));
   const preferred = preferredId ? offered.find((s2) => s2._id === preferredId) : void 0;
   if (preferred) return preferred;
   return [...offered].sort(
-    (a, b) => a.durationMinutes - b.durationMinutes || a.sortOrder - b.sortOrder
+    (a, b) => minutesOnChair(staff, a) - minutesOnChair(staff, b) || a.sortOrder - b.sortOrder
   )[0] ?? null;
 }
 async function loadShared(now2) {
@@ -38610,7 +38825,7 @@ async function staffOpenings(slug, count, now2) {
   }));
   return {
     staff: { id: staff._id, slug: staff.slug, name: staff.name },
-    service: service2 ? { id: service2._id, name: service2.name, durationMinutes: service2.durationMinutes } : null,
+    service: service2 ? { id: service2._id, name: service2.name, durationMinutes: minutesOnChair(staff, service2) } : null,
     openings
   };
 }
@@ -38643,6 +38858,8 @@ function toPublicStaff(doc) {
     bio: doc.bio,
     chairNumber: doc.chairNumber,
     serviceIds: doc.serviceIds,
+    // Prices are the public menu, so they travel with the person. Old documents have none.
+    servicePrices: doc.servicePrices ?? [],
     photoUrl: doc.photoUrl,
     instagramHandle: doc.instagramHandle,
     acceptsOnlineBooking: doc.acceptsOnlineBooking,
@@ -38888,6 +39105,10 @@ var authRoutes = [
 
 // server/http/routes/availability.ts
 var MAX_DAYS = 62;
+function shortestTotalMinutes(result, ctx) {
+  const totals = [...result.quotes.values()].map((q) => q.totalMinutes);
+  return totals.length > 0 ? Math.min(...totals) : serviceMinutesOf(ctx.services) + effectiveBufferMinutes(ctx.services, ctx.settings);
+}
 var availabilityRoutes = [
   {
     method: "GET",
@@ -38920,7 +39141,7 @@ var availabilityRoutes = [
       const day = result.days[0];
       const body = availabilityResponseSchema.parse({
         date: query.date,
-        durationMinutes: result.totalMinutes,
+        durationMinutes: shortestTotalMinutes(result, data),
         slots: (day?.slots ?? []).map((s2) => ({
           startAt: s2.startAt.toISOString(),
           endAt: s2.endAt.toISOString(),

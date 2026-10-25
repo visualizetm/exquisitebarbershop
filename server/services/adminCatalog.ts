@@ -7,6 +7,7 @@ import type {
   ConflictResolution,
   OutboxMessageView,
 } from '../../shared/api/admin';
+import { pruneServicePrices } from '../../shared/lib/servicePricing';
 import { shopDayBounds } from '../../shared/lib/time';
 import type { EmailOutboxDocument } from '../../shared/schemas/emailOutbox';
 import type { ServiceDocument, ServiceInput, ServiceUpdate } from '../../shared/schemas/service';
@@ -160,6 +161,8 @@ export function toStaffView(s: StaffDocument): AdminStaffView {
     bio: s.bio,
     chairNumber: s.chairNumber,
     serviceIds: s.serviceIds,
+    // Read with a default: staff documents written before per person prices have no field.
+    servicePrices: s.servicePrices ?? [],
     photoUrl: s.photoUrl,
     instagramHandle: s.instagramHandle,
     sortOrder: s.sortOrder,
@@ -186,6 +189,11 @@ export async function createStaff(principal: Principal, input: StaffInput, meta:
 /**
  * Updates a chair. Dropping a service the chair has upcoming bookings for goes
  * through the conflict rule; other edits never leave a booking stranded.
+ *
+ * Prices follow the menu: a request that changes only the services drops the prices of any service
+ * it removes, and a request that changes the prices is checked against the menu the chair will
+ * have afterwards (one price per service, only for services it offers). Bookings already made keep
+ * the price they were booked with.
  */
 export async function updateStaff(
   principal: Principal,
@@ -193,9 +201,17 @@ export async function updateStaff(
   input: Omit<StaffUpdate, 'slug'> & { resolutions?: Resolutions },
   meta: ServiceMeta,
 ): Promise<Changed<{ staff: AdminStaffView } & ConflictOutcome>> {
-  const { resolutions, ...patch } = input;
+  const { resolutions, ...requested } = input;
   const before = await staffRepo.findStaffById(id);
   if (!before || before.deletedAt) throw new AppError('NOT_FOUND', 'Staff member was not found');
+  const patch: typeof requested = { ...requested };
+  const beforePrices = before.servicePrices ?? [];
+  if (patch.servicePrices !== undefined) {
+    staffRepo.assertPricesMatchMenu(patch.serviceIds ?? before.serviceIds, patch.servicePrices);
+  } else if (patch.serviceIds) {
+    const kept = pruneServicePrices(patch.serviceIds, beforePrices);
+    if (kept.length !== beforePrices.length) patch.servicePrices = kept;
+  }
   const removed = patch.serviceIds
     ? before.serviceIds.filter((s) => !patch.serviceIds?.includes(s))
     : [];
@@ -218,6 +234,21 @@ export async function updateStaff(
         (b) => b.staffId === id && b.services.some((s) => removed.includes(s.serviceId)),
       ),
   });
+  const afterPrices = change.result.servicePrices ?? [];
+  if (JSON.stringify(afterPrices) !== JSON.stringify(beforePrices)) {
+    // Prices get their own entry with both sides, so the log answers "who changed Drew's prices".
+    await audit(
+      principal,
+      {
+        action: 'staff.prices.update',
+        entityType: 'staff',
+        entityId: id,
+        before: { servicePrices: beforePrices },
+        after: { servicePrices: afterPrices },
+      },
+      meta,
+    );
+  }
   return {
     body: {
       staff: toStaffView(change.result),

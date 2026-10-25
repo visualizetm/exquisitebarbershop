@@ -881,3 +881,83 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
   Dontrise types a real address in Settings, and no calendar client was tested either way. (c) The personal
   number stays out of every file this prompt wrote; the tests that assert its absence match a short
   fragment, and the lead's data file still carries it.
+- D12-26 Where the overrides live: `staff.servicePrices`, an optional array of `{serviceId, priceCents,
+durationMinutes?}` on the staff document. Rejected: a separate prices collection (one more join on every
+  availability load, and the editor, the public page and the booking all work per person) and a map on the
+  service (the owner edits one person at a time). The field is optional so documents written before it read
+  as none: `toStaffView`, `toPublicStaff` and the engine default it to an empty list, and no migration runs.
+- D12-27 The pricing rule is one pure helper, `shared/lib/servicePricing.ts`. A chosen or assigned person
+  gets their own entry, else the shop's price and time. The "from" flag stays the service's own flag, so the
+  owner still decides what "from" means (a price that depends on the head of hair is true whatever the
+  barber); it is also switched on when first available could land on a different price. An entry that cannot
+  be a price (negative, a fraction of a cent, not a number) is ignored and the shop price applies, so a
+  damaged record never charges nonsense; writes are validated, so this only guards against hand edits.
+- D12-28 First available, or no one chosen yet: the lowest total among the people who do every chosen
+  service, not the sum of each service's cheapest person (one barber has to do them all). A tie goes to the
+  shorter time, then to display order. The matching duration decision: the time shown with a "from" price is
+  that same person's time, so the price and the minutes always describe one real person ("From $20, 20 min"
+  is Drew's lineup, not an average). Rejected: the shortest time of anyone (it would print minutes the
+  cheapest person does not take) and the longest (it would scare customers off). The real price and time are
+  fixed when a chair is assigned.
+- D12-29 Two pools. The price list (Home, Services) draws from everyone on the site who offers the service,
+  because a walk-in pays that price too. The booking steps and the owner's New booking panel draw first
+  available from the chairs that take online bookings, which is the pool the server assigns from, so a
+  "from" figure can only be too low by the spread between those chairs, never by a chair that cannot be
+  booked.
+- D12-30 The availability engine quotes per chair. `AvailabilityResult.quotes` (a map by staff id, price
+  included) replaces the single `serviceMinutes`, `bufferMinutes` and `totalMinutes`: a start is offered to
+  a chair only if that chair's own time fits before closing, and `OpenSlot.endAt` is measured for the chair
+  the slot goes to (each candidate keeps its own length, and placement reads the chosen chair's quote). The
+  cleanup gap stays per service and shop wide, not per person. `/api/availability` reports the shortest
+  chair total as `durationMinutes` (nothing on the client reads it). Next openings and a chair's openings
+  use the chair's own times, and a chair's measuring service is its shortest by those times.
+- D12-31 Online, phone and walk-in bookings store the quote of the chair the booking lands on: the service
+  lines (price, "from" flag, minutes), `durationMinutes`, `totalPriceCents` and the locks. That holds for
+  first available too, where the chair is only known at placement. Emails, the ticket, the manage page, the
+  admin views and the totals on the dashboard all read the stored snapshot, so none of them needed to
+  change.
+- D12-32 Reschedule. On the same chair the booking keeps what it was booked with: price, service lines and
+  length. The engine request takes `keep` (that chair's stored minutes), so the times offered match what is
+  locked even if the chair's time was edited afterwards. A move to another chair (the owner's reschedule
+  with a chair, or anyone available) re-resolves with the new chair's own price and time and writes the
+  service lines, `durationMinutes` and `totalPriceCents`, because keeping the old chair's price on a booking
+  now sitting with Nelly would be wrong. Rejected: always re-resolving (an edit to a price would silently
+  change an existing customer's price and length). The resolver Move (a schedule conflict) keeps price and
+  length: the owner is fixing a schedule, not repricing, and the conflict rule checked the same time span.
+- D12-33 Validation. Cents are whole and not below zero, minutes use the service rule (multiple of 5, 5 to
+  480; `serviceDurationSchema` is shared), at most 100 entries, one per service. Duplicates are an array
+  level refinement, because Zod 4 refuses `.omit()` on an object with refinements and the staff schemas are
+  derived with `.omit()`. For the same reason "only for a service on the menu" is a refinement on the create
+  and update request schemas (when a request carries both halves) plus `staffRepo.assertPricesMatchMenu`,
+  which `insertStaff` and `adminCatalog.updateStaff` run against the menu the chair will have afterwards, so
+  a request with only one half is checked against the stored other half.
+- D12-34 Taking a service off a barber's menu drops that service's price in the same save when the request
+  carries no prices. Rejected: refusing the save (the owner would have to clear the price on another tab
+  first) and keeping the entry (adding the service back later would silently revive an old price).
+- D12-35 Audit. A price change writes its own `staff.prices.update` entry with the list before and after,
+  because the existing `staff.update` entry records only the patch. It is written only when the list
+  changed, so saving the same list twice leaves one entry.
+- D12-36 The Team, Prices editor. An empty price means the shop price and an empty time means the shop time.
+  A time with no price stores the shop's current price with it, because the schema needs a price. A price
+  typed equal to the shop's is kept, since the owner may want a barber's price to stay put when the shop
+  price moves. The editor is props driven (`staffName`, `services`, `saved`, `onSave`) so `/kit` shows every
+  state with fake saves, and `PricesTab` does the PATCH, the toast and the refresh. "Use shop price" only
+  appears on a group that holds a value, instead of ten disabled buttons.
+- D12-37 Client. `src/lib/menuPrices.ts` (`menuServices`, `chairServices`, `bookingQuote`) hands back
+  `PublicService` objects with the price, "from" flag and minutes already resolved, so `PriceRow`,
+  `ServicePicker`, `BookingSummary` and `BookingCard` stayed as they were; `ServicePicker` gained an
+  optional totals prop and `StaffPicker` shows what the chosen services come to with each person.
+  `/api/services` stays at shop level and `/api/staff` carries `servicePrices`; the numbers are the ones
+  printed on the pages, so nothing private travels. The owner's New booking panel and the barber walk-in
+  form price the services for the chosen chair.
+- D12-38 Bookings made before this change keep their stored cents: nothing recomputes a stored price, and
+  the revenue, spent and total figures on the dashboard sum the stored totals. Staff documents without the
+  field book at the shop price.
+- D12-39 Two test fixes that were not about prices. The team spec's "In or Off" test now keeps the bookings
+  an earlier test left on that chair today, because the shop is open on Sundays now and the resolver asks
+  first. The availability unit tests select a chair by id, since two fixture chairs created in the same
+  hours get the same generated slug.
+- D12-40 Databases that were seeded before this change keep their staff as they are (`runSeed` never
+  overwrites), so they have no per barber prices until the owner enters them in Team, Prices or runs Demo
+  data, Reset, which wipes and reloads the seed with the overrides. Said in the report next to the other
+  post deploy step.

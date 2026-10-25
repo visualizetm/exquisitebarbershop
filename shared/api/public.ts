@@ -7,7 +7,7 @@ import {
   googleSettingsSchema,
   socialLinksSchema,
 } from '../schemas/shopSettings';
-import { staffRoleSchema } from '../schemas/staff';
+import { servicePriceSchema, staffRoleSchema } from '../schemas/staff';
 import { photoViewSchema } from './photos';
 
 /** Public shop information for the Visit page, the footer and SEO. */
@@ -68,6 +68,8 @@ export const publicStaffSchema = z.object({
   bio: z.string(),
   chairNumber: z.int().nullable(),
   serviceIds: z.array(idSchema),
+  /** This person's own prices and times, where they differ from the shop's. Public on the menu. */
+  servicePrices: z.array(servicePriceSchema).default([]),
   photoUrl: z.string().nullable(),
   instagramHandle: z.string().nullable(),
   acceptsOnlineBooking: z.boolean(),

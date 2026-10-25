@@ -13,6 +13,7 @@ function member(overrides: Partial<PublicStaff>): PublicStaff {
     bio: '',
     chairNumber: 2,
     serviceIds: ['64a1f2c3d4e5f60718293a4c'],
+    servicePrices: [],
     photoUrl: null,
     instagramHandle: 'lee_dabarber_',
     acceptsOnlineBooking: true,

@@ -473,3 +473,23 @@ commit, and what is still open.
   integration cases, and a "a chair only lists the services it does" group in `tests/e2e/realshop.spec.ts`
   (public flow, owner New booking panel, barber walk-in form). Decisions D12-20 to D12-25. The owner guide PDF
   is re-rendered in milestone 5.
+
+### M2: per barber prices
+
+- Shipped: `staff.servicePrices` (optional `{serviceId, priceCents, durationMinutes?}` list, zod in `shared`,
+  validated on the staff create and update routes); `shared/lib/servicePricing.ts`, the one helper behind every
+  price (chosen or assigned barber, first available as a "from" price, several services, the price list); the
+  seed overrides for Dontrise, Drew and Nelly from the menus.
+- Server: the availability engine quotes per chair (a chair's own time decides which starts it gets and where its
+  slot ends), booking create, walk-in and phone bookings store the assigned chair's price, lines and minutes,
+  reschedule keeps them on the same chair and re-resolves on a move to another chair, next openings and a chair's
+  openings use the chair's own times, `/api/staff` carries the prices, and `staff.prices.update` is audited with
+  both sides. Emails, the ticket, the manage page, the admin views and the team portal read the stored snapshot.
+- Client: `/services` and the Home menu show "From $x" where barbers differ, a chair page shows that person's
+  prices and minutes, the booking steps price the chosen chair (or the lowest total for first available) and the
+  barber step shows each person's total, the owner New booking panel and the barber walk-in form price per chair,
+  and Team has a Prices tab (`PriceOverrideEditor`, also in `/kit` and `DESIGN-SYSTEM.md` with its states).
+- Tests: `tests/unit/servicePricing.test.ts`, `staffPrices.test.ts`, per chair cases in `availability.test.ts`,
+  `tests/integration/barberPrices.test.ts` (override price and time on the booking, emails, admin and manage
+  views, first available, reschedule, validation, owner only), `tests/e2e/prices.spec.ts`; the Prices tab is in
+  the Team axe run and `/kit` lists the new section. Decisions D12-26 to D12-40.

@@ -12,7 +12,7 @@ import { PLACEHOLDER_SHOP_EMAIL } from '../shared/lib/email';
 import type { WeekHours } from '../shared/schemas/common';
 import type { ServiceInput } from '../shared/schemas/service';
 import type { ShopSettingsInput } from '../shared/schemas/shopSettings';
-import type { StaffInput } from '../shared/schemas/staff';
+import type { ServicePrice, StaffInput } from '../shared/schemas/staff';
 
 export const shopSettingsSeed: ShopSettingsInput = {
   name: 'Exquisite Barber & Beauty Lounge',
@@ -284,6 +284,37 @@ const serviceKeysByStaff = {
   iniya: [] as string[],
 };
 
+/**
+ * Where a person charges more, or takes longer, than the shop's own price and time: [price in cents]
+ * or [price in cents, minutes]. They come from the same menus as the prices above (Dontrise's Squire
+ * menu, Drew's and Nelly's theCut menus). A service missing here uses the shop's price and time.
+ */
+const servicePriceKeysByStaff: Record<
+  string,
+  Record<string, readonly [priceCents: number] | readonly [priceCents: number, minutes: number]>
+> = {
+  dontrise: {
+    haircut: [5000, 75],
+    'cut-design': [7000],
+    'kids-cut': [3000, 45],
+    'kids-design': [4000, 90],
+    lineup: [3000, 40],
+    'color-cut': [10000, 180],
+  },
+  drew: { 'kids-cut': [2500] },
+  nelly: { haircut: [4500] },
+};
+
+function servicePricesFor(staffKey: string): ServicePrice[] {
+  return Object.entries(servicePriceKeysByStaff[staffKey] ?? {}).map(
+    ([serviceKey, [price, minutes]]) => ({
+      serviceId: serviceSeedId(serviceKey),
+      priceCents: price,
+      ...(minutes === undefined ? {} : { durationMinutes: minutes }),
+    }),
+  );
+}
+
 export interface StaffSeed {
   key: string;
   input: StaffInput;
@@ -307,6 +338,7 @@ export const staffSeed: StaffSeed[] = [
       bio: 'Team barber for the New York Jets and a travel barber. Hair Unit and AKN certified.',
       chairNumber: 1, // PLACEHOLDER
       serviceIds: serviceKeysByStaff.dontrise.map(serviceSeedId),
+      servicePrices: servicePricesFor('dontrise'),
       photoUrl: null,
       instagramHandle: 'dontrisethebarber',
       sortOrder: 0,
@@ -326,6 +358,7 @@ export const staffSeed: StaffSeed[] = [
       bio: '', // PLACEHOLDER no public profile text was found
       chairNumber: 2, // PLACEHOLDER
       serviceIds: serviceKeysByStaff.lee.map(serviceSeedId), // PLACEHOLDER
+      servicePrices: servicePricesFor('lee'),
       photoUrl: null,
       instagramHandle: 'lee_dabarber_',
       sortOrder: 10,
@@ -345,6 +378,7 @@ export const staffSeed: StaffSeed[] = [
       bio: 'PA licensed barber and certified sensory safe. Works with all hair types: designs, color, perms, big chops and hairline restoration.',
       chairNumber: 3, // PLACEHOLDER
       serviceIds: serviceKeysByStaff.drew.map(serviceSeedId),
+      servicePrices: servicePricesFor('drew'),
       photoUrl: null,
       instagramHandle: 'drew2sharp',
       sortOrder: 20,
@@ -372,6 +406,7 @@ export const staffSeed: StaffSeed[] = [
       bio: 'Delaware County barber. Ask for the steam, hot towel and fade.',
       chairNumber: 4, // PLACEHOLDER
       serviceIds: serviceKeysByStaff.nelly.map(serviceSeedId),
+      servicePrices: servicePricesFor('nelly'),
       photoUrl: null,
       instagramHandle: 'nellycutz_',
       sortOrder: 30,
@@ -391,6 +426,7 @@ export const staffSeed: StaffSeed[] = [
       bio: 'Braiding since 2020. Book through Instagram for now.',
       chairNumber: 5, // PLACEHOLDER
       serviceIds: serviceKeysByStaff.iniya,
+      servicePrices: servicePricesFor('iniya'),
       photoUrl: null,
       instagramHandle: 'iniyathestylist',
       sortOrder: 40,

@@ -34,12 +34,14 @@ test.describe('schedule', () => {
     // A click on an empty slot of a chair does the same with the clicked time.
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'New booking' })).toHaveCount(0);
-    // The fourth chair (Nelly Cutz), two hours down its column. Playwright scrolls that point into
-    // view first; a hand worked mouse position missed the grid once the page had scrolled.
+    // The fourth chair (Nelly Cutz), five hours down its column (mid afternoon, where earlier specs
+    // in a full run have not booked her: they take the first free times of the day). Playwright
+    // scrolls that point into view first; a hand worked mouse position missed the grid once the
+    // page had scrolled.
     await page
       .locator('.exq-daygrid__col')
       .nth(3)
-      .click({ position: { x: 20, y: 24 * 4 * 2 + 12 } });
+      .click({ position: { x: 20, y: 24 * 4 * 5 + 12 } });
     await expect(
       page.getByRole('dialog', { name: 'New booking' }).getByLabel('Barber'),
     ).toHaveValue('nelly');
@@ -218,7 +220,20 @@ test.describe('team and the resolver', () => {
     const panel = page.getByRole('dialog', { name: 'Barber out' });
     await expect(panel.getByLabel('Barber')).toHaveValue(/[0-9a-f]{24}/);
     await panel.getByRole('button', { name: 'Mark out' }).click();
-    await expect(page.getByText(/Dontrise is out today/)).toBeVisible();
+    // A booking an earlier test moved onto this chair today asks first (the shop is open on
+    // Sundays now): keep each one, then apply.
+    const outToast = page.getByText(/Dontrise is out today/);
+    const decide = panel.getByText(/^0 of \d+ decided$/);
+    await expect(outToast.or(decide)).toBeVisible();
+    if (await decide.isVisible()) {
+      const items = panel.locator('.exq-resolver__item');
+      const count = await items.count();
+      for (let i = 0; i < count; i += 1) {
+        await items.nth(i).getByRole('radio', { name: /^Keep/ }).check({ force: true });
+      }
+      await panel.getByRole('button', { name: 'Apply the change' }).click();
+    }
+    await expect(outToast).toBeVisible();
     await expect(card.getByRole('switch')).not.toBeChecked();
     await card.getByRole('switch').click();
     await expect(page.getByText(/Dontrise is back in today/)).toBeVisible();
@@ -262,7 +277,7 @@ for (const theme of ['light', 'dark'] as const) {
       await check(`team ${size.width}`);
       await page.locator('.exq-teamcard').first().getByRole('link').first().click();
       await expect(page.getByRole('tablist')).toBeVisible();
-      for (const tab of ['Profile', 'Services', 'Working hours', 'Time off']) {
+      for (const tab of ['Profile', 'Services', 'Prices', 'Working hours', 'Time off']) {
         await page.getByRole('tab', { name: tab }).click();
         await check(`team ${tab} ${size.width}`);
       }

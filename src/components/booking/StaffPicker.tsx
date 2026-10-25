@@ -1,5 +1,7 @@
 import Users01 from '@untitled-ui/icons-react/build/esm/Users01';
-import type { PublicStaff } from '@shared/api/public';
+import type { PublicService, PublicStaff } from '@shared/api/public';
+import { formatCents } from '@shared/lib/money';
+import { quoteFirstAvailable, quoteForStaff } from '@shared/lib/servicePricing';
 import { Button, OptionCard, PhotoFrame } from '@/components/ui';
 import { qualifiedStaff } from '@/lib/booking/helpers';
 import { inChairOrder } from '@/lib/chairStatus';
@@ -7,22 +9,46 @@ import { inChairOrder } from '@/lib/chairStatus';
 export interface StaffPickerProps {
   staff: PublicStaff[];
   serviceIds: string[];
+  /** The services chosen, so each chair can show what they come to with that person. */
+  services?: PublicService[] | undefined;
   selected: string | null;
   allowFirstAvailable: boolean;
   onChange: (selector: string) => void;
   onContinue: () => void;
 }
 
+function QuoteMeta({ cents, minutes, from }: { cents: number; minutes: number; from: boolean }) {
+  return (
+    <>
+      <span className="exq-service-option__price exq-price">
+        {from ? 'From ' : ''}
+        {formatCents(cents)}
+      </span>
+      <span className="exq-service-option__duration">{minutes} min</span>
+    </>
+  );
+}
+
+/** What the chosen services come to with this person: their own prices and times. */
+function chairMeta(services: PublicService[], member: PublicStaff) {
+  const quote = services.length > 0 ? quoteForStaff(services, member) : null;
+  return quote ? (
+    <QuoteMeta cents={quote.totalCents} minutes={quote.totalMinutes} from={quote.from} />
+  ) : undefined;
+}
+
 /** Chairs as option cards plus "Anyone available". Only chairs that do every chosen service appear. */
 export function StaffPicker({
   staff,
   serviceIds,
+  services = [],
   selected,
   allowFirstAvailable,
   onChange,
   onContinue,
 }: StaffPickerProps) {
   const qualified = inChairOrder(qualifiedStaff(staff, serviceIds));
+  const anyQuote = services.length > 0 ? quoteFirstAvailable(services, qualified) : null;
   return (
     <div
       className="exq-staff-picker"
@@ -47,6 +73,15 @@ export function StaffPicker({
                   selected={selected === 'any'}
                   title="Anyone available"
                   description="We pick the least booked chair."
+                  meta={
+                    anyQuote ? (
+                      <QuoteMeta
+                        cents={anyQuote.totalCents}
+                        minutes={anyQuote.totalMinutes}
+                        from={anyQuote.from}
+                      />
+                    ) : undefined
+                  }
                   lead={
                     <span className="exq-option__mark" aria-hidden="true">
                       <Users01 />
@@ -70,6 +105,7 @@ export function StaffPicker({
                   selected={selected === member.slug}
                   title={member.name}
                   description={member.specialty || member.title}
+                  meta={chairMeta(services, member)}
                   lead={
                     <PhotoFrame
                       photo={member.photo ?? null}

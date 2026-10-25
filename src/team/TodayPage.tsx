@@ -30,6 +30,7 @@ import {
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
 import { offeredServices } from '@/lib/booking/offered';
+import { chairServices } from '@/lib/menuPrices';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { newIdempotencyKey, shopDateLabel, shopTime } from '@/admin/format';
@@ -415,9 +416,11 @@ function WalkInForm({ onDone }: { onDone: (name: string) => void }) {
   if (services.status === 'error') return <Status state="error" />;
   // Only the services on this barber's own menu: another chair's would be refused. If the menu
   // cannot be read, every service is listed and the server decides.
-  const menu =
-    team.status === 'ready' ? team.data.staff.find((m) => m.id === me.staff.id)?.serviceIds : null;
-  const offered = offeredServices(services.data.services, menu);
+  // Prices and times are this barber's own where they set them.
+  const member = team.status === 'ready' ? team.data.staff.find((m) => m.id === me.staff.id) : null;
+  const offered = member
+    ? chairServices(services.data.services, member)
+    : offeredServices(services.data.services, null);
   return (
     <form className="exq-team-form" onSubmit={(e) => void submit(e)}>
       <Input

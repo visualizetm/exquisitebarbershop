@@ -5,6 +5,12 @@ import {
   serviceListResponseSchema,
   staffListResponseSchema,
 } from '@shared/api/admin';
+import {
+  menuPrice,
+  quoteFirstAvailable,
+  quoteForStaff,
+  resolveServiceForStaff,
+} from '@shared/lib/servicePricing';
 import { Button, Checkbox, Chip, Chips, Input, Select, Textarea, useToast } from '@/components/ui';
 import { ApiRequestError, apiRequest } from '@/lib/api';
 import { offeredServices } from '@/lib/booking/offered';
@@ -83,9 +89,17 @@ export function NewBookingPanel({
   const chairDoc = selectedChair === 'any' ? null : chairs.find((s) => s.slug === selectedChair);
   const shown = offeredServices(bookable, chairDoc?.serviceIds ?? null);
   const picked = serviceIds.filter((id) => shown.some((s) => s.id === id));
-  const total = shown
-    .filter((s) => picked.includes(s.id))
-    .reduce((sum, s) => sum + s.priceCents, 0);
+  // Prices are the chosen barber's own. With first available they are the lowest among the chairs
+  // that take online bookings, as the public page prints them; the server prices the booking for
+  // the chair it assigns, so the real total can only be higher than a "from" figure.
+  const pool = chairs.filter((c) => c.acceptsOnlineBooking && c.showOnWebsite);
+  const priceOf = (s: (typeof shown)[number]) =>
+    chairDoc ? resolveServiceForStaff(s, chairDoc) : menuPrice(s, pool);
+  const quote = (() => {
+    const chosen = shown.filter((s) => picked.includes(s.id));
+    if (chosen.length === 0) return null;
+    return chairDoc ? quoteForStaff(chosen, chairDoc) : quoteFirstAvailable(chosen, pool);
+  })();
 
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
@@ -161,7 +175,7 @@ export function NewBookingPanel({
           <Checkbox
             key={s.id}
             label={s.name}
-            hint={`${s.durationMinutes} min, ${s.priceFrom ? 'from ' : ''}${money(s.priceCents)}`}
+            hint={`${priceOf(s).durationMinutes} min, ${priceOf(s).priceFrom ? 'from ' : ''}${money(priceOf(s).priceCents)}`}
             checked={serviceIds.includes(s.id)}
             onChange={(e) => {
               setServiceIds((prev) =>
@@ -170,7 +184,12 @@ export function NewBookingPanel({
             }}
           />
         ))}
-        {picked.length > 0 ? <p className="exq-muted">Total {money(total)}</p> : null}
+        {quote ? (
+          <p className="exq-muted">
+            Total {quote.from ? 'from ' : ''}
+            {money(quote.totalCents)}, {quote.totalMinutes} min
+          </p>
+        ) : null}
       </fieldset>
 
       <Select

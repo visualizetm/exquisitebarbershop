@@ -122,6 +122,7 @@ Indexes: none beyond `_id`.
 | role                        | owner, barber, stylist |                                                          |
 | chairNumber                 | int or null            |                                                          |
 | serviceIds                  | string[]               | services this person performs                            |
+| servicePrices               | array, optional        | own price and time, one per service                      |
 | photoUrl, instagramHandle   | string or null         |                                                          |
 | sortOrder                   | int                    | display order                                            |
 | acceptsOnlineBooking        | boolean                | false means walk-in only                                 |
@@ -133,6 +134,11 @@ Indexes: none beyond `_id`.
 | -------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | uniq_slugKeys (unique, multikey) | slugKeys                            | no slug, current or former, can belong to two people. This is what makes printed QR codes safe forever. |
 | public_listing                   | deletedAt, showOnWebsite, sortOrder | public team page                                                                                        |
+
+`servicePrices` entries are `{serviceId, priceCents, durationMinutes?}`: a person's own price (whole cents) and
+time (multiple of 5) where they differ from the shop's, at most one per service and only for a service in
+`serviceIds`. Documents written before the field have none, which reads as an empty list. A booking stores the
+price and minutes of the person it lands on, so editing a price never changes a booking already made.
 
 Daily "in or out" toggles are not fields on staff; they are `timeBlocks` of kind
 `dayOff` or `extraHours` for that date, so history is kept and nothing is lost
@@ -586,7 +592,7 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 | GET, POST     | /api/admin/services                   | owner                    |                                                                                                                  |
 | PATCH, DELETE | /api/admin/services/:id               | owner                    | DELETE is a soft delete through the conflict rule                                                                |
 | GET, POST     | /api/admin/staff                      | owner                    | SLUG_TAKEN                                                                                                       |
-| PATCH, DELETE | /api/admin/staff/:id                  | owner                    | conflict rule; DELETE soft deletes and disables the login                                                        |
+| PATCH, DELETE | /api/admin/staff/:id                  | owner                    | conflict rule; DELETE soft deletes and disables the login; PATCH takes `servicePrices`                           |
 | POST          | /api/admin/staff/:id/slug             | owner                    | old slug becomes an alias                                                                                        |
 | PUT           | /api/admin/staff/:id/hours            | owner                    | conflict rule                                                                                                    |
 | GET, PUT      | /api/admin/hours                      | owner                    | PUT is the shop hours; conflict rule                                                                             |

@@ -8,6 +8,11 @@ export interface ServicePickerProps {
   chairName?: string | undefined;
   /** Drops the chair choice so every service is listed (shown beside the chair's name). */
   onShowAll?: (() => void) | undefined;
+  /**
+   * What the chosen services come to for the person or the first available pool the page is
+   * pricing for. Without it the picker adds up the rows it shows.
+   */
+  totals?: { cents: number; minutes: number; from: boolean } | undefined;
   selected: string[];
   max: number;
   onChange: (selected: string[]) => void;
@@ -19,15 +24,16 @@ export function ServicePicker({
   services,
   chairName,
   onShowAll,
+  totals,
   selected,
   max,
   onChange,
   onContinue,
 }: ServicePickerProps) {
   const chosen = services.filter((s) => selected.includes(s.id));
-  const totalCents = chosen.reduce((sum, s) => sum + s.priceCents, 0);
-  const totalMinutes = chosen.reduce((sum, s) => sum + s.durationMinutes, 0);
-  const anyFrom = chosen.some((s) => s.priceFrom);
+  const totalCents = totals?.cents ?? chosen.reduce((sum, s) => sum + s.priceCents, 0);
+  const totalMinutes = totals?.minutes ?? chosen.reduce((sum, s) => sum + s.durationMinutes, 0);
+  const anyFrom = totals?.from ?? chosen.some((s) => s.priceFrom);
   const full = selected.length >= max;
   const totalLabel = `${anyFrom ? 'From ' : ''}${formatCents(totalCents)}`;
 

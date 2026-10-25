@@ -150,6 +150,10 @@ export async function rescheduleBooking(
     startAt: Date;
     endAt: Date;
     bufferMinutes: number;
+    /** Only when the booking moves to a chair with other prices: the services as that chair does them. */
+    services?: BookingDocument['services'];
+    durationMinutes?: number;
+    totalPriceCents?: number;
   },
   now: Date,
   options?: RepoOptions,

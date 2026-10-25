@@ -1,5 +1,6 @@
 import type { NextOpening, NextOpeningsResponse } from '../../shared/api/availability';
 import type { Opening, StaffOpeningsResponse } from '../../shared/api/public';
+import { resolveServiceForStaff } from '../../shared/lib/servicePricing';
 import { formatShopTime, shopDateOf, shopDayStart, toShopTime } from '../../shared/lib/time';
 import type { ServiceDocument } from '../../shared/schemas/service';
 import type { StaffDocument } from '../../shared/schemas/staff';
@@ -8,6 +9,8 @@ import { servicesRepo, shopSettingsRepo, staffRepo } from '../repos';
 import {
   computeAvailability,
   nextOpenSlots,
+  pricedService,
+  pricedStaff,
   workingRangesFor,
   type AvailabilityContext,
   type OpenSlot,
@@ -31,7 +34,15 @@ export function openingLabel(startAt: Date, now: Date): string {
   return `${toShopTime(startAt).toFormat('ccc')} ${time}`;
 }
 
-/** The service a chair's next opening is measured with: the owner's pick, else their shortest. */
+/** How long the chair takes for a service: its own time when it set one, else the shop's. */
+export function minutesOnChair(staff: StaffDocument, service: ServiceDocument): number {
+  return resolveServiceForStaff(pricedService(service), pricedStaff(staff)).durationMinutes;
+}
+
+/**
+ * The service a chair's next opening is measured with: the owner's pick, else the chair's shortest
+ * by the chair's own times (one chair's quick service is another's long one).
+ */
 export function serviceForChair(
   staff: StaffDocument,
   services: readonly ServiceDocument[],
@@ -42,7 +53,7 @@ export function serviceForChair(
   if (preferred) return preferred;
   return (
     [...offered].sort(
-      (a, b) => a.durationMinutes - b.durationMinutes || a.sortOrder - b.sortOrder,
+      (a, b) => minutesOnChair(staff, a) - minutesOnChair(staff, b) || a.sortOrder - b.sortOrder,
     )[0] ?? null
   );
 }
@@ -129,7 +140,7 @@ export async function staffOpenings(
   return {
     staff: { id: staff._id, slug: staff.slug, name: staff.name },
     service: service
-      ? { id: service._id, name: service.name, durationMinutes: service.durationMinutes }
+      ? { id: service._id, name: service.name, durationMinutes: minutesOnChair(staff, service) }
       : null,
     openings,
   };

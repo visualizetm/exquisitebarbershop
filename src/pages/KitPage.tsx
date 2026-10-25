@@ -42,6 +42,8 @@ import {
   type LightboxPhoto,
 } from '@/components/ui';
 import { BarView } from '@/components/ui/BottomBar';
+import { PriceOverrideEditor } from '@/admin/team/PriceOverrideEditor';
+import type { AdminServiceView } from '@shared/api/admin';
 import { usePageTitle } from '@/lib/usePageTitle';
 import '@/styles/dashboard.css';
 
@@ -57,6 +59,29 @@ function sample(label: string, w: number, h: number): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${String(w)}" height="${String(h)}"><rect width="100%" height="100%" fill="#555"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="${String(Math.round(w / 8))}" text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
+/** The real shop prices for Haircut, Lineup and Kids Cut, and Dontrise's own entries for two of them. */
+const PRICE_SERVICES: AdminServiceView[] = [
+  ['Haircut', 4000, true, 45],
+  ['Lineup', 2000, true, 20],
+  ['Kids Cut', 2000, true, 30],
+].map(([name, priceCents, priceFrom, durationMinutes], index) => ({
+  id: String(index + 1).repeat(24),
+  name: String(name),
+  group: 'Barber' as const,
+  description: '',
+  priceCents: Number(priceCents),
+  priceFrom: Boolean(priceFrom),
+  durationMinutes: Number(durationMinutes),
+  bufferMinutes: null,
+  sortOrder: index,
+  isActive: true,
+  deletedAt: null,
+}));
+const PRICE_SAVED = [
+  { serviceId: '1'.repeat(24), priceCents: 5000, durationMinutes: 75 },
+  { serviceId: '2'.repeat(24), priceCents: 3000, durationMinutes: 40 },
+];
+
 const PHOTO = { url: sample('4:5', 400, 500), width: 400, height: 500, alt: 'Sample portrait' };
 const LIGHTBOX: LightboxPhoto[] = [1, 2, 3].map((n) => ({
   id: String(n),
@@ -597,6 +622,44 @@ function Specimen() {
           <IconButton label="Copy manage link" icon={<Copy01 aria-hidden="true" />} />
         </p>
         <PinPad label="Enter your PIN" onComplete={() => undefined} />
+      </section>
+
+      <section className="exq-kit__block" aria-label="Barber prices">
+        <h2>Barber prices</h2>
+        <p className="exq-muted">
+          A barber&apos;s own price and time for a service. Empty means the shop&apos;s. The first
+          editor starts with two entries saved and Save off; change a field to turn it on, type a
+          letter in a price to see the field error, press Save to see it work. The second one is
+          refused by the server. The third has no services to price.
+        </p>
+        <div className="exq-panel">
+          <PriceOverrideEditor
+            staffName="Dontrise"
+            services={PRICE_SERVICES}
+            saved={PRICE_SAVED}
+            onSave={async () => {
+              await new Promise((resolve) => setTimeout(resolve, 900));
+              toast({ text: 'Prices saved.', tone: 'ok' });
+            }}
+          />
+        </div>
+        <div className="exq-panel">
+          <PriceOverrideEditor
+            staffName="Dontrise"
+            services={PRICE_SERVICES.slice(0, 1)}
+            saved={[]}
+            onSave={() => Promise.reject(new Error('The prices were not saved. Try again.'))}
+          />
+        </div>
+        <div className="exq-panel">
+          <PriceOverrideEditor
+            staffName="Dontrise"
+            services={[]}
+            saved={[]}
+            onSave={() => Promise.resolve()}
+            onChooseServices={() => undefined}
+          />
+        </div>
       </section>
 
       <section className="exq-kit__block" aria-label="Motion">

@@ -76,6 +76,7 @@ white mark always shows.
 | BottomBar (BarView, useBar)                        | per page through `useBar`                                                                      | shown, hidden (keyboard)                                |
 | Footer                                             | shop                                                                                           | loading, ready                                          |
 | ThemeMenu, ThemeSwitch, Mark, DemoBanner, SiteDown | as before                                                                                      |                                                         |
+| PriceOverrideEditor (`src/admin/team`)             | staffName, services (the barber's menu), saved, onSave, onChooseServices                       | see "Barber prices" below                               |
 
 ## Motion
 
@@ -146,3 +147,27 @@ Both are built from the kit (`Sidebar`, `StatTile`, `DataTable`, `SearchBox`, `P
 `motion.css`. `/team` is a phone first page with four tabs, 48px targets and 64px PIN keys, and uses
 `--card-2` (not the light-only `--surface-2`). Toasts carry a tone icon. The demo notice is a `Modal` with a
 focus trap and an inert page behind it.
+
+## Barber prices (prompt 12)
+
+Barbers charge different prices for the same service, so a service has the shop's price and time and each
+person may override either (`staff.servicePrices`). One pure helper, `shared/lib/servicePricing.ts`, decides every
+number; `src/lib/menuPrices.ts` is its client side use (the price list, a chair's menu, the booking steps).
+
+Customer pages show it with the existing `PriceRow` and `OptionCard` meta, no new component: a plain price where
+everyone who does the service charges the same and the shop does not say "from", `From $x` where they differ or
+the shop flag says so, and the lowest price's own minutes beside it. A chair page shows only that person's prices.
+In booking, a chosen chair shows its own total, first available shows the lowest total among the chairs that can be
+assigned, and the barber step shows what the chosen services come to with each person.
+
+**PriceOverrideEditor** (Team, Prices tab, owner only; also in `/kit`, section "Barber prices"). Built from `Input`,
+`Button` and the dashboard panel classes (`exq-panelbody`, `exq-tabbody`); its own classes are `exq-priceedit*`
+in `dashboard.css`, tokens only. One group per service on the barber's menu, with the shop price and time as a hint
+and the same numbers as the placeholders. States, on `data-state` of the form: `idle` (nothing changed, Save is
+disabled), `changed` (Save on), `invalid` (a field shows its error under it and Save is disabled), `saving` (Save
+shows its loading state, every field is disabled), and `empty` (the barber has no services; it says so and offers
+"Choose services"). A group is `data-state="custom"` (red border) when it holds an entry and `shop` when it is empty;
+"Use shop price" appears only on a custom group. A refused save shows `ErrorNote` under the form and keeps what was
+typed. A save shows a toast and writes the audit entry `staff.prices.update` with the list before and after.
+Focus is the kit's input focus ring; every field is labelled "Price in dollars for X" and "Minutes for X" for screen
+readers.

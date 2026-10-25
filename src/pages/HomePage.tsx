@@ -20,6 +20,7 @@ import {
   Reveal,
   SectionHead,
 } from '@/components/ui';
+import { menuServices } from '@/lib/menuPrices';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
@@ -136,8 +137,15 @@ export function HomePage() {
       <section className="exq-band exq-dark exq-home__services" aria-labelledby="exq-home-services">
         <div className="exq-wrap exq-section">
           <SectionHead label="The menu" title="Services" id="exq-home-services" />
-          {services.status === 'ready' ? (
-            <ServiceRows services={services.data.services} limit={5} showDescription />
+          {services.status === 'ready' && staff.status !== 'loading' ? (
+            <ServiceRows
+              services={menuServices(
+                services.data.services,
+                staff.status === 'ready' ? staff.data.staff : [],
+              )}
+              limit={5}
+              showDescription
+            />
           ) : services.status === 'error' ? (
             <ErrorState title="The menu did not load">Call the shop for prices.</ErrorState>
           ) : null}

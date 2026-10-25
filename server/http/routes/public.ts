@@ -55,6 +55,8 @@ export function toPublicStaff(doc: StaffDocument): PublicStaff {
     bio: doc.bio,
     chairNumber: doc.chairNumber,
     serviceIds: doc.serviceIds,
+    // Prices are the public menu, so they travel with the person. Old documents have none.
+    servicePrices: doc.servicePrices ?? [],
     photoUrl: doc.photoUrl,
     instagramHandle: doc.instagramHandle,
     acceptsOnlineBooking: doc.acceptsOnlineBooking,

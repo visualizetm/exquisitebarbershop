@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MAX_NOTE_LENGTH } from '../lib/constants';
+import { servicePriceIssues } from '../lib/servicePricing';
 import {
   bookingCustomerSchema,
   bookingSourceSchema,
@@ -16,7 +17,12 @@ import {
 import { outboxStatusSchema } from '../schemas/emailOutbox';
 import { serviceInputSchema, serviceUpdateSchema } from '../schemas/service';
 import { shopSettingsInputSchema, shopSettingsUpdateSchema } from '../schemas/shopSettings';
-import { staffInputSchema, staffUpdateSchema } from '../schemas/staff';
+import {
+  servicePriceSchema,
+  staffInputSchema,
+  staffUpdateSchema,
+  type ServicePrice,
+} from '../schemas/staff';
 import { actorTypeSchema, timeBlockKindSchema } from '../schemas/timeBlock';
 import { staffSelectorSchema } from './availability';
 import { bookingViewSchema } from './bookings';
@@ -454,6 +460,7 @@ export const adminStaffViewSchema = z.object({
   bio: z.string(),
   chairNumber: z.int().nullable(),
   serviceIds: z.array(idSchema),
+  servicePrices: z.array(servicePriceSchema).default([]),
   photoUrl: z.string().nullable(),
   instagramHandle: z.string().nullable(),
   sortOrder: z.int(),
@@ -464,10 +471,28 @@ export const adminStaffViewSchema = z.object({
 export type AdminStaffView = z.infer<typeof adminStaffViewSchema>;
 export const staffListResponseSchema = z.object({ staff: z.array(adminStaffViewSchema) });
 export const staffResponseSchema = z.object({ staff: adminStaffViewSchema });
-export const staffCreateRequestSchema = staffInputSchema;
+/**
+ * A request that carries both a menu and prices cannot price a service that is not on the menu.
+ * An update that carries only one of them is checked against the stored other half by the service.
+ */
+function checkPricesAgainstMenu(
+  value: { serviceIds?: string[] | undefined; servicePrices?: ServicePrice[] | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (!value.serviceIds || !value.servicePrices) return;
+  for (const issue of servicePriceIssues(value.serviceIds, value.servicePrices)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['servicePrices', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+export const staffCreateRequestSchema = staffInputSchema.superRefine(checkPricesAgainstMenu);
 export const staffUpdateRequestSchema = staffUpdateSchema
   .omit({ slug: true })
-  .extend({ resolutions: resolutionsSchema });
+  .extend({ resolutions: resolutionsSchema })
+  .superRefine(checkPricesAgainstMenu);
 export const staffSlugRequestSchema = z.object({ slug: slugSchema });
 export const staffMutationResponseSchema = staffResponseSchema.extend(conflictOutcomeSchema.shape);
 

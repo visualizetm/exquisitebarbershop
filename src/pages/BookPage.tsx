@@ -30,7 +30,8 @@ import { StaffPicker } from '@/components/booking/StaffPicker';
 import { StepHeading } from '@/components/booking/StepHeading';
 import { TimePicker } from '@/components/booking/TimePicker';
 import { ApiRequestError, apiRequest } from '@/lib/api';
-import { offeredServices } from '@/lib/booking/offered';
+import { qualifiedStaff } from '@/lib/booking/helpers';
+import { bookingQuote, chairServices, menuServices } from '@/lib/menuPrices';
 import {
   clearIdempotencyKey,
   idempotencyKeyFor,
@@ -234,9 +235,26 @@ export function BookPage() {
     preselected?.acceptsOnlineBooking && preselected.serviceIds.length > 0
       ? preselected.serviceIds
       : null;
-  const chosenServices = selection.serviceIds
+  // Every price on this page is the chosen chair's own, or with first available the lowest among
+  // the chairs that could be assigned ("From $x"). The booking itself is priced by the server for
+  // the chair it assigns, so the confirmation shows the final figure.
+  const pickedServices = selection.serviceIds
     .map((id) => allServices.find((s) => s.id === id))
     .filter((s) => s !== undefined);
+  const chosenChair =
+    selection.staff && selection.staff !== 'any'
+      ? (staff.data.staff.find((s) => s.slug === selection.staff) ?? null)
+      : null;
+  const bookable = staff.data.staff.filter((s) => s.acceptsOnlineBooking);
+  const { services: chosenServices, quote } = bookingQuote(
+    pickedServices,
+    chosenChair,
+    qualifiedStaff(staff.data.staff, selection.serviceIds),
+  );
+  const pickerServices =
+    chairMenu && preselected
+      ? chairServices(allServices, preselected)
+      : menuServices(allServices, bookable);
   const chosenStaff =
     selection.staff === 'any'
       ? 'Anyone available'
@@ -362,7 +380,12 @@ export function BookPage() {
       case 'services':
         return (
           <ServicePicker
-            services={offeredServices(allServices, chairMenu)}
+            services={pickerServices}
+            totals={
+              quote
+                ? { cents: quote.totalCents, minutes: quote.totalMinutes, from: quote.from }
+                : undefined
+            }
             chairName={chairMenu ? preselected?.name : undefined}
             onShowAll={() => {
               // Any chair: the services stay chosen and the calendar then looks at every chair.
@@ -384,6 +407,7 @@ export function BookPage() {
           <StaffPicker
             staff={staff.data.staff}
             serviceIds={selection.serviceIds}
+            services={pickedServices}
             selected={selection.staff}
             allowFirstAvailable={shop.data.booking.allowFirstAvailable}
             onChange={(selector) => {

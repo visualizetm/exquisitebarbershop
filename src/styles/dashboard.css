@@ -1227,6 +1227,38 @@
   border-radius: var(--r-card);
 }
 
+/* Team, Prices: one block per service on the barber's menu */
+.exq-priceedit__row {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.exq-priceedit__row[data-state='custom'] {
+  border-color: var(--accent-text);
+}
+.exq-priceedit__fields {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: start;
+}
+.exq-priceedit__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s1) var(--s3);
+}
+.exq-priceedit__name {
+  font-weight: 600;
+}
+.exq-priceedit__shop {
+  color: var(--fg-3);
+}
+
 /* Booking sheet */
 .exq-bsheet {
   display: grid;
