@@ -36445,7 +36445,7 @@ function wrapHtml(title, bodyParagraphs, p) {
   return [
     "<!doctype html>",
     '<html><head><meta charset="utf-8"><title>' + esc2(title) + "</title></head>",
-    '<body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111;">',
+    `<body style="font-family: Archivo, 'Helvetica Neue', Arial, sans-serif; line-height: 1.5; color: #111;">`,
     `<h1 style="font-size: 20px;">${esc2(title)}</h1>`,
     paragraphs,
     `<p style="color:#555; font-size: 13px;">${esc2(p.shop.name)}<br>${p.shop.addressLines.map(esc2).join("<br>")}<br>${esc2(formatUsPhone(p.shop.phone))}</p>`,

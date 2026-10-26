@@ -1277,3 +1277,17 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   online booking and without a handle gets no bar.
 - D13a-12 site.spec's uncredited lightbox check looks only for barber book links (`/book?barber=`),
   so the shop-wide "Book a chair" link is allowed.
+- D13b-01 Archivo comes from `@fontsource-variable/archivo` and its `wdth.css`: that file carries both axes
+  (`font-weight: 100 900; font-stretch: 62% 125%`) in one latin woff2 (90 KB), which is the one file
+  preloaded. The latin-ext and vietnamese faces in the same CSS load only for text in their ranges.
+  Rejected self-hosting under public/fonts: the package already ships the width axis.
+- D13b-02 Width tokens `--w-display` 122%, `--w-head` 116%, `--w-label` 114%, used by the display,
+  heading and label rules; body stays at 100%. Labels went from 600 to 700 and prices and h3 to 800, so
+  the small caps read as a sign rather than soft. Display line height 1 and -1% tracking.
+- D13b-03 With the wider label, a pill button can run past a 360 phone (the empty gallery's "See the
+  latest on Instagram"). Buttons now keep `max-width: 100%` and let a long label wrap, instead of
+  clipping the page.
+- D13b-04 Emails use `Archivo, 'Helvetica Neue', Arial, sans-serif` as a stack: mail clients that have
+  Archivo show it, the rest fall back. No web font is loaded in mail.
+- D13b-05 The brand script re-renders the icons too; they carry no text, so the regenerated PNGs were
+  reverted and only og.png (the tagline in Archivo) changed.

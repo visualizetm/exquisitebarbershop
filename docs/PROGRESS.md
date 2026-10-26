@@ -648,3 +648,14 @@ commit, and what is still open.
 - Heartbeat: 01:41 UTC, next is SHIP (gate, screenshots, Lighthouse, report, PR, merge).
 - SHIP: 02:01 UTC, gate green after two narrowed Iniya checks, screens and Lighthouse captured
   (Home 88, Visit 95), report written; next is the PR and the merge.
+
+## Prompt 13b
+
+### M1: Archivo everywhere
+
+- Shipped: `@fontsource-variable/archivo` (wdth.css, one preloaded latin file with both axes), width
+  tokens, weights raised for labels, prices and headings, the email stack, og.png and OWNER-GUIDE.pdf
+  re-rendered, buttons that wrap a long label. Hero contrast with Archivo: 390 red 5.07:1 white
+  10.59:1; 768 red 4.89:1 white 8.88:1; 1280 on ink 6.07:1 and 18.88:1. Scroll, carousel, chrome,
+  rules, p13a and kit specs pass.
+- Heartbeat: 22:27 UTC, commit follows, next is M2 (the dark dashboard shell).

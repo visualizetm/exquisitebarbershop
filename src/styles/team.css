@@ -52,12 +52,12 @@
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   background: var(--card);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-team-error {
   margin: 0;
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Next up */
@@ -82,7 +82,7 @@
 }
 .exq-team-next__time {
   color: var(--fg-2);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-team-next__who {
   font-size: var(--t-h3);
@@ -170,7 +170,7 @@ button.exq-team-row:hover {
 }
 .exq-team-day__count {
   color: var(--fg-2);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-team-day[data-state='free'] .exq-team-day__head {
   color: var(--fg-2);
@@ -288,7 +288,7 @@ button.exq-team-row:hover {
   border-radius: var(--r-card);
   background: var(--card);
   color: var(--fg-2);
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .exq-team-signin__placeholder {

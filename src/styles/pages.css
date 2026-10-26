@@ -64,7 +64,8 @@
   gap: var(--s1);
   align-items: center;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--accent-text);
@@ -77,7 +78,7 @@
 .exq-hero__info dd {
   min-height: 3.1em;
   margin: var(--s1) 0 0;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
 }
 .exq-hero__photo {
@@ -276,7 +277,7 @@
   margin-top: var(--s2);
 }
 .exq-chair__walk-in {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--fg-2);
 }
 .exq-chair__openings-note {
@@ -369,7 +370,7 @@
   gap: var(--s2) var(--s3);
 }
 .exq-ratingline__text {
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-ratingline__links {
   display: flex;
@@ -419,7 +420,8 @@
 .exq-visit__heading {
   margin-bottom: var(--s3);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   line-height: 1.3;
   text-transform: uppercase;
@@ -471,7 +473,8 @@
   background: var(--ink);
   color: var(--paper);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -526,7 +529,8 @@
 .exq-hours__today {
   margin-left: var(--s2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--accent-text);
@@ -627,7 +631,7 @@
   border: 1px solid var(--accent);
   border-radius: var(--r-card);
   background: var(--card);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-outage p {
   margin: 0;

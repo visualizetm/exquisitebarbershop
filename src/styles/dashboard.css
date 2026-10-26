@@ -192,7 +192,7 @@
 .exq-sidebar__who {
   margin: 0;
   color: var(--paper);
-  font-weight: 600;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 .exq-sidebar__role {
@@ -232,7 +232,7 @@
   color: var(--fg-2);
   font: inherit;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
 }
@@ -399,11 +399,11 @@
 }
 .exq-alert__text {
   flex: 1 1 auto;
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-alert__go {
   flex: none;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent-text);
 }
 
@@ -454,7 +454,7 @@
   margin: 0;
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-stat__value {
   grid-area: value;
@@ -514,7 +514,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-chairrow__lines {
   display: grid;
@@ -536,7 +536,7 @@
 }
 .exq-chairrow__lines b {
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Status chip: a small pill, never color alone (the word is always there). */
@@ -550,7 +550,7 @@
   background: var(--card-2);
   color: var(--fg);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 .exq-status-chip svg {
@@ -604,7 +604,7 @@
 }
 .exq-activity__who {
   min-width: 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-activity__sub {
   display: block;
@@ -636,7 +636,7 @@
   position: relative;
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 .exq-table [data-align='end'] {
@@ -651,7 +651,7 @@
   background: none;
   color: inherit;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .exq-table__sort:hover {
@@ -673,7 +673,7 @@
   background: none;
   color: inherit;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
@@ -795,7 +795,7 @@
   background: var(--card-2);
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -810,7 +810,7 @@
   box-shadow: inset 3px 0 0 var(--red);
 }
 .exq-search__title {
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-search__detail {
   color: var(--fg-2);
@@ -839,7 +839,7 @@
   background: none;
   color: var(--fg-2);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .exq-tabs__tab:hover {
@@ -906,7 +906,7 @@
 }
 .exq-pin[data-state='error'] .exq-pin__status {
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-pin__keys {
   display: grid;
@@ -948,7 +948,7 @@
 .exq-chart__title {
   margin-bottom: var(--s2);
   font-size: var(--t-h3);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-adm .exq-chart__legend,
 .exq-chart__legend {
@@ -1038,7 +1038,7 @@
   min-height: 52px;
   border-bottom: 1px solid var(--border);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-menusheet__link svg {
   width: 20px;
@@ -1046,7 +1046,7 @@
 }
 .exq-menusheet__who {
   margin: var(--s4) 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* The theme menu opens upward inside the sidebar. */
@@ -1219,7 +1219,7 @@
 .exq-fieldset legend {
   padding: 0;
   margin-bottom: var(--s2);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-announce-preview {
   overflow: hidden;
@@ -1253,7 +1253,7 @@
   gap: var(--s1) var(--s3);
 }
 .exq-priceedit__name {
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-priceedit__shop {
   color: var(--fg-3);
@@ -1291,11 +1291,11 @@
 .exq-bsheet__fact dt {
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-bsheet__fact dd {
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 .exq-bsheet__actions {
@@ -1333,7 +1333,7 @@
 .exq-bsheet__when {
   display: block;
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-bsheet__skeleton {
   min-height: 240px;
@@ -1497,7 +1497,7 @@
   background: var(--card-2);
   color: var(--fg-3);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   cursor: default;
 }
 .exq-daygrid__block {
@@ -1508,7 +1508,7 @@
   overflow: hidden;
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   cursor: default;
 }
 .exq-daygrid__line {
@@ -1652,7 +1652,7 @@
   background: none;
   color: var(--fg);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .exq-switch:disabled {
@@ -1851,7 +1851,7 @@
 }
 .exq-reviewsedit__preview[data-state='rated'] {
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-reviewlist {
   display: grid;
@@ -1918,7 +1918,7 @@
 .exq-homephoto figcaption {
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-drafts,
 .exq-gallerylist {
@@ -1989,7 +1989,7 @@
   padding: 0 var(--s1);
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-settings__facts {
   display: grid;

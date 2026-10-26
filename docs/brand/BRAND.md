@@ -1,7 +1,7 @@
 # Exquisite brand guide
 
 Exquisite Barber & Beauty Lounge, 3309 Edgmont Ave, Brookhaven PA. Tagline: Gifted Hands.
-Black, white and red. Jost only. The signature is the shears Q: the tail of the Q is a pair of closed shears with a red pivot dot.
+Black, white and red. Site and app type: Archivo; the logo keeps its own lettering. The signature is the shears Q: the tail of the Q is a pair of closed shears with a red pivot dot.
 
 ## Logo files (`public/brand/`)
 
@@ -47,7 +47,7 @@ More color versions (red crest and disc, one-color crest and disc) are in `docs/
 
 ## Type
 
-Jost only (`@fontsource-variable/jost`).
+Site and app type: Archivo (`@fontsource-variable/archivo`, weight and width axes). The logo keeps its own lettering: its files are fixed paths drawn in Jost 800 and never redrawn in live text.
 
 - Headlines: 800 to 900, all caps, tight line height, slight negative tracking.
 - Labels: 600, all caps, wide tracking, red.

@@ -59,10 +59,13 @@ white mark always shows.
 
 ## Type
 
-- Jost Variable (`@fontsource-variable/jost`, self-hosted, one latin file preloaded,
-  `font-display: swap`), weights 400 to 900.
-- Label 600 caps +14% tracking, red. Body 400, line height 1.55. h3 700. h2 800 caps, line height 1,
-  -1.5%. Display 900 caps, line height .95, -2%. Price 700, tabular numerals.
+- Archivo Variable (`@fontsource-variable/archivo`, its `wdth.css`: one latin file carrying both the
+  weight axis 100 to 900 and the width axis 62% to 125%, preloaded, `font-display: swap`). The logo
+  keeps its own lettering (fixed SVG paths).
+- Width tokens: `--w-display` 122%, `--w-head` 116%, `--w-label` 114%; body is 100%.
+- Label 700, width 114%, caps, +14% tracking, red. Body 400, line height 1.55; strong 700. h3 800.
+  h2 800, width 116%, caps, line height 1, -1.5%. Display 900, width 122%, caps, line height 1, -1%.
+  Price 800, tabular numerals.
 - Public pages use these six sizes and no others; the admin uses 13 to 22px. Button text is label
   size. `tests/unit/motionCss.test.ts` fails if a kit stylesheet names another font size or a literal
   color.

@@ -31,16 +31,20 @@
   --scrim-photo-strong: color-mix(in srgb, var(--ink) 90%, transparent);
   --scrim-photo-light: color-mix(in srgb, var(--ink) 62%, transparent);
 
-  --font: 'Jost Variable', 'Jost', system-ui, sans-serif;
+  --font: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+  /* Archivo's width axis: wide and heavy for display and headings, a little wide for labels, normal for body. */
+  --w-display: 122%;
+  --w-head: 116%;
+  --w-label: 114%;
 
   /* type, phone first; the values at 1024px and up are set at the bottom of this file */
-  --t-label: 13px; /* 600, caps, +14% tracking */
+  --t-label: 13px; /* 700, width 114%, caps, +14% tracking */
   --t-body: 17px; /* 400, line height 1.55 */
   --t-h3: 22px; /* 700, line height 1.15 */
-  --t-h2: 36px; /* 800, caps, line height 1.0 */
+  --t-h2: 36px; /* 800, width 116%, caps, line height 1.0 */
   /* 52px from 385px wide, a little smaller on the narrowest phones so EXQUISITE never clips */
-  --t-display: clamp(40px, 13.4vw, 52px); /* 900, caps, line height .95 */
-  --t-price: 22px; /* 700, tabular numerals */
+  --t-display: clamp(40px, 13.4vw, 52px); /* 900, width 122%, caps, line height 1.0, -1% */
+  --t-price: 22px; /* 800, tabular numerals */
 
   --s1: 4px;
   --s2: 8px;
