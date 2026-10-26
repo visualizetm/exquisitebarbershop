@@ -72,7 +72,7 @@ export function GlobalSearch() {
       onQuery={onQuery}
       onChoose={(group, key) => {
         if (group === 'Bookings') quick.openBooking(key);
-        else void navigate(`/admin/customers/${key.replace(/\D/g, '')}`);
+        else void navigate(`/admin/shop/clients/${key.replace(/\D/g, '')}`);
       }}
     />
   );

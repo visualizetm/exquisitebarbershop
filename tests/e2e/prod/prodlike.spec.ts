@@ -227,15 +227,16 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await page.getByLabel('Password').fill(PRODLIKE_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
-  // The sidebar is ink in both themes, so it carries the white mark.
-  await expect(page.locator('.exq-sidebar .exq-mark--dark')).toHaveAttribute(
+  // The dashboard is dark only, so the top bar carries the white mark.
+  await expect(page.locator('.exq-topbar .exq-mark--dark').first()).toHaveAttribute(
     'src',
     '/brand/exq-stacked-white.svg',
   );
 
   await page.goto('/admin/website?tab=gallery');
-  await expect(page.getByRole('heading', { name: 'Website' })).toBeVisible();
-  const empty = page.locator('.exq-tabs__panel .exq-state[data-state="empty"]');
+  await expect(page).toHaveURL(/\/admin\/website\/gallery$/);
+  await expect(page.getByRole('heading', { name: 'Gallery', level: 1 })).toBeVisible();
+  const empty = page.locator('.exq-website__panel .exq-state[data-state="empty"]');
   await expect(empty).toContainText("Photo storage isn't set up yet.");
   await expect(empty).toContainText("Photos can be added once it's connected.");
   await expect(page.getByRole('button', { name: 'Upload photo' })).toHaveCount(0);

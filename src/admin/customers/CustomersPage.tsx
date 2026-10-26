@@ -130,7 +130,7 @@ export function CustomersPage() {
           onSort={onSort}
           onOpen={(r) => {
             void navigate(
-              `/admin/customers/${r.phoneE164.replace(/\D/g, '')}${window.location.search}`,
+              `/admin/shop/clients/${r.phoneE164.replace(/\D/g, '')}${window.location.search}`,
             );
           }}
           openLabel={(r) => `Open ${r.name}, ${r.phone}`}
@@ -193,7 +193,7 @@ export function CustomersPage() {
       <CustomerSheet
         phone={phone}
         onClose={() => {
-          void navigate(`/admin/customers${window.location.search}`);
+          void navigate(`/admin/shop/clients${window.location.search}`);
         }}
       />
     </div>

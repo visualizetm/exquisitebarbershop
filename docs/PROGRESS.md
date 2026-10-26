@@ -659,3 +659,14 @@ commit, and what is still open.
   10.59:1; 768 red 4.89:1 white 8.88:1; 1280 on ink 6.07:1 and 18.88:1. Scroll, carousel, chrome,
   rules, p13a and kit specs pass.
 - Heartbeat: 22:27 UTC, commit follows, next is M2 (the dark dashboard shell).
+
+### M2: the dark dashboard shell
+
+- Shipped: `--adm-*` tokens and the dark scope on the admin app, a shell with no side menu (top bar
+  with the Shop | Website switch remembered per device, search, clock, New booking, account menu;
+  section tabs under it), new `/admin/shop/*` and `/admin/website/:tab` routes with every old path
+  redirecting, the Website page keyed by path, the Appearance switch removed, red primary buttons in
+  the dashboard, `Sidebar` deleted. dashboard.spec and website.spec rewritten for the shell and pass
+  (23 of 23); axe clean in the shell, on Overview, Bookings, the booking panel, the website and
+  settings sections at 1280 and 390.
+- Heartbeat: 22:52 UTC, commit follows, next is M3 (the floor on Shop, Today).

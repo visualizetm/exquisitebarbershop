@@ -22,7 +22,6 @@ export { PriceRow } from './PriceRow';
 export { Reveal } from './Reveal';
 export { SocialIcon, type Network } from './SocialIcon';
 export { SearchBox, type SearchGroup, type SearchItem } from './SearchBox';
-export { Sidebar, type SidebarItem } from './Sidebar';
 export { StatTile } from './StatTile';
 export { Tabs, type TabItem } from './Tabs';
 export { Modal, Sheet } from './Sheet';

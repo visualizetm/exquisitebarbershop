@@ -6,50 +6,98 @@ const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 
 test.describe('the owner dashboard shell', () => {
-  test('shows the sidebar, the top bar and every area at 1280', async ({ page }) => {
+  test('shows the top bar, the Shop | Website switch and the section tabs at 1280, no side menu', async ({
+    page,
+  }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    const nav = page.getByRole('navigation', { name: 'Dashboard', exact: true });
-    for (const label of [
-      'Overview',
-      'Bookings',
-      'Schedule',
-      'Customers',
-      'Team',
-      'Website',
-      'Settings',
-    ]) {
+    await expect(page).toHaveURL(/\/admin\/shop\/today$/);
+    await expect(page.locator('.exq-sidebar')).toHaveCount(0);
+    const nav = page.getByRole('navigation', { name: 'Shop sections' });
+    for (const label of ['Today', 'Bookings', 'Schedule', 'Clients', 'Team']) {
       await expect(nav.getByRole('link', { name: label })).toBeVisible();
     }
-    const side = page.locator('.exq-sidebar');
-    const box = await side.boundingBox();
-    expect(Math.round(box?.width ?? 0)).toBe(248);
-    await expect(nav.getByRole('link', { name: 'Overview' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    // Search, today's date and the primary button sit in the top bar.
+    await expect(nav.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
+    // Logo, switch, search, the clock, New booking and the account menu sit in the top bar.
     const top = page.locator('.exq-topbar');
+    await expect(top.locator('.exq-mark--dark').first()).toHaveAttribute(
+      'src',
+      '/brand/exq-stacked-white.svg',
+    );
     await expect(
       top.getByRole('combobox', { name: 'Search bookings and customers' }),
     ).toBeVisible();
+    await expect(top.locator('.exq-topbar__date')).toHaveText(
+      /^[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} · \d{1,2}:\d{2} (AM|PM)$/,
+    );
     await expect(top.getByRole('button', { name: 'New booking' })).toBeVisible();
-    // The tab bar is for phones only.
-    await expect(page.getByRole('navigation', { name: 'Dashboard, mobile' })).toBeHidden();
+    // The account menu holds Settings, Audit, Outbox, Change password and Sign out.
+    await top.getByRole('button', { name: /^Account menu/ }).click();
+    for (const label of ['Settings', 'Audit log', 'Outbox', 'Change password']) {
+      await expect(page.getByRole('link', { name: label })).toBeVisible();
+    }
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('link', { name: 'Audit log' })).toBeHidden();
+    // The switch moves to the Website side and is remembered on this device.
+    const sw = top.getByRole('group', { name: 'Dashboard side' });
+    await expect(sw.getByRole('button', { name: 'Shop' })).toHaveAttribute('aria-pressed', 'true');
+    await sw.getByRole('button', { name: 'Website' }).click();
+    await expect(page).toHaveURL(/\/admin\/website\/announcement$/);
+    const web = page.getByRole('navigation', { name: 'Website sections' });
+    for (const label of [
+      'Announcement',
+      'Top of page',
+      'Hours',
+      'Services and prices',
+      'Gallery',
+      'Reviews',
+    ]) {
+      await expect(web.getByRole('link', { name: label })).toBeVisible();
+    }
+    expect(await page.evaluate(() => localStorage.getItem('exq-admin-side'))).toBe('website');
+    await page.goto('/admin');
+    await expect(page).toHaveURL(/\/admin\/website\/announcement$/);
+    await sw.getByRole('button', { name: 'Shop' }).click();
+    await expect(page).toHaveURL(/\/admin\/shop\/today$/);
+    // Every old address lands on its new home.
+    for (const [from, to] of [
+      ['/admin/bookings?range=past', /\/admin\/shop\/bookings\?range=past$/],
+      ['/admin/customers', /\/admin\/shop\/clients$/],
+      ['/admin/team', /\/admin\/shop\/team$/],
+      ['/admin/schedule?view=week', /\/admin\/shop\/schedule\?view=week$/],
+      ['/admin/website?tab=photo', /\/admin\/website\/top$/],
+      ['/admin/photos', /\/admin\/website\/gallery$/],
+    ] as const) {
+      await page.goto(from);
+      await expect(page, from).toHaveURL(to);
+    }
   });
 
-  test('shows the top bar, the menu button and a four tab bar at 390', async ({ page }) => {
+  test('at 390 the switch and the tabs share one row that scrolls sideways, and nothing overflows', async ({
+    page,
+  }) => {
     await page.setViewportSize(PHONE);
     await signInOwner(page);
-    await expect(page.locator('.exq-sidebar')).toBeHidden();
-    const tabs = page.getByRole('navigation', { name: 'Dashboard, mobile' });
-    await expect(tabs.getByRole('link')).toHaveCount(3);
-    await tabs.getByRole('button', { name: 'More' }).click();
-    const sheet = page.getByRole('dialog', { name: 'Menu' });
-    await expect(sheet.getByRole('link', { name: 'Customers' })).toBeVisible();
-    await expect(sheet.getByRole('link', { name: 'Website' })).toBeVisible();
-    await sheet.getByRole('link', { name: 'Customers' }).click();
-    await expect(page).toHaveURL(/\/admin\/customers$/);
+    await expect(page.locator('.exq-sidebar')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Dashboard, mobile' })).toHaveCount(0);
+    const row = page.locator('.exq-sectabs');
+    await expect(row.getByRole('group', { name: 'Dashboard side' })).toBeVisible();
+    await expect(row.getByRole('link', { name: 'Today' })).toBeVisible();
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(390);
+    await row.getByRole('link', { name: 'Team' }).click();
+    await expect(page).toHaveURL(/\/admin\/shop\/team$/);
+    // Tap targets are at least 44px tall.
+    for (const locator of [
+      row.getByRole('button', { name: 'Website' }),
+      row.getByRole('link', { name: 'Team' }),
+      page.getByRole('button', { name: 'New booking' }),
+      page.getByRole('button', { name: /^Account menu/ }),
+    ]) {
+      const box = await locator.boundingBox();
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test('"/" focuses the search, which finds a booking by code, phone and name, from the keyboard', async ({
@@ -82,17 +130,13 @@ test.describe('the owner dashboard shell', () => {
     await expect(page.getByRole('dialog', { name: 'Booking' }).getByText(code)).toBeVisible();
   });
 
-  for (const theme of ['light', 'dark'] as const) {
-    test(`axe finds nothing in the shell, ${theme}`, async ({ page }) => {
-      await page.addInitScript((t) => {
-        localStorage.setItem('exq-theme', t);
-      }, theme);
-      await page.setViewportSize(DESKTOP);
-      await signInOwner(page);
-      const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
-      expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.html ?? ''}`)).toEqual([]);
-    });
-  }
+  test('axe finds nothing in the shell, with the account menu open', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await signInOwner(page);
+    await page.getByRole('button', { name: /^Account menu/ }).click();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.html ?? ''}`)).toEqual([]);
+  });
 
   for (const theme of ['light', 'dark'] as const) {
     test(`axe finds nothing on Overview, Bookings and the booking panel, ${theme}`, async ({
@@ -118,7 +162,7 @@ test.describe('the owner dashboard shell', () => {
           ).toEqual([]);
         };
         await check(`overview ${size.width}`);
-        await page.goto('/admin/bookings?range=upcoming');
+        await page.goto('/admin/shop/bookings?range=upcoming');
         await expect(
           page.locator('.exq-table__row[data-state="interactive"]').first(),
         ).toBeVisible();
@@ -156,9 +200,8 @@ test.describe('the owner dashboard shell', () => {
     ]) {
       await expect(page.locator('.exq-stat', { hasText: label })).toBeVisible();
     }
-    // Sidebar, search, quick actions, tiles, Now and next and the chart all sit in the first screen.
+    // Search, quick actions, tiles, Now and next and the chart all sit in the first screen.
     for (const locator of [
-      page.locator('.exq-sidebar'),
       page.getByRole('combobox', { name: 'Search bookings and customers' }),
       quick,
       page.locator('.exq-stat').first(),
@@ -221,7 +264,7 @@ test.describe('the bookings page', () => {
   }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    await page.goto('/admin/bookings');
+    await page.goto('/admin/shop/bookings');
     // Quick filters carry counts.
     for (const name of ['Today', 'Tomorrow', 'This week', 'Upcoming', 'Past']) {
       await expect(
@@ -250,12 +293,12 @@ test.describe('the bookings page', () => {
     await context.clearCookies();
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    await page.goto('/admin/bookings');
+    await page.goto('/admin/shop/bookings');
     await page
       .getByRole('button', { name: /Open booking for Deep Link/ })
       .first()
       .click();
-    await expect(page).toHaveURL(/\/admin\/bookings\/[0-9a-f]{24}$/);
+    await expect(page).toHaveURL(/\/admin\/shop\/bookings\/[0-9a-f]{24}$/);
     const sheet = page.getByRole('dialog', { name: 'Booking' });
     const code = (await sheet.locator('.exq-bsheet__code').textContent()) ?? '';
     expect(code).toMatch(/^[A-Z0-9]{3}-[A-Z0-9]{4}$/);
@@ -264,7 +307,7 @@ test.describe('the bookings page', () => {
     await expect(page.getByRole('dialog', { name: 'Booking' }).getByText(code)).toBeVisible();
     await expect(page.locator('table.exq-table')).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page).toHaveURL(/\/admin\/bookings$/);
+    await expect(page).toHaveURL(/\/admin\/shop\/bookings$/);
   });
 
   test('the panel cancels with and without a notice, and Resend says why it is off', async ({

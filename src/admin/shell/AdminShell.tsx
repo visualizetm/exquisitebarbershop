@@ -1,26 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { DateTime } from 'luxon';
 import { Link, matchPath, useLocation, useNavigate } from 'react-router';
-import BarChart01 from '@untitled-ui/icons-react/build/esm/BarChart01';
-import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
-import ClipboardCheck from '@untitled-ui/icons-react/build/esm/ClipboardCheck';
-import DotsHorizontal from '@untitled-ui/icons-react/build/esm/DotsHorizontal';
-import LogOut01 from '@untitled-ui/icons-react/build/esm/LogOut01';
-import Menu01 from '@untitled-ui/icons-react/build/esm/Menu01';
 import Plus from '@untitled-ui/icons-react/build/esm/Plus';
 import { okResponseSchema } from '@shared/api/auth';
-import {
-  BottomTabs,
-  Button,
-  IconButton,
-  Mark,
-  Sheet,
-  Sidebar,
-  ThemeMenu,
-  ThemeSwitch,
-} from '@/components/ui';
+import { SHOP_TIMEZONE } from '@shared/lib/constants';
+import { Button, Mark, NavLink, Sheet } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
-import { todayInShop, shopDateLabel } from '../format';
 import { BookingSheet } from '../bookings/BookingSheet';
 import { AnnouncementPanel } from '../panels/AnnouncementPanel';
 import { BarberOutPanel } from '../panels/BarberOutPanel';
@@ -29,7 +15,15 @@ import { BlockTimePanel } from '../panels/BlockTimePanel';
 import { NewBookingPanel } from '../panels/NewBookingPanel';
 import { useMe, useSession } from '../useSession';
 import { GlobalSearch } from './GlobalSearch';
-import { ICON, OWNER_ITEMS } from './ownerNav';
+import {
+  SHOP_TABS,
+  SIDE_HOME,
+  WEBSITE_TABS,
+  loadSide,
+  saveSide,
+  sideOf,
+  type Side,
+} from './ownerNav';
 import { QuickContext, type NewBookingPrefill, type QuickApi } from './quick';
 
 type Panel =
@@ -47,29 +41,109 @@ const PANEL_TITLE: Record<Panel['kind'], string> = {
   alert: 'Needs a decision',
 };
 
+const SIDE_LABEL: Record<Side, string> = { shop: 'Shop', website: 'Website' };
+
+const ACCOUNT_LINKS = [
+  { to: '/admin/settings', label: 'Settings' },
+  { to: '/admin/audit', label: 'Audit log' },
+  { to: '/admin/outbox', label: 'Outbox' },
+  { to: '/admin/settings?tab=account', label: 'Change password' },
+];
+
+/** "Mon, Oct 26 · 2:14 PM" in shop time, kept current to the minute. */
+function useShopClock(): string {
+  const read = () => DateTime.now().setZone(SHOP_TIMEZONE).toFormat('ccc, LLL d · h:mm a');
+  const [label, setLabel] = useState(read);
+  useEffect(() => {
+    const tick = () => {
+      setLabel(read());
+    };
+    const id = window.setInterval(tick, 30_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, []);
+  return label;
+}
+
+/** Shop | Website. The chosen side is remembered on this device. */
+function SideSwitch({
+  side,
+  onPick,
+  className,
+}: {
+  side: Side;
+  onPick: (side: Side) => void;
+  className: string;
+}) {
+  return (
+    <div className={`exq-seg exq-side ${className}`} role="group" aria-label="Dashboard side">
+      {(['shop', 'website'] as const).map((s) => (
+        <button
+          key={s}
+          type="button"
+          className="exq-seg__btn"
+          data-state={s === side ? 'selected' : 'idle'}
+          aria-pressed={s === side}
+          onClick={() => {
+            onPick(s);
+          }}
+        >
+          {SIDE_LABEL[s]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
- * The owner dashboard frame: the ink sidebar from 1024px, a top bar with search, today's date
- * and New booking on every page, and a four tab bar with a menu sheet below that. It also owns
- * the side panels any page can open (see QuickApi).
+ * The owner dashboard frame: a dark top bar (logo, Shop | Website, search, the clock, New
+ * booking, the account menu) and the section tabs of the chosen side under it. No side menu.
+ * It also owns the side panels any page can open (see QuickApi).
  */
 export function AdminShell({ children }: { children: ReactNode }) {
   const me = useMe();
   const { signedOut } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [leaving, setLeaving] = useState(false);
+  const clock = useShopClock();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+
+  // The side follows the address; on the account pages (Settings, Audit, Outbox) it is the
+  // remembered one, so the tabs row still shows where Back would land.
+  const [savedSide, setSavedSide] = useState<Side>(loadSide);
+  const pathSide = sideOf(location.pathname);
+  const side = pathSide ?? savedSide;
+  useEffect(() => {
+    if (pathSide && pathSide !== savedSide) {
+      saveSide(pathSide);
+      setSavedSide(pathSide);
+    }
+  }, [pathSide, savedSide]);
+  const pickSide = useCallback(
+    (next: Side) => {
+      saveSide(next);
+      setSavedSide(next);
+      if (next !== pathSide) void navigate(SIDE_HOME[next]);
+    },
+    [navigate, pathSide],
+  );
 
   const changed = useCallback(() => {
     setVersion((v) => v + 1);
   }, []);
-  // On the bookings pages the open booking lives in the address (/admin/bookings/:id), so a link
-  // to one works and the back button closes it. Anywhere else it is plain state.
-  const routeId = matchPath('/admin/bookings/:id', location.pathname)?.params.id ?? null;
-  const onBookings = location.pathname.startsWith('/admin/bookings');
+  // On the bookings pages the open booking lives in the address (/admin/shop/bookings/:id), so a
+  // link to one works and the back button closes it. Anywhere else it is plain state.
+  const routeId = matchPath('/admin/shop/bookings/:id', location.pathname)?.params.id ?? null;
+  const onBookings = location.pathname.startsWith('/admin/shop/bookings');
   const activeBookingId = routeId ?? bookingId;
   const api = useMemo<QuickApi>(
     () => ({
@@ -77,12 +151,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
         setPanel({ kind: 'new', prefill });
       },
       openBooking: (id) => {
-        if (onBookings) void navigate(`/admin/bookings/${id}${location.search}`);
+        if (onBookings) void navigate(`/admin/shop/bookings/${id}${location.search}`);
         else setBookingId(id);
       },
       closeBooking: () => {
         setBookingId(null);
-        if (routeId) void navigate(`/admin/bookings${location.search}`);
+        if (routeId) void navigate(`/admin/shop/bookings${location.search}`);
       },
       openBlock: (options) => {
         setPanel({ kind: 'block', staffId: options?.staffId, blockKind: options?.kind });
@@ -102,6 +176,29 @@ export function AdminShell({ children }: { children: ReactNode }) {
     [navigate, version, changed, onBookings, routeId, location.search],
   );
 
+  // The account menu closes on a pick, on Escape and on a tap outside.
+  const closeAccount = useCallback(() => {
+    setAccountOpen(false);
+  }, []);
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setAccountOpen(false);
+        accountButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [accountOpen]);
+
   async function logout() {
     setLeaving(true);
     try {
@@ -114,133 +211,96 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   const name = me.staff?.name ?? me.user.email;
-  const signOut = (
-    <Button
-      variant="onink"
-      size="sm"
-      icon={<LogOut01 aria-hidden="true" />}
-      loading={leaving}
-      onClick={() => void logout()}
-    >
-      Sign out
-    </Button>
-  );
+  const initial = (name.trim()[0] ?? 'E').toUpperCase();
+  const tabs = side === 'shop' ? SHOP_TABS : WEBSITE_TABS;
 
   return (
     <QuickContext.Provider value={api}>
-      <div className="exq-shell" data-state="owner">
-        <Sidebar
-          label="Dashboard"
-          logo={
-            <Link to="/admin" aria-label="Exquisite dashboard, overview">
-              <Mark name="stacked" alt="" width={190} height={44} />
-            </Link>
-          }
-          items={OWNER_ITEMS}
-          footer={
-            <>
-              <p className="exq-sidebar__who">
-                {name}
-                <span className="exq-sidebar__role"> Owner</span>
-              </p>
-              <div className="exq-sidebar__actions">
-                <ThemeMenu />
-                {signOut}
-              </div>
-            </>
-          }
-        />
-        <div className="exq-shell__main">
-          <header className="exq-topbar">
-            <IconButton
-              className="exq-topbar__menu"
-              label="Menu"
-              icon={<Menu01 aria-hidden="true" />}
+      <div className="exq-shell" data-state="owner" data-side={side}>
+        <header className="exq-topbar">
+          <Link to={SIDE_HOME[side]} className="exq-topbar__logo" aria-label="Exquisite dashboard">
+            <Mark name="stacked" alt="" width={155} height={36} />
+          </Link>
+          <SideSwitch side={side} onPick={pickSide} className="exq-topbar__side" />
+          <div className="exq-topbar__search">
+            <GlobalSearch />
+          </div>
+          <span className="exq-topbar__spacer" />
+          <span className="exq-topbar__date exq-label">{clock}</span>
+          {/* Check in (tablet check-in) goes here in prompt 13c. */}
+          <span className="exq-topbar__slot" data-slot="check-in" />
+          <Button
+            className="exq-topbar__new"
+            variant="accent"
+            size="sm"
+            icon={<Plus aria-hidden="true" />}
+            aria-label="New booking"
+            onClick={() => {
+              setPanel({ kind: 'new', prefill: {} });
+            }}
+          >
+            New booking
+          </Button>
+          <div ref={accountRef} className="exq-acct" data-state={accountOpen ? 'open' : 'closed'}>
+            <button
+              ref={accountButtonRef}
+              type="button"
+              className="exq-acct__button"
+              aria-label={`Account menu, ${name}`}
+              aria-haspopup="true"
+              aria-expanded={accountOpen}
               onClick={() => {
-                setMenuOpen(true);
-              }}
-            />
-            <Link to="/admin" className="exq-topbar__brand" aria-label="Overview">
-              <Mark name="disc" alt="" width={28} height={28} />
-            </Link>
-            <div className="exq-topbar__search">
-              <GlobalSearch />
-            </div>
-            <span className="exq-topbar__spacer" />
-            <span className="exq-topbar__date">{shopDateLabel(todayInShop())}</span>
-            <Button
-              className="exq-topbar__new"
-              size="sm"
-              icon={<Plus aria-hidden="true" />}
-              aria-label="New booking"
-              onClick={() => {
-                setPanel({ kind: 'new', prefill: {} });
+                setAccountOpen((o) => !o);
               }}
             >
-              New booking
-            </Button>
-          </header>
-          <div
-            className="exq-shell__content exq-adm exq-adm__content"
-            key={location.pathname.split('/')[2] ?? 'overview'}
-          >
-            {children}
-          </div>
-        </div>
-
-        <BottomTabs
-          label="Dashboard, mobile"
-          items={[
-            { to: '/admin', label: 'Overview', icon: <BarChart01 {...ICON} />, end: true },
-            { to: '/admin/bookings', label: 'Bookings', icon: <ClipboardCheck {...ICON} /> },
-            { to: '/admin/schedule', label: 'Schedule', icon: <Calendar {...ICON} /> },
-            {
-              label: 'More',
-              icon: <DotsHorizontal {...ICON} />,
-              active: menuOpen,
-              onClick: () => {
-                setMenuOpen(true);
-              },
-            },
-          ]}
-        />
-
-        <Sheet
-          open={menuOpen}
-          title="Menu"
-          onClose={() => {
-            setMenuOpen(false);
-          }}
-        >
-          <ul className="exq-menusheet exq-bare">
-            {OWNER_ITEMS.map((item) => (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  className="exq-menusheet__link"
-                  onClick={() => {
-                    setMenuOpen(false);
-                  }}
+              <span className="exq-acct__initial" aria-hidden="true">
+                {initial}
+              </span>
+            </button>
+            {accountOpen ? (
+              <div className="exq-acct__menu">
+                <p className="exq-acct__who">
+                  {name}
+                  <span className="exq-acct__role">Owner</span>
+                </p>
+                <ul className="exq-bare exq-acct__list">
+                  {ACCOUNT_LINKS.map((item) => (
+                    <li key={item.label}>
+                      <Link to={item.to} className="exq-acct__link" onClick={closeAccount}>
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  block
+                  loading={leaving}
+                  onClick={() => void logout()}
                 >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              </li>
+                  Sign out
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </header>
+        <div className="exq-sectabs">
+          <SideSwitch side={side} onPick={pickSide} className="exq-sectabs__side" />
+          <nav className="exq-sectabs__nav" aria-label={`${SIDE_LABEL[side]} sections`}>
+            {tabs.map((tab) => (
+              <NavLink key={tab.to} to={tab.to} className="exq-sectabs__tab">
+                {tab.label}
+              </NavLink>
             ))}
-          </ul>
-          <ThemeSwitch />
-          <p className="exq-menusheet__who">
-            {name} <span className="exq-muted">Owner</span>
-          </p>
-          <Button
-            variant="outline"
-            icon={<LogOut01 aria-hidden="true" />}
-            loading={leaving}
-            onClick={() => void logout()}
-          >
-            Sign out
-          </Button>
-        </Sheet>
+          </nav>
+        </div>
+        <div
+          className="exq-shell__content exq-adm exq-adm__content"
+          key={location.pathname.split('/').slice(2, 4).join('/') || 'home'}
+        >
+          {children}
+        </div>
 
         <Sheet
           open={panel !== null}

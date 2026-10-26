@@ -38,32 +38,40 @@ async function samplePng(page: Page, color: string): Promise<Buffer> {
 const tab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true }).click();
 
 test.describe('the website page', () => {
-  test('has five tabs, and View on site opens the page the tab changes', async ({ page }) => {
+  test('has six sections, and View on site opens the page the section changes', async ({
+    page,
+  }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
     await page.goto('/admin/website');
-    await expect(page.getByRole('heading', { name: 'Website', level: 1 })).toBeVisible();
-    const expected: [string, string][] = [
-      ['Hours', '/visit'],
-      ['Announcement', '/'],
-      ['Services', '/services'],
-      ['Home photo', '/'],
-      ['Gallery', '/gallery'],
+    await expect(page).toHaveURL(/\/admin\/website\/announcement$/);
+    const nav = page.getByRole('navigation', { name: 'Website sections' });
+    const expected: [string, string, string][] = [
+      ['Announcement', 'announcement', '/'],
+      ['Top of page', 'top', '/'],
+      ['Hours', 'hours', '/visit'],
+      ['Services and prices', 'services', '/services'],
+      ['Gallery', 'gallery', '/gallery'],
+      ['Reviews', 'reviews', '/'],
     ];
-    for (const [name, href] of expected) {
-      await tab(page, name);
+    for (const [name, id, href] of expected) {
+      await nav.getByRole('link', { name }).click();
+      await expect(page).toHaveURL(new RegExp(`/admin/website/${id}$`));
+      await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
       const link = page.getByRole('link', { name: 'View on site' });
       await expect(link).toHaveAttribute('href', href);
       await expect(link).toHaveAttribute('target', '_blank');
       await expect(link).toHaveAttribute('rel', /noopener/);
     }
-    // The tab is in the address, so a reload or a shared link lands on the same panel.
-    await expect(page).toHaveURL(/tab=gallery/);
-    await page.reload();
-    await expect(page.getByRole('tab', { name: 'Gallery', exact: true })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    // The section is in the address, so a reload or a shared link lands on the same panel.
+    await page.goto('/admin/website/gallery');
+    await expect(nav.getByRole('link', { name: 'Gallery' })).toHaveAttribute(
+      'aria-current',
+      'page',
     );
+    // The old tab addresses still work.
+    await page.goto('/admin/website/top');
+    await expect(page).toHaveURL(/\/admin\/website\/top$/);
   });
 
   test('the announcement tab changes the strip on the site, and putting it back is one more save', async ({
@@ -72,7 +80,7 @@ test.describe('the website page', () => {
   }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    await page.goto('/admin/website?tab=announcement');
+    await page.goto('/admin/website/announcement');
     const text = page.getByLabel('Text');
     await expect(text).toHaveAttribute('maxlength', '90');
     const visitor = await (await browser.newContext()).newPage();
@@ -101,7 +109,7 @@ test.describe('the website page', () => {
     const day = DateTime.fromISO(startAt, { zone: ZONE }).toISODate() ?? '';
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    await page.goto('/admin/website?tab=hours');
+    await page.goto('/admin/website/hours');
     await page.getByLabel('Day', { exact: true }).fill(day);
     await page.getByLabel('Reason').fill('Staff training');
     await page.getByRole('button', { name: 'Save day' }).click();
@@ -135,7 +143,7 @@ test.describe('the website page', () => {
   }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    await page.goto('/admin/website?tab=services');
+    await page.goto('/admin/website/services');
     const name = `Hot Towel ${String(Date.now()).slice(-5)}`;
     await page.getByRole('button', { name: 'Add service' }).click();
     const sheet = page.getByRole('dialog', { name: 'Add service' });
@@ -188,7 +196,7 @@ test.describe('the website page', () => {
   test('home photo: preview, replace, and the home page shows it', async ({ page, browser }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    await page.goto('/admin/website?tab=photo');
+    await page.goto('/admin/website/top');
     await expect(page.getByText('On a phone')).toBeVisible();
     await expect(page.getByText('On a computer')).toBeVisible();
     const png = await samplePng(page, '#2a4d69');
@@ -220,7 +228,7 @@ test.describe('the website page', () => {
   }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    await page.goto('/admin/website?tab=gallery');
+    await page.goto('/admin/website/gallery');
     const stamp = String(Date.now()).slice(-6);
     await page.getByLabel('Add photos').setInputFiles([
       { name: 'one.png', mimeType: 'image/png', buffer: await samplePng(page, '#7a1f1f') },
@@ -401,14 +409,18 @@ for (const theme of ['light', 'dark'] as const) {
     for (const size of [DESKTOP, PHONE]) {
       await page.setViewportSize(size);
       const pages = [
-        ...['hours', 'announcement', 'services', 'photo', 'gallery'].map(
-          (t) => `/admin/website?tab=${t}`,
+        ...['hours', 'announcement', 'services', 'top', 'gallery', 'reviews'].map(
+          (t) => `/admin/website/${t}`,
         ),
         ...['shop', 'rules', 'account', 'email'].map((t) => `/admin/settings?tab=${t}`),
       ];
       for (const url of pages) {
         await page.goto(url);
-        await expect(page.getByRole('tabpanel')).toBeVisible();
+        await expect(
+          url.includes('/website/')
+            ? page.locator('.exq-website__panel')
+            : page.getByRole('tabpanel'),
+        ).toBeVisible();
         await page.waitForTimeout(400);
         const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
         expect(

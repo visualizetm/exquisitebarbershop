@@ -1291,3 +1291,30 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   Archivo show it, the rest fall back. No web font is loaded in mail.
 - D13b-05 The brand script re-renders the icons too; they carry no text, so the regenerated PNGs were
   reverted and only og.png (the tagline in Archivo) changed.
+- D13b-06 The owner dashboard is dark only. Its surfaces are the `--adm-*` tokens (page #0E0E0E, card
+  #171717, raised #1F1F1F, lines #2B2B2B and #3A3A3A, text white, secondary #A8A8A8) scoped on
+  `.exq-app[data-state='admin']` by overriding the semantic surface variables, so every kit part,
+  sheet, toast and form in the admin goes dark without its own rules. The public site keeps its light
+  and dark themes; the Appearance switch left Settings and the theme menu left the shell. Cards are
+  16px there (`--r-card` rescoped) and inner tiles get `--r-tile` 12px. The primary button is a red
+  fill with white text in the dashboard; outline stays white. The marks are always the white files.
+- D13b-07 No side menu. The shell is one top bar (stacked white logo, Shop | Website, search, the
+  shop clock to the minute, New booking, the account menu) and one row of section tabs. Shop:
+  Today, Bookings, Schedule, Clients, Team. Website: Announcement, Top of page, Hours, Services
+  and prices, Gallery, Reviews. The side is remembered in localStorage (`exq-admin-side`, try and
+  catch) and `/admin` lands on that side's first tab, Shop Today until the owner switches; on the
+  account pages (Settings, Audit, Outbox) the tabs of the remembered side stay shown. Under 1024px
+  the switch moves from the top bar into the tabs row, which scrolls sideways. The account menu is
+  a button with the owner's initial and a small menu (Settings, Audit log, Outbox, Change password,
+  Sign out); a native `details` was tried first and dropped because `summary` has no button role.
+  A `data-slot="check-in"` span in the top bar is the place for prompt 13c's Check in button.
+- D13b-08 New addresses: `/admin/shop/{today,bookings,bookings/:id,schedule,clients,clients/:phone,
+  team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its path remainder and
+  query kept (`/admin/bookings?range=past` to `/admin/shop/bookings?range=past`, `/admin/customers`
+  to clients, `/admin/website?tab=photo` to `/admin/website/top`, `/admin/photos` to the gallery),
+  so bookmarks, the guide's links and the printed cards keep working. The Website page reads its
+  section from the path and no longer carries its own tab strip; its heading is the section name
+  under a "Website" kicker.
+- D13b-09 The `Sidebar` kit component was deleted with its CSS (nothing used it after the shell
+  change); `BottomTabs` stays for the barber portal. The owner guide still describes the old menu;
+  it is rewritten with prompt 13d's barber portal and editor work.
