@@ -94,12 +94,12 @@ function toHtml(markdown: string): string {
 }
 
 async function main(): Promise<void> {
-  const fonts = resolve('node_modules', '@fontsource-variable', 'jost', 'files');
+  const fonts = resolve('node_modules', '@fontsource-variable', 'archivo', 'files');
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Jost;font-weight:100 900;src:url(${dataUri(`${fonts}/jost-latin-wght-normal.woff2`)}) format('woff2')}
-body{font-family:Jost,sans-serif;font-size:12pt;line-height:1.5;color:#111;margin:0;padding:0 8mm}
-h1{font-size:24pt;text-transform:uppercase;letter-spacing:-0.01em;margin:0 0 12pt}
-h2{font-size:16pt;text-transform:uppercase;margin:24pt 0 8pt;page-break-after:avoid}
+@font-face{font-family:Archivo;font-weight:100 900;font-stretch:62% 125%;src:url(${dataUri(`${fonts}/archivo-latin-wdth-normal.woff2`)}) format('woff2-variations')}
+body{font-family:Archivo,sans-serif;font-size:12pt;line-height:1.5;color:#111;margin:0;padding:0 8mm}
+h1{font-size:24pt;font-weight:900;font-stretch:122%;text-transform:uppercase;letter-spacing:-0.01em;margin:0 0 12pt}
+h2{font-size:16pt;font-weight:800;font-stretch:116%;text-transform:uppercase;margin:24pt 0 8pt;page-break-after:avoid}
 h3{font-size:13pt;margin:16pt 0 6pt;page-break-after:avoid}
 p,li{margin:0 0 6pt} ol,ul{padding-left:18pt;margin:0 0 8pt}
 figure{margin:8pt 0 12pt;text-align:center;page-break-inside:avoid}

@@ -18,7 +18,8 @@
 .exq-topstrip__text,
 .exq-topstrip__link {
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   line-height: 1.2;
   text-transform: uppercase;
@@ -139,7 +140,8 @@
 .exq-nav__link > span {
   position: relative;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -277,7 +279,7 @@ html[data-menu='open'] {
   padding: var(--s1) var(--s4);
   border-bottom: 1px solid var(--line);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
@@ -382,7 +384,8 @@ html[data-menu='open'] {
 .exq-footer__title {
   margin-bottom: var(--s2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--accent-text);

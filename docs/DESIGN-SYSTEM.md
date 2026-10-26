@@ -57,12 +57,21 @@ Dark values: background #111, cards #1F1F1F, borders #333, red text #FF5470, sel
 primary button invert to paper. Marks swap by CSS (`Mark` renders both files); in an ink band the
 white mark always shows.
 
+The owner dashboard is dark only (prompt 13b): `.exq-app[data-state='admin']` sets the semantic
+surfaces from the `--adm-*` tokens (page #0E0E0E, card #171717, raised #1F1F1F, lines #2B2B2B and
+#3A3A3A, text white, secondary #A8A8A8 at 4.5:1 or better on every card), `--r-card` 16px with
+`--r-tile` 12px for inner tiles, red primary buttons, and the white marks. There is no theme switch
+in the dashboard; the public site keeps its three choices.
+
 ## Type
 
-- Jost Variable (`@fontsource-variable/jost`, self-hosted, one latin file preloaded,
-  `font-display: swap`), weights 400 to 900.
-- Label 600 caps +14% tracking, red. Body 400, line height 1.55. h3 700. h2 800 caps, line height 1,
-  -1.5%. Display 900 caps, line height .95, -2%. Price 700, tabular numerals.
+- Archivo Variable (`@fontsource-variable/archivo`, its `wdth.css`: one latin file carrying both the
+  weight axis 100 to 900 and the width axis 62% to 125%, preloaded, `font-display: swap`). The logo
+  keeps its own lettering (fixed SVG paths).
+- Width tokens: `--w-display` 122%, `--w-head` 116%, `--w-label` 114%; body is 100%.
+- Label 700, width 114%, caps, +14% tracking, red. Body 400, line height 1.55; strong 700. h3 800.
+  h2 800, width 116%, caps, line height 1, -1.5%. Display 900, width 122%, caps, line height 1, -1%.
+  Price 800, tabular numerals.
 - Public pages use these six sizes and no others; the admin uses 13 to 22px. Button text is label
   size. `tests/unit/motionCss.test.ts` fails if a kit stylesheet names another font size or a literal
   color.
@@ -161,11 +170,25 @@ owner dashboard buttons and tiles.
 
 ## The barber portal and the owner dashboard (prompt 11)
 
-Both are built from the kit (`Sidebar`, `StatTile`, `DataTable`, `SearchBox`, `PinPad`, `BarChart`, `Tabs`,
+Both are built from the kit (`StatTile`, `DataTable`, `SearchBox`, `PinPad`, `BarChart`, `Tabs`,
 `BottomTabs`, `IconButton`). Admin type is 13 to 22px; motion is calmer than the public site and lives only in
 `motion.css`. `/team` is a phone first page with four tabs, 48px targets and 64px PIN keys, and uses
 `--card-2` (not the light-only `--surface-2`). Toasts carry a tone icon. The demo notice is a `Modal` with a
 focus trap and an inert page behind it.
+
+## The owner dashboard shell and the floor (prompt 13b)
+
+No side menu. `AdminShell` is one top bar (stacked white mark, the Shop | Website `exq-seg` switch
+remembered per device under `exq-admin-side`, `GlobalSearch`, the shop clock, New booking, the
+account menu `exq-acct*`) and a row of section tabs (`exq-sectabs*`, label style, red underline).
+Under 1024px the switch moves into the tabs row, which scrolls sideways. Routes live under
+`/admin/shop/*` and `/admin/website/:tab`; old addresses redirect.
+
+Shop, Today (`src/admin/today/`) is the floor: `exq-floorcard` per chair with `data-kind`
+inChair, free, off or instagram (red dot and progress bar for in chair, green dot for free), the
+`exq-coming*` list with Arrived, Start, Move and No show, `exq-sofar*` tiles (34px numbers) and
+`exq-donelist*`. The rules are in `shared/lib/floor.ts`; `useFloor` refreshes every 30 seconds
+while the tab is visible. The bar fills without a transition.
 
 ## Barber prices (prompt 12)
 

@@ -231,7 +231,7 @@ function RemoveBarber({ member, onChanged }: { member: AdminStaffView; onChanged
   function removed() {
     onChanged();
     toast({ text: `${member.name} is removed from the schedule.`, tone: 'ok' });
-    void navigate('/admin/team');
+    void navigate('/admin/shop/team');
   }
 
   return (

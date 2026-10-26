@@ -648,3 +648,39 @@ commit, and what is still open.
 - Heartbeat: 01:41 UTC, next is SHIP (gate, screenshots, Lighthouse, report, PR, merge).
 - SHIP: 02:01 UTC, gate green after two narrowed Iniya checks, screens and Lighthouse captured
   (Home 88, Visit 95), report written; next is the PR and the merge.
+
+## Prompt 13b
+
+### M1: Archivo everywhere
+
+- Shipped: `@fontsource-variable/archivo` (wdth.css, one preloaded latin file with both axes), width
+  tokens, weights raised for labels, prices and headings, the email stack, og.png and OWNER-GUIDE.pdf
+  re-rendered, buttons that wrap a long label. Hero contrast with Archivo: 390 red 5.07:1 white
+  10.59:1; 768 red 4.89:1 white 8.88:1; 1280 on ink 6.07:1 and 18.88:1. Scroll, carousel, chrome,
+  rules, p13a and kit specs pass.
+- Heartbeat: 22:27 UTC, commit follows, next is M2 (the dark dashboard shell).
+
+### M2: the dark dashboard shell
+
+- Shipped: `--adm-*` tokens and the dark scope on the admin app, a shell with no side menu (top bar
+  with the Shop | Website switch remembered per device, search, clock, New booking, account menu;
+  section tabs under it), new `/admin/shop/*` and `/admin/website/:tab` routes with every old path
+  redirecting, the Website page keyed by path, the Appearance switch removed, red primary buttons in
+  the dashboard, `Sidebar` deleted. dashboard.spec and website.spec rewritten for the shell and pass
+  (23 of 23); axe clean in the shell, on Overview, Bookings, the booking panel, the website and
+  settings sections at 1280 and 390.
+- Heartbeat: 22:52 UTC, commit follows, next is M3 (the floor on Shop, Today).
+
+### M3: the floor
+
+- Shipped: `arrivedAt` and `startedAt` on bookings, `GET /api/admin/floor`, `POST .../arrived` and
+  `.../start` (idempotent, audited, owner only), pure floor rules in `shared/lib/floor.ts`, the
+  Today page (chair cards, Coming up with Arrived, Start, Move and No show, Today so far, Done today
+  with All n, 30 second refresh) replacing Overview with its alerts, quick actions, chart and
+  activity kept. Tests: `tests/unit/floor.test.ts` (6, frozen clock), the arrived and start
+  integration test in adminApi.test.ts, `tests/e2e/floor.spec.ts` at 1180 (Arrived, Start, Done on
+  a walk-in seeded for later today).
+- Heartbeat: 23:05 UTC, commit follows, next is SHIP (gate, screenshots, Lighthouse, report, PR).
+- SHIP: 23:36 UTC, gate green after five spec fixes for the new paths and one weekday de-flake,
+  screens and Lighthouse captured (Home 79 then 84, 13a was 88; the 91 KB font is the cause),
+  report written; next is the PR, the merge and the production check.

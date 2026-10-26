@@ -1,21 +1,55 @@
-import BarChart01 from '@untitled-ui/icons-react/build/esm/BarChart01';
-import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
-import ClipboardCheck from '@untitled-ui/icons-react/build/esm/ClipboardCheck';
-import Globe01 from '@untitled-ui/icons-react/build/esm/Globe01';
-import Scissors01 from '@untitled-ui/icons-react/build/esm/Scissors01';
-import Settings01 from '@untitled-ui/icons-react/build/esm/Settings01';
-import Users01 from '@untitled-ui/icons-react/build/esm/Users01';
-import type { SidebarItem } from '@/components/ui';
+/** The two sides of the owner dashboard and the section tabs under the top bar. */
+export type Side = 'shop' | 'website';
 
-export const ICON = { 'aria-hidden': true } as const;
+export interface SectionTab {
+  to: string;
+  label: string;
+}
 
-/** The seven areas of the owner dashboard, in sidebar order. */
-export const OWNER_ITEMS: SidebarItem[] = [
-  { to: '/admin', label: 'Overview', icon: <BarChart01 {...ICON} />, end: true },
-  { to: '/admin/bookings', label: 'Bookings', icon: <ClipboardCheck {...ICON} /> },
-  { to: '/admin/schedule', label: 'Schedule', icon: <Calendar {...ICON} /> },
-  { to: '/admin/customers', label: 'Customers', icon: <Users01 {...ICON} /> },
-  { to: '/admin/team', label: 'Team', icon: <Scissors01 {...ICON} /> },
-  { to: '/admin/website', label: 'Website', icon: <Globe01 {...ICON} /> },
-  { to: '/admin/settings', label: 'Settings', icon: <Settings01 {...ICON} /> },
+export const SHOP_TABS: SectionTab[] = [
+  { to: '/admin/shop/today', label: 'Today' },
+  { to: '/admin/shop/bookings', label: 'Bookings' },
+  { to: '/admin/shop/schedule', label: 'Schedule' },
+  { to: '/admin/shop/clients', label: 'Clients' },
+  { to: '/admin/shop/team', label: 'Team' },
 ];
+
+export const WEBSITE_TABS: SectionTab[] = [
+  { to: '/admin/website/announcement', label: 'Announcement' },
+  { to: '/admin/website/top', label: 'Top of page' },
+  { to: '/admin/website/hours', label: 'Hours' },
+  { to: '/admin/website/services', label: 'Services and prices' },
+  { to: '/admin/website/gallery', label: 'Gallery' },
+  { to: '/admin/website/reviews', label: 'Reviews' },
+];
+
+export const SIDE_HOME: Record<Side, string> = {
+  shop: '/admin/shop/today',
+  website: '/admin/website/announcement',
+};
+
+const SIDE_KEY = 'exq-admin-side';
+
+/** The side the owner last used on this device; Shop until they switch. */
+export function loadSide(): Side {
+  try {
+    return localStorage.getItem(SIDE_KEY) === 'website' ? 'website' : 'shop';
+  } catch {
+    return 'shop';
+  }
+}
+
+export function saveSide(side: Side): void {
+  try {
+    localStorage.setItem(SIDE_KEY, side);
+  } catch {
+    // Storage blocked: the switch simply starts on Shop next time.
+  }
+}
+
+/** Which side a path belongs to, or null for the account pages (Settings, Audit, Outbox). */
+export function sideOf(pathname: string): Side | null {
+  if (pathname.startsWith('/admin/website')) return 'website';
+  if (pathname.startsWith('/admin/shop')) return 'shop';
+  return null;
+}

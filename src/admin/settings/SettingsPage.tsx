@@ -3,16 +3,7 @@ import type { SyntheticEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { settingsResponseSchema } from '@shared/api/admin';
 import { logoutAllResponseSchema, meResponseSchema, okResponseSchema } from '@shared/api/auth';
-import {
-  Button,
-  Checkbox,
-  ErrorState,
-  Input,
-  Modal,
-  Tabs,
-  ThemeSwitch,
-  useToast,
-} from '@/components/ui';
+import { Button, Checkbox, ErrorState, Input, Modal, Tabs, useToast } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
@@ -504,13 +495,6 @@ function AccountTab() {
             </Button>
           </div>
         </form>
-      </section>
-      <section className="exq-settings__section" aria-labelledby="exq-set-theme">
-        <h2 id="exq-set-theme" className="exq-h3">
-          Appearance
-        </h2>
-        <p className="exq-muted">System follows your phone or computer. Light and Dark stay put.</p>
-        <ThemeSwitch />
       </section>
       <section className="exq-settings__section" aria-labelledby="exq-set-out">
         <h2 id="exq-set-out" className="exq-h3">

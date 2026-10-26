@@ -1277,3 +1277,70 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   online booking and without a handle gets no bar.
 - D13a-12 site.spec's uncredited lightbox check looks only for barber book links (`/book?barber=`),
   so the shop-wide "Book a chair" link is allowed.
+- D13b-01 Archivo comes from `@fontsource-variable/archivo` and its `wdth.css`: that file carries both axes
+  (`font-weight: 100 900; font-stretch: 62% 125%`) in one latin woff2 (90 KB), which is the one file
+  preloaded. The latin-ext and vietnamese faces in the same CSS load only for text in their ranges.
+  Rejected self-hosting under public/fonts: the package already ships the width axis.
+- D13b-02 Width tokens `--w-display` 122%, `--w-head` 116%, `--w-label` 114%, used by the display,
+  heading and label rules; body stays at 100%. Labels went from 600 to 700 and prices and h3 to 800, so
+  the small caps read as a sign rather than soft. Display line height 1 and -1% tracking.
+- D13b-03 With the wider label, a pill button can run past a 360 phone (the empty gallery's "See the
+  latest on Instagram"). Buttons now keep `max-width: 100%` and let a long label wrap, instead of
+  clipping the page.
+- D13b-04 Emails use `Archivo, 'Helvetica Neue', Arial, sans-serif` as a stack: mail clients that have
+  Archivo show it, the rest fall back. No web font is loaded in mail.
+- D13b-05 The brand script re-renders the icons too; they carry no text, so the regenerated PNGs were
+  reverted and only og.png (the tagline in Archivo) changed.
+- D13b-06 The owner dashboard is dark only. Its surfaces are the `--adm-*` tokens (page #0E0E0E, card
+  #171717, raised #1F1F1F, lines #2B2B2B and #3A3A3A, text white, secondary #A8A8A8) scoped on
+  `.exq-app[data-state='admin']` by overriding the semantic surface variables, so every kit part,
+  sheet, toast and form in the admin goes dark without its own rules. The public site keeps its light
+  and dark themes; the Appearance switch left Settings and the theme menu left the shell. Cards are
+  16px there (`--r-card` rescoped) and inner tiles get `--r-tile` 12px. The primary button is a red
+  fill with white text in the dashboard; outline stays white. The marks are always the white files.
+- D13b-07 No side menu. The shell is one top bar (stacked white logo, Shop | Website, search, the
+  shop clock to the minute, New booking, the account menu) and one row of section tabs. Shop:
+  Today, Bookings, Schedule, Clients, Team. Website: Announcement, Top of page, Hours, Services
+  and prices, Gallery, Reviews. The side is remembered in localStorage (`exq-admin-side`, try and
+  catch) and `/admin` lands on that side's first tab, Shop Today until the owner switches; on the
+  account pages (Settings, Audit, Outbox) the tabs of the remembered side stay shown. Under 1024px
+  the switch moves from the top bar into the tabs row, which scrolls sideways. The account menu is
+  a button with the owner's initial and a small menu (Settings, Audit log, Outbox, Change password,
+  Sign out); a native `details` was tried first and dropped because `summary` has no button role.
+  A `data-slot="check-in"` span in the top bar is the place for prompt 13c's Check in button.
+- D13b-08 New addresses: `/admin/shop/{today,bookings,bookings/:id,schedule,clients,clients/:phone,
+team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its path remainder and
+  query kept (`/admin/bookings?range=past` to `/admin/shop/bookings?range=past`, `/admin/customers`
+  to clients, `/admin/website?tab=photo` to `/admin/website/top`, `/admin/photos` to the gallery),
+  so bookmarks, the guide's links and the printed cards keep working. The Website page reads its
+  section from the path and no longer carries its own tab strip; its heading is the section name
+  under a "Website" kicker.
+- D13b-09 The `Sidebar` kit component was deleted with its CSS (nothing used it after the shell
+  change); `BottomTabs` stays for the barber portal. The owner guide still describes the old menu;
+  it is rewritten with prompt 13d's barber portal and editor work.
+- D13b-10 The floor rules are pure functions in `shared/lib/floor.ts` (`chairState`, `currentBooking`,
+  `chairWindow`, `progressOf`), fed by `server/services/floor.ts` and tested with a frozen clock in
+  `tests/unit/floor.test.ts`. In chair: the confirmed booking Start was pressed on (latest first),
+  else the one whose booked window holds now; its bar runs from the real start (or the booked start)
+  for the booked duration, so a late start ends late. Free: no current booking and the chair has
+  hours; Off today: no hours and nothing booked; Instagram: a chair that does not book online and
+  has a handle, unless something is booked in the system for it today. Coming up: today's confirmed
+  bookings not started and not in a chair; waiting: those marked Arrived.
+- D13b-11 `arrivedAt` and `startedAt` are optional nullable UTC dates on the booking document, exposed
+  on the admin view, stamped by `POST /api/admin/bookings/:id/arrived` and `/start` (owner only).
+  The repo update matches `status: confirmed` and the field still empty, so a second tap or a race
+  writes nothing and the service answers with the stored booking; one audit entry
+  (`booking.arrived`, `booking.start`) per real stamp; 409 INVALID_TRANSITION for completed, no-show
+  and cancelled bookings. Done and No show use the existing status route (with Undo in the toast,
+  back to confirmed); Move opens the booking sheet, whose move already reprices. The barber portal
+  is left alone for 13d.
+- D13b-12 Today keeps the alerts strip, the quick actions, the week chart and the latest events
+  from the old Overview under the floor (existing behavior, the mockup's look); the four old stat
+  tiles became Today so far (booked, done, walk-ins by source, takings as the sum of completed
+  stored totals). The floor refreshes every 30 seconds while the tab is visible, when it comes back,
+  and after every action, keeping the last data on screen (`useFloor`); progress is computed from
+  the server's `now` in the response and the bar is a plain width with no transition. No websockets.
+- D13b-13 `availabilityRoutes.test.ts` built its "inverted range" from `nextDate(3, 7)` and
+  `nextDate(3, 3)`, which land on the same Wednesday when the suite runs on a Monday (both roll
+  forward to it), so the range was not inverted and the test failed on Mondays. The second date is
+  now the day before the first, whatever the weekday. Not a product change.

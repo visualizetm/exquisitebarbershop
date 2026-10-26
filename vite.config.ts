@@ -22,7 +22,7 @@ function resolveSiteUrl(): string {
 }
 
 /**
- * Fills %SITE_URL% in index.html, preloads the one variable Jost file so text renders in
+ * Fills %SITE_URL% in index.html, preloads the one variable Archivo file (weight and width axes) so text renders in
  * the right font from the first paint (otherwise the swap shifts the whole page below the
  * hero), and adds the Sitemap line to robots.txt when the site URL is known.
  */
@@ -50,7 +50,7 @@ function headPlugin(): Plugin {
       order: 'post',
       handler(html, ctx) {
         const fonts = Object.keys(ctx.bundle ?? {}).filter((file) =>
-          /jost-latin-wght-normal.*\.woff2$/.test(file),
+          /archivo-latin-wdth-normal.*\.woff2$/.test(file),
         );
         const tags: HtmlTagDescriptor[] = fonts.map((href) => ({
           tag: 'link',

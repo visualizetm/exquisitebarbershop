@@ -53,7 +53,7 @@ export function TeamDetailPage() {
   if (!member || member.deletedAt) {
     return (
       <ErrorState title="That barber was not found">
-        They may have been removed. <Link to="/admin/team">Back to the team</Link>
+        They may have been removed. <Link to="/admin/shop/team">Back to the team</Link>
       </ErrorState>
     );
   }
@@ -63,7 +63,7 @@ export function TeamDetailPage() {
   return (
     <div className="exq-teamdetail">
       <p className="exq-teamdetail__back">
-        <Link to="/admin/team" className="exq-link-row">
+        <Link to="/admin/shop/team" className="exq-link-row">
           <ChevronLeft aria-hidden="true" width={16} height={16} />
           Team
         </Link>

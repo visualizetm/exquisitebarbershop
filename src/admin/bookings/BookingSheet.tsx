@@ -42,6 +42,8 @@ type Panel = null | 'reschedule' | 'cancel';
 const ACTION_WORDS: Record<string, string> = {
   'booking.create': 'Booked',
   'booking.status': 'Status changed',
+  'booking.arrived': 'Arrived at the shop',
+  'booking.start': 'Started',
   'booking.cancel': 'Cancelled',
   'booking.restore': 'Restored',
   'booking.reschedule': 'Moved to another time',

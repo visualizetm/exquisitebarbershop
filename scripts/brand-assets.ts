@@ -7,7 +7,7 @@ import { chromium } from '@playwright/test';
  * Outputs land in public/ and are committed, so the build never needs a browser.
  */
 const INK = '#111111';
-const fonts = `${process.cwd()}/node_modules/@fontsource-variable/jost/files`;
+const fonts = `${process.cwd()}/node_modules/@fontsource-variable/archivo/files`;
 const primaryWhite = readFileSync('public/brand/exq-primary-white.svg', 'utf8');
 const qBlack = readFileSync('public/brand/exq-q-icon-black.svg', 'utf8');
 const qWhite = readFileSync('public/brand/exq-q-icon-white.svg', 'utf8');
@@ -27,7 +27,7 @@ async function main() {
   ) {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
     await page.setContent(html);
-    // Fonts are declared with file:// sources; waiting for the load keeps the tagline in Jost.
+    // Fonts are declared with file:// sources; waiting for the load keeps the tagline in Archivo.
     await page.waitForFunction(() => document.fonts.status === 'loaded');
     await page.screenshot({ path, type: 'png', omitBackground: transparent });
     await page.close();
@@ -55,11 +55,11 @@ async function main() {
     1200,
     630,
     `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Jost;font-weight:100 900;src:url(file://${fonts}/jost-latin-wght-normal.woff2) format('woff2')}
+@font-face{font-family:Archivo;font-weight:100 900;font-stretch:62% 125%;src:url(file://${fonts}/archivo-latin-wdth-normal.woff2) format('woff2-variations')}
 html,body{margin:0;width:1200px;height:630px;background:${INK};overflow:hidden}
-.wrap{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:40px;height:630px;padding:0 96px;box-sizing:border-box;font-family:Jost,sans-serif;color:#fff}
+.wrap{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:40px;height:630px;padding:0 96px;box-sizing:border-box;font-family:Archivo,sans-serif;color:#fff}
 .logo{width:680px}
-.tag{margin:0;font-size:28px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:#D9D9D9}
+.tag{margin:0;font-size:28px;font-weight:700;font-stretch:114%;letter-spacing:.14em;text-transform:uppercase;color:#D9D9D9}
 .dot{position:absolute;right:96px;bottom:72px;width:16px;height:16px;border-radius:999px;background:#C8102E}
 </style></head><body><div class="wrap"><div class="logo">${fill(primaryWhite)}</div><p class="tag">Fresh cuts. Gifted hands. Brookhaven, PA</p></div><span class="dot"></span></body></html>`,
   );

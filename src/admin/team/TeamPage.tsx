@@ -112,7 +112,7 @@ export function TeamPage() {
                 <div className="exq-teamcard__top">
                   <Avatar name={m.name} photo={chair?.photo ?? null} />
                   <div>
-                    <Link to={`/admin/team/${m.id}`} className="exq-teamcard__name">
+                    <Link to={`/admin/shop/team/${m.id}`} className="exq-teamcard__name">
                       {m.name}
                     </Link>
                     <p className="exq-teamcard__title">
@@ -155,7 +155,7 @@ export function TeamPage() {
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    void navigate(`/admin/team/${m.id}`);
+                    void navigate(`/admin/shop/team/${m.id}`);
                   }}
                 >
                   Open profile
@@ -180,7 +180,7 @@ export function TeamPage() {
               setAdding(false);
               quick.changed();
               toast({ text: `${name} is added. Set their hours and services next.`, tone: 'ok' });
-              void navigate(`/admin/team/${id}`);
+              void navigate(`/admin/shop/team/${id}`);
             }}
           />
         </div>

@@ -29,7 +29,7 @@ test('a public booking shows as new for the owner, who marks it done and undoes 
   await context.clearCookies();
 
   await signIn(page, E2E_OWNER);
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
 
   // It is flagged New in the list until the owner opens it.
   await page.goto('/admin/bookings');
@@ -65,7 +65,7 @@ test('the owner blocks an hour and that time disappears from /book', async ({ pa
   const local = DateTime.fromISO(startAt, { zone: SHOP_ZONE });
 
   await signIn(page, E2E_OWNER);
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
   await page.getByRole('button', { name: 'Block time' }).click();
   const panel = page.getByRole('dialog', { name: 'Block time' });
   await panel.getByLabel('Barber').selectOption({ label: 'Drew' });

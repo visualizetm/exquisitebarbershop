@@ -22,7 +22,7 @@ async function signInAsOwner(page: Page) {
   await page.getByLabel('Email').fill(E2E_OWNER.email);
   await page.getByLabel('Password').fill(E2E_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
 }
 
 async function expectNoAxeViolations(page: Page, label: string) {
@@ -138,10 +138,10 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeVisible();
     await expectNoAxeViolations(page, `book ${theme}`);
     await signInAsOwner(page);
-    await expect(page.locator('.exq-chairrow').first()).toBeVisible();
+    await expect(page.locator('.exq-floorcard').first()).toBeVisible();
     await expectNoAxeViolations(page, `admin overview ${theme}`);
     await page.goto('/admin/settings?tab=account');
-    await expect(page.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Password' })).toBeVisible();
     await expectNoAxeViolations(page, `admin account ${theme}`);
   });
 }

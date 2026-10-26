@@ -615,6 +615,54 @@ export async function ownerReschedule(
   };
 }
 
+/**
+ * Arrived and Start on the floor. Only a confirmed booking takes a stamp; a second press answers
+ * with the same booking and writes nothing (no second audit entry).
+ */
+export async function stampBookingMoment(
+  principal: Principal,
+  scope: Scope,
+  id: string,
+  moment: 'arrived' | 'start',
+  meta: ServiceMeta,
+): Promise<{ booking: AdminBookingView; changed: boolean }> {
+  const booking = await loadBookingInScope(scope, id);
+  const staff = (await staffRepo.findStaffById(booking.staffId)) ?? unknownStaff(booking.staffId);
+  if (booking.status !== 'confirmed') {
+    throw new AppError(
+      'INVALID_TRANSITION',
+      `A ${booking.status} booking cannot be marked ${moment === 'arrived' ? 'arrived' : 'started'}`,
+    );
+  }
+  const field = moment === 'arrived' ? 'arrivedAt' : 'startedAt';
+  if (booking[field]) return { booking: toAdminBookingView(booking, staff), changed: false };
+  const updated = await withTransaction(async (session) => {
+    const next = await bookingsRepo.stampBookingMoment(booking._id, field, meta.now, { session });
+    if (!next) return null;
+    await auditLogRepo.appendAuditEntry(
+      {
+        actor: actorOf(principal),
+        action: moment === 'arrived' ? 'booking.arrived' : 'booking.start',
+        entityType: 'booking',
+        entityId: booking._id,
+        before: { [field]: null },
+        after: { [field]: meta.now.toISOString() },
+        meta: null,
+        requestId: meta.requestId,
+      },
+      meta.now,
+      { session },
+    );
+    return next;
+  });
+  // Lost a race with another tap: the stamp is there now, answer with what is stored.
+  if (!updated) {
+    const again = await loadBookingInScope(scope, id);
+    return { booking: toAdminBookingView(again, staff), changed: false };
+  }
+  return { booking: toAdminBookingView(updated, staff), changed: true };
+}
+
 export async function updateBookingNotes(
   principal: Principal,
   scope: Scope,

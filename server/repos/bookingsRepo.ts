@@ -141,6 +141,24 @@ export async function setBookingStatus(
   return updated;
 }
 
+/**
+ * Stamps Arrived or Start on a confirmed booking. Null when the booking is not confirmed or the
+ * stamp is already there, so the service can answer the same way twice.
+ */
+export async function stampBookingMoment(
+  id: string,
+  field: 'arrivedAt' | 'startedAt',
+  at: Date,
+  options?: RepoOptions,
+): Promise<BookingDocument | null> {
+  const col = await collection('bookings');
+  return col.findOneAndUpdate(
+    { _id: id, status: 'confirmed', [field]: { $in: [null, undefined] } },
+    { $set: { [field]: at, updatedAt: at } },
+    { returnDocument: 'after', ...sessionOf(options) },
+  );
+}
+
 /** Moves a booking. Lock changes happen in the service, inside the same transaction. */
 export async function rescheduleBooking(
   id: string,

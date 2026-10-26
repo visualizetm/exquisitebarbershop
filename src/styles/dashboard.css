@@ -1,20 +1,21 @@
 /*
- * The owner dashboard and the barber portal: the shell (sidebar, top bar, tab bar), the kit parts
- * built for them (sidebar, stat tile, data table, search box, tabs, PIN pad, bar chart) and the
- * page layouts. Tokens only; nothing here moves (motion.css owns every transition).
+ * The owner dashboard and the barber portal: the shell (top bar, section tabs), the kit parts
+ * built for them (stat tile, data table, search box, tabs, PIN pad, bar chart) and the page
+ * layouts. Tokens only; nothing here moves (motion.css owns every transition).
  */
 
-/* Page color: surface-2 behind white cards in light, ink behind ink-2 cards in dark. */
-.exq-shell,
+/* Page color: the dashboard is dark only (tokens.css scopes the ink surfaces on the admin app);
+   the portal is surface-2 behind white cards in light, ink behind ink-2 cards in dark. */
+.exq-shell {
+  --page: var(--bg);
+}
 .exq-portal {
   --page: var(--card-2);
 }
-[data-theme='dark'] .exq-shell,
 [data-theme='dark'] .exq-portal {
   --page: var(--ink);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .exq-shell,
   :root:not([data-theme='light']) .exq-portal {
     --page: var(--ink);
   }
@@ -27,26 +28,28 @@
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--page);
+  color: var(--fg);
 }
-.exq-shell__main {
-  min-width: 0;
+/* The dashboard is always dark, so its marks are always the white ones. */
+.exq-app[data-state='admin'] .exq-mark--light {
+  display: none;
+}
+.exq-app[data-state='admin'] .exq-mark--dark {
+  display: inline-block;
 }
 .exq-shell__content {
   width: 100%;
-  max-width: 1280px;
+  max-width: 1440px;
   margin-inline: auto;
-  padding: var(--s4) var(--s4) calc(80px + var(--s5) + env(safe-area-inset-bottom));
+  padding: var(--s4) var(--s4) var(--s7);
 }
 @media (min-width: 1024px) {
-  .exq-shell {
-    padding-left: 248px;
-  }
   .exq-shell__content {
     padding: var(--s5) var(--s6) var(--s7);
   }
 }
 
-/* Top bar: search, date, New booking. Sticky; the menu button shows below 1024px. */
+/* Top bar: logo, Shop | Website, search, the clock, New booking, the account menu. Sticky. */
 .exq-topbar {
   position: sticky;
   top: 0;
@@ -56,22 +59,26 @@
   gap: var(--s3);
   min-height: 64px;
   padding: var(--s2) var(--s4);
-  background: var(--card);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
-.exq-topbar__brand {
+.exq-topbar__logo {
   display: inline-flex;
   align-items: center;
   flex: none;
 }
-.exq-topbar__brand img {
-  height: 28px;
+.exq-topbar__logo img {
+  height: 32px;
   width: auto;
+}
+.exq-topbar__side {
+  display: none;
+  flex: none;
 }
 .exq-topbar__search {
   flex: 1 1 auto;
   min-width: 0;
-  max-width: 520px;
+  max-width: 440px;
 }
 .exq-topbar__spacer {
   flex: 1 1 0;
@@ -82,16 +89,22 @@
   color: var(--fg-2);
   white-space: nowrap;
 }
+.exq-topbar__slot:empty {
+  display: none;
+}
 .exq-topbar__new {
   flex: none;
 }
 @media (min-width: 1024px) {
   .exq-topbar {
+    gap: var(--s4);
     padding-inline: var(--s6);
   }
-  .exq-topbar__brand,
-  .exq-topbar .exq-topbar__menu {
-    display: none;
+  .exq-topbar__logo img {
+    height: 36px;
+  }
+  .exq-topbar__side {
+    display: inline-flex;
   }
   .exq-topbar__date {
     display: block;
@@ -104,109 +117,160 @@
   }
 }
 
-/* Sidebar: fixed, 248px, ink. */
-.exq-sidebar {
-  display: none;
+/* Dashboard buttons: the primary action is a red fill with white text; outline stays white. */
+.exq-app[data-state='admin'] .exq-btn[data-variant='primary'] {
+  background: var(--red);
+  color: var(--paper);
+  border-color: var(--red);
 }
-@media (min-width: 1024px) {
-  .exq-sidebar {
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 40;
-    display: flex;
-    flex-direction: column;
-    width: 248px;
-    padding: var(--s5) 0 var(--s4);
-    background: var(--bg);
-    color: var(--fg);
-    overflow-y: auto;
+@media (hover: hover) {
+  .exq-app[data-state='admin'] .exq-btn[data-state='default'][data-variant='primary']:hover {
+    background: var(--red-600);
+    border-color: var(--red-600);
   }
 }
-.exq-sidebar__logo {
-  padding: 0 var(--s5) var(--s5);
-}
-.exq-sidebar__logo img {
-  width: 100%;
-  height: auto;
-  max-width: 190px;
-}
-.exq-sidebar__list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.exq-sidebar__link,
-.exq-sidebar__link:hover {
-  display: block;
-  color: var(--fg);
-  text-decoration: none;
-}
-.exq-sidebar__row {
+
+/* The account menu: one round button with the owner's initial, a small menu under it. */
+.exq-acct {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  min-height: 44px;
-  padding: 0 var(--s5);
-  color: var(--fg-3);
-  font-weight: 500;
-}
-.exq-sidebar__row svg {
   flex: none;
-  width: 20px;
-  height: 20px;
 }
-.exq-sidebar__link:hover .exq-sidebar__row {
-  color: var(--fg);
-  background: var(--ink-2);
-}
-.exq-sidebar__row[data-state='active'] {
-  color: var(--paper);
-  background: var(--ink-2);
-}
-.exq-sidebar__row[data-state='active']::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--red);
-}
-.exq-sidebar__badge {
-  margin-left: auto;
-  min-width: 22px;
-  padding: 0 6px;
+.exq-acct__button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
   border-radius: var(--r-pill);
-  background: var(--red);
-  color: var(--paper);
-  font-size: var(--t-label);
-  font-weight: 700;
-  text-align: center;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
 }
-.exq-sidebar__footer {
-  display: grid;
+.exq-acct__button:hover,
+.exq-acct[data-state='open'] .exq-acct__button {
+  border-color: var(--fg-3);
+}
+/* The Shop | Website switch: each half is a full 44px tap target. */
+.exq-side {
+  padding: 0;
+}
+.exq-side .exq-seg__btn {
+  min-height: var(--hit);
+  padding-inline: var(--s4);
+}
+.exq-acct__initial {
+  font-weight: 800;
+  font-size: var(--t-h3);
+  line-height: 1;
+}
+.exq-acct__menu {
+  position: absolute;
+  top: calc(100% + var(--s2));
+  right: 0;
+  z-index: 40;
+  width: 260px;
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+  box-shadow: var(--shadow-pop);
+}
+.exq-acct__who {
+  display: flex;
+  justify-content: space-between;
   gap: var(--s3);
-  margin-top: auto;
-  padding: var(--s5) var(--s5) 0;
-  border-top: 1px solid var(--ink-3);
+  margin: 0 0 var(--s3);
+  font-weight: 700;
 }
-.exq-sidebar__who {
-  margin: 0;
-  color: var(--paper);
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-.exq-sidebar__role {
+.exq-acct__role {
   color: var(--fg-3);
-  font-size: var(--t-label);
   font-weight: 400;
 }
-.exq-sidebar__actions {
+.exq-acct__list {
+  margin-bottom: var(--s4);
+  border-top: 1px solid var(--border);
+}
+.exq-acct__link {
   display: flex;
-  gap: var(--s2);
   align-items: center;
+  min-height: var(--hit);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 700;
+}
+.exq-acct__link:hover {
+  color: var(--accent-text);
 }
 
-/* Bottom tab bar: phones. Four items, 56px. */
+/* Section tabs under the bar: Shop (Today ... Team) or Website (Announcement ... Reviews).
+   On phones the switch sits at the left of the same row and the row scrolls sideways. */
+.exq-sectabs {
+  position: sticky;
+  top: 64px;
+  z-index: 29;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s2) var(--s4) 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.exq-sectabs::-webkit-scrollbar {
+  display: none;
+}
+.exq-sectabs__side {
+  flex: none;
+  margin-bottom: var(--s2);
+}
+.exq-sectabs__nav {
+  display: flex;
+  gap: var(--s1);
+  flex: none;
+}
+.exq-sectabs__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  min-height: var(--hit);
+  padding: 0 var(--s3) var(--s2);
+  color: var(--fg-3);
+  font-size: var(--t-label);
+  font-weight: 700;
+  font-stretch: var(--w-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.exq-sectabs__tab:hover {
+  color: var(--fg);
+}
+.exq-sectabs__tab[aria-current='page'] {
+  color: var(--fg);
+}
+.exq-sectabs__tab[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  inset: auto var(--s3) -1px;
+  height: 3px;
+  background: var(--red);
+}
+@media (min-width: 1024px) {
+  .exq-sectabs {
+    padding-inline: var(--s6);
+  }
+  .exq-sectabs__side {
+    display: none;
+  }
+}
+
+/* Bottom tab bar: the barber portal on phones. 56px. */
 .exq-bottomtabs {
   position: fixed;
   inset: auto 0 0 0;
@@ -232,7 +296,7 @@
   color: var(--fg-2);
   font: inherit;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
 }
@@ -326,6 +390,10 @@
   margin: var(--s1) 0 0;
   color: var(--fg-2);
 }
+.exq-dash-head__kicker {
+  margin: 0 0 var(--s1);
+  color: var(--fg-3);
+}
 .exq-dash-grid {
   display: grid;
   gap: var(--s4);
@@ -399,11 +467,11 @@
 }
 .exq-alert__text {
   flex: 1 1 auto;
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-alert__go {
   flex: none;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent-text);
 }
 
@@ -454,7 +522,7 @@
   margin: 0;
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-stat__value {
   grid-area: value;
@@ -514,7 +582,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s2);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-chairrow__lines {
   display: grid;
@@ -536,7 +604,7 @@
 }
 .exq-chairrow__lines b {
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* Status chip: a small pill, never color alone (the word is always there). */
@@ -550,7 +618,7 @@
   background: var(--card-2);
   color: var(--fg);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 .exq-status-chip svg {
@@ -604,7 +672,7 @@
 }
 .exq-activity__who {
   min-width: 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-activity__sub {
   display: block;
@@ -636,7 +704,7 @@
   position: relative;
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 .exq-table [data-align='end'] {
@@ -651,7 +719,7 @@
   background: none;
   color: inherit;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .exq-table__sort:hover {
@@ -673,7 +741,7 @@
   background: none;
   color: inherit;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
@@ -795,7 +863,7 @@
   background: var(--card-2);
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -810,7 +878,7 @@
   box-shadow: inset 3px 0 0 var(--red);
 }
 .exq-search__title {
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-search__detail {
   color: var(--fg-2);
@@ -839,7 +907,7 @@
   background: none;
   color: var(--fg-2);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .exq-tabs__tab:hover {
@@ -906,7 +974,7 @@
 }
 .exq-pin[data-state='error'] .exq-pin__status {
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-pin__keys {
   display: grid;
@@ -948,7 +1016,7 @@
 .exq-chart__title {
   margin-bottom: var(--s2);
   font-size: var(--t-h3);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-adm .exq-chart__legend,
 .exq-chart__legend {
@@ -1017,44 +1085,13 @@
 }
 .exq-shell .exq-adm__content {
   width: 100%;
-  max-width: 1280px;
-  padding: var(--s4) var(--s4) calc(80px + var(--s5) + env(safe-area-inset-bottom));
+  max-width: 1440px;
+  padding: var(--s4) var(--s4) var(--s7);
 }
 @media (min-width: 1024px) {
   .exq-shell .exq-adm__content {
     padding: var(--s5) var(--s6) var(--s7);
   }
-}
-
-/* The menu sheet (phones) */
-.exq-menusheet {
-  display: grid;
-  margin-bottom: var(--s4);
-}
-.exq-menusheet__link {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  min-height: 52px;
-  border-bottom: 1px solid var(--border);
-  text-decoration: none;
-  font-weight: 600;
-}
-.exq-menusheet__link svg {
-  width: 20px;
-  height: 20px;
-}
-.exq-menusheet__who {
-  margin: var(--s4) 0;
-  font-weight: 600;
-}
-
-/* The theme menu opens upward inside the sidebar. */
-.exq-sidebar .exq-theme__menu {
-  top: auto;
-  bottom: calc(100% + 4px);
-  left: 0;
-  right: auto;
 }
 
 /* Checkbox */
@@ -1219,7 +1256,7 @@
 .exq-fieldset legend {
   padding: 0;
   margin-bottom: var(--s2);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-announce-preview {
   overflow: hidden;
@@ -1253,7 +1290,7 @@
   gap: var(--s1) var(--s3);
 }
 .exq-priceedit__name {
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-priceedit__shop {
   color: var(--fg-3);
@@ -1291,11 +1328,11 @@
 .exq-bsheet__fact dt {
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-bsheet__fact dd {
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 .exq-bsheet__actions {
@@ -1333,7 +1370,7 @@
 .exq-bsheet__when {
   display: block;
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-bsheet__skeleton {
   min-height: 240px;
@@ -1497,7 +1534,7 @@
   background: var(--card-2);
   color: var(--fg-3);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   cursor: default;
 }
 .exq-daygrid__block {
@@ -1508,7 +1545,7 @@
   overflow: hidden;
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   cursor: default;
 }
 .exq-daygrid__line {
@@ -1652,7 +1689,7 @@
   background: none;
   color: var(--fg);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .exq-switch:disabled {
@@ -1851,7 +1888,7 @@
 }
 .exq-reviewsedit__preview[data-state='rated'] {
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-reviewlist {
   display: grid;
@@ -1918,7 +1955,7 @@
 .exq-homephoto figcaption {
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-drafts,
 .exq-gallerylist {
@@ -1989,7 +2026,7 @@
   padding: 0 var(--s1);
   color: var(--fg-2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-settings__facts {
   display: grid;
@@ -2002,4 +2039,321 @@
 }
 .exq-settings__facts dd {
   margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Shop, Today: the floor
+   --------------------------------------------------------------------------- */
+.exq-today__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.exq-today__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  font-size: var(--t-label);
+  font-weight: 700;
+  font-stretch: var(--w-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.exq-today__pill[data-tone='accent'] {
+  border-color: var(--red);
+  background: var(--red);
+  color: var(--paper);
+}
+.exq-today__grid {
+  display: grid;
+  gap: var(--s4);
+  margin-bottom: var(--s4);
+}
+@media (min-width: 1024px) {
+  .exq-today__grid {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    align-items: start;
+  }
+}
+.exq-today__main,
+.exq-today__aside {
+  min-width: 0;
+}
+.exq-today__h2 {
+  margin: 0 0 var(--s3);
+  color: var(--fg-3);
+}
+.exq-today__all {
+  color: var(--accent-text);
+}
+
+/* Chair cards */
+.exq-floor {
+  display: grid;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+}
+.exq-floorcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.exq-floorcard[data-kind='inChair'] {
+  border-color: var(--band-line);
+}
+.exq-floorcard[data-kind='off'],
+.exq-floorcard[data-kind='instagram'] {
+  color: var(--fg-3);
+}
+.exq-floorcard__chair {
+  margin: 0;
+  color: var(--fg-3);
+}
+.exq-floorcard__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+.exq-floorcard__name {
+  margin: 0;
+  font-size: var(--t-h3);
+}
+.exq-floorcard__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--fg-3);
+}
+.exq-floorcard[data-kind='inChair'] .exq-floorcard__state {
+  color: var(--accent-text);
+}
+.exq-floorcard[data-kind='inChair'] .exq-floorcard__state::before,
+.exq-floorcard[data-kind='free'] .exq-floorcard__state::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.exq-floorcard[data-kind='free'] .exq-floorcard__state {
+  color: var(--ok);
+}
+.exq-floorcard__client {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-floorcard__client:hover .exq-floorcard__who {
+  color: var(--accent-text);
+}
+.exq-floorcard__who {
+  display: block;
+  margin: 0;
+  font-weight: 700;
+}
+.exq-floorcard__service {
+  display: block;
+  margin: 0;
+  color: var(--fg-2);
+}
+.exq-floorcard__bar {
+  height: 8px;
+  margin-top: var(--s1);
+  border-radius: var(--r-pill);
+  background: var(--card-2);
+  overflow: hidden;
+}
+.exq-floorcard__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--red);
+}
+.exq-floorcard__times {
+  margin: 0;
+  color: var(--fg-3);
+}
+.exq-floorcard__next {
+  margin: 0;
+  color: var(--fg-2);
+}
+.exq-floorcard__actions {
+  display: flex;
+  gap: var(--s2);
+  margin-top: auto;
+  padding-top: var(--s2);
+}
+.exq-floorcard__more {
+  position: relative;
+}
+.exq-floorcard__menu {
+  position: absolute;
+  top: calc(100% + var(--s1));
+  left: 0;
+  z-index: 10;
+  min-width: 160px;
+  padding: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-tile);
+  background: var(--card-2);
+  box-shadow: var(--shadow-pop);
+}
+.exq-floorcard__item {
+  display: block;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-floorcard__item:hover {
+  background: var(--border);
+}
+
+/* Coming up */
+.exq-coming__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--border);
+}
+.exq-coming__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.exq-coming__time {
+  font-weight: 800;
+  white-space: nowrap;
+}
+.exq-coming__who {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-coming__who:hover .exq-coming__name {
+  color: var(--accent-text);
+}
+.exq-coming__name {
+  font-weight: 700;
+}
+.exq-coming__sub {
+  color: var(--fg-2);
+}
+.exq-coming__source {
+  margin-top: var(--s1);
+  color: var(--fg-3);
+}
+.exq-coming__row[data-state='arrived'] .exq-coming__source {
+  color: var(--ok);
+}
+.exq-coming__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+@media (min-width: 768px) {
+  .exq-coming__row {
+    grid-template-columns: 80px minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .exq-coming__actions {
+    grid-column: auto;
+    justify-content: flex-end;
+  }
+}
+
+/* Today so far */
+.exq-sofar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+.exq-sofar__tile {
+  padding: var(--s3);
+  border-radius: var(--r-tile);
+  background: var(--card-2);
+}
+.exq-sofar__tile dt {
+  margin: 0 0 var(--s1);
+  color: var(--fg-3);
+}
+.exq-sofar__tile dd {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Done today */
+.exq-donelist__row {
+  border-top: 1px solid var(--border);
+}
+.exq-donelist__row:first-child {
+  border-top: 0;
+}
+.exq-donelist__btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  width: 100%;
+  min-height: var(--hit);
+  padding: var(--s2) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-donelist__btn:hover .exq-donelist__who {
+  color: var(--accent-text);
+}
+.exq-donelist__who {
+  display: grid;
+  min-width: 0;
+  font-weight: 700;
+}
+.exq-donelist__sub {
+  color: var(--fg-3);
+  font-weight: 400;
+}
+.exq-donelist__price {
+  font-weight: 800;
+  white-space: nowrap;
 }

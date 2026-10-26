@@ -19,12 +19,15 @@
   border-radius: var(--r-pill);
   font: inherit;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   line-height: 1;
   text-transform: uppercase;
   text-decoration: none;
-  white-space: nowrap;
+  /* A long label wraps inside the pill rather than running past a narrow phone. */
+  max-width: 100%;
+  text-align: center;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -154,7 +157,7 @@
 }
 .exq-field__label {
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -197,7 +200,7 @@ textarea.exq-field__control {
 }
 .exq-field[data-state='error'] .exq-field__message {
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 .exq-field[data-state='warning'] .exq-field__control {
   border-color: var(--warn);
@@ -205,7 +208,7 @@ textarea.exq-field__control {
 }
 .exq-field[data-state='warning'] .exq-field__message {
   color: var(--warn);
-  font-weight: 600;
+  font-weight: 700;
 }
 /* The bot trap in the booking form stays off screen. */
 .exq-field--trap {
@@ -259,7 +262,7 @@ textarea.exq-field__control {
   color: var(--fg);
   font: inherit;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
@@ -300,7 +303,7 @@ textarea.exq-field__control {
   border-radius: var(--r-pill);
   background: var(--card-2);
   color: var(--fg-2);
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   text-align: center;
@@ -503,7 +506,7 @@ textarea.exq-field__control {
 }
 .exq-pricerow__meta {
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -566,7 +569,8 @@ a.exq-pricerow:focus-visible {
 }
 .exq-photoframe__name {
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--mute-on-dark);
@@ -613,7 +617,8 @@ div.exq-chaircard {
   background: var(--ink);
   color: var(--paper);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -652,7 +657,7 @@ div.exq-chaircard {
   align-items: center;
   gap: var(--s2);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -722,7 +727,7 @@ div.exq-chaircard {
 }
 .exq-stepbar__label {
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -772,7 +777,8 @@ div.exq-chaircard {
 }
 .exq-ticket__label {
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--accent-text);
@@ -813,7 +819,8 @@ div.exq-chaircard {
   gap: var(--s2);
   align-items: center;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);
@@ -1103,7 +1110,7 @@ div.exq-chaircard {
   color: var(--fg-2);
   font: inherit;
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 .exq-seg__btn[data-state='selected'] {
@@ -1170,7 +1177,7 @@ div.exq-chaircard {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
@@ -1190,7 +1197,8 @@ div.exq-chaircard {
 }
 .exq-theme-switch__label {
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
+  font-stretch: var(--w-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -1219,7 +1227,7 @@ div.exq-chaircard {
   background: var(--accent-soft);
   color: var(--fg);
   font-size: var(--t-label);
-  font-weight: 600;
+  font-weight: 700;
   text-align: center;
 }
 .exq-site-down__details {

@@ -29,6 +29,7 @@ import {
   outboxListQuerySchema,
   outboxListResponseSchema,
   overviewResponseSchema,
+  floorResponseSchema,
   ownerCancelRequestSchema,
   ownerRescheduleRequestSchema,
   resolutionsBodySchema,
@@ -70,6 +71,7 @@ import { ownerScope, actorOf } from '../../services/access';
 import {
   bookingDetail,
   changeBookingStatus,
+  stampBookingMoment,
   customerByPhone,
   customerList,
   saveCustomerNotes,
@@ -112,6 +114,7 @@ import {
   upsertClosure,
 } from '../../services/adminSchedule';
 import { bookingTable, overview } from '../../services/adminDashboard';
+import { floor } from '../../services/floor';
 import { adminSearch } from '../../services/adminSearch';
 import { dismissAlert, resolveAlert } from '../../services/alerts';
 import { createManualBooking } from '../../services/bookingService';
@@ -176,6 +179,10 @@ export const adminRoutes: RouteDefinition[] = [
   owner('GET', '/api/admin/overview', async (ctx) => {
     ctxScope(ctx);
     return { body: overviewResponseSchema.parse(await overview(ctx.now)), headers: NO_STORE };
+  }),
+  owner('GET', '/api/admin/floor', async (ctx) => {
+    ctxScope(ctx);
+    return { body: floorResponseSchema.parse(await floor(ctx.now)), headers: NO_STORE };
   }),
   owner('GET', '/api/admin/booking-table', async (ctx) => {
     ctxScope(ctx);
@@ -242,6 +249,18 @@ export const adminRoutes: RouteDefinition[] = [
     const done = await changeBookingStatus(principal, scope, id, input, metaOf(ctx));
     scheduleDelivery(done.outboxIds);
     return { body: bookingResponseSchema.parse(done.body) };
+  }),
+  owner('POST', '/api/admin/bookings/:id/arrived', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await stampBookingMoment(principal, scope, id, 'arrived', metaOf(ctx));
+    return { body: bookingResponseSchema.parse({ booking: done.booking }) };
+  }),
+  owner('POST', '/api/admin/bookings/:id/start', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await stampBookingMoment(principal, scope, id, 'start', metaOf(ctx));
+    return { body: bookingResponseSchema.parse({ booking: done.booking }) };
   }),
   owner('POST', '/api/admin/bookings/:id/cancel', async (ctx) => {
     const { principal, scope } = ctxScope(ctx);

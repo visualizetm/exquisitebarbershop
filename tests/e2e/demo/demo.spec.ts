@@ -54,7 +54,7 @@ async function enterDemo(page: Page) {
   await expect(page).toHaveURL(/\/admin\/login/);
   await expect(page.getByText(BANNER)).toBeVisible();
   await page.getByRole('button', { name: 'Enter demo dashboard' }).click();
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
 }
 
 /** A PNG drawn in the page, so the real file input and the real resize run. */
@@ -240,7 +240,7 @@ test('the demo button opens admin Today with sample bookings, and Bookings lists
   await enterDemo(page);
   // The banner rides along in the admin.
   await expect(page.getByText(BANNER)).toBeVisible();
-  await expect(page.locator('.exq-chairrow').first()).toBeVisible();
+  await expect(page.locator('.exq-floorcard').first()).toBeVisible();
 
   await page.goto('/admin/bookings');
   await expect(page.getByRole('heading', { name: 'Bookings' })).toBeVisible();
@@ -472,8 +472,8 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
   await sheet.getByRole('button', { name: 'Reset it' }).click();
 
   // Back on a fresh Today, still signed in.
-  await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/shop\/today$/);
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
 
   // The photos and the visitor's booking are gone; the sample shop is back.
   await page.goto('/admin/bookings');
