@@ -32,9 +32,11 @@ const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
 const THU = nextDate(4, 3);
-const marcus = staffSeedId('marcus');
-const tre = staffSeedId('tre');
-const cut = serviceSeedId('classic-cut');
+const SUN = nextDate(7, 3);
+const lee = staffSeedId('lee');
+const drew = staffSeedId('drew');
+const nelly = staffSeedId('nelly');
+const cut = serviceSeedId('haircut');
 
 const asOwner = (method: string, path: string, body?: unknown) =>
   call(server.baseUrl, method, path, {
@@ -46,9 +48,9 @@ const asOwner = (method: string, path: string, body?: unknown) =>
 async function seedBooking(
   staffId: string,
   hhmm: string,
-  opts: { serviceId?: string; email?: string | null } = {},
+  opts: { serviceId?: string; email?: string | null; date?: string } = {},
 ) {
-  const startAt = new Date(slotAt(THU, hhmm));
+  const startAt = new Date(slotAt(opts.date ?? THU, hhmm));
   const service = await servicesRepo.findServiceById(opts.serviceId ?? cut);
   if (!service) throw new Error('missing service');
   const endAt = addMinutes(startAt, service.durationMinutes);
@@ -136,7 +138,7 @@ beforeEach(async () => {
 
 describe('conflict rule: weekly hours', () => {
   it('shop hours: 409 lists the booking and changes nothing; keep applies it and is not asked again', async () => {
-    const booking = await seedBooking(marcus, '16:00');
+    const booking = await seedBooking(lee, '16:00');
     const conflict = await asOwner('PUT', '/api/admin/hours', {
       days: thuOnly([{ start: '09:00', end: '15:00' }]),
     });
@@ -146,7 +148,7 @@ describe('conflict rule: weekly hours', () => {
     const summary = apiErrorSchema.parse(conflict.body).error.affected?.[0];
     expect(summary).toMatchObject({
       referenceCode: booking.referenceCode,
-      staffName: 'Marcus',
+      staffName: 'Lee',
       customerName: 'Customer 16:00',
       hasEmail: true,
     });
@@ -176,8 +178,8 @@ describe('conflict rule: weekly hours', () => {
   });
 
   it('cancel with and without notifying the customer, releasing locks; partial answers are refused', async () => {
-    const a = await seedBooking(marcus, '16:00');
-    const b = await seedBooking(tre, '16:30');
+    const a = await seedBooking(lee, '16:00');
+    const b = await seedBooking(nelly, '16:30');
     const partial = await asOwner('PUT', '/api/admin/hours', {
       days: thuOnly([{ start: '09:00', end: '15:00' }]),
       resolutions: [{ bookingId: a._id, action: 'cancelAndNotify' }],
@@ -207,15 +209,15 @@ describe('conflict rule: weekly hours', () => {
   });
 
   it('chair hours: only that chair is checked', async () => {
-    const mine = await seedBooking(marcus, '10:00');
-    await seedBooking(tre, '10:00');
-    const res = await asOwner('PUT', `/api/admin/staff/${marcus}/hours`, { days: thuOnly([]) });
+    const mine = await seedBooking(lee, '10:00');
+    await seedBooking(nelly, '10:00');
+    const res = await asOwner('PUT', `/api/admin/staff/${lee}/hours`, { days: thuOnly([]) });
     expect(res.status).toBe(409);
     expect(affectedIds(res.body)).toEqual([mine._id]);
   });
 
   it('a change that strands nobody applies directly', async () => {
-    await seedBooking(marcus, '10:00');
+    await seedBooking(lee, '10:00');
     const res = await asOwner('PUT', '/api/admin/hours', {
       days: thuOnly([{ start: '09:00', end: '18:00' }]),
     });
@@ -223,7 +225,7 @@ describe('conflict rule: weekly hours', () => {
   });
 
   it('a choice for a booking that is not affected is ignored, never cancelled', async () => {
-    const safe = await seedBooking(marcus, '10:00');
+    const safe = await seedBooking(lee, '10:00');
     const res = await asOwner('PUT', '/api/admin/hours', {
       days: thuOnly([{ start: '09:00', end: '18:00' }]),
       resolutions: [{ bookingId: safe._id, action: 'cancel' }],
@@ -235,8 +237,8 @@ describe('conflict rule: weekly hours', () => {
 
 describe('conflict rule: closures', () => {
   it('closing a day lists the bookings of every chair that day', async () => {
-    const a = await seedBooking(marcus, '10:00');
-    const b = await seedBooking(tre, '12:00');
+    const a = await seedBooking(lee, '10:00');
+    const b = await seedBooking(nelly, '12:00');
     const res = await asOwner('PUT', '/api/admin/closures', {
       date: THU,
       kind: 'closed',
@@ -258,7 +260,7 @@ describe('conflict rule: closures', () => {
 
   it('removing longer special hours shortens the day and is checked too', async () => {
     await weeklyHoursRepo.setStaffHours(
-      marcus,
+      lee,
       thuOnly([{ start: '07:00', end: '21:00' }]),
       new Date(),
     );
@@ -269,7 +271,7 @@ describe('conflict rule: closures', () => {
       label: 'Late night',
     });
     expect(created.status).toBe(200);
-    const late = await seedBooking(marcus, '20:00');
+    const late = await seedBooking(lee, '20:00');
     const id = (created.body as { closure: { id: string } }).closure.id;
     const res = await asOwner('DELETE', `/api/admin/closures/${id}`, {});
     expect(res.status).toBe(409);
@@ -283,9 +285,9 @@ describe('conflict rule: closures', () => {
 
 describe('conflict rule: time blocks and days', () => {
   it('time off over a booking is refused until answered', async () => {
-    const booking = await seedBooking(marcus, '13:00');
+    const booking = await seedBooking(lee, '13:00');
     const res = await asOwner('POST', '/api/admin/time-blocks', {
-      staffId: marcus,
+      staffId: lee,
       kind: 'timeOff',
       startAt: slotAt(THU, '12:00'),
       endAt: slotAt(THU, '19:00'),
@@ -302,9 +304,10 @@ describe('conflict rule: time blocks and days', () => {
   });
 
   it('a blocked period shares slots only with a kept booking, and takes them back when it is cancelled', async () => {
-    const booking = await seedBooking(marcus, '13:00'); // 13:00 to 13:30, buffer to 13:40: locks 13:00, 13:15, 13:30
+    // A kids cut: 13:00 to 13:30, buffer to 13:40: locks 13:00, 13:15, 13:30
+    const booking = await seedBooking(lee, '13:00', { serviceId: serviceSeedId('kids-cut') });
     const res = await asOwner('POST', '/api/admin/time-blocks', {
-      staffId: marcus,
+      staffId: lee,
       kind: 'block',
       startAt: slotAt(THU, '13:00'),
       endAt: slotAt(THU, '14:00'),
@@ -323,10 +326,13 @@ describe('conflict rule: time blocks and days', () => {
   });
 
   it('marking someone out for the day is checked; marking them in again restores the day', async () => {
-    const booking = await seedBooking(tre, '11:00');
-    const out = await asOwner('POST', `/api/admin/staff/${tre}/day`, { date: THU, status: 'out' });
+    const booking = await seedBooking(nelly, '11:00');
+    const out = await asOwner('POST', `/api/admin/staff/${nelly}/day`, {
+      date: THU,
+      status: 'out',
+    });
     expect(out.status).toBe(409);
-    const kept = await asOwner('POST', `/api/admin/staff/${tre}/day`, {
+    const kept = await asOwner('POST', `/api/admin/staff/${nelly}/day`, {
       date: THU,
       status: 'out',
       resolutions: [{ bookingId: booking._id, action: 'keep' }],
@@ -336,7 +342,10 @@ describe('conflict rule: time blocks and days', () => {
       status: 'out',
       dayOff: true,
     });
-    const back = await asOwner('POST', `/api/admin/staff/${tre}/day`, { date: THU, status: 'in' });
+    const back = await asOwner('POST', `/api/admin/staff/${nelly}/day`, {
+      date: THU,
+      status: 'in',
+    });
     expect((back.body as { entry: { status: string; dayOff: boolean } }).entry).toMatchObject({
       status: 'in',
       dayOff: false,
@@ -344,9 +353,9 @@ describe('conflict rule: time blocks and days', () => {
   });
 
   it('removing extra hours that hold a booking is checked', async () => {
-    const jay = staffSeedId('jay'); // off on Thursdays
-    const added = await asOwner('POST', `/api/admin/staff/${jay}/day`, {
-      date: THU,
+    // Drew works Tuesday to Saturday, so Sunday is a day he is off.
+    const added = await asOwner('POST', `/api/admin/staff/${drew}/day`, {
+      date: SUN,
       status: 'in',
       start: '10:00',
       end: '14:00',
@@ -355,10 +364,10 @@ describe('conflict rule: time blocks and days', () => {
       status: 'in',
       extraHours: true,
     });
-    const booking = await seedBooking(jay, '11:00');
-    const blocks = await timeBlocksRepo.listTimeBlocksForStaff(jay, {
-      start: new Date(slotAt(THU, '00:00')),
-      end: new Date(slotAt(THU, '23:59')),
+    const booking = await seedBooking(drew, '11:00', { date: SUN });
+    const blocks = await timeBlocksRepo.listTimeBlocksForStaff(drew, {
+      start: new Date(slotAt(SUN, '00:00')),
+      end: new Date(slotAt(SUN, '23:59')),
     });
     const extra = blocks.find((b) => b.kind === 'extraHours');
     const res = await asOwner('DELETE', `/api/admin/time-blocks/${extra?._id ?? ''}`, {});
@@ -419,8 +428,8 @@ describe('conflict rule: removing chairs and services', () => {
       isActive: true,
     });
     const serviceId = (created.body as { service: { id: string } }).service.id;
-    const withIt = await seedBooking(marcus, '10:00', { serviceId });
-    await seedBooking(marcus, '11:00');
+    const withIt = await seedBooking(lee, '10:00', { serviceId });
+    await seedBooking(lee, '11:00');
     const res = await asOwner('DELETE', `/api/admin/services/${serviceId}`, {});
     expect(res.status).toBe(409);
     expect(affectedIds(res.body)).toEqual([withIt._id]);
@@ -432,34 +441,34 @@ describe('conflict rule: removing chairs and services', () => {
   });
 
   it("dropping a service from a chair lists that chair's bookings for it", async () => {
-    const booking = await seedBooking(marcus, '10:00');
-    const staff = await staffRepo.findStaffById(marcus);
+    const booking = await seedBooking(lee, '10:00');
+    const staff = await staffRepo.findStaffById(lee);
     const without = (staff?.serviceIds ?? []).filter((s) => s !== cut);
-    const res = await asOwner('PATCH', `/api/admin/staff/${marcus}`, { serviceIds: without });
+    const res = await asOwner('PATCH', `/api/admin/staff/${lee}`, { serviceIds: without });
     expect(res.status).toBe(409);
     expect(affectedIds(res.body)).toEqual([booking._id]);
-    const ok = await asOwner('PATCH', `/api/admin/staff/${marcus}`, {
+    const ok = await asOwner('PATCH', `/api/admin/staff/${lee}`, {
       serviceIds: without,
       resolutions: [{ bookingId: booking._id, action: 'keep' }],
     });
     expect(ok.status).toBe(200);
-    await asOwner('PATCH', `/api/admin/staff/${marcus}`, { serviceIds: staff?.serviceIds ?? [] });
+    await asOwner('PATCH', `/api/admin/staff/${lee}`, { serviceIds: staff?.serviceIds ?? [] });
   });
 });
 
 describe('schedule guards', () => {
   it('bookings and schedule changes both bump the chair guard', async () => {
-    const before = await scheduleGuardsRepo.getScheduleGuardVersion(marcus);
-    await asOwner('PUT', `/api/admin/staff/${marcus}/hours`, { days: shopHoursSeed });
-    const afterChange = await scheduleGuardsRepo.getScheduleGuardVersion(marcus);
+    const before = await scheduleGuardsRepo.getScheduleGuardVersion(lee);
+    await asOwner('PUT', `/api/admin/staff/${lee}/hours`, { days: shopHoursSeed });
+    const afterChange = await scheduleGuardsRepo.getScheduleGuardVersion(lee);
     expect(afterChange).toBe(before + 1);
     const { bookPublic } = await import('../helpers/bookingApi');
     await bookPublic(server.baseUrl, {
-      staff: 'marcus',
+      staff: 'lee',
       serviceIds: [cut],
       startAt: slotAt(THU, '15:00'),
     });
-    expect(await scheduleGuardsRepo.getScheduleGuardVersion(marcus)).toBe(afterChange + 1);
+    expect(await scheduleGuardsRepo.getScheduleGuardVersion(lee)).toBe(afterChange + 1);
   });
 
   it('race: a schedule change and bookings on the same chair never strand a booking silently', async () => {
@@ -468,11 +477,11 @@ describe('schedule guards', () => {
     const { loadScheduleData } = await import('../../server/services/scheduleData');
     const times = ['14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'];
     const results = await Promise.allSettled([
-      asOwner('PUT', `/api/admin/staff/${marcus}/hours`, {
+      asOwner('PUT', `/api/admin/staff/${lee}/hours`, {
         days: thuOnly([{ start: '09:00', end: '13:00' }]),
       }),
       ...times.map((t) =>
-        bookPublic(server.baseUrl, { staff: 'marcus', serviceIds: [cut], startAt: slotAt(THU, t) }),
+        bookPublic(server.baseUrl, { staff: 'lee', serviceIds: [cut], startAt: slotAt(THU, t) }),
       ),
     ]);
     const change = results[0];
@@ -480,10 +489,10 @@ describe('schedule guards', () => {
     const changeStatus = change.status === 'fulfilled' ? change.value.status : 0;
     expect([200, 409]).toContain(changeStatus);
     const data = await loadScheduleData(THU, THU);
-    const staff = data.staff.find((x) => x._id === marcus);
+    const staff = data.staff.find((x) => x._id === lee);
     const confirmed = await bookingsRepo.listBookingsBetween(
       { start: new Date(slotAt(THU, '00:00')), end: new Date(slotAt(THU, '23:59')) },
-      { staffId: marcus, statuses: ['confirmed'] },
+      { staffId: lee, statuses: ['confirmed'] },
     );
     // Either the change won (no afternoon bookings exist) or bookings won (the change was refused).
     for (const booking of confirmed)

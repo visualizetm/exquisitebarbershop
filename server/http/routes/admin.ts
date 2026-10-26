@@ -41,6 +41,7 @@ import {
   serviceListResponseSchema,
   serviceResponseSchema,
   serviceUpdateRequestSchema,
+  reviewsRequestSchema,
   settingsRequestSchema,
   settingsResponseSchema,
   staffCreateRequestSchema,
@@ -91,6 +92,7 @@ import {
   listOutbox,
   listServices,
   listStaff,
+  putReviews,
   putSettings,
   renameStaffSlug,
   retryOutboxMessage,
@@ -466,6 +468,11 @@ export const adminRoutes: RouteDefinition[] = [
     const { principal } = ctxScope(ctx);
     const input = await parseBody(ctx, settingsRequestSchema);
     return { body: settingsResponseSchema.parse(await putSettings(principal, input, metaOf(ctx))) };
+  }),
+  owner('PUT', '/api/admin/reviews', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input = await parseBody(ctx, reviewsRequestSchema);
+    return { body: settingsResponseSchema.parse(await putReviews(principal, input, metaOf(ctx))) };
   }),
 
   // A barber's PIN access ---------------------------------------------------

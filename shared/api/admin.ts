@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MAX_NOTE_LENGTH } from '../lib/constants';
+import { servicePriceIssues } from '../lib/servicePricing';
 import {
   bookingCustomerSchema,
   bookingSourceSchema,
@@ -15,8 +16,18 @@ import {
 } from '../schemas/common';
 import { outboxStatusSchema } from '../schemas/emailOutbox';
 import { serviceInputSchema, serviceUpdateSchema } from '../schemas/service';
-import { shopSettingsInputSchema } from '../schemas/shopSettings';
-import { staffInputSchema, staffUpdateSchema } from '../schemas/staff';
+import {
+  googleRatingSchema,
+  MAX_REVIEWS,
+  shopSettingsInputSchema,
+  shopSettingsUpdateSchema,
+} from '../schemas/shopSettings';
+import {
+  servicePriceSchema,
+  staffInputSchema,
+  staffUpdateSchema,
+  type ServicePrice,
+} from '../schemas/staff';
 import { actorTypeSchema, timeBlockKindSchema } from '../schemas/timeBlock';
 import { staffSelectorSchema } from './availability';
 import { bookingViewSchema } from './bookings';
@@ -454,6 +465,7 @@ export const adminStaffViewSchema = z.object({
   bio: z.string(),
   chairNumber: z.int().nullable(),
   serviceIds: z.array(idSchema),
+  servicePrices: z.array(servicePriceSchema).default([]),
   photoUrl: z.string().nullable(),
   instagramHandle: z.string().nullable(),
   sortOrder: z.int(),
@@ -464,10 +476,28 @@ export const adminStaffViewSchema = z.object({
 export type AdminStaffView = z.infer<typeof adminStaffViewSchema>;
 export const staffListResponseSchema = z.object({ staff: z.array(adminStaffViewSchema) });
 export const staffResponseSchema = z.object({ staff: adminStaffViewSchema });
-export const staffCreateRequestSchema = staffInputSchema;
+/**
+ * A request that carries both a menu and prices cannot price a service that is not on the menu.
+ * An update that carries only one of them is checked against the stored other half by the service.
+ */
+function checkPricesAgainstMenu(
+  value: { serviceIds?: string[] | undefined; servicePrices?: ServicePrice[] | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (!value.serviceIds || !value.servicePrices) return;
+  for (const issue of servicePriceIssues(value.serviceIds, value.servicePrices)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['servicePrices', ...issue.path],
+      message: issue.message,
+    });
+  }
+}
+export const staffCreateRequestSchema = staffInputSchema.superRefine(checkPricesAgainstMenu);
 export const staffUpdateRequestSchema = staffUpdateSchema
   .omit({ slug: true })
-  .extend({ resolutions: resolutionsSchema });
+  .extend({ resolutions: resolutionsSchema })
+  .superRefine(checkPricesAgainstMenu);
 export const staffSlugRequestSchema = z.object({ slug: slugSchema });
 export const staffMutationResponseSchema = staffResponseSchema.extend(conflictOutcomeSchema.shape);
 
@@ -503,7 +533,31 @@ export const closureResponseSchema = z
   .extend(conflictOutcomeSchema.shape);
 
 export const settingsResponseSchema = z.object({ settings: shopSettingsInputSchema });
-export const settingsRequestSchema = shopSettingsInputSchema;
+export const settingsRequestSchema = shopSettingsUpdateSchema;
+
+/**
+ * Website, Reviews (`PUT /api/admin/reviews`, answered with the settings). Each part is optional,
+ * so the list and the rating save on their own. `items` lists every stored review once, in the
+ * new order, with whether it shows. It is strict and carries no text: a review can be shown,
+ * hidden and moved, never typed, changed or added, so every quote on the site stays real.
+ */
+export const reviewsRequestSchema = z
+  .strictObject({
+    /** Off hides the whole section on Home and the chair pages. */
+    enabled: z.boolean().optional(),
+    google: googleRatingSchema.optional(),
+    items: z
+      .array(z.strictObject({ id: idSchema, show: z.boolean() }))
+      .max(MAX_REVIEWS)
+      .refine((items) => new Set(items.map((i) => i.id)).size === items.length, {
+        message: 'A review is listed twice',
+      })
+      .optional(),
+  })
+  .refine((r) => r.enabled !== undefined || r.google !== undefined || r.items !== undefined, {
+    message: 'Nothing to save',
+  });
+export type ReviewsRequest = z.infer<typeof reviewsRequestSchema>;
 
 // ---------------------------------------------------------------------------
 // Overview

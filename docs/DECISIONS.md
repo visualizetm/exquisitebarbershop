@@ -762,3 +762,470 @@ missing: [names] }` while the gate refuses; `db` is left out because nothing
 - D11-43 The capture script resets the demo data (the demo reset route) before every run, because the demo
   database outlives a server restart and earlier runs leave all-day hours behind that would show on the public
   pages.
+
+## Prompt 12: real shop content
+
+- D12-01 Address: `3309 Edgmont Ave, Suite F, Brookhaven, PA 19015`. The ZIP is confirmed. Google and Drew's
+  booking page say Suite F, Dontrise's Squire page says "Unit 4". Suite F wins until Dontrise says otherwise.
+- D12-02 Phone: `(610) 609-0786`, from the Google Business Profile. The owner's personal text line for Sunday
+  appointments (listed in `docs/content/exquisite-site-data.json`) is never published: it is in no seed
+  value, no page and no email. A test asserts it is absent from every public answer and from the home page
+  source. This file does not repeat the number because the repository is public.
+- D12-03 The shop email stays a PLACEHOLDER and no public page shows it. The check is `isPlaceholderEmail` in
+  `shared/lib/email.ts`, which compares with the one stand-in address. `/api/shop` then sends an empty email,
+  the Visit page drops its Mail line, the JSON-LD leaves `email` out and the calendar file carries no
+  `ORGANIZER` line. A `showEmail` flag was rejected: it needs a settings field, an editor and a migration,
+  and the check turns itself off the moment Dontrise types a real address in Settings. The owner's own
+  settings screen still shows the stored value.
+- D12-04 Hours come from the Google Business Profile: Monday closed, Tuesday to Sunday 10:00 to 19:00. They
+  stay editable in the dashboard. Instagram posts and Dontrise's Squire page hint at other walk-in days and a
+  Sunday deposit, so the hours are an open question for Dontrise. Drew works Tuesday to Saturday, 10:00 to
+  18:00, from his own theCut schedule. Lee, Nelly and Dontrise use the shop hours (PLACEHOLDER). Iniya has no
+  online hours at all.
+- D12-05 The announcement is on with "Walk-ins welcome" and a "Book online" link to `/book`. The hyphen is
+  used everywhere the phrase appears (the strip, the default, the hero fact, the Visit policy list and the
+  no-script text), so the site never says it two ways.
+- D12-06 New settings field `google`: `{ placeId, rating, reviewCount, ratingCheckedOn }`. It is validated by
+  zod (at most one decimal, 0 to 5, a whole review count, a date or empty, a place id of letters, digits,
+  hyphens and underscores), defaults to "not set" so a settings document saved earlier still reads, and is
+  served on `/api/shop`. A count above zero needs a rating of at least 1. The rating is copied by hand from
+  the profile (Google has no free feed) and the owner edits it in Website, Reviews in milestone 4.
+- D12-07 The Maps and write-a-review links are built from the place id in `shared/lib/google.ts`. Every
+  Directions button (Home and Visit are the only two) uses the Maps link. With no place id set, Directions
+  falls back to a Maps search for the address instead of vanishing; the prompt says the link "replaces" the
+  search link, and this keeps that true whenever a place id exists.
+- D12-08 The JSON-LD stays a `BarberShop` with the phone, the address including Suite F, an
+  `openingHoursSpecification` per open range and `sameAs` from the Instagram URL in the social links (TikTok
+  and Facebook are added only when set). There is no `aggregateRating`: Google ignores self-served review
+  markup for a local business, the rating on the page is typed in by hand, and marking it up invites a manual
+  action for no gain. A test asserts the output contains no rating markup.
+- D12-09 The team is the owner plus four: Dontrise, Lee, Drew, Nelly Cutz and Iniya, with chairs 1 to 5 in
+  that order (PLACEHOLDER, the real chair numbers are unknown). Nelly is shown as "Nelly Cutz"; his theCut
+  reviews call him "Mike", and only the name he lists is used. Lee's bio and services are PLACEHOLDER because
+  no public menu or profile text was found; his services use the shop prices. A review calls Lee "the
+  owner", which conflicts with the brief, so Dontrise stays the owner and Lee is a barber until Dontrise says
+  how he wants it shown.
+- D12-10 Iniya is on the website (`showOnWebsite: true`) with `acceptsOnlineBooking: false` and no services.
+  The engine already skipped her: `staffQualifies` needs the flag, so first available, the booking picker
+  and named availability never include her, even when her menu is filled in (a test proves it). What was
+  missing is the client: her card said "Off today" (she has no hours here), the Home card linked to a booking
+  page that cannot book her, `/book?barber=iniya` ended on an empty calendar, and her page said "Walk-ins
+  only". Now her card says "Book through Instagram"; on Home it opens her Instagram in a new tab, on the
+  chairs page it opens her page; her page has a "Book through Instagram" button; `/book?barber=iniya` moves
+  to "Anyone available". The phone bottom bar keeps the shop-wide CALL and BOOK NOW on her page, because
+  that is booking with the shop, not with her. The availability API still answers 200 with
+  `noQualifiedStaff` for her slug (an existing contract), and a booking is refused with `STAFF_UNAVAILABLE`.
+- D12-11 `/chairs/iniya` stays in the sitemap. It is a real page with her title, bio and a working link to
+  where she books. Hiding it would need a new filter and would drop a page that has a purpose. The sitemap
+  test proves it is listed.
+- D12-12 The 15 services are the ones in Dontrise's Squire menu and Drew's and Nelly's theCut menus, at the
+  prices and times in the prompt; each barber's `serviceIds` is the "who" column. The five made up beauty
+  services are gone and there is no braids service (Iniya's, no public price). Female Haircut has an empty
+  description because the menu gave none. Service ids come from the key, so `lineup` and `kids-cut` keep the
+  ids they had. Until milestone 2 every chair shows the shop price, including where a barber charges more.
+- D12-13 `runSeed` never overwrites, so a database seeded before this prompt keeps the old shop and barbers
+  until Settings, Demo data, Reset runs on it. The report and DEPLOY.md say so.
+- D12-14 The demo sample bookings were re-planned on the real barbers and services (Dontrise, Lee, Drew and
+  Nelly; Iniya takes none). Days are counted as open days for that chair, so Monday and Drew's Sunday are
+  skipped on their own.
+- D12-15 The no-script text in `index.html` takes the address from the seed at build time (`%SHOP_ADDRESS%`),
+  the way it already took the phone, instead of repeating it by hand.
+- D12-16 Test migration: marcus became lee, dee drew, tre nelly. Jay became iniya where only a PIN or a
+  removal mattered (she cannot be booked) and dontrise or nelly where a booking was needed; kris became
+  dontrise or nelly the same way. Classic Cut (30 min, $30) became Haircut (45 min, $40), so lock counts and
+  totals were recomputed, and Silk Press (beauty, owner only) became Female Haircut. Sunday is a working day
+  now and Monday is closed, so "closed day" tests use Monday and a barber's day off is Drew's Sunday. The
+  end to end tests pick the service with `/^Haircut(?! and| with)/` because the name starts two others.
+- D12-17 The end to end team page test turns Dontrise's chair off for the day, so the random walk-in chair in
+  the dashboard test no longer includes him.
+- D12-18 `docs/content/exquisite-site-data.json` and `seed/photos/manifest.json` are listed in
+  `.prettierignore`. They arrived as delivered data, `npm run format:check` failed on both, and rewriting
+  the whitespace of the source of truth would only make its history harder to read.
+- D12-19 The owner's New booking panel and the barber's walk-in form list only the services the chosen chair
+  offers (the panel lists all of them for "first available"). With one shared menu that did not matter; now
+  that Nelly does three services and Iniya none, a click on a service the chair cannot do would end in a
+  refusal. A chair with no services says so instead of showing an empty box.
+- D12-20 Review fix-up for M1, public booking. A chair chosen before the services (`/book?barber=<slug>` from
+  a printed card, a Lightbox credit or the Book button on a chair page) now lists only that chair's menu, as
+  the owner panel and the walk-in form already did (D12-19); picking Eyebrows after choosing Nelly used to
+  end on "Nothing is open in the next 31 days". A line says "Showing what Nelly Cutz offers." with a "See
+  every service" button, which sets the chair to anyone available and keeps the chosen services. The
+  alternative, routing to the chair step when the chosen services do not fit, was rejected: that step cannot
+  be reached before any service is chosen, and it would drop the chair the customer came for without a word.
+  A chair that takes online bookings but has an empty menu is treated like Iniya: `/book?barber=` that chair
+  moves to anyone available. The three pickers share `offeredServices` in `src/lib/booking/offered.ts`
+  (its own file so the node type check, which has no JSX setting, can import it from a test).
+- D12-21 Review fix-up, address in the calendar file. The "Add to calendar" download on the confirmation page
+  now puts Suite F in LOCATION, like the emailed file, through `addressLine` in `src/lib/shop.ts`, which the
+  Visit and Home meta descriptions use too. The short "Find us" fact in the Home hero stays street only: it
+  is a compact label and the full address with the suite sits in the same section.
+- D12-22 Review fix-up, settings save. The `PUT /api/admin/settings` request schema
+  (`shopSettingsUpdateSchema`) makes `google` optional, and `updateShopSettings` leaves a group the save
+  does not carry as it is. Before, a dashboard tab opened before a deploy (its response schema strips the
+  unknown `google` key) would save the settings back without it and reset the place id and the rating to
+  empty. The audit entry now records the settings as stored after the save. A group added after launch
+  follows the same rule, so `reviews` in milestone 4 must be optional on the request in the same way.
+- D12-23 Review fix-up, small things. Iniya's page title and description no longer promise "next openings";
+  `chairDescription` in `src/lib/seo.ts` ends with her away label ("Book through Instagram."). The
+  new-tab Instagram links (the chair card and the button on her page) say "opens in a new tab" to screen
+  readers; the card's label used to drop that when it had a status. The Kit's disabled sample option is
+  Hot Towel and Steam at $20 instead of the old made up shave.
+- D12-24 "Takes online bookings" is a general switch, not an Iniya special case: any chair with it off shows
+  "Book through Instagram" when it has a handle and "Walk-ins only" when it has none, and is left out of
+  online booking and first available. The checkbox in Team, Profile now says so, and the owner guide too.
+- D12-25 Review claims checked and left as they are. (a) The sitemap keeps `/chairs/iniya` (D12-11): the
+  prompt's "skip her cleanly" is read as "without errors" for the sitemap, because her page is a real public
+  page with a working link to where she books; excluding her needs one filter and one changed test if the
+  lead reads it the other way. (b) The emailed calendar file has no `ORGANIZER` line while the shop email is
+  the placeholder (D12-03): a stand-in address would be an invented mailbox, the state ends the moment
+  Dontrise types a real address in Settings, and no calendar client was tested either way. (c) The personal
+  number stays out of every file this prompt wrote; the tests that assert its absence match a short
+  fragment, and the lead's data file still carries it.
+- D12-26 Where the overrides live: `staff.servicePrices`, an optional array of `{serviceId, priceCents,
+durationMinutes?}` on the staff document. Rejected: a separate prices collection (one more join on every
+  availability load, and the editor, the public page and the booking all work per person) and a map on the
+  service (the owner edits one person at a time). The field is optional so documents written before it read
+  as none: `toStaffView`, `toPublicStaff` and the engine default it to an empty list, and no migration runs.
+- D12-27 The pricing rule is one pure helper, `shared/lib/servicePricing.ts`. A chosen or assigned person
+  gets their own entry, else the shop's price and time. The "from" flag first stayed the service's own flag for one
+  person too; replaced by D12-82: one person's price is exact, and "from" is only for the shop-wide list and
+  first available, where it is switched on by the service flag or when the people differ. An entry that cannot
+  be a price (negative, a fraction of a cent, not a number) is ignored and the shop price applies, so a
+  damaged record never charges nonsense; writes are validated, so this only guards against hand edits.
+- D12-28 First available, or no one chosen yet: the lowest total among the people who do every chosen
+  service, not the sum of each service's cheapest person (one barber has to do them all). A tie goes to the
+  shorter time, then to display order. The matching duration decision: the time shown with a "from" price is
+  that same person's time, so the price and the minutes always describe one real person ("From $20, 20 min"
+  is Drew's lineup, not an average). Rejected: the shortest time of anyone (it would print minutes the
+  cheapest person does not take) and the longest (it would scare customers off). The real price and time are
+  fixed when a chair is assigned.
+- D12-29 Two pools. The price list (Home, Services) draws from everyone on the site who offers the service,
+  because a walk-in pays that price too. The booking steps and the owner's New booking panel draw first
+  available from the chairs that take online bookings, which is the pool the server assigns from, so a
+  "from" figure can only be too low by the spread between those chairs, never by a chair that cannot be
+  booked.
+- D12-30 The availability engine quotes per chair. `AvailabilityResult.quotes` (a map by staff id, price
+  included) replaces the single `serviceMinutes`, `bufferMinutes` and `totalMinutes`: a start is offered to
+  a chair only if that chair's own time fits before closing, and `OpenSlot.endAt` is measured for the chair
+  the slot goes to (each candidate keeps its own length, and placement reads the chosen chair's quote). The
+  cleanup gap stays per service and shop wide, not per person. `/api/availability` reports the shortest
+  chair total as `durationMinutes` (nothing on the client reads it). Next openings and a chair's openings
+  use the chair's own times, and a chair's measuring service is its shortest by those times.
+- D12-31 Online, phone and walk-in bookings store the quote of the chair the booking lands on: the service
+  lines (price, "from" flag, minutes), `durationMinutes`, `totalPriceCents` and the locks. That holds for
+  first available too, where the chair is only known at placement. Emails, the ticket, the manage page, the
+  admin views and the totals on the dashboard all read the stored snapshot, so none of them needed to
+  change.
+- D12-32 Reschedule. On the same chair the booking keeps what it was booked with: price, service lines and
+  length. The engine request takes `keep` (that chair's stored minutes), so the times offered match what is
+  locked even if the chair's time was edited afterwards. A move to another chair (the owner's reschedule
+  with a chair, or anyone available) re-resolves with the new chair's own price and time and writes the
+  service lines, `durationMinutes` and `totalPriceCents`, because keeping the old chair's price on a booking
+  now sitting with Nelly would be wrong. Rejected: always re-resolving (an edit to a price would silently
+  change an existing customer's price and length). The resolver Move (a schedule conflict) first kept price and
+  length; replaced by D12-81, which reprices it for the new chair like any other move.
+- D12-33 Validation. Cents are whole and not below zero, minutes use the service rule (multiple of 5, 5 to
+  480; `serviceDurationSchema` is shared), at most 100 entries, one per service. Duplicates are an array
+  level refinement, because Zod 4 refuses `.omit()` on an object with refinements and the staff schemas are
+  derived with `.omit()`. For the same reason "only for a service on the menu" is a refinement on the create
+  and update request schemas (when a request carries both halves) plus `staffRepo.assertPricesMatchMenu`,
+  which `insertStaff` and `adminCatalog.updateStaff` run against the menu the chair will have afterwards, so
+  a request with only one half is checked against the stored other half.
+- D12-34 Taking a service off a barber's menu drops that service's price in the same save when the request
+  carries no prices. Rejected: refusing the save (the owner would have to clear the price on another tab
+  first) and keeping the entry (adding the service back later would silently revive an old price).
+- D12-35 Audit. A price change writes its own `staff.prices.update` entry with the list before and after,
+  because the existing `staff.update` entry records only the patch. It is written only when the list
+  changed, so saving the same list twice leaves one entry.
+- D12-36 The Team, Prices editor. An empty price means the shop price and an empty time means the shop time.
+  A time with no price stores the shop's current price with it, because the schema needs a price. A price
+  typed equal to the shop's is kept, since the owner may want a barber's price to stay put when the shop
+  price moves. The editor is props driven (`staffName`, `services`, `saved`, `onSave`) so `/kit` shows every
+  state with fake saves, and `PricesTab` does the PATCH, the toast and the refresh. "Use shop price" only
+  appears on a group that holds a value, instead of ten disabled buttons.
+- D12-37 Client. `src/lib/menuPrices.ts` (`menuServices`, `chairServices`, `bookingQuote`) hands back
+  `PublicService` objects with the price, "from" flag and minutes already resolved, so `PriceRow`,
+  `ServicePicker`, `BookingSummary` and `BookingCard` stayed as they were; `ServicePicker` gained an
+  optional totals prop and `StaffPicker` shows what the chosen services come to with each person.
+  `/api/services` stays at shop level and `/api/staff` carries `servicePrices`; the numbers are the ones
+  printed on the pages, so nothing private travels. The owner's New booking panel and the barber walk-in
+  form price the services for the chosen chair.
+- D12-38 Bookings made before this change keep their stored cents: nothing recomputes a stored price, and
+  the revenue, spent and total figures on the dashboard sum the stored totals. Staff documents without the
+  field book at the shop price.
+- D12-39 Two test fixes that were not about prices. The team spec's "In or Off" test now keeps the bookings
+  an earlier test left on that chair today, because the shop is open on Sundays now and the resolver asks
+  first. The availability unit tests select a chair by id, since two fixture chairs created in the same
+  hours get the same generated slug.
+- D12-40 Databases that were seeded before this change keep their staff as they are (`runSeed` never
+  overwrites), so they have no per barber prices until the owner enters them in Team, Prices or runs Demo
+  data, Reset, which wipes and reloads the seed with the overrides. Said in the report next to the other
+  post deploy step.
+- D12-41 Seed photo sizes without a dependency: a 30 line WebP header reader (`server/lib/webpSize.ts`, lossy
+  VP8, lossless VP8L and extended VP8X) gives width and height. Rejected: sharp or image-size (a new
+  dependency, and sharp is native and heavy in a Vercel function) and ImageMagick (not on Vercel). Every
+  manifest file is WebP; a file that is not is reported and skipped.
+- D12-42 Seed photo idempotency by a deterministic id: `_id = seedId('photo', file)`, the helper staff and
+  services already use, so there is no `sourceKey` field. A run skips every file whose record exists, deleted
+  or not, so a seed photo the owner deleted stays deleted, and the hero entry is skipped while any hero
+  exists, so a home photo the owner chose wins. Rejected: a `sourceKey` field (a schema field and a lookup
+  for the same result).
+- D12-43 Seed photo object keys: the uuid in the key is derived from the database name, the file name and the
+  bytes. Running again after a crash rewrites the same object instead of leaving an orphan; two deployments
+  sharing a bucket never share an object (a demo reset can never delete production's photo); a file replaced
+  under the same name gets a new address, so the year long immutable media cache never serves the old
+  picture. Rejected: random uuids (an orphan per crash) and a uuid from the file name alone (shared across
+  deployments).
+- D12-44 A manifest entry whose file is missing is skipped with one warning per run that names every missing
+  file; nothing throws for a missing file. A missing or invalid manifest is one warning and nothing loaded;
+  with STORAGE_DRIVER=none the loader does nothing. Demo setup and reset always finish. The milestone was
+  started with 3 of 16 files present; the lead added the rest while it was built (a83d278) and dropped
+  exq-15 as a copy of exq-12 (b25a294), so all 15 manifest files exist now and the warning is silent.
+- D12-45 Where the loader runs: in bootstrap's demo branch, which both the first visit setup and Demo data,
+  Reset go through, plus `npm run photos:seed` for a real launch. Rejected: a per request check like the
+  demo PINs one (the live showcase needs a Reset for the new team and prices anyway, and it would cost a
+  query a minute). A run that added photos writes one `photo.seed` audit entry. SEED_PHOTOS_DIR points the
+  loader at another folder (tests and fixture captures); it is read from the process environment like
+  EXQ_LOCAL_UPLOADS_DIR, not the validated env schema, since no deployment sets it.
+- D12-46 Server side photo writes go through one helper, `storePhotoBytes`: a plain `put` for R2, the local
+  disk and GridFS, and the signed upload form posted from the server for Cloudinary (whose `put` refuses).
+  `photos:migrate` now uses it too instead of its own copy.
+- D12-47 The photos reach the Vercel function through `includeFiles` (`{server/bundle/**,seed/photos/**}`)
+  and are read from `process.cwd()/seed/photos` at run time, so adding a photo needs no bundle rebuild.
+  Rejected: embedding the WebPs in the esbuild bundle (the committed bundle would grow by every photo, and a
+  missing file would break the build). `test:vercel-function` copies the `includeFiles` set into the nft
+  shape (nft does not trace data files), lets the photos and the manifest past the "no loose source" check
+  in both shapes, and proves the demo setup serves `exq-01-hero.webp` byte for byte.
+- D12-48 The Home pick is an optional `home` flag on the photo record, set from the manifest.
+  `/api/gallery?home=true` returns the picked photos first, in manifest order, then the rest of the gallery,
+  so Home still fills from photos the owner uploads. With every photo delivered (15 since b25a294) that is
+  exactly the six marked photos (exq-02, 03, 05, 09, 10, 14). Rejected: returning only marked photos (a launch without the seed would never show its uploaded
+  work on Home). The owner cannot change the pick yet; deleting or adding photos is the lever for now.
+- D12-49 Home's "the work" renders with at least three photos and shows one row of three (three to five
+  photos) or the full six, so the grid never ends on a half row. With the 15 delivered photos Home shows the
+  six marked ones; the minimum covers a shop with fewer photos (a real launch before photos:seed). A work grid
+  of exactly three photos is one row of three at every width.
+- D12-50 A chair page's work strip shows the photos credited to that chair; with none, up to three shop
+  photos in Home order under the label "From the shop" with a "See the gallery" link; with no shop photos,
+  no section. A shop photo credited to another barber may appear there (the lightbox names whose work it
+  is); rejected a separate uncredited only query. Iniya's page gets the same strip.
+- D12-51 Gallery needed no change: the barber filter chips already render only when a photo is credited to a
+  public chair, so with the seed (nobody credited) they stay hidden and come back with the first credit.
+- D12-52 With a photo, the Home hero is an ink band (`.exq-dark`). Below 1024px the photo fills the hero
+  behind the text under a new token, `--scrim-photo` (ink at 80%): over a pure white photo white text keeps
+  10.2:1, `--line` 7.2:1 and the red display line 3.3:1 (large text), and the 13px red labels turn white on
+  the photo. From 1024px the photo sits in its own 4:5 column with no scrim. The text sets the height, so
+  the title and the BOOK action stay in the first screen and nothing shifts when the photo loads. Rejected:
+  a gradient scrim (the copy rules allow one gradient, the placeholder stripe) and a photo band above the
+  text (it pushes BOOK below the first screen at 390). The hero photo is no longer wrapped in a reveal, so
+  the LCP image is never clipped. Checked in screenshots in milestone 5 (no Playwright in this milestone).
+- D12-53 Crops: the hero uses `object-position: 85% 30%` (both faces in exq-01 sit in the upper right) and
+  gallery tiles `50% 35%` (head and cut sit in the upper middle of a portrait photo); a contact sheet of
+  the square crops of all 15 delivered photos keeps every face and cut. Rejected: a per photo focal point
+  (a schema field, the API and an admin control); revisit if a later photo crops badly. Tile `sizes` now say 33vw from 768px, where the grid has three columns.
+- D12-54 Visit gets no storefront photo slot: none was delivered, and a placeholder would look like one. Open
+  item for Dontrise: a storefront photo.
+- D12-55 Barber pole check: `scripts/brand-assets.ts` reads only the v2 marks, and `public/` holds the Q
+  icon, the v2 emblems, the OG card and the favicons; no file draws a barber pole (the old `exq-pole` files
+  were deleted in 32dbf82). Nothing to remove.
+- D12-56 Where the reviews live: `settings.reviews`, `{ enabled, items }`, on the shop settings document as
+  the prompt says, at most 30 items, text up to 600 characters. A stored review carries `staffId`, resolved
+  from the seed's `staffKey` with `staffSeedId`, not the key itself: the public API and the chair pages
+  match on ids like every other reference, and the key only exists in `seed/shop.ts`. Rejected: a reviews
+  collection (another repo, index, wipe step and route for at most 30 rows that are read with the settings).
+- D12-57 Review ids come from `newId()` when the seed module loads (the task names newId), so they are 24 hex
+  like every id. They are fixed once the settings document is created (`$setOnInsert`); Demo data, Reset
+  reseeds them with new ids, and a Reviews tab left open across a reset gets a 409 "reload the page" answer
+  instead of a wrong save. Rejected: `seedId` ids; they would work too, but the task asked for newId.
+- D12-58 The seed: all 18 reviews shown and the section on. Order: Unique D., Ricardo E. and Routine Life
+  Fitness first, then the other Google reviews in file order, then Drew's and Nelly's theCut reviews in file
+  order. Home shows the first three shown reviews in the owner's order instead of a separate "on Home" flag:
+  one rule, and the owner changes Home by moving a review up. Wesley T. is left out entirely, Lamont I. is the
+  short version, every review has 5 stars, theCut ones have no date, and the text is byte for byte the data
+  file's (a test compares them).
+- D12-59 Nelly's theCut reviews say "Mike". The data file's team entry says Mike is Nelly's own name
+  ("Reviews call him Mike"), so they are right, kept word for word and shown. Open item for Dontrise: confirm
+  Nelly is happy with "Mike" on the Nelly Cutz page, or hide those two in Website, Reviews.
+- D12-60 One writer for the reviews: `PUT /api/admin/reviews`, owner only, takes
+  `{ enabled?, google?, items? }`. `items` lists every stored review once, as id and show only, in the new
+  order (the position becomes `sortOrder`, 10 apart). The request is strict: a review with text, stars or a
+  name, an extra key such as a new review, a review listed twice or a place id is a 400; a list that does not
+  name exactly the stored reviews is a 409. So the dashboard can never type, change or add a quote, and every
+  review on the site stays real. The read and the write share one transaction. Rejected: saving the reviews through
+  `PUT /api/admin/settings` like the other panels (it would accept any text).
+- D12-61 `PUT /api/admin/settings` has `reviews` left out of its schema (`shopSettingsUpdateSchema`): zod
+  strips it, so a save that omits the group keeps it (the D12-22 rule) and a save that carries it (every
+  panel sends back the settings it loaded) changes nothing. This goes one step past the google rule (optional,
+  replaced when present) because a stale tab must neither undo a Reviews save nor change a quote. `google`
+  keeps its D12-22 rule.
+- D12-62 The Google rating, count and checked date are edited in Website, Reviews and saved through the same
+  route with `googleRatingSchema`, a strict part of the Google block: the place id (Directions and the review
+  links) cannot change there. The panel has two kinds of save: the section switch and the rating are a form
+  with one Save (off until something changed), and in the list each Show, Hide or arrow saves at once with a
+  toast, as Services and Gallery do. Rejected: one Save for everything (moving a review would take a second
+  click, unlike the other lists). No drag and drop: the arrows are enough for 18 rows and less code.
+- D12-63 Audit: one entry per Reviews save, action `settings.reviews.update`, entity `shopSettings/shop`,
+  before and after holding the switch, the rating, count and date, and each review's id, name, show and sort
+  order (no quote, since it never changes). Same helper as the other panels.
+- D12-64 `/api/shop` gains `reviews`: only the shown ones, in order, as
+  `{ id, name, text, stars, source, date, staffId }` (`date` null for theCut), and an empty list while the
+  section is off, so a hidden review never leaves the server. Home and the chair pages read it from the shop
+  answer every page already has, so there is no new request. A settings document written before the field
+  reads as `{ enabled: true, items: [] }`; the live showcase gets the reviews from Demo data, Reset, like the
+  rest of the new seed.
+- D12-65 Display. Home, "What clients say", after the work and before Visit: the rating line (only when a
+  rating and a count are set; "Read them on Google" and "Leave a review" need the place id) and the first
+  three shown reviews. A chair page: up to three shown reviews about that chair under its menu, with no rating
+  line (the rating is the shop's). Either section is left out when no review would show. Stars are `Star01`
+  from the icon set, a filled row clipped to the value over an outline row, hidden from screen readers with
+  the rating in words beside them (a card says "Rated 5 out of 5"). A card shows the month and year
+  ("November 2025"); a theCut card shows the source alone. Cards sit one per row on a phone and up to three
+  across from about 830px.
+- D12-66 No `aggregateRating` or any review markup in the JSON-LD: Google ignores self-served review markup
+  for a local business, and the rating is copied by hand. `shopJsonLd` already left it out; its unit test now
+  passes reviews in and checks that none reach the structured data.
+- D12-67 Copy sweep (milestone 5): searched `src`, `server` (with the email templates), `shared`, `seed`,
+  `scripts`, `tests/helpers` and the living docs for the old stand-in phone, Dontrise's personal number, the
+  five made up barbers, em dashes, emoji and written-in numbers. Code and copy were clean of the first four.
+  Two numbers were written in: the Visit page said "up to 2 hours before" whatever the setting, and the manage
+  page printed the cutoff as `minutes / 60` ("1 hours", "1.5 hours"). Both now read the setting through
+  `src/lib/booking/policy.ts` (`cutoffSpan`, `cancelPolicyLabel`, `changePolicyLabel`), which the booking card
+  already used. The masking unit test's sample number was the old shop number; it is now another 555 number.
+  Left as they are: the reports, `docs/content`, older DECISIONS and PROGRESS entries and the p6 audit capture
+  (history), the two tests that assert the old numbers never appear, and the `/kit` samples (real shop data or
+  a 555 number).
+- D12-68 The copy rules unit test now covers more: em dashes and emoji also across `server`, `scripts`,
+  `tests/helpers` and every top-level `docs/*.md`, and a new case fails if the site source, the email templates,
+  the seed or either guide names one of the five made up barbers, the old stand-in number or the personal
+  number. Rejected: a grep step in CI (one more place to keep in sync; the unit suite already runs everywhere).
+- D12-69 The Gallery tab's alt text Save and its "Credit the work to" choice saved without a word; they now show a
+  toast ("Credited to Drew. It now shows on Drew's page too.", "Credit removed...", "Alt text saved."), as the
+  design rules ask of every save and as the owner guide now describes. No other behaviour changed.
+- D12-70 The owner guide PDF converter (`scripts/guide-pdf.ts`) joins wrapped lines: a line that does not
+  start a heading, image or list item continues the paragraph or item above it, and a numbered list keeps its
+  number (`<ol start>`) after bullets break it. Before, every wrapped line became its own paragraph and the
+  steps after a wrapped line restarted at 1. Rejected: a Markdown library (a new dependency for one file).
+- D12-71 Owner guide: Team, Prices (step by step), Website gains Reviews (show, hide, order, the section
+  switch) and the Google rating fields, Gallery explains crediting a photo to a barber, Settings says the
+  placeholder email stays off the site and that the Visit page and confirmation read the cancel time, and a new
+  section 13 lists every value still marked PLACEHOLDER in Dontrise's words with where he changes it (chair
+  numbers, the cleanup gap, the reply-to address and the website address have no dashboard field, so they go
+  to Visualize). Its p11 screenshots stay for now with a note that they show sample barbers; recapturing them
+  needs Playwright, which this part does not run. The PDF is re-rendered.
+- D12-72 Barber guide: two lines. The walk-in list shows only the barber's own services at their own prices,
+  and a gallery photo the owner credits to a barber shows on that barber's page. No names changed.
+- D12-73 `/kit` already showed RatingLine (rated, unrated), ReviewCard (dated, undated), PriceOverrideEditor
+  (saved entries, refused, no services) and ReviewsEditor (normal, refused, empty and off). ReviewsPanel only
+  loads and saves, so it is not rendered whole; its two own states are now one exported `ReviewsPanelState`
+  (loading, error) that the panel and the kit both render, so their copy cannot drift. `tests/e2e/kit.spec.ts`
+  checks each state and the field error, saving, toast and refused paths of both editors, and finds the kit
+  blocks by their class: the reviews editor's own section is a region named "Reviews", so the M4 check by role
+  and name would have counted four. Not run in this part (no Playwright until the milestone 5 captures).
+- D12-74 Docs: ARCHITECTURE.md gains the `google` and `reviews` settings (links, hand-copied rating, the one
+  writer, defaults for old documents, no JSON-LD rating), the per barber pricing rule next to the availability
+  rules (each chair quoted on its own minutes, first available as the lowest total, the booking snapshot), the
+  booking snapshot note and the seed photo id (`seedId('photo', file)`, no `sourceKey`, D12-42).
+  DESIGN-SYSTEM.md gains ReviewsPanel and a photo rules section. DEPLOY.md section 11 says what the seed now
+  holds, that the live showcase needs Demo data, Reset after this deploy, that Cloudinary is a real launch
+  storage choice, and where to credit photos. SITE-REPORT.md gains the prompt 12 additions and open items.
+- D12-75 The prompt 12 screenshots show the real state only, with no FIXTURE set. All 15 manifest photos are
+  in `seed/photos/` now (the lead's UPDATE 2), so Home already shows its six marked photos, the gallery all 14
+  and the chair strips three, which is the "more photos" layout the fixture set was meant to show. Rejected:
+  generated fixture images (they would only repeat what the real photos show, and could be mistaken for them).
+  The capture script is `tests/e2e/p12-capture.ts` (demo build on 4176, Demo data, Reset first, reads only).
+- D12-76 The Home hero sets its own text color (`.exq-hero { color: var(--fg) }`). With a photo the hero is an
+  ink band (`.exq-dark`), but the title lines and the three info values had no color of their own and
+  inherited the body's ink in the light theme: "Gifted hands." and "cuts." were black on the scrim at 390 and
+  black on ink at 1280, which the first capture showed. Rejected: a color on each child (the next child added
+  would miss it again). `tests/e2e/rules.spec.ts` now checks the computed colors over the photo.
+- D12-77 `IconButton` takes an optional `tip`, a shorter tooltip for a label that names its item. The Website,
+  Gallery rows use "Move up", "Move down" and "Remove" as tooltips while their accessible names keep the
+  photo's alt text. The full labels ("Move Full beard and fade, client leaning back in the chair down"),
+  centered and unwrapped, ran past the right edge and gave that tab a 25px sideways scroll at 1280.
+  Rejected: wrapping the tooltip (a 14rem tooltip still runs off near the edge from 1024 to about 1100).
+- D12-78 Axe and the image rules on the photo states run in `tests/e2e/rules.spec.ts` with the shop's real
+  photos stubbed into `/api/shop` and `/api/gallery` in the browser (the dev e2e server stores no photos):
+  the hero photo behind the text, Home's six, the gallery with a Drew chip, Drew's own strip (two photos
+  credited to him) and Lee's "From the shop" strip, light and dark, 390 and 1280. `/chairs/drew` and
+  `/chairs/iniya` join the page lists for axe, type sizes, tap targets and alt text. Rejected: uploading
+  photos to the dev server (state leaks into later specs when a cleanup step fails) and running the rules
+  against the demo build (not part of the dev config the gate runs).
+- D12-79 Lighthouse ran once (13.5.0, mobile, simulated throttling) on the demo build, the only local profile
+  that serves photos (GridFS, brotli like Vercel): Home 81, Gallery 74, Drew's page 93 for performance,
+  accessibility 100 and CLS 0 on all three, SEO 63 because the showcase is noindex
+  (`docs/screens/p12/lighthouse.json`). Home's LCP is the hero photo (3.6s: its URL is known only after
+  `/api/shop`); Gallery's is 7.6s with 900 KB of images, because the GridFS driver serves the 1200 to 1600px
+  files into 180px tiles (Lighthouse estimates 781 KiB of savings). Not fixed in this part: the fix is
+  resized copies at seed and upload time, or Cloudinary for the real launch (its `srcset` already asks for
+  400px tiles). Rejected: a resize step on the server in a capture pass (a new image pipeline, not a visual
+  fix).
+- D12-80 The red display line on the hero photo (Rob's call after the milestone 5 captures). Red text on a
+  photo or on ink is always `--red-on-dark` (#FF5470), never `--red` (#C8102E): the hero with a photo is
+  `.exq-dark` in both themes, so "Exquisite" already rendered #FF5470 there, and that stays the brand rule.
+  The word stays red and the scrim keeps its design; only its strength changed. Measured on the real hero
+  photo on the demo build with the title text hidden, the brightest pixel under the line box (the milestone 5
+  method) gave 3.99:1 at 390 and 3.67:1 at 768 at the old 80% ink (glyph box only: 4.22 and 4.36), short of
+  4.5:1. `--scrim-photo` is now 87% ink, the lightest whole step that passes at both widths: 4.75:1 at 390 and
+  4.51:1 at 768 (glyph box 4.91 and 5.00), identical in light and dark; 86% gives 4.34:1 at 768. White text
+  on it is 13.2:1 or more over any photo. `tests/unit/heroScrim.test.ts` holds the measured pixels and fails
+  if the token gets lighter, and `tests/e2e/rules.spec.ts` checks the line's computed color in both themes.
+  Rejected: a white accent line (drops the red) and a darker band only behind the title (a second scrim
+  token for one line).
+- D12-81 A move to another barber reprices the booking (Rob, must fix). The resolver's Move now prices the
+  booking for the new chair with the shared helper (`quoteMove` in `shared/lib/servicePricing.ts`: the new
+  chair's own entry, else the service's current price and time, else the stored line when a service record is
+  gone) and writes the service lines, `durationMinutes`, `totalPriceCents` and the end time from the same
+  start, with the slot locks taken over the new length, all in the change's transaction. The cleanup gap is per
+  service, so it stays. A chair whose own length does not fit (past its hours, or into another booking) is not
+  offered, and asking for it anyway fails the lock insert and rolls the whole change back. `moveOptions` carry
+  each chair's `totalPriceCents` and `durationMinutes`, and each affected booking its current ones, so the
+  "Move to" list reads "Drew, $40" (plus the minutes when they change) with a line under it ("With Drew: $40,
+  45 min (now $50, 75 min)") before the owner applies anything. The owner's Reschedule with another barber
+  already repriced (D12-32); its Barber list now shows the same per barber price, and a barber who does not do
+  the services is listed but disabled. The customer is emailed the move ("Your appointment has been moved",
+  the new barber, the lines and the total at the new price), so D11-08 no longer holds: the link version moves
+  up like a reschedule, which keeps the outbox dedupe key unique per move and raises the calendar SEQUENCE so a
+  calendar app replaces the event. Rejected: keeping the old price (the spec prices a booking by the barber
+  actually assigned) and a silent move (the customer would arrive expecting another barber and price).
+- D12-82 One person's price is exact, never "From" (Rob, must fix). `resolveServiceForStaff` and
+  `quoteForStaff` return `priceFrom: false`, so a chair page, a barber chosen in booking (the service step, the
+  barber step, the bar and the summary card), the owner's New booking panel with a barber, and the barber's
+  own walk-in list print the barber's exact price whatever the service's flag says (Drew's page reads $40, $25
+  and $65, as his theCut menu does). "From" stays where no one person is meant: `/services`, the Home menu and
+  first available, from the service flag or when the people differ. Bookings store `priceFrom: false` on every
+  line, and the emails and the booked summaries ignore a stored flag, so a booking made before this change no
+  longer prints "from" or the "(starting price...)" note either. Team, Services shows each service at that
+  barber's own price. Rejected: keeping the service flag for one person (D12-27; the spec says a chosen
+  barber's page shows that barber's prices, and those menus list flat prices).
+- D12-83 Lighthouse under 85 (Home 81, Gallery 74, D12-79) stays an open item in this PR (Rob's call): no
+  smaller photo copies here. The photos move to Cloudinary before the real launch, which already serves 400px
+  tiles; if Cloudinary is delayed, smaller copies for the GridFS and local drivers go in the next prompt.
+- D12-84 A settings save no longer writes the Google block. Every settings panel sends back the whole document
+  it loaded, so a tab opened before a Website, Reviews save put the old rating and count back (tab A loads
+  4.7 from 15, tab B saves 4.8 from 16, tab A saves Shop info: 4.7 again). `shopSettingsUpdateSchema` strips
+  `google` like `reviews`, and `PUT /api/admin/reviews` is the one writer of the rating, count and checked
+  date; the place id comes from the seed and has no editor. `tests/integration/realShop.test.ts` replays the
+  two tabs. Rejected: merging only the place id from the settings route (nothing in the UI edits it).
+- D12-85 The sitemap skips a chair that takes no online bookings, so Iniya's page is not listed (the prompt:
+  "first available, the booking staff picker and the sitemap skip her cleanly"; this replaces D12-11 and
+  part (a) of D12-25). Her page still answers and is linked from The Chairs. Rejected: listing her (the
+  literal instruction says skip, and the cost is one filter).
+- D12-86 The stand-in shop email now lives in `seed/shop.ts` (`PLACEHOLDER_SHOP_EMAIL`, marked PLACEHOLDER) as
+  hard rule 9 asks; the comparison moved from `shared/lib/email.ts` to `server/lib/publicEmail.ts`, because
+  only the server hides it (`/api/shop`, the calendar file) and the client must not bundle the seed. A unit
+  test checks that the literal sits on a PLACEHOLDER line in the seed and nowhere in the server code.
+- D12-87 Review claims not fixed here. (a) The barber walk-in form for a barber hidden from the website:
+  rejected, it cannot happen. `authenticateTeam` refuses the session of a barber with `showOnWebsite` off
+  (`usableStaff` in `server/auth/teamAuth.ts`), so the portal goes back to sign in and the form never shows
+  for them; a trial test got 401 for Nelly's session once she was hidden, and the PIN sign in already answers a
+  hidden barber like a wrong PIN (`tests/integration/teamAuth.test.ts`). The public staff list and the
+  portal therefore always agree. (b) The owner guide pictures still show the prompt 11 sample barbers: per
+  Rob, the final step recaptures them with the guide mode of `tests/e2e/p11-capture.ts` on the demo build and
+  reruns `scripts/guide-pdf.ts`; this step ran no Playwright beyond the hero measurement. (c) The prompt 12
+  report is written in the final step too, because it must carry the final gate's results and the commits.
+- D12-88 tests/integration/manualBookings.test.ts no longer depends on the time of day. Its clock is
+  frozen (only Date, timers stay real) at 13:00 shop time on the next Tuesday and runs on from there,
+  because walk-ins and the lead time are about "now". Every date-based booking in it uses the barber's
+  next working day (from the stored shop and staff hours) at a fixed time no other test in the file uses
+  (Lee 12:00, 15:00 and 17:00; Dontrise 10:00 and 11:00). Before this the file failed every evening from
+  20:00 shop time, when a booking a few hours out spilled past midnight.

@@ -8,22 +8,12 @@ export function qualifiedStaff(staff: PublicStaff[], serviceIds: string[]): Publ
   );
 }
 
-/** "Free to cancel up to 2 hours before." from the shop's cutoff setting. */
-export function cancelPolicyLabel(cutoffMinutes: number): string {
-  if (cutoffMinutes <= 0) return 'Free to cancel any time before your appointment.';
-  const hours = cutoffMinutes / 60;
-  const span =
-    cutoffMinutes % 60 === 0
-      ? `${hours} ${hours === 1 ? 'hour' : 'hours'}`
-      : `${cutoffMinutes} minutes`;
-  return `Free to cancel up to ${span} before.`;
-}
-
+/** A booked appointment has one barber, so its prices are exact, never "from". */
 export function viewToSummary(view: BookingView): SummaryItem[] {
   return view.services.map((s) => ({
     name: s.name,
     priceCents: s.priceCents,
-    priceFrom: s.priceFrom,
+    priceFrom: false,
     durationMinutes: s.durationMinutes,
   }));
 }

@@ -403,6 +403,8 @@ export async function galleryPage(query: {
   staff?: string | undefined;
   cursor?: string | undefined;
   limit: number;
+  /** Home's order: the picked photos first (in their order), then the rest of the gallery. */
+  home?: boolean | undefined;
 }): Promise<GalleryResponse> {
   const staff = await staffRepo.listStaff({ includeDeleted: true });
   const byId = new Map(staff.map((s) => [s._id, s]));
@@ -422,7 +424,10 @@ export async function galleryPage(query: {
     : [];
   const counts = new Map<string, number>();
   for (const p of all) if (p.staffId) counts.set(p.staffId, (counts.get(p.staffId) ?? 0) + 1);
-  const filtered = only ? all.filter((p) => p.staffId === only) : all;
+  const chosen = only ? all.filter((p) => p.staffId === only) : all;
+  const filtered = query.home
+    ? [...chosen.filter((p) => p.home === true), ...chosen.filter((p) => p.home !== true)]
+    : chosen;
   const after = cursors.decode(query.cursor, isOrderCursor);
   const start = after ? filtered.findIndex((p) => p._id === after.i) + 1 : 0;
   const page = filtered.slice(start, start + query.limit);

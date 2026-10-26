@@ -1,6 +1,12 @@
 import type { NoAvailabilityReason } from '../../shared/api/availability';
 import { LOCK_GRANULARITY_MINUTES } from '../../shared/lib/constants';
 import {
+  quoteForStaff,
+  type PricedService,
+  type PricedStaff,
+  type PriceQuote,
+} from '../../shared/lib/servicePricing';
+import {
   addMinutes,
   ceilToStep,
   dayKeyOfIsoDate,
@@ -53,13 +59,18 @@ export interface AvailabilityRequest {
   staff: string;
   /** A booking being rescheduled: its own time does not count as busy. */
   excludeBookingId?: string;
+  /**
+   * A booking being rescheduled on the same chair keeps the length it was booked with, even if the
+   * chair's time for the service was edited since. Only that chair's length is pinned.
+   */
+  keep?: { staffId: string; serviceMinutes: number };
 }
 
 export interface OpenSlot {
   startAt: Date;
   /** End of the appointment itself (services only). */
   endAt: Date;
-  /** Chair chosen for this slot (the fairness pick when "any"). */
+  /** Chair chosen for this slot (the fairness pick when "any"); endAt is measured for this chair. */
   staffId: string;
   /** Every free chair for this start, best pick first. Used for fallback on conflict. */
   candidates: string[];
@@ -79,11 +90,26 @@ export interface DayAvailability {
   slots: OpenSlot[];
 }
 
-export interface AvailabilityResult {
+/**
+ * What one chair charges and how long it takes for the chosen services. Chairs differ: a chair's
+ * own price and time for a service replace the shop's (shared/lib/servicePricing.ts), so every
+ * number a booking stores comes from the quote of the chair it lands on.
+ */
+export interface StaffQuote {
+  staffId: string;
+  /** Minutes of work on the chair's own times (or the length a rescheduled booking keeps). */
   serviceMinutes: number;
+  /** The cleanup gap after the services. Not per chair: the longest service or shop default. */
   bufferMinutes: number;
   /** serviceMinutes + bufferMinutes: what a booking locks. */
   totalMinutes: number;
+  /** Price and time per service for this chair. */
+  price: PriceQuote;
+}
+
+export interface AvailabilityResult {
+  /** One quote per qualified chair, keyed by staff id. */
+  quotes: ReadonlyMap<string, StaffQuote>;
   /** Qualified chairs after applying the selector. */
   staff: StaffDocument[];
   days: DayAvailability[];
@@ -121,6 +147,49 @@ export function staffQualifies(
 
 export function serviceMinutesOf(services: readonly ServiceDocument[]): number {
   return services.reduce((sum, s) => sum + s.durationMinutes, 0);
+}
+
+/** The pricing helper's view of a service document. */
+export function pricedService(service: ServiceDocument): PricedService {
+  return {
+    id: service._id,
+    priceCents: service.priceCents,
+    priceFrom: service.priceFrom,
+    durationMinutes: service.durationMinutes,
+  };
+}
+
+/** The pricing helper's view of a staff document. Documents from before the field have no prices. */
+export function pricedStaff(staff: StaffDocument): PricedStaff {
+  return {
+    id: staff._id,
+    sortOrder: staff.sortOrder,
+    serviceIds: staff.serviceIds,
+    servicePrices: staff.servicePrices ?? [],
+  };
+}
+
+/**
+ * The price and time of the chosen services on one chair. Null when the chair does not offer every
+ * one of them. `keepMinutes` pins the length of the work (a reschedule on the same chair).
+ */
+export function quoteStaff(
+  staff: StaffDocument,
+  services: readonly ServiceDocument[],
+  settings: BookingSettings,
+  keepMinutes?: number,
+): StaffQuote | null {
+  const price = quoteForStaff(services.map(pricedService), pricedStaff(staff));
+  if (!price) return null;
+  const serviceMinutes = keepMinutes ?? price.totalMinutes;
+  const bufferMinutes = effectiveBufferMinutes(services, settings);
+  return {
+    staffId: staff._id,
+    serviceMinutes,
+    bufferMinutes,
+    totalMinutes: serviceMinutes + bufferMinutes,
+    price,
+  };
 }
 
 /** The shop default unless a chosen service asks for more; the longest wins. */
@@ -305,13 +374,13 @@ interface StaffDayInput {
   dayBounds: Range;
   shopRanges: Range[];
   ctx: AvailabilityContext;
-  totalMinutes: number;
-  serviceMinutes: number;
+  /** This chair's own length of work and the cleanup gap after it. */
+  quote: StaffQuote;
   excludeBookingId: string | undefined;
 }
 
 function computeStaffDay(input: StaffDayInput): StaffDay {
-  const { staff, date, dayKey, dayBounds, shopRanges, ctx, totalMinutes } = input;
+  const { staff, date, dayKey, dayBounds, shopRanges, ctx, quote } = input;
   const working = chairRanges(staff._id, date, dayKey, dayBounds, shopRanges, ctx);
   if (working.length === 0) return { staffId: staff._id, starts: [], reason: 'dayOff' };
   const blocks = ctx.timeBlocks.filter(
@@ -341,8 +410,8 @@ function computeStaffDay(input: StaffDayInput): StaffDay {
       // The services must finish inside working time. The cleanup buffer after them
       // may run past the end of the range (closing time, the start of time off), but
       // it still may not overlap anything busy, so the next booking keeps its gap.
-      if (addMinutes(t, input.serviceMinutes).getTime() > range.end.getTime()) break;
-      const candidate: Range = { start: t, end: addMinutes(t, totalMinutes) };
+      if (addMinutes(t, quote.serviceMinutes).getTime() > range.end.getTime()) break;
+      const candidate: Range = { start: t, end: addMinutes(t, quote.totalMinutes) };
       if (busy.some((b) => overlaps(b, candidate))) continue;
       if (t.getTime() < earliest.getTime()) {
         freeBeforeLead += 1;
@@ -411,13 +480,16 @@ export function computeAvailability(
   request: AvailabilityRequest,
   ctx: AvailabilityContext,
 ): AvailabilityResult {
-  const serviceMinutes = serviceMinutesOf(ctx.services);
-  const bufferMinutes = effectiveBufferMinutes(ctx.services, ctx.settings);
-  const totalMinutes = serviceMinutes + bufferMinutes;
-
   const selected = request.staff === 'any' ? null : resolveStaffSelector(ctx.staff, request.staff);
   const pool = request.staff === 'any' ? ctx.staff : selected ? [selected] : [];
   const qualified = pool.filter((s) => staffQualifies(s, ctx.services));
+  const quotes = new Map<string, StaffQuote>();
+  for (const staff of qualified) {
+    const keep = request.keep?.staffId === staff._id ? request.keep.serviceMinutes : undefined;
+    const quote = quoteStaff(staff, ctx.services, ctx.settings, keep);
+    // A qualified chair offers every service, so the quote exists.
+    if (quote) quotes.set(staff._id, quote);
+  }
 
   const days: DayAvailability[] = [];
   let cursor = shopDayStart(request.fromDate);
@@ -446,20 +518,21 @@ export function computeAvailability(
       continue;
     }
     const dayBounds = shopDayBounds(date);
-    const staffDays = qualified.map((staff) => ({
-      staff,
-      day: computeStaffDay({
+    const staffDays = qualified.flatMap((staff) => {
+      const quote = quotes.get(staff._id);
+      if (!quote) return [];
+      const day = computeStaffDay({
         staff,
         date,
         dayKey,
         dayBounds,
         shopRanges,
         ctx,
-        totalMinutes,
-        serviceMinutes,
+        quote,
         excludeBookingId: request.excludeBookingId,
-      }),
-    }));
+      });
+      return [{ staff, day }];
+    });
     const byStaff = staffDays.map((sd) => sd.day);
 
     const byStart = new Map<number, StaffDocument[]>();
@@ -483,9 +556,11 @@ export function computeAvailability(
         );
         slotIndex += 1;
         const startAt = new Date(time);
+        // The slot shows the end for the chair it would go to; each candidate has its own length.
+        const firstMinutes = quotes.get(ranked[0]._id)?.serviceMinutes ?? 0;
         return {
           startAt,
-          endAt: addMinutes(startAt, serviceMinutes),
+          endAt: addMinutes(startAt, firstMinutes),
           staffId: ranked[0]._id,
           candidates: ranked.map((s) => s._id),
         };
@@ -499,7 +574,7 @@ export function computeAvailability(
     });
   }
 
-  return { serviceMinutes, bufferMinutes, totalMinutes, staff: qualified, days };
+  return { quotes, staff: qualified, days };
 }
 
 /** The slot for an exact start on a day, or null. */

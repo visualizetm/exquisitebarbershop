@@ -8,7 +8,7 @@ const base = {
   startAt: new Date('2026-07-15T13:00:00.000Z'), // 09:00 EDT
   endAt: new Date('2026-07-15T13:45:00.000Z'),
   summary: 'Exquisite: Cut, Beard',
-  description: 'With Dee; reference ABC-DEFG, manage online',
+  description: 'With Drew; reference ABC-DEFG, manage online',
   location: '3309 Edgmont Ave, Brookhaven, PA 19015',
   organizerName: 'Exquisite Barber & Beauty Lounge',
   organizerEmail: 'hello@example.com',

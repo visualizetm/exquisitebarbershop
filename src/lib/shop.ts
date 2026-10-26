@@ -1,14 +1,32 @@
 import { DateTime } from 'luxon';
 import type { PublicShop } from '@shared/api/public';
 import { SHOP_TIMEZONE } from '@shared/lib/constants';
+import { googleMapsUrl } from '@shared/lib/google';
 import { DAY_KEYS, type DayKey } from '@shared/lib/time';
 
-/** A Google Maps search link for the shop address. A plain link, no embed. */
-export function directionsUrl(address: PublicShop['address']): string {
+/**
+ * The link behind every Directions button: the shop's own Google Maps page, built from its place
+ * id. A shop without a place id in its settings falls back to a Maps search for the address.
+ */
+export function directionsUrl(shop: Pick<PublicShop, 'address' | 'name' | 'google'>): string {
+  if (shop.google?.placeId) return googleMapsUrl(shop.google.placeId, shop.name);
+  const { address } = shop;
   const query = [address.line1, address.line2, address.city, address.state, address.postalCode]
     .filter(Boolean)
     .join(', ');
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+/** The street address on one line, suite included: "3309 Edgmont Ave, Suite F, Brookhaven, PA 19015". */
+export function addressLine(address: PublicShop['address']): string {
+  return [
+    address.line1,
+    address.line2,
+    address.city,
+    `${address.state} ${address.postalCode}`.trim(),
+  ]
+    .filter(Boolean)
+    .join(', ');
 }
 
 /** Today's key in shop time, so the hours table highlights the right row for every visitor. */

@@ -7,8 +7,11 @@ import {
   staffOpeningsResponseSchema,
 } from '@shared/api/public';
 import { priceLabel } from '@shared/lib/money';
+import { chairReviews } from '@shared/lib/reviews';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
+import { ReviewList } from '@/components/site/ReviewCard';
 import {
+  ButtonAnchor,
   ButtonLink,
   Chips,
   ErrorState,
@@ -24,8 +27,12 @@ import {
 import { useShop } from '@/app/useShop';
 import { Status } from '@/components/Status';
 import { ApiRequestError } from '@/lib/api';
+import { chairServices } from '@/lib/menuPrices';
+import { offlineBooking } from '@/lib/offlineBooking';
+import { chairDescription } from '@/lib/seo';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
+import { chairWork, SHOP_WORK_MAX } from '@/lib/workPhotos';
 
 export function ChairPage() {
   const { slug = '' } = useParams();
@@ -38,6 +45,17 @@ export function ChairPage() {
   );
   const services = useApi('/api/services', publicServicesResponseSchema);
   const work = useApi(slug ? `/api/gallery?staff=${encoded}&limit=6` : null, galleryResponseSchema);
+  // Nobody credited a photo to this chair yet: the shop's own photos stand in, labeled as such.
+  const shopWork = useApi(
+    work.status === 'ready' && work.data.photos.length === 0
+      ? `/api/gallery?home=true&limit=${String(SHOP_WORK_MAX)}`
+      : null,
+    galleryResponseSchema,
+  );
+  const strip = chairWork(
+    work.status === 'ready' ? work.data.photos : null,
+    shopWork.status === 'ready' ? shopWork.data.photos : null,
+  );
   const profile = result.status === 'ready' ? result.data.staff : null;
   const shop = useShop();
   const phone = (shop.status === 'ready' ? shop.data.phone : __SHOP_PHONE__).replace(/[^\d+]/g, '');
@@ -56,9 +74,7 @@ export function ChairPage() {
   );
   usePageMeta({
     title: profile?.name ?? 'The chairs',
-    description: profile
-      ? `${profile.name}, ${profile.title} at Exquisite Barber & Beauty Lounge in Brookhaven, PA. ${profile.specialty}. See the next openings and book online.`
-      : undefined,
+    description: profile ? chairDescription(profile) : undefined,
   });
 
   // An old slug (from a printed card) resolves, then the address is replaced with the current one.
@@ -90,11 +106,13 @@ export function ChairPage() {
   }
   const { staff } = result.data;
   const bookPath = `/book?barber=${encodeURIComponent(staff.slug)}`;
-  const offered =
-    services.status === 'ready'
-      ? services.data.services.filter((s) => staff.serviceIds.includes(s.id))
-      : [];
+  // Someone who takes no online bookings (Iniya) sends people to Instagram instead.
+  const away = offlineBooking(staff);
+  // This person's own menu: their price and time where they set them, the shop's otherwise.
+  const offered = services.status === 'ready' ? chairServices(services.data.services, staff) : [];
   const open = openings.status === 'ready' ? openings.data : null;
+  // Up to three of the shown reviews that are about this chair, in the owner's order.
+  const reviews = chairReviews(shop.status === 'ready' ? (shop.data.reviews ?? []) : [], staff.id);
   const badge =
     staff.chairNumber !== null ? `Chair ${String(staff.chairNumber).padStart(2, '0')}` : null;
 
@@ -132,8 +150,19 @@ export function ChairPage() {
               <ButtonLink to={bookPath} size="lg">
                 Book {staff.name}
               </ButtonLink>
+            ) : away?.href ? (
+              <ButtonAnchor
+                href={away.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                size="lg"
+                data-away="instagram"
+              >
+                {away.label}
+                <span className="exq-visually-hidden"> (opens in a new tab)</span>
+              </ButtonAnchor>
             ) : (
-              <span className="exq-chair__walk-in">Walk-ins only</span>
+              <span className="exq-chair__walk-in">{away?.label}</span>
             )}
           </p>
         </div>
@@ -205,14 +234,39 @@ export function ChairPage() {
         </section>
       ) : null}
 
-      {work.status === 'ready' && work.data.photos.length > 0 ? (
-        <section className="exq-wrap exq-section exq-chair__work" aria-labelledby="exq-chair-work">
-          <SectionHead label="The work" title={`${staff.name}'s work`} id="exq-chair-work">
-            <Link className="exq-link-row" to={`/gallery?staff=${encodeURIComponent(staff.slug)}`}>
-              See all
-            </Link>
-          </SectionHead>
-          <PhotoGrid photos={work.data.photos} columns="work" />
+      {reviews.length > 0 ? (
+        <section
+          className="exq-wrap exq-section exq-chair__reviews"
+          aria-labelledby="exq-chair-reviews"
+        >
+          <SectionHead label="Reviews" title="What clients say" id="exq-chair-reviews" />
+          <ReviewList reviews={reviews} />
+        </section>
+      ) : null}
+
+      {strip ? (
+        <section
+          className="exq-wrap exq-section exq-chair__work"
+          aria-labelledby="exq-chair-work"
+          data-state={strip.source}
+        >
+          {strip.source === 'own' ? (
+            <SectionHead label="The work" title={`${staff.name}'s work`} id="exq-chair-work">
+              <Link
+                className="exq-link-row"
+                to={`/gallery?staff=${encodeURIComponent(staff.slug)}`}
+              >
+                See all
+              </Link>
+            </SectionHead>
+          ) : (
+            <SectionHead label="From the shop" title="The work" id="exq-chair-work">
+              <Link className="exq-link-row" to="/gallery">
+                See the gallery
+              </Link>
+            </SectionHead>
+          )}
+          <PhotoGrid photos={strip.photos} columns="work" />
         </section>
       ) : null}
     </article>

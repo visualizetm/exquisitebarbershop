@@ -148,6 +148,7 @@ export function ProfileTab({
         />
         <Checkbox
           label="Takes online bookings"
+          hint="Off: the site shows Book through Instagram if they have a handle, otherwise Walk-ins only. They are left out of online booking."
           checked={online}
           onChange={(e) => {
             setOnline(e.target.checked);

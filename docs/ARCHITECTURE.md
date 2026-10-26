@@ -107,9 +107,27 @@ timestamp is a BSON Date in UTC. Index definitions are the source of truth in
 | notifications        | { ownerAlertEmail, fromName, replyToEmail, customerConfirmationEmail, ownerNewBookingEmail, customerSms } |                       |
 | features             | { giftCards, rewards, smsReminders }                                                                      | all false until built |
 | permissions          | { barbersCanBlockTime }                                                                                   | default false         |
+| google               | { placeId, rating, reviewCount, ratingCheckedOn }                                                         | Website, Reviews      |
+| reviews              | { enabled, items: ReviewItem[] } at most 30; ReviewItem { id, name, text, stars, source, date?, staffId } | plus show, sortOrder  |
 | createdAt, updatedAt | Date                                                                                                      |                       |
 
 Indexes: none beyond `_id`.
+
+`google` (prompt 12) is `{ placeId, rating, reviewCount, ratingCheckedOn }`. The place id builds the two links in
+`shared/lib/google.ts`: the Maps link every Directions button uses
+(`https://www.google.com/maps/search/?api=1&query=<shop name>&query_place_id=<placeId>`) and the write-a-review
+link (`https://search.google.com/local/writereview?placeid=<placeId>`); with no place id, Directions searches the
+address. The rating (0 to 5, one decimal), the count and the checked date are copied by hand from the Google
+profile in Website, Reviews (Google has no free feed) and are never written in code. The place id is set by the
+seed and is not editable in the dashboard.
+
+`reviews` (prompt 12) is `{ enabled, items }`: at most 30 items, each `{ id, name, text (up to 600), stars (1 to
+5), source ('google' or 'thecut'), date (YYYY-MM-DD, optional), staffId (string or null), show, sortOrder }`.
+The seed copies them word for word from `docs/content/exquisite-site-data.json` and resolves its `staffKey` to the
+chair's id. The one writer is `PUT /api/admin/reviews` (show, hide, order, the switch and the Google rating; never
+text, a new review or the place id); `PUT /api/admin/settings` strips `reviews`. A document written before either
+field reads with defaults (an empty Google block, `{ enabled: true, items: [] }`). Neither field reaches the
+JSON-LD: there is no `aggregateRating` (D12-66).
 
 ### staff
 
@@ -122,6 +140,7 @@ Indexes: none beyond `_id`.
 | role                        | owner, barber, stylist |                                                          |
 | chairNumber                 | int or null            |                                                          |
 | serviceIds                  | string[]               | services this person performs                            |
+| servicePrices               | array, optional        | own price and time, one per service                      |
 | photoUrl, instagramHandle   | string or null         |                                                          |
 | sortOrder                   | int                    | display order                                            |
 | acceptsOnlineBooking        | boolean                | false means walk-in only                                 |
@@ -133,6 +152,11 @@ Indexes: none beyond `_id`.
 | -------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | uniq_slugKeys (unique, multikey) | slugKeys                            | no slug, current or former, can belong to two people. This is what makes printed QR codes safe forever. |
 | public_listing                   | deletedAt, showOnWebsite, sortOrder | public team page                                                                                        |
+
+`servicePrices` entries are `{serviceId, priceCents, durationMinutes?}`: a person's own price (whole cents) and
+time (multiple of 5) where they differ from the shop's, at most one per service and only for a service in
+`serviceIds`. Documents written before the field have none, which reads as an empty list. A booking stores the
+price and minutes of the person it lands on, so editing a price never changes a booking already made.
 
 Daily "in or out" toggles are not fields on staff; they are `timeBlocks` of kind
 `dayOff` or `extraHours` for that date, so history is kept and nothing is lost
@@ -218,7 +242,7 @@ in on a day they do not normally work, with the hours in startAt and endAt.
 | referenceCode        | "ABC-DEFG"                                                           | unique, alphabet without 0 O 1 I                        |
 | staffId              | string                                                               | the chair                                               |
 | staffRequested       | boolean                                                              | false when "first available" chose the chair            |
-| services             | [{ serviceId, name, group, priceCents, priceFrom, durationMinutes }] | snapshot at booking time                                |
+| services             | [{ serviceId, name, group, priceCents, priceFrom, durationMinutes }] | snapshot at booking time, at the assigned chair's price |
 | startAt, endAt       | Date                                                                 | UTC                                                     |
 | durationMinutes      | int                                                                  | sum of services                                         |
 | bufferMinutes        | int                                                                  | buffer applied after this booking, captured at creation |
@@ -390,9 +414,10 @@ conflict check of a schedule change and its commit. Indexes: `_id` only.
 | kind          | staff, gallery, hero |                                                                                      |
 | staffId       | string or null       | the chair for staff photos and credited gallery photos                               |
 | key           | string               | server generated: staff/<staffId>/<uuid>.webp, gallery/<uuid>.webp, hero/<uuid>.webp |
-| width, height | int                  | from the browser after the resize                                                    |
+| width, height | int                  | from the browser after the resize (seed photos: from the WebP header)                |
 | alt           | string               | required                                                                             |
 | sortOrder     | int                  | display order within a kind (and chair)                                              |
+| home          | boolean, optional    | gallery photos picked for Home (seed manifest); `?home=true` lists them first        |
 | createdBy     | actor                |                                                                                      |
 | createdAt     | Date                 |                                                                                      |
 | deletedAt     | Date or null         | soft delete                                                                          |
@@ -402,6 +427,9 @@ conflict check of a schedule change and its commit. Indexes: `_id` only.
 | --------------- | -------------------------- | ------------------------------------ |
 | kind_live_order | kind, deletedAt, sortOrder | gallery and hero reads in order      |
 | by_staff_kind   | staffId, kind              | one chair's portrait and work photos |
+
+A seed photo's `_id` is `seedId('photo', <manifest file name>)`, so the loader knows a file it already stored
+without a lookup field: there is no `sourceKey` (D12-42). Uploaded photos get `newId()` like every other record.
 
 ### pendingUploads (prompt 5)
 
@@ -586,13 +614,14 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 | GET, POST     | /api/admin/services                   | owner                    |                                                                                                                  |
 | PATCH, DELETE | /api/admin/services/:id               | owner                    | DELETE is a soft delete through the conflict rule                                                                |
 | GET, POST     | /api/admin/staff                      | owner                    | SLUG_TAKEN                                                                                                       |
-| PATCH, DELETE | /api/admin/staff/:id                  | owner                    | conflict rule; DELETE soft deletes and disables the login                                                        |
+| PATCH, DELETE | /api/admin/staff/:id                  | owner                    | conflict rule; DELETE soft deletes and disables the login; PATCH takes `servicePrices`                           |
 | POST          | /api/admin/staff/:id/slug             | owner                    | old slug becomes an alias                                                                                        |
 | PUT           | /api/admin/staff/:id/hours            | owner                    | conflict rule                                                                                                    |
 | GET, PUT      | /api/admin/hours                      | owner                    | PUT is the shop hours; conflict rule                                                                             |
 | GET, PUT      | /api/admin/closures                   | owner                    | upsert by date; conflict rule                                                                                    |
 | DELETE        | /api/admin/closures/:id               | owner                    | conflict rule (removing special hours)                                                                           |
-| GET, PUT      | /api/admin/settings                   | owner                    | full `shopSettingsInputSchema`                                                                                   |
+| GET, PUT      | /api/admin/settings                   | owner                    | full `shopSettingsInputSchema`; `google` optional; never writes `reviews`                                        |
+| PUT           | /api/admin/reviews                    | owner                    | `{ enabled?, google?, items? }`: show, hide, order, rating; strict, no review text; audited                      |
 | GET, POST     | /api/admin/users                      | owner                    | POST `{ email, staffId }` returns a one-time temporary password                                                  |
 | POST          | /api/admin/users/:id/reset-password   | owner                    | new temporary password; ends the login's sessions                                                                |
 | POST          | /api/admin/users/:id/disable, /enable | owner                    | disable ends every session                                                                                       |
@@ -623,19 +652,21 @@ environment (development, test, preview, production) needs.
 
 ### Prompt 4: photos, next opening, gallery
 
-| Method        | Path                         | Auth               | Notes                                                                                 |
-| ------------- | ---------------------------- | ------------------ | ------------------------------------------------------------------------------------- |
-| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId |
-| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service               |
-| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`; photos with per chair counts        |
-| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                 |
-| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket    |
-| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201           |
-| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal              |
-| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus `/chairs/:slug`        |
+| Method        | Path                         | Auth               | Notes                                                                                   |
+| ------------- | ---------------------------- | ------------------ | --------------------------------------------------------------------------------------- |
+| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId   |
+| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service                 |
+| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`, `home`; photos with per chair counts  |
+| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                   |
+| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket      |
+| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201             |
+| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal                |
+| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus bookable `/chairs/:slug` |
 
 `/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
-`/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`.
+`/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`. `/api/shop` also carries
+`google` and `reviews`: only the shown reviews, in order, as `{ id, name, text, stars, source, date, staffId }`,
+and none while the section is off.
 `/api/internal/outbox/deliver` also purges deleted photo objects (`photosPurged`) and
 sweeps abandoned uploads (`uploadsSwept`). A confirm whose object does not match the
 ticket (size, type, or over 10 MB) deletes the object before answering 409.
@@ -673,8 +704,11 @@ Algorithm, per shop-local day
 5. Busy: every booking that is not cancelled (each with its own captured
    buffer) and `block` time blocks. Completed and no-show bookings keep their
    slot locks, so they stay busy too.
-6. Total = sum of service durations + effective buffer, where the effective
-   buffer is the largest of each service's override or the shop default. Starts
+6. Total = sum of the chair's own service durations (its `servicePrices`
+   minutes where set, else the service's) + effective buffer, where the effective
+   buffer is the largest of each service's override or the shop default. Each
+   chair is quoted on its own times (prompt 12), so a start and its end can
+   differ from chair to chair. Starts
    step by `slotStepMinutes` from each working range start (rounded up to the
    grid); a start is kept only when the services (start + durations) end inside
    the range and start + total overlaps nothing busy. The cleanup buffer after
@@ -688,6 +722,31 @@ Algorithm, per shop-local day
    day, cancelled ones aside, then display order, then id) or `roundRobin` (rotating by slot index).
    Each slot carries the pick and every candidate, best first. The booking
    service uses that order for fallback when the pick's lock insert conflicts.
+
+Per barber prices and times (prompt 12)
+
+One pure helper, `shared/lib/servicePricing.ts`, decides every price and time a customer, an email or the owner
+sees, on the server and in the browser alike:
+
+- A chosen or assigned person: their `servicePrices` entry for a service (price, and minutes when set), else the
+  service's own price and time. Several services add up for that one person. That price is exact: never "From",
+  whatever the service's `priceFrom` flag says (a chair page, a chosen barber in booking, the ticket, the
+  confirmation, the emails and the admin views).
+- First available, or nobody chosen yet: the lowest total among the people who could be assigned (online
+  bookable and doing every chosen service; ties by total minutes, then display order, then id), shown as "From
+  $x" when the people differ or a service is flagged `priceFrom`. The minutes are that same person's.
+- The price list (`/services`, Home's menu): per service, the lowest price among the people who offer it, "from"
+  when they differ or the service is flagged; a chair page shows only that person's exact prices and minutes.
+- The booking stores the resolved lines (with `priceFrom: false`), total and minutes of the person it lands on,
+  inside the same transaction as its slot locks. Walk-ins and phone bookings do the same. A reschedule on the
+  same chair keeps the stored prices. A move to another chair, the owner's reschedule with a chair or the
+  resolver's Move, re-resolves them for the new chair: lines, total, minutes, end time and locks, in the same
+  transaction, and refuses the move when the new length does not fit. The resolver lists each chair a booking
+  can move to with that chair's price and minutes, and a move emails the customer the new barber, price and
+  time. Emails, the ticket, the manage page and the admin views read the stored snapshot, so a later price edit
+  never changes a booking.
+- Writes: `servicePrices` is validated with zod on the staff create and update routes (whole cents, minutes a
+  multiple of 5, one entry per service, only services in `serviceIds`) and audited as `staff.prices.update`.
 
 Settings (`shopSettings.booking`, owner-editable)
 
@@ -822,6 +881,15 @@ cropped to each frame (`shared/lib/cloudinary.ts`). The driver keeps no backups 
 daily job skips them as it does for `mongo`. `npm run photos:migrate` copies GridFS or local photos
 over and rewrites their records.
 
+Seed photos (prompt 12): `server/services/seedPhotos.ts` reads `seed/photos/manifest.json` (or
+SEED_PHOTOS_DIR) and stores each WebP that exists through the active driver (`storePhotoBytes`: `put`,
+or the signed form for Cloudinary) as a normal photo record with `_id = seedId('photo', file)`, kind,
+alt, sortOrder and `home` from the manifest, no chair, and width and height from the WebP header
+(`server/lib/webpSize.ts`). Existing records are skipped (also deleted ones), the hero only fills an
+empty slot, and missing files are skipped with one warning. Demo setup and Demo data, Reset run it from
+bootstrap; `npm run photos:seed` runs it for a real launch. The files reach the Vercel function through
+`includeFiles` in vercel.json.
+
 Storage is a port (`server/storage/types.ts`) with two drivers chosen by
 STORAGE_DRIVER: `r2` (Cloudflare R2 through its S3 API, signed with aws4fetch,
 presigned PUT URLs valid for five minutes, public reads through
@@ -915,10 +983,14 @@ else to `authenticateFromCookie`, which now rejects barber role users, so barber
   resolutions; Move, Cancel and Cancel and notify are owner only.
 - Search: `GET /api/admin/search` over `bookings.nameKey` (index `by_name_key`), phone digits and reference code.
 - Resolver Move: `applyScheduleChange` accepts `move` with `toStaffId`; options list only chairs that do the
-  service and are free for the whole booking plus buffer. The move updates the booking, re-points its
-  `slotLocks` and writes `booking.move` audit in one transaction; a concurrent change taking the same free
-  time loses at the unique `(staffId, slotStart)` index and rolls back whole. The customer link version does
-  not change because the time did not.
+  service and are free for their own length of the booking plus buffer, each with that chair's price and
+  minutes (`moveOptions[].totalPriceCents`, `durationMinutes`). The move reprices the booking for the new
+  chair (`quoteMove` in `shared/lib/servicePricing.ts`: services, `durationMinutes`, `totalPriceCents` and
+  the end time from the same start), re-points its `slotLocks` over the new length, writes `booking.move`
+  audit and queues the customer's "moved" email in one transaction; a concurrent change taking the same
+  free time, or a longer length running into another booking, loses at the unique `(staffId, slotStart)`
+  index and rolls back whole. The customer link version moves up like a reschedule (prompt 12; before it a
+  move was silent and kept the first chair's price).
 - Demo: seeded barbers get PIN 246810; the sign-in shows it only when `/api/shop` says `demo`.
 - Team routes (16) are under `/api/team/*`; owner access routes are `/api/admin/staff/:id/access`,
   `/setup-link` and `/unlock`.

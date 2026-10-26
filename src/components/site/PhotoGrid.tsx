@@ -23,6 +23,7 @@ export function PhotoGrid({
       <ul
         className="exq-photo-grid exq-bare"
         data-layout={columns}
+        data-count={String(photos.length)}
         data-state={index === null ? 'idle' : 'open'}
       >
         {photos.map((photo, i) => {
@@ -48,7 +49,7 @@ export function PhotoGrid({
                     loading={firstPriority && i === 0 ? 'eager' : 'lazy'}
                     fetchPriority={firstPriority && i === 0 ? 'high' : undefined}
                     decoding="async"
-                    sizes="(min-width: 1024px) 380px, 50vw"
+                    sizes="(min-width: 1024px) 380px, (min-width: 768px) 33vw, 50vw"
                   />
                 </Reveal>
               </button>

@@ -10,8 +10,8 @@ describe('pii masking', () => {
   });
 
   it('keeps the last two digits of a phone number in any shape', () => {
-    expect(maskPhone('(610) 555-0100')).toBe('***00');
-    expect(maskPhone('+16105550100')).toBe('***00');
+    expect(maskPhone('(610) 555-0142')).toBe('***42');
+    expect(maskPhone('+16105550142')).toBe('***42');
     expect(maskPhone('call 610-555-0199 today')).toBe('call ***99 today');
     // Short numbers (a year, a price) are left alone.
     expect(maskPhone('booked 2026 for $120')).toBe('booked 2026 for $120');

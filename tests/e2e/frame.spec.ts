@@ -2,11 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
-const PAGES = ['/', '/services', '/chairs', '/chairs/marcus', '/gallery', '/visit', '/book'];
+const PAGES = ['/', '/services', '/chairs', '/chairs/lee', '/gallery', '/visit', '/book'];
 
 async function toDetails(page: Page) {
-  await page.goto('/book?barber=marcus');
-  await page.getByLabel(/Classic Cut/).click();
+  await page.goto('/book?barber=lee');
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   await page.locator('.exq-bar').getByRole('button', { name: 'Continue' }).click();
   await page.locator('.exq-day-option[data-state="available"] button').nth(1).click();
   await page.locator('.exq-time-option button').first().click();
@@ -52,12 +52,12 @@ test.describe('the phone bottom bar', () => {
 
   test('on a barber profile the right half books that barber', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('/chairs/marcus');
-    const book = page.locator('.exq-bar').getByRole('link', { name: 'Book Marcus' });
+    await page.goto('/chairs/lee');
+    const book = page.locator('.exq-bar').getByRole('link', { name: 'Book Lee' });
     await expect(book).toBeVisible();
-    await expect(book).toHaveAttribute('href', '/book?barber=marcus');
+    await expect(book).toHaveAttribute('href', '/book?barber=lee');
     await book.click();
-    await expect(page).toHaveURL(/\/book\?barber=marcus/);
+    await expect(page).toHaveURL(/\/book\?barber=lee/);
     await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeVisible();
     // Leaving the profile puts the default labels back.
     await page.goto('/services');
@@ -68,15 +68,15 @@ test.describe('the phone bottom bar', () => {
     page,
   }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('/book?barber=marcus');
+    await page.goto('/book?barber=lee');
     const bar = page.locator('.exq-bar');
     await expect(bar.getByRole('link', { name: 'Back' })).toBeVisible();
     const next = bar.getByRole('button', { name: 'Continue' });
     await expect(next).toBeDisabled();
-    await page.getByLabel(/Classic Cut/).click();
+    await page.getByLabel(/^Haircut(?! and| with)/).click();
     await expect(next).toBeEnabled();
-    await expect(bar.locator('.exq-bar__summary')).toContainText('$30');
-    await expect(bar.locator('.exq-bar__summary')).toContainText('30 min');
+    await expect(bar.locator('.exq-bar__summary')).toContainText('$40');
+    await expect(bar.locator('.exq-bar__summary')).toContainText('45 min');
     await next.click();
     await page.locator('.exq-day-option[data-state="available"] button').nth(1).click();
     await page.locator('.exq-time-option button').first().click();
@@ -141,7 +141,7 @@ test.describe('the frame', () => {
     await page.setViewportSize(PHONE);
     await page.goto('/');
     const strip = page.locator('.exq-topstrip[data-state="ready"]');
-    await expect(strip).toContainText('Walk ins welcome');
+    await expect(strip).toContainText('Walk-ins welcome');
     await expect(strip.getByRole('link', { name: 'Book online' })).toHaveAttribute('href', '/book');
     const toggle = page.getByRole('button', { name: 'Open menu' });
     await toggle.click();

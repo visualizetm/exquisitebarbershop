@@ -27,7 +27,7 @@ export function randomPhone(): string {
 }
 
 /**
- * Books Classic Cut with a chair through the public flow, as a customer would. Returns the
+ * Books a Haircut with a chair through the public flow, as a customer would. Returns the
  * reference code and the chosen start time.
  */
 export async function bookPublicly(
@@ -38,7 +38,7 @@ export async function bookPublicly(
   const phone = customer.phone ?? randomPhone();
   await resetRateLimits();
   await page.goto(`/book?barber=${barber}`);
-  await page.getByLabel(/Classic Cut/).click();
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.locator('.exq-day-option[data-state="available"] button').first().click();
   const first = page.locator('.exq-time-option button').first();

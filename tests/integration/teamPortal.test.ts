@@ -42,14 +42,14 @@ const { db } = useTestDb();
 let server: TestServer;
 const THU = nextDate(4, 3);
 const FRI = nextDate(5, 3);
-const MORNING = new Date(slotAt(THU, '09:00'));
-const marcus = staffSeedId('marcus');
-const dee = staffSeedId('dee');
-const cut = serviceSeedId('classic-cut');
+const MORNING = new Date(slotAt(THU, '10:00'));
+const lee = staffSeedId('lee');
+const drew = staffSeedId('drew');
+const cut = serviceSeedId('haircut');
 const barber: Principal = {
-  userId: marcus,
+  userId: lee,
   role: 'barber',
-  staffId: marcus,
+  staffId: lee,
   sessionId: newId(),
   email: '',
   mustChangePassword: false,
@@ -133,10 +133,10 @@ beforeEach(async () => {
 
 describe('Today', () => {
   it('lists the barber’s own day with the next client, counts, and never a phone or email', async () => {
-    const first = await seedBooking(marcus, THU, '10:00', { name: 'First Client' });
-    await seedBooking(marcus, THU, '11:00', { name: 'Second Client' });
-    await seedBooking(marcus, THU, '12:00', { name: 'Walked Out', status: 'cancelled' });
-    await seedBooking(dee, THU, '10:00', { name: 'Dees Client' });
+    const first = await seedBooking(lee, THU, '10:00', { name: 'First Client' });
+    await seedBooking(lee, THU, '11:00', { name: 'Second Client' });
+    await seedBooking(lee, THU, '12:00', { name: 'Walked Out', status: 'cancelled' });
+    await seedBooking(drew, THU, '10:00', { name: 'Dees Client' });
     const day = teamDayResponseSchema.parse(await teamDay(barber, MORNING));
     expect(day.date).toBe(THU);
     expect(day.bookings.map((b) => b.customerName)).toEqual(['First Client', 'Second Client']);
@@ -144,14 +144,14 @@ describe('Today', () => {
     expect(day.counts).toEqual({ total: 2, done: 0, noShow: 0, left: 2 });
     expect(day.isOut).toBe(false);
     const text = JSON.stringify(day);
-    for (const secret of ['2155550142', 'client@example.com', 'Dees Client', dee]) {
+    for (const secret of ['2155550142', 'client@example.com', 'Dees Client', drew]) {
       expect(text).not.toContain(secret);
     }
   });
 
   it('Done and No show move the counts and the next client on, and Undo puts them back', async () => {
-    const a = await seedBooking(marcus, THU, '10:00', { name: 'A' });
-    const b = await seedBooking(marcus, THU, '11:00', { name: 'B' });
+    const a = await seedBooking(lee, THU, '10:00', { name: 'A' });
+    const b = await seedBooking(lee, THU, '11:00', { name: 'B' });
     await setBookingStatus(barber, a._id, 'completed', meta());
     let day = await teamDay(barber, MORNING);
     expect(day.counts).toEqual({ total: 2, done: 1, noShow: 0, left: 1 });
@@ -166,7 +166,7 @@ describe('Today', () => {
   });
 
   it('adds a note that the owner sees on the booking', async () => {
-    const a = await seedBooking(marcus, THU, '10:00');
+    const a = await seedBooking(lee, THU, '10:00');
     const view = await setBookingNote(barber, a._id, '  Prefers a #2 guard  ', meta());
     expect(view.notes).toBe('Prefers a #2 guard');
     expect((await bookingsRepo.findBookingById(a._id))?.notes).toBe('Prefers a #2 guard');
@@ -175,9 +175,9 @@ describe('Today', () => {
   });
 
   it('a week shows seven days with a count each, grouped by day', async () => {
-    await seedBooking(marcus, THU, '10:00');
-    await seedBooking(marcus, THU, '11:00');
-    await seedBooking(marcus, FRI, '10:00');
+    await seedBooking(lee, THU, '10:00');
+    await seedBooking(lee, THU, '11:00');
+    await seedBooking(lee, FRI, '10:00');
     const week = await teamWeek(barber, MORNING);
     expect(week.days).toHaveLength(7);
     expect(week.days[0]?.date).toBe(THU);
@@ -188,40 +188,40 @@ describe('Today', () => {
 
 describe('I’m out today', () => {
   it('sets the day off, cancels and moves nothing, and raises one alert for the owner', async () => {
-    const a = await seedBooking(marcus, THU, '12:00', { name: 'Noon' });
-    const b = await seedBooking(marcus, THU, '14:00', { name: 'Afternoon' });
+    const a = await seedBooking(lee, THU, '12:00', { name: 'Noon' });
+    const b = await seedBooking(lee, THU, '14:00', { name: 'Afternoon' });
     const first = await outToday(barber, meta());
     expect(first).toEqual({ clients: 2 });
     for (const booking of [a, b]) {
       const stored = await bookingsRepo.findBookingById(booking._id);
       expect(stored?.status).toBe('confirmed');
-      expect(stored?.staffId).toBe(marcus);
+      expect(stored?.staffId).toBe(lee);
     }
     const day = shopDayBounds(THU);
-    const blocks = await timeBlocksRepo.listTimeBlocksForStaff(marcus, day);
+    const blocks = await timeBlocksRepo.listTimeBlocksForStaff(lee, day);
     expect(blocks.map((x) => x.kind)).toEqual(['dayOff']);
-    expect(blocks[0]?.createdBy).toEqual({ type: 'barber', userId: null, staffId: marcus });
+    expect(blocks[0]?.createdBy).toEqual({ type: 'barber', userId: null, staffId: lee });
     const alerts = await alertsRepo.listOpenAlerts();
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toMatchObject({
       kind: 'barberOut',
-      staffId: marcus,
+      staffId: lee,
       fromDate: THU,
       toDate: THU,
     });
     const views = await listAlertViews(MORNING);
-    expect(views[0]).toMatchObject({ staffName: 'Marcus', affectedCount: 2 });
+    expect(views[0]).toMatchObject({ staffName: 'Lee', affectedCount: 2 });
     expect((await teamDay(barber, MORNING)).isOut).toBe(true);
 
     // Pressing it again changes nothing and adds no second alert.
     expect(await outToday(barber, meta())).toEqual({ clients: 0 });
     expect(await alertsRepo.listOpenAlerts()).toHaveLength(1);
-    expect(await timeBlocksRepo.listTimeBlocksForStaff(marcus, day)).toHaveLength(1);
+    expect(await timeBlocksRepo.listTimeBlocksForStaff(lee, day)).toHaveLength(1);
   });
 
   it('the owner then decides each client: one cancelled, one kept, and the alert closes', async () => {
-    const a = await seedBooking(marcus, THU, '12:00', { name: 'Noon' });
-    const b = await seedBooking(marcus, THU, '14:00', { name: 'Afternoon' });
+    const a = await seedBooking(lee, THU, '12:00', { name: 'Noon' });
+    const b = await seedBooking(lee, THU, '14:00', { name: 'Afternoon' });
     await outToday(barber, meta());
     const [alert] = await alertsRepo.listOpenAlerts();
     const owner = {
@@ -263,19 +263,19 @@ describe('days off ahead', () => {
       meta(),
     );
     expect(result).toEqual({ applied: true, clients: 0 });
-    const blocks = await timeBlocksRepo.listTimeBlocksForStaff(marcus, shopDayBounds(FRI));
+    const blocks = await timeBlocksRepo.listTimeBlocksForStaff(lee, shopDayBounds(FRI));
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toMatchObject({ kind: 'timeOff', reason: 'Wedding' });
     expect(await alertsRepo.listOpenAlerts()).toHaveLength(0);
   });
 
   it('become a request when clients are booked, and nothing changes until the owner decides', async () => {
-    const booked = await seedBooking(marcus, FRI, '12:00');
+    const booked = await seedBooking(lee, FRI, '12:00');
     const result = await requestDaysOff(barber, { fromDate: FRI, toDate: FRI }, meta());
     expect(result).toEqual({ applied: false, clients: 1 });
-    expect(await timeBlocksRepo.listTimeBlocksForStaff(marcus, shopDayBounds(FRI))).toHaveLength(0);
+    expect(await timeBlocksRepo.listTimeBlocksForStaff(lee, shopDayBounds(FRI))).toHaveLength(0);
     const [alert] = await alertsRepo.listOpenAlerts();
-    expect(alert).toMatchObject({ kind: 'timeOffRequest', staffId: marcus, fromDate: FRI });
+    expect(alert).toMatchObject({ kind: 'timeOffRequest', staffId: lee, fromDate: FRI });
     const listed = await teamTimeOff(barber, MORNING);
     expect(listed.requests).toEqual([{ id: alert?._id, fromDate: FRI, toDate: FRI, reason: null }]);
     expect(listed.blocks).toEqual([]);
@@ -295,12 +295,12 @@ describe('days off ahead', () => {
       [{ bookingId: booked._id, action: 'keep' }],
       meta(),
     );
-    expect(await timeBlocksRepo.listTimeBlocksForStaff(marcus, shopDayBounds(FRI))).toHaveLength(1);
+    expect(await timeBlocksRepo.listTimeBlocksForStaff(lee, shopDayBounds(FRI))).toHaveLength(1);
     expect((await teamTimeOff(barber, MORNING)).requests).toEqual([]);
   });
 
   it('a block of time over a client asks first, over free time it just applies', async () => {
-    await seedBooking(marcus, THU, '12:00');
+    await seedBooking(lee, THU, '12:00');
     await expect(
       blockTime(barber, { date: THU, start: '12:00', end: '12:30' }, meta()),
     ).rejects.toMatchObject({ code: 'SCHEDULE_CONFLICT' });
@@ -313,7 +313,7 @@ describe('days off ahead', () => {
 
 describe('the walk-in button', () => {
   it('books a walk-in on the barber’s own chair and replays safely', async () => {
-    const cookie = await teamCookie(marcus);
+    const cookie = await teamCookie(lee);
     const key = idemKey();
     const send = () =>
       call(server.baseUrl, 'POST', '/api/team/walk-ins', {
@@ -325,12 +325,12 @@ describe('the walk-in button', () => {
     const view = teamWalkInResponseSchema.parse(first.body);
     expect(view.booking).toMatchObject({ customerName: 'Walk In Guest', source: 'walkIn' });
     const stored = await bookingsRepo.findBookingById(view.booking.id);
-    expect(stored?.staffId).toBe(marcus);
+    expect(stored?.staffId).toBe(lee);
     // No phone number or email in what the barber gets back.
     expect(JSON.stringify(first.body)).not.toContain('2155550188');
     const replay = await send();
     expect(teamWalkInResponseSchema.parse(replay.body).booking.id).toBe(view.booking.id);
-    expect(await db().collection('bookings').countDocuments({ staffId: marcus })).toBe(1);
+    expect(await db().collection('bookings').countDocuments({ staffId: lee })).toBe(1);
     // It needs the Idempotency-Key header and at least one service.
     expect(
       (

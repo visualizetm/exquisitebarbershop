@@ -12,6 +12,7 @@ import { usePageTitle } from '@/lib/usePageTitle';
 import { useQuick } from '../shell/quick';
 import { AccessTab } from './AccessTab';
 import { HoursTab } from './HoursTab';
+import { PricesTab } from './PricesTab';
 import { ProfileTab } from './ProfileTab';
 import { ServicesTab } from './ServicesTab';
 import { TimeOffTab } from './TimeOffTab';
@@ -19,12 +20,13 @@ import { TimeOffTab } from './TimeOffTab';
 const TABS = [
   { id: 'profile', label: 'Profile' },
   { id: 'services', label: 'Services' },
+  { id: 'prices', label: 'Prices' },
   { id: 'hours', label: 'Working hours' },
   { id: 'timeoff', label: 'Time off' },
   { id: 'access', label: 'Access' },
 ];
 
-/** One barber: profile, the services they do, weekly hours, time off and how they sign in. */
+/** One barber: profile, the services they do, their own prices, weekly hours, time off and how they sign in. */
 export function TeamDetailPage() {
   const { id = '' } = useParams();
   const quick = useQuick();
@@ -94,6 +96,16 @@ export function TeamDetailPage() {
           {tab === 'profile' ? <ProfileTab member={member} onChanged={quick.changed} /> : null}
           {tab === 'services' ? (
             <ServicesTab member={member} services={live} onChanged={quick.changed} />
+          ) : null}
+          {tab === 'prices' ? (
+            <PricesTab
+              member={member}
+              services={live}
+              onChanged={quick.changed}
+              onChooseServices={() => {
+                setParams({ tab: 'services' }, { replace: true });
+              }}
+            />
           ) : null}
           {tab === 'hours' ? (
             <HoursTab member={member} hours={days} onChanged={quick.changed} />

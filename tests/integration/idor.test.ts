@@ -19,36 +19,36 @@ import { NOW, useTestDb } from '../helpers/db';
 process.env.OUTBOX_AFTER_RESPONSE = 'off';
 const { db } = useTestDb();
 let server: TestServer;
-let marcusCookie: string;
+let leeCookie: string;
 let deeBooking: { id: string; token: string };
-let marcusBooking: { id: string };
+let leeBooking: { id: string };
 let deeBlockId: string;
-const DEE_PHONE = '+12155550177';
-const MARCUS_PHONE = '+12155550178';
+const DREW_PHONE = '+12155550177';
+const LEE_PHONE = '+12155550178';
 const WED = nextDate(3, 3);
-const cutId = serviceSeedId('classic-cut');
+const cutId = serviceSeedId('haircut');
 
 beforeAll(async () => {
   await runSeed(db(), NOW);
   server = await startTestServer();
-  marcusCookie = await teamCookie(staffSeedId('marcus'));
+  leeCookie = await teamCookie(staffSeedId('lee'));
   deeBooking = await bookPublic(server.baseUrl, {
-    staff: 'dee',
+    staff: 'drew',
     serviceIds: [cutId],
     startAt: slotAt(WED, '10:00'),
-    phone: DEE_PHONE,
-    email: 'dee.client@example.com',
+    phone: DREW_PHONE,
+    email: 'drew.client@example.com',
   });
-  marcusBooking = await bookPublic(server.baseUrl, {
-    staff: 'marcus',
+  leeBooking = await bookPublic(server.baseUrl, {
+    staff: 'lee',
     serviceIds: [cutId],
     startAt: slotAt(WED, '11:00'),
-    phone: MARCUS_PHONE,
-    email: 'marcus.client@example.com',
+    phone: LEE_PHONE,
+    email: 'lee.client@example.com',
   });
   const block = await timeBlocksRepo.insertTimeBlock(
     {
-      staffId: staffSeedId('dee'),
+      staffId: staffSeedId('drew'),
       kind: 'timeOff',
       startAt: new Date(slotAt(WED, '15:00')),
       endAt: new Date(slotAt(WED, '16:00')),
@@ -63,18 +63,18 @@ afterAll(async () => {
   await server.close();
 });
 
-const asMarcus = (method: string, path: string, body?: unknown) =>
+const asLee = (method: string, path: string, body?: unknown) =>
   call(server.baseUrl, method, path, {
-    headers: { cookie: marcusCookie },
+    headers: { cookie: leeCookie },
     ...(body === undefined ? {} : { body }),
   });
 
 describe('a barber cannot reach another chair', () => {
   it("another barber's booking reads as not found, exactly like a made-up id", async () => {
-    const other = await asMarcus('POST', `/api/team/bookings/${deeBooking.id}/status`, {
+    const other = await asLee('POST', `/api/team/bookings/${deeBooking.id}/status`, {
       status: 'completed',
     });
-    const madeUp = await asMarcus('POST', `/api/team/bookings/${newId()}/status`, {
+    const madeUp = await asLee('POST', `/api/team/bookings/${newId()}/status`, {
       status: 'completed',
     });
     expect(other.status).toBe(404);
@@ -89,7 +89,7 @@ describe('a barber cannot reach another chair', () => {
   });
 
   it("cannot add a note to another barber's booking", async () => {
-    const res = await asMarcus('POST', `/api/team/bookings/${deeBooking.id}/note`, {
+    const res = await asLee('POST', `/api/team/bookings/${deeBooking.id}/note`, {
       notes: 'not mine',
     });
     expect(res.status).toBe(404);
@@ -100,7 +100,7 @@ describe('a barber cannot reach another chair', () => {
   });
 
   it('cannot cancel, even its own booking: the barber API has no such status', async () => {
-    const res = await asMarcus('POST', `/api/team/bookings/${marcusBooking.id}/status`, {
+    const res = await asLee('POST', `/api/team/bookings/${leeBooking.id}/status`, {
       status: 'cancelled',
     });
     expect(res.status).toBe(400);
@@ -108,26 +108,26 @@ describe('a barber cannot reach another chair', () => {
   });
 
   it("cannot delete another barber's time block", async () => {
-    const res = await asMarcus('DELETE', `/api/team/time-blocks/${deeBlockId}`);
+    const res = await asLee('DELETE', `/api/team/time-blocks/${deeBlockId}`);
     expect(res.status).toBe(404);
     expect(await timeBlocksRepo.findTimeBlockById(deeBlockId)).not.toBeNull();
   });
 
   it('a staffId smuggled into a block request is ignored: the block lands on the own chair', async () => {
-    const res = await asMarcus('POST', '/api/team/time-blocks', {
-      staffId: staffSeedId('dee'),
+    const res = await asLee('POST', '/api/team/time-blocks', {
+      staffId: staffSeedId('drew'),
       date: WED,
       start: '13:00',
       end: '13:30',
     });
     expect(res.status).toBe(201);
     expect((res.body as { timeBlock: { staffId: string } }).timeBlock.staffId).toBe(
-      staffSeedId('marcus'),
+      staffSeedId('lee'),
     );
   });
 
   it('a block over a booked client asks, and the barber API can only keep, never cancel', async () => {
-    const conflict = await asMarcus('POST', '/api/team/time-blocks', {
+    const conflict = await asLee('POST', '/api/team/time-blocks', {
       date: WED,
       start: '11:00',
       end: '11:30',
@@ -135,40 +135,40 @@ describe('a barber cannot reach another chair', () => {
     expect(conflict.status).toBe(409);
     expect(apiErrorSchema.parse(conflict.body).error.code).toBe('SCHEDULE_CONFLICT');
     expect(apiErrorSchema.parse(conflict.body).error.affected?.map((a) => a.bookingId)).toEqual([
-      marcusBooking.id,
+      leeBooking.id,
     ]);
     // Nothing was saved: the booking is intact.
     const stored = await db()
       .collection<{ _id: string; status: string }>('bookings')
-      .findOne({ _id: marcusBooking.id });
+      .findOne({ _id: leeBooking.id });
     expect(stored?.status).toBe('confirmed');
   });
 
   it('the own week never contains another chair, and no client phone or email', async () => {
-    const res = await asMarcus('GET', '/api/team/week');
+    const res = await asLee('GET', '/api/team/week');
     const parsed = teamWeekResponseSchema.parse(res.body);
     expect(parsed.days).toHaveLength(7);
     const text = JSON.stringify(res.body);
-    for (const secret of [DEE_PHONE, MARCUS_PHONE, 'dee.client', 'marcus.client', '2155550177']) {
+    for (const secret of [DREW_PHONE, LEE_PHONE, 'drew.client', 'lee.client', '2155550177']) {
       expect(text).not.toContain(secret);
     }
     expect(text).not.toContain(deeBooking.id);
-    expect(text).not.toContain(staffSeedId('dee'));
-    const today = teamDayResponseSchema.parse((await asMarcus('GET', '/api/team/today')).body);
-    expect(JSON.stringify(today)).not.toContain(MARCUS_PHONE);
+    expect(text).not.toContain(staffSeedId('drew'));
+    const today = teamDayResponseSchema.parse((await asLee('GET', '/api/team/today')).body);
+    expect(JSON.stringify(today)).not.toContain(LEE_PHONE);
   });
 
   it('owner routes refuse a barber session, including by id', async () => {
     for (const path of [
       `/api/admin/bookings/${deeBooking.id}`,
-      `/api/admin/schedule?date=${WED}&staffId=${staffSeedId('dee')}`,
+      `/api/admin/schedule?date=${WED}&staffId=${staffSeedId('drew')}`,
       `/api/admin/customer-list`,
       `/api/admin/search?q=test`,
     ]) {
-      const res = await asMarcus('GET', path);
+      const res = await asLee('GET', path);
       expect(res.status, path).toBe(401);
     }
-    const cancel = await asMarcus('POST', `/api/admin/bookings/${deeBooking.id}/cancel`, {
+    const cancel = await asLee('POST', `/api/admin/bookings/${deeBooking.id}/cancel`, {
       notify: false,
     });
     expect(cancel.status).toBe(401);

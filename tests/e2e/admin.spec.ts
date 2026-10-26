@@ -25,7 +25,7 @@ test('a public booking shows as new for the owner, who marks it done and undoes 
   page,
   context,
 }) => {
-  const { code } = await bookPublicly(page, 'dee');
+  const { code } = await bookPublicly(page, 'drew');
   await context.clearCookies();
 
   await signIn(page, E2E_OWNER);
@@ -54,9 +54,9 @@ test('a public booking shows as new for the owner, who marks it done and undoes 
 });
 
 test('the owner blocks an hour and that time disappears from /book', async ({ page, browser }) => {
-  // Find the first open time for Jay, as a customer would see it.
-  await page.goto('/book?barber=jay');
-  await page.getByLabel(/Classic Cut/).click();
+  // Find the first open time for Drew, as a customer would see it.
+  await page.goto('/book?barber=drew');
+  await page.getByLabel(/^Haircut(?! and| with)/).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await page.locator('.exq-day-option[data-state="available"] button').first().click();
   const startAt =
@@ -68,7 +68,7 @@ test('the owner blocks an hour and that time disappears from /book', async ({ pa
   await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
   await page.getByRole('button', { name: 'Block time' }).click();
   const panel = page.getByRole('dialog', { name: 'Block time' });
-  await panel.getByLabel('Barber').selectOption({ label: 'Jay' });
+  await panel.getByLabel('Barber').selectOption({ label: 'Drew' });
   await panel.getByLabel('Day', { exact: true }).fill(local.toISODate() ?? '');
   await panel.getByLabel('From', { exact: true }).fill(local.toFormat('HH:mm'));
   await panel.getByLabel('To', { exact: true }).fill(local.plus({ hours: 1 }).toFormat('HH:mm'));
@@ -77,8 +77,8 @@ test('the owner blocks an hour and that time disappears from /book', async ({ pa
 
   // A new customer in a fresh browser: availability is cached for ten seconds per browser.
   const customer = await (await browser.newContext()).newPage();
-  await customer.goto('/book?barber=jay');
-  await customer.getByLabel(/Classic Cut/).click();
+  await customer.goto('/book?barber=drew');
+  await customer.getByLabel(/^Haircut(?! and| with)/).click();
   await customer.getByRole('button', { name: 'Continue' }).click();
   await customer.locator('.exq-day-option[data-state="available"] button').first().click();
   await expect(customer.locator('.exq-time-picker')).toBeVisible();

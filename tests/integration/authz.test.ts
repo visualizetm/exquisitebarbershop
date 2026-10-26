@@ -112,6 +112,7 @@ const EXPECTED: Record<string, AuthLevel | 'owner+'> = {
   'DELETE /api/admin/closures/:id': 'owner',
   'GET /api/admin/settings': 'owner',
   'PUT /api/admin/settings': 'owner',
+  'PUT /api/admin/reviews': 'owner',
   'GET /api/admin/audit': 'owner',
   'GET /api/admin/outbox': 'owner',
   'POST /api/admin/outbox/:id/retry': 'owner',
@@ -137,7 +138,7 @@ function pathFor(path: string): string {
 
 async function cookieFor(role: Role): Promise<Record<string, string>> {
   if (role === 'anonymous') return {};
-  if (role === 'team') return { cookie: await teamCookie(staffSeedId('marcus')) };
+  if (role === 'team') return { cookie: await teamCookie(staffSeedId('lee')) };
   return { cookie: await sessionCookie(role === 'owner' ? ids.owner : ids.temp) };
 }
 
@@ -146,7 +147,7 @@ beforeAll(async () => {
   const owner = await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') });
   const temp = await createLogin({
     role: 'owner',
-    staffId: staffSeedId('dee'),
+    staffId: staffSeedId('drew'),
     mustChangePassword: true,
   });
   ids = { owner: owner._id, temp: temp._id };

@@ -71,23 +71,23 @@ describe('public routes', () => {
   });
 
   it('resolves a staff member by current slug and by alias with a canonical flag', async () => {
-    const dee = await staffRepo.findStaffBySlug('dee');
-    await staffRepo.renameStaffSlug(dee?._id ?? '', 'dee-the-barber', NOW);
-    const current = publicStaffResponseSchema.parse((await get('/api/staff/dee-the-barber')).body);
+    const drew = await staffRepo.findStaffBySlug('drew');
+    await staffRepo.renameStaffSlug(drew?._id ?? '', 'drew-the-barber', NOW);
+    const current = publicStaffResponseSchema.parse((await get('/api/staff/drew-the-barber')).body);
     expect(current.canonical).toBe(true);
-    const alias = publicStaffResponseSchema.parse((await get('/api/staff/DEE')).body);
+    const alias = publicStaffResponseSchema.parse((await get('/api/staff/DREW')).body);
     expect(alias.canonical).toBe(false);
-    expect(alias.staff.slug).toBe('dee-the-barber');
+    expect(alias.staff.slug).toBe('drew-the-barber');
     const missing = await get('/api/staff/nobody');
     expect(missing.status).toBe(404);
     expect(apiErrorSchema.parse(missing.body).error.code).toBe('NOT_FOUND');
   });
 
   it('hides soft-deleted staff from the slug route', async () => {
-    const jay = await staffRepo.findStaffBySlug('jay');
-    await staffRepo.softDeleteStaff(jay?._id ?? '', NOW);
+    const iniya = await staffRepo.findStaffBySlug('iniya');
+    await staffRepo.softDeleteStaff(iniya?._id ?? '', NOW);
     // A removed barber's address answers "removed" (410), so the pages can send visitors to booking.
-    expect((await get('/api/staff/jay')).status).toBe(410);
+    expect((await get('/api/staff/iniya')).status).toBe(410);
   });
 });
 

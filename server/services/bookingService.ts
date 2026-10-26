@@ -8,8 +8,10 @@ import type {
   RescheduleBookingResponse,
 } from '../../shared/api/bookings';
 import { generateReferenceCode } from '../../shared/lib/referenceCode';
+import type { PriceQuote } from '../../shared/lib/servicePricing';
 import { addMinutes, minutesBetween, shopDateOf, shopDayStart } from '../../shared/lib/time';
 import type { BookingCustomer, BookingDocument, BookingSource } from '../../shared/schemas/booking';
+import type { ServiceDocument } from '../../shared/schemas/service';
 import type { BookingSettings, ShopSettingsDocument } from '../../shared/schemas/shopSettings';
 import type { StaffDocument } from '../../shared/schemas/staff';
 import type { Actor } from '../../shared/schemas/timeBlock';
@@ -32,13 +34,12 @@ import {
 import { ReferenceCodeCollision } from '../repos/bookingsRepo';
 import {
   computeAvailability,
-  effectiveBufferMinutes,
   findSlot,
   isOnSlotGrid,
   isWithinWorkingTime,
   nextOpenSlots,
+  quoteStaff,
   resolveStaffSelector,
-  serviceMinutesOf,
   type AvailabilityContext,
   type AvailabilityResult,
   type OpenSlot,
@@ -142,6 +143,7 @@ async function alternativesAfter(
     staff: string;
     startAt: Date;
     excludeBookingId?: string;
+    keep?: { staffId: string; serviceMinutes: number };
     override?: boolean;
   },
   now: Date,
@@ -158,9 +160,13 @@ async function alternativesAfter(
     now,
   });
   const ctx = input.override ? { ...loaded, settings: relaxed(loaded.settings) } : loaded;
-  const request = input.excludeBookingId
-    ? { fromDate, toDate, staff: input.staff, excludeBookingId: input.excludeBookingId }
-    : { fromDate, toDate, staff: input.staff };
+  const request = {
+    fromDate,
+    toDate,
+    staff: input.staff,
+    ...(input.excludeBookingId ? { excludeBookingId: input.excludeBookingId } : {}),
+    ...(input.keep ? { keep: input.keep } : {}),
+  };
   const result = computeAvailability(request, ctx);
   return nextOpenSlots(result, input.startAt, ALTERNATIVE_LIMIT).map(toApiSlot);
 }
@@ -171,6 +177,7 @@ async function slotTakenWithAlternatives(
     staff: string;
     startAt: Date;
     excludeBookingId?: string;
+    keep?: { staffId: string; serviceMinutes: number };
     override?: boolean;
   },
   now: Date,
@@ -334,15 +341,26 @@ interface PlacedBooking {
   outsideWorkingTime: boolean;
 }
 
-function serviceSnapshots(ctx: AvailabilityContext): BookingDocument['services'] {
-  return ctx.services.map((s) => ({
-    serviceId: s._id,
-    name: s.name,
-    group: s.group,
-    priceCents: s.priceCents,
-    priceFrom: s.priceFrom,
-    durationMinutes: s.durationMinutes,
-  }));
+/**
+ * The services as the booking will keep them: the name and group of the service, and the price and
+ * time of the chair it was booked on. They are copied, so later price edits never touch a booking.
+ * A booking always has one chair, so its prices are exact, never "from".
+ */
+function serviceSnapshots(
+  services: readonly ServiceDocument[],
+  quote: PriceQuote,
+): BookingDocument['services'] {
+  return services.map((s) => {
+    const line = quote.lines.find((l) => l.serviceId === s._id);
+    return {
+      serviceId: s._id,
+      name: s.name,
+      group: s.group,
+      priceCents: line?.priceCents ?? s.priceCents,
+      priceFrom: false,
+      durationMinutes: line?.durationMinutes ?? s.durationMinutes,
+    };
+  });
 }
 
 function cleanNotes(notes: string | undefined): string | null {
@@ -377,7 +395,8 @@ async function placeBooking(
   const staffId = slot.candidates.find((id) => !tried.has(id));
   if (!staffId) throw new AppError('SLOT_TAKEN', 'That time is no longer available');
   const staff = result.staff.find((s) => s._id === staffId);
-  if (!staff) throw new AppError('SLOT_TAKEN', 'That time is no longer available');
+  const quote = staff ? result.quotes.get(staff._id) : undefined;
+  if (!staff || !quote) throw new AppError('SLOT_TAKEN', 'That time is no longer available');
   const overrideUsed =
     policy.override &&
     findSlot(
@@ -400,18 +419,19 @@ async function placeBooking(
     }
   }
 
-  const endAt = addMinutes(startAt, result.serviceMinutes);
+  // Price and time are the assigned chair's own, also when "first available" picked the chair.
+  const endAt = addMinutes(startAt, quote.serviceMinutes);
   const booking = await bookingsRepo.insertBooking(
     {
       referenceCode,
       staffId: staff._id,
       staffRequested: input.staff !== 'any',
-      services: serviceSnapshots(ctx),
+      services: serviceSnapshots(ctx.services, quote.price),
       startAt,
       endAt,
-      durationMinutes: result.serviceMinutes,
-      bufferMinutes: result.bufferMinutes,
-      totalPriceCents: ctx.services.reduce((sum, s) => sum + s.priceCents, 0),
+      durationMinutes: quote.serviceMinutes,
+      bufferMinutes: quote.bufferMinutes,
+      totalPriceCents: quote.price.totalCents,
       customer: input.customer,
       status: 'confirmed',
       source: policy.source,
@@ -426,7 +446,7 @@ async function placeBooking(
   );
   await slotLocksRepo.acquireSlotLocks(
     staff._id,
-    { start: startAt, end: addMinutes(endAt, result.bufferMinutes) },
+    { start: startAt, end: addMinutes(endAt, quote.bufferMinutes) },
     { holderType: 'booking', holderId: booking._id },
     meta.now,
     { session },
@@ -578,13 +598,13 @@ async function placeWalkIn(
   // A missing chair reads as undefined, which is not null, so it is refused too.
   if (staff?.deletedAt !== null)
     throw new AppError('STAFF_UNAVAILABLE', 'That chair was not found');
-  if (!ctx.services.every((s) => staff.serviceIds.includes(s._id))) {
+  const quote = quoteStaff(staff, ctx.services, ctx.settings);
+  if (!quote) {
     throw new AppError('STAFF_UNAVAILABLE', `${staff.name} does not offer every chosen service`);
   }
   await scheduleGuardsRepo.bumpScheduleGuards([staff._id], meta.now, { session });
 
-  const serviceMinutes = serviceMinutesOf(ctx.services);
-  const bufferMinutes = effectiveBufferMinutes(ctx.services, ctx.settings);
+  const { serviceMinutes, bufferMinutes } = quote;
   const endAt = addMinutes(startAt, serviceMinutes);
   const outsideWorkingTime = !isWithinWorkingTime(
     { staffId: staff._id, startAt, endAt },
@@ -596,12 +616,12 @@ async function placeWalkIn(
       referenceCode,
       staffId: staff._id,
       staffRequested: true,
-      services: serviceSnapshots(ctx),
+      services: serviceSnapshots(ctx.services, quote.price),
       startAt,
       endAt,
       durationMinutes: serviceMinutes,
       bufferMinutes,
-      totalPriceCents: ctx.services.reduce((sum, s) => sum + s.priceCents, 0),
+      totalPriceCents: quote.price.totalCents,
       customer: input.customer,
       status: 'confirmed',
       source: 'walkIn',
@@ -860,6 +880,7 @@ export async function rescheduleBookingAs(
 ): Promise<Rescheduled> {
   const { startAt, selector } = input;
   const serviceIds = booking.services.map((s) => s.serviceId);
+  const keep = { staffId: booking.staffId, serviceMinutes: booking.durationMinutes };
   const tried = new Set<string>();
   let lastConflict: unknown = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -872,23 +893,33 @@ export async function rescheduleBookingAs(
         );
         const ctx = policy.override ? { ...strict, settings: relaxed(strict.settings) } : strict;
         const result = computeAvailability(
-          { fromDate: date, toDate: date, staff: selector, excludeBookingId: booking._id },
+          {
+            fromDate: date,
+            toDate: date,
+            staff: selector,
+            excludeBookingId: booking._id,
+            keep,
+          },
           ctx,
         );
         const slot = findSlot(result, startAt);
         if (!slot) throw reasonError(result, startAt, ctx);
         const staffId = slot.candidates.find((id) => !tried.has(id));
         const staff = staffId ? result.staff.find((s) => s._id === staffId) : undefined;
-        if (!staffId || !staff)
+        const quote = staffId ? result.quotes.get(staffId) : undefined;
+        if (!staffId || !staff || !quote)
           throw new AppError('SLOT_TAKEN', 'That time is no longer available');
         await scheduleGuardsRepo.bumpScheduleGuards([staff._id], now, { session });
 
-        const endAt = addMinutes(startAt, result.serviceMinutes);
+        // The same chair keeps the length it was booked with. A different chair has its own price
+        // and time for these services, so the booking takes that chair's from here on.
+        const sameChair = staff._id === booking.staffId;
+        const endAt = addMinutes(startAt, quote.serviceMinutes);
         // Release first so moving within the same chair's current window works.
         await slotLocksRepo.releaseSlotLocks(booking._id, { session });
         await slotLocksRepo.acquireSlotLocks(
           staff._id,
-          { start: startAt, end: addMinutes(endAt, result.bufferMinutes) },
+          { start: startAt, end: addMinutes(endAt, quote.bufferMinutes) },
           { holderType: 'booking', holderId: booking._id },
           now,
           { session },
@@ -906,7 +937,14 @@ export async function rescheduleBookingAs(
             staffRequested: selector !== 'any',
             startAt,
             endAt,
-            bufferMinutes: result.bufferMinutes,
+            bufferMinutes: quote.bufferMinutes,
+            ...(sameChair
+              ? {}
+              : {
+                  services: serviceSnapshots(ctx.services, quote.price),
+                  durationMinutes: quote.serviceMinutes,
+                  totalPriceCents: quote.price.totalCents,
+                }),
           },
           now,
           { session },
@@ -961,6 +999,7 @@ export async function rescheduleBookingAs(
       staff: selector,
       startAt,
       excludeBookingId: booking._id,
+      keep,
       override: policy.override,
     },
     now,

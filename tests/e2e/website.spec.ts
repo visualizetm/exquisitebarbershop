@@ -85,7 +85,7 @@ test.describe('the website page', () => {
       await visitor.goto('/');
       await expect(visitor.locator('.exq-topstrip')).toContainText('Closed Monday for the holiday');
     } finally {
-      await text.fill('Walk ins welcome');
+      await text.fill('Walk-ins welcome');
       await page.getByRole('button', { name: 'Save announcement' }).click();
       await expect(page.getByText(/Announcement saved/).last()).toBeVisible();
       await visitor.context().close();
@@ -96,7 +96,7 @@ test.describe('the website page', () => {
     page,
     context,
   }) => {
-    const { code, startAt } = await bookPublicly(page, 'marcus', { name: 'Closed Day Client' });
+    const { code, startAt } = await bookPublicly(page, 'lee', { name: 'Closed Day Client' });
     await context.clearCookies();
     const day = DateTime.fromISO(startAt, { zone: ZONE }).toISODate() ?? '';
     await page.setViewportSize(DESKTOP);
@@ -143,7 +143,7 @@ test.describe('the website page', () => {
     await sheet.getByLabel('Description').fill('A towel, a razor and a steady hand.');
     await sheet.getByLabel('Price in dollars').fill('18.50');
     await sheet.getByLabel('Minutes').fill('25');
-    await sheet.getByLabel('Marcus').check();
+    await sheet.getByLabel('Lee').check();
     await sheet.getByRole('button', { name: 'Add service' }).click();
     await expect(page.getByText(new RegExp(`${name} is saved`))).toBeVisible();
     const row = page.locator('.exq-svc', { hasText: name });
@@ -232,7 +232,7 @@ test.describe('the website page', () => {
     await page.getByLabel('Alt text for one.png').fill(`First fade ${stamp}`);
     await expect(upload).toBeDisabled();
     await page.getByLabel('Alt text for two.png').fill(`Second taper ${stamp}`);
-    await page.getByLabel('Credit the work to').first().selectOption({ label: 'Marcus' });
+    await page.getByLabel('Credit the work to').first().selectOption({ label: 'Lee' });
     await expect(upload).toBeEnabled();
     await upload.click();
     await expect(page.getByText('2 photos added to the gallery.')).toBeVisible();

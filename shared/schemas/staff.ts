@@ -1,8 +1,41 @@
 import { z } from 'zod';
-import { idSchema, nonEmptyText, slugSchema, timestampsSchema } from './common';
+import { centsSchema, idSchema, nonEmptyText, slugSchema, timestampsSchema } from './common';
+import { serviceDurationSchema } from './service';
 
 export const staffRoleSchema = z.enum(['owner', 'barber', 'stylist']);
 export type StaffRole = z.infer<typeof staffRoleSchema>;
+
+/** Most overrides one person can hold: the menu is far smaller, this only bounds a bad request. */
+export const SERVICE_PRICES_MAX = 100;
+
+/**
+ * One person's own price, and optionally their own time, for a service they offer. A service
+ * without an entry uses the shop's price and time (services collection).
+ */
+export const servicePriceSchema = z.object({
+  serviceId: idSchema,
+  priceCents: centsSchema,
+  durationMinutes: serviceDurationSchema.optional(),
+});
+export type ServicePrice = z.infer<typeof servicePriceSchema>;
+
+/** At most one entry per service. Whether each service is on the person's menu is checked with it. */
+export const servicePricesSchema = z
+  .array(servicePriceSchema)
+  .max(SERVICE_PRICES_MAX)
+  .superRefine((list, ctx) => {
+    const seen = new Set<string>();
+    list.forEach((entry, index) => {
+      if (seen.has(entry.serviceId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [index, 'serviceId'],
+          message: 'Only one price per service',
+        });
+      }
+      seen.add(entry.serviceId);
+    });
+  });
 
 export const staffDocumentSchema = z
   .object({
@@ -25,6 +58,11 @@ export const staffDocumentSchema = z
     bio: z.string().trim().max(2000),
     chairNumber: z.int().min(1).max(99).nullable(),
     serviceIds: z.array(idSchema),
+    /**
+     * Per person prices and times that differ from the shop's. Optional: documents written
+     * before the field existed have none, which reads the same as an empty list.
+     */
+    servicePrices: servicePricesSchema.optional(),
     photoUrl: z.url().nullable(),
     instagramHandle: z
       .string()

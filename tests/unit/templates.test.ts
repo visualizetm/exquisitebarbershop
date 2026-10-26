@@ -8,12 +8,12 @@ const payload: BookingEmailPayload = {
     referenceCode: 'KZT-7MQ4',
     status: 'confirmed',
     source: 'online',
-    staff: { id: '64a1f2c3d4e5f60718293a4c', name: 'Dee', slug: 'dee' },
+    staff: { id: '64a1f2c3d4e5f60718293a4c', name: 'Drew', slug: 'drew' },
     staffRequested: true,
     services: [
       {
         serviceId: '64a1f2c3d4e5f60718293a4d',
-        name: 'Classic Cut',
+        name: 'Haircut',
         group: 'Barber',
         priceCents: 3000,
         priceFrom: false,
@@ -21,7 +21,7 @@ const payload: BookingEmailPayload = {
       },
       {
         serviceId: '64a1f2c3d4e5f60718293a4e',
-        name: 'Hair Design',
+        name: 'Lineup',
         group: 'Barber',
         priceCents: 1000,
         priceFrom: true,
@@ -41,7 +41,7 @@ const payload: BookingEmailPayload = {
     name: 'Exquisite Barber & Beauty Lounge',
     tagline: 'Gifted Hands',
     addressLines: ['3309 Edgmont Ave', 'Brookhaven, PA 19015'],
-    phone: '+16105550100',
+    phone: '+16106090786',
     email: 'hello@example.com',
     fromName: 'Exquisite',
     replyToEmail: null,
@@ -58,8 +58,12 @@ describe('email templates', () => {
     expect(m.subject).toContain('Wed, Jul 15 at 9:00 AM');
     expect(m.subject).toContain('KZT-7MQ4');
     expect(m.text).toContain('https://example.com/manage?token=v1.abc.def');
-    expect(m.text).toContain('from $10');
-    expect(m.text).toContain('Total: $40 (starting price');
+    // The booking has one barber, so the price is exact even for a line stored with the old
+    // "from" flag: no "from", no starting price note.
+    expect(m.text).toContain(': $10 (');
+    expect(m.text).not.toMatch(/from \$/i);
+    expect(m.text).not.toContain('starting price');
+    expect(m.text).toContain('Total: $40\n');
     expect(m.html).toContain('&lt;Customer&gt;');
     expect(m.html).toContain('href="https://example.com/manage?token=v1.abc.def"');
     expect(m.attachments).toHaveLength(1);
@@ -68,6 +72,19 @@ describe('email templates', () => {
     expect(m.attachments[0]?.content).toContain('SEQUENCE:2');
     expect(m.to).toBe('sam@example.com');
     expect(m.idempotencyKey).toBe('msg1');
+  });
+
+  it('the calendar file names an organizer only when the shop has a real email', () => {
+    const real = renderTemplate('bookingConfirmed', payload, 'sam@example.com', 'm1', env);
+    expect(real.attachments[0]?.content).toContain('ORGANIZER;CN=Exquisite Barber & Beauty Lounge');
+    expect(real.attachments[0]?.content).toContain('mailto:hello@example.com');
+    const stand = {
+      ...payload,
+      shop: { ...payload.shop, email: 'hello@exquisitebarberbeauty.com' },
+    };
+    const none = renderTemplate('bookingConfirmed', stand, 'sam@example.com', 'm2', env);
+    expect(none.attachments[0]?.content).not.toContain('ORGANIZER');
+    expect(none.attachments[0]?.content).not.toContain('exquisitebarberbeauty.com');
   });
 
   it('reschedule mentions the previous time; cancel uses METHOD:CANCEL and the reason', () => {

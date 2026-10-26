@@ -5,8 +5,15 @@ import {
   serviceListResponseSchema,
   staffListResponseSchema,
 } from '@shared/api/admin';
+import {
+  menuPrice,
+  quoteFirstAvailable,
+  quoteForStaff,
+  resolveServiceForStaff,
+} from '@shared/lib/servicePricing';
 import { Button, Checkbox, Chip, Chips, Input, Select, Textarea, useToast } from '@/components/ui';
 import { ApiRequestError, apiRequest } from '@/lib/api';
+import { offeredServices } from '@/lib/booking/offered';
 import { useApi } from '@/lib/useApi';
 import { Status } from '@/components/Status';
 import { ErrorNote } from '../components/ErrorNote';
@@ -77,9 +84,22 @@ export function NewBookingPanel({
     error instanceof ApiRequestError && error.code === 'SLOT_TAKEN'
       ? (error.alternatives ?? [])
       : [];
-  const total = bookable
-    .filter((s) => serviceIds.includes(s.id))
-    .reduce((sum, s) => sum + s.priceCents, 0);
+  // A chair only offers its own menu, and another chair's service would be refused, so a chosen
+  // barber narrows the list. "First available" shows every service.
+  const chairDoc = selectedChair === 'any' ? null : chairs.find((s) => s.slug === selectedChair);
+  const shown = offeredServices(bookable, chairDoc?.serviceIds ?? null);
+  const picked = serviceIds.filter((id) => shown.some((s) => s.id === id));
+  // Prices are the chosen barber's own. With first available they are the lowest among the chairs
+  // that take online bookings, as the public page prints them; the server prices the booking for
+  // the chair it assigns, so the real total can only be higher than a "from" figure.
+  const pool = chairs.filter((c) => c.acceptsOnlineBooking && c.showOnWebsite);
+  const priceOf = (s: (typeof shown)[number]) =>
+    chairDoc ? resolveServiceForStaff(s, chairDoc) : menuPrice(s, pool);
+  const quote = (() => {
+    const chosen = shown.filter((s) => picked.includes(s.id));
+    if (chosen.length === 0) return null;
+    return chairDoc ? quoteForStaff(chosen, chairDoc) : quoteFirstAvailable(chosen, pool);
+  })();
 
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
@@ -93,7 +113,7 @@ export function NewBookingPanel({
         headers: { 'Idempotency-Key': key },
         body: {
           source,
-          serviceIds,
+          serviceIds: picked,
           staff: selectedChair,
           ...(startAt ? { startAt } : {}),
           customer: { name, phone, email: email.trim() ? email.trim() : null },
@@ -146,11 +166,16 @@ export function NewBookingPanel({
 
       <fieldset className="exq-fieldset">
         <legend>Services</legend>
-        {bookable.map((s) => (
+        {shown.length === 0 ? (
+          <p className="exq-muted">
+            {chairDoc?.name} has no services yet. Add some under Team, Services.
+          </p>
+        ) : null}
+        {shown.map((s) => (
           <Checkbox
             key={s.id}
             label={s.name}
-            hint={`${s.durationMinutes} min, ${s.priceFrom ? 'from ' : ''}${money(s.priceCents)}`}
+            hint={`${priceOf(s).durationMinutes} min, ${priceOf(s).priceFrom ? 'from ' : ''}${money(priceOf(s).priceCents)}`}
             checked={serviceIds.includes(s.id)}
             onChange={(e) => {
               setServiceIds((prev) =>
@@ -159,7 +184,12 @@ export function NewBookingPanel({
             }}
           />
         ))}
-        {serviceIds.length > 0 ? <p className="exq-muted">Total {money(total)}</p> : null}
+        {quote ? (
+          <p className="exq-muted">
+            Total {quote.from ? 'from ' : ''}
+            {money(quote.totalCents)}, {quote.totalMinutes} min
+          </p>
+        ) : null}
       </fieldset>
 
       <Select
@@ -292,7 +322,7 @@ export function NewBookingPanel({
           </Chips>
         </div>
       ) : null}
-      <Button type="submit" loading={working} disabled={serviceIds.length === 0}>
+      <Button type="submit" loading={working} disabled={picked.length === 0}>
         {source === 'phone' ? 'Book it' : 'Add walk-in'}
       </Button>
     </form>

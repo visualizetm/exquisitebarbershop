@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { ConflictAction, ConflictResolution } from '@shared/api/admin';
 import { Button, Select } from '@/components/ui';
-import { firstNameLastInitial, shopDateTime } from '../format';
+import { firstNameLastInitial, money, shopDateTime } from '../format';
 import type { AffectedBooking } from '../useConflictAction';
+import { optionLabel, type MoveOption } from './moveOption';
 
 const LABEL: Record<ConflictAction, string> = {
   move: 'Move',
@@ -11,7 +12,7 @@ const LABEL: Record<ConflictAction, string> = {
   cancelAndNotify: 'Cancel and notify',
 };
 const HELP: Record<ConflictAction, string> = {
-  move: 'Another chair takes it at the same time.',
+  move: "Another chair takes it at the same time, at that chair's price and time.",
   keep: 'It stays where it is, as an exception.',
   cancel: 'Cancel it. The customer is not emailed.',
   cancelAndNotify: 'Cancel it and email the customer.',
@@ -27,7 +28,8 @@ interface Choice {
  * outside working time. Nothing has been applied yet. Every booking needs exactly one choice
  * (Move, Keep, Cancel or Cancel and notify); the count says how many are decided and the change
  * can be applied only when all are. Move offers only the chairs the server says are free for the
- * whole booking and do its services.
+ * whole booking and do its services, each with what the booking costs and takes with that chair:
+ * a move takes the new chair's price and time, and the client is emailed the change.
  */
 export function Resolver({
   affected,
@@ -106,7 +108,11 @@ export function Resolver({
                   <strong>{shopDateTime(b.startAt)}</strong>, {firstNameLastInitial(b.customerName)}{' '}
                   with {b.staffName}
                   <span className="exq-resolver__meta">
-                    {b.services.join(', ')} ({b.referenceCode})
+                    {b.services.join(', ')}
+                    {b.totalPriceCents !== undefined
+                      ? `, ${money(b.totalPriceCents)}, ${String(b.durationMinutes ?? 0)} min`
+                      : ''}{' '}
+                    ({b.referenceCode})
                   </span>
                 </legend>
                 <div className="exq-resolver__choices">
@@ -145,22 +151,28 @@ export function Resolver({
                   })}
                 </div>
                 {choice?.action === 'move' ? (
-                  <Select
-                    label="Move to"
-                    value={choice.toStaffId ?? ''}
-                    onChange={(e) => {
-                      setChoices((prev) => ({
-                        ...prev,
-                        [b.bookingId]: { action: 'move', toStaffId: e.target.value },
-                      }));
-                    }}
-                  >
-                    {(b.moveOptions ?? []).map((o) => (
-                      <option key={o.staffId} value={o.staffId}>
-                        {o.staffName}
-                      </option>
-                    ))}
-                  </Select>
+                  <>
+                    <Select
+                      label="Move to"
+                      value={choice.toStaffId ?? ''}
+                      onChange={(e) => {
+                        setChoices((prev) => ({
+                          ...prev,
+                          [b.bookingId]: { action: 'move', toStaffId: e.target.value },
+                        }));
+                      }}
+                    >
+                      {(b.moveOptions ?? []).map((o) => (
+                        <option key={o.staffId} value={o.staffId}>
+                          {optionLabel(b, o)}
+                        </option>
+                      ))}
+                    </Select>
+                    <MoveNote
+                      booking={b}
+                      option={b.moveOptions?.find((o) => o.staffId === choice.toStaffId)}
+                    />
+                  </>
                 ) : null}
               </fieldset>
             </li>
@@ -176,5 +188,36 @@ export function Resolver({
         </Button>
       </div>
     </section>
+  );
+}
+
+/** What the move changes, before the owner applies it. */
+function MoveNote({
+  booking,
+  option,
+}: {
+  booking: AffectedBooking;
+  option: MoveOption | undefined;
+}) {
+  if (!option) return null;
+  const was =
+    booking.totalPriceCents === undefined
+      ? ''
+      : ` (now ${money(booking.totalPriceCents)}, ${String(booking.durationMinutes ?? 0)} min)`;
+  const changed =
+    option.totalPriceCents !== booking.totalPriceCents ||
+    option.durationMinutes !== booking.durationMinutes;
+  return (
+    <p
+      className="exq-resolver__move exq-muted"
+      data-state={changed ? 'changed' : 'same'}
+      aria-live="polite"
+    >
+      With {option.staffName}: {money(option.totalPriceCents)}, {String(option.durationMinutes)} min
+      {was}.{' '}
+      {booking.hasEmail
+        ? 'The client is emailed the new barber and price.'
+        : 'No email on file, so tell the client.'}
+    </p>
   );
 }

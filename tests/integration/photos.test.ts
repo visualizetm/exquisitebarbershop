@@ -23,8 +23,8 @@ import { NOW, useTestDb } from '../helpers/db';
 const { db } = useTestDb();
 let server: TestServer;
 let ownerCookie: string;
-const marcus = staffSeedId('marcus');
-const dee = staffSeedId('dee');
+const lee = staffSeedId('lee');
+const drew = staffSeedId('drew');
 
 /** A tiny valid-looking WebP payload; the server only checks size and type, never decodes. */
 const BYTES = Buffer.from('RIFF....WEBPVP8 ' + 'x'.repeat(200));
@@ -104,15 +104,15 @@ describe('upload limits and keys', () => {
   it('generates the key itself and ignores one sent by the client', async () => {
     const { res, issued } = await issue(ownerCookie, {
       kind: 'staff',
-      staffId: marcus,
+      staffId: lee,
       key: 'hero/evil.webp',
     });
     expect(res.status).toBe(200);
-    expect(issued?.key.startsWith(`staff/${marcus}/`)).toBe(true);
+    expect(issued?.key.startsWith(`staff/${lee}/`)).toBe(true);
     expect(photoKeySchema.safeParse(issued?.key).success).toBe(true);
     expect(issued?.method).toBe('PUT');
     expect(new Date(issued?.expiresAt ?? 0).getTime() - Date.now()).toBeLessThanOrEqual(5 * 60_000);
-    const hero = await issue(ownerCookie, { kind: 'hero', staffId: marcus });
+    const hero = await issue(ownerCookie, { kind: 'hero', staffId: lee });
     expect(hero.issued?.key.startsWith('hero/')).toBe(true);
   });
 });
@@ -229,11 +229,11 @@ describe('the local driver end to end', () => {
   it('uploads, publishes, edits, soft deletes and purges a staff photo', async () => {
     const { issued, photo } = await uploadAndConfirm(ownerCookie, {
       kind: 'staff',
-      staffId: marcus,
+      staffId: lee,
     });
     expect(photo).toMatchObject({
       kind: 'staff',
-      staffId: marcus,
+      staffId: lee,
       alt: 'A clean fade',
       width: 1600,
     });
@@ -248,7 +248,7 @@ describe('the local driver end to end', () => {
     const staff = publicStaffListResponseSchema.parse(
       (await call(server.baseUrl, 'GET', '/api/staff')).body,
     );
-    expect(staff.staff.find((s) => s.id === marcus)?.photo?.id).toBe(photo.id);
+    expect(staff.staff.find((s) => s.id === lee)?.photo?.id).toBe(photo.id);
 
     const edited = await owner('PATCH', `/api/admin/photos/${photo.id}`, {
       alt: 'Skin fade, side part',
@@ -259,7 +259,7 @@ describe('the local driver end to end', () => {
     expect((await owner('DELETE', `/api/admin/photos/${photo.id}`)).status).toBe(200);
     expect(existsSync(localPathFor(issued.key))).toBe(true);
     const list = adminPhotoListResponseSchema.parse(
-      (await owner('GET', `/api/admin/photos?kind=staff&staffId=${marcus}`)).body,
+      (await owner('GET', `/api/admin/photos?kind=staff&staffId=${lee}`)).body,
     );
     expect(list.photos.map((p) => p.id)).not.toContain(photo.id);
     expect(await purgeDeletedPhotos(new Date())).toBeGreaterThanOrEqual(1);
@@ -286,24 +286,24 @@ describe('the local driver end to end', () => {
     expect(shop.heroPhoto?.id).toBe(hero.id);
 
     for (let i = 0; i < 3; i += 1)
-      await uploadAndConfirm(ownerCookie, { kind: 'gallery', staffId: marcus }, `Marcus cut ${i}`);
-    await uploadAndConfirm(ownerCookie, { kind: 'gallery', staffId: dee }, 'Dee braids');
+      await uploadAndConfirm(ownerCookie, { kind: 'gallery', staffId: lee }, `Lee cut ${i}`);
+    await uploadAndConfirm(ownerCookie, { kind: 'gallery', staffId: drew }, 'Drew design');
     const page1 = galleryResponseSchema.parse(
       (await call(server.baseUrl, 'GET', '/api/gallery?limit=2')).body,
     );
     expect(page1.photos).toHaveLength(2);
     expect(page1.nextCursor).not.toBeNull();
-    expect(page1.counts.find((c) => c.staffId === marcus)?.count).toBe(3);
+    expect(page1.counts.find((c) => c.staffId === lee)?.count).toBe(3);
     const page2 = galleryResponseSchema.parse(
       (await call(server.baseUrl, 'GET', `/api/gallery?limit=2&cursor=${page1.nextCursor ?? ''}`))
         .body,
     );
     expect(page2.photos.map((p) => p.id)).not.toEqual(page1.photos.map((p) => p.id));
     const onlyDee = galleryResponseSchema.parse(
-      (await call(server.baseUrl, 'GET', '/api/gallery?staff=dee')).body,
+      (await call(server.baseUrl, 'GET', '/api/gallery?staff=drew')).body,
     );
     expect(onlyDee.photos).toHaveLength(1);
-    expect(onlyDee.photos[0]?.staff?.slug).toBe('dee');
+    expect(onlyDee.photos[0]?.staff?.slug).toBe('drew');
     expect((await call(server.baseUrl, 'GET', '/api/gallery?staff=nobody')).status).toBe(404);
   });
 });
@@ -312,11 +312,11 @@ describe('crediting a gallery photo to a barber', () => {
   it('lets the owner tag and untag the work, shows it in the barber filter, and refuses everything else', async () => {
     const { photo } = await uploadAndConfirm(ownerCookie, { kind: 'gallery' }, 'A skin fade');
     expect(photo.staffId).toBeNull();
-    const tagged = await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: dee });
+    const tagged = await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: drew });
     expect(tagged.status).toBe(200);
-    expect(adminPhotoResponseSchema.parse(tagged.body).photo.staffId).toBe(dee);
+    expect(adminPhotoResponseSchema.parse(tagged.body).photo.staffId).toBe(drew);
     const gallery = galleryResponseSchema.parse(
-      (await call(server.baseUrl, 'GET', '/api/gallery?staff=dee')).body,
+      (await call(server.baseUrl, 'GET', '/api/gallery?staff=drew')).body,
     );
     expect(gallery.photos.map((p) => p.id)).toContain(photo.id);
     const untagged = await owner('PATCH', `/api/admin/photos/${photo.id}`, { staffId: null });
@@ -327,14 +327,14 @@ describe('crediting a gallery photo to a barber', () => {
     ).toBe(404);
     const hero = await uploadAndConfirm(ownerCookie, { kind: 'hero' }, 'The shop');
     expect(
-      (await owner('PATCH', `/api/admin/photos/${hero.photo.id}`, { staffId: dee })).status,
+      (await owner('PATCH', `/api/admin/photos/${hero.photo.id}`, { staffId: drew })).status,
     ).toBe(403);
     // A barber's PIN session is not an owner session: the photo routes refuse it outright.
     expect(
       (
         await call(server.baseUrl, 'PATCH', `/api/admin/photos/${photo.id}`, {
-          headers: { cookie: await teamCookie(marcus) },
-          body: { staffId: dee },
+          headers: { cookie: await teamCookie(lee) },
+          body: { staffId: drew },
         })
       ).status,
     ).toBe(401);

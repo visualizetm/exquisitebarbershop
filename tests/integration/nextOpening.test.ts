@@ -35,11 +35,11 @@ const ALWAYS: WeekHours = {
   sat: [allDay],
   sun: [allDay],
 };
-const marcus = staffSeedId('marcus');
-const marcusSeed = staffSeed.find((s) => s.key === 'marcus')?.input ?? {
+const lee = staffSeedId('lee');
+const leeSeed = staffSeed.find((s) => s.key === 'lee')?.input ?? {
   serviceIds: [] as string[],
 };
-const dee = staffSeedId('dee');
+const drew = staffSeedId('drew');
 
 const next = async () =>
   nextOpeningsResponseSchema.parse(
@@ -49,7 +49,7 @@ const next = async () =>
 beforeAll(async () => {
   await runSeed(db(), NOW);
   await weeklyHoursRepo.setShopHours(ALWAYS, new Date());
-  for (const key of ['marcus', 'dee']) {
+  for (const key of ['lee', 'drew']) {
     await weeklyHoursRepo.setStaffHours(staffSeedId(key), ALWAYS, new Date());
   }
   server = await startTestServer();
@@ -65,14 +65,14 @@ describe('GET /api/availability/next', () => {
     expect(res.headers.get('cache-control')).toBe('public, max-age=30');
     const body = nextOpeningsResponseSchema.parse(res.body);
     expect(body.date).toBe(shopDateOf(new Date()));
-    expect(body.chairs.length).toBeGreaterThanOrEqual(6);
-    const m = body.chairs.find((c) => c.staff.id === marcus);
+    expect(body.chairs.length).toBeGreaterThanOrEqual(5);
+    const m = body.chairs.find((c) => c.staff.id === lee);
     expect(m?.status).toBe('in');
     expect(m?.nextOpen).not.toBeNull();
     expect(m?.nextOpenLabel).toMatch(/^(Tomorrow )?\d{1,2}:\d{2} [AP]M$/);
-    // The shortest service Marcus offers (ties broken by display order).
+    // The shortest service Lee offers (ties broken by display order).
     const offered = servicesSeed.filter((svc) =>
-      marcusSeed.serviceIds.includes(serviceSeedId(svc.key)),
+      leeSeed.serviceIds.includes(serviceSeedId(svc.key)),
     );
     const shortest = [...offered].sort(
       (a, b) =>
@@ -84,17 +84,17 @@ describe('GET /api/availability/next', () => {
 
   it("honours the owner's next-open service and reads off and closed days", async () => {
     await shopSettingsRepo.updateShopSettings(
-      { ...shopSettingsSeed, nextOpenServiceId: serviceSeedId('classic-cut') },
+      { ...shopSettingsSeed, nextOpenServiceId: serviceSeedId('haircut') },
       new Date(),
     );
-    expect((await next()).chairs.find((c) => c.staff.id === marcus)?.serviceId).toBe(
-      serviceSeedId('classic-cut'),
+    expect((await next()).chairs.find((c) => c.staff.id === lee)?.serviceId).toBe(
+      serviceSeedId('haircut'),
     );
     const today = shopDateOf(new Date());
     const bounds = shopDayBounds(today);
     await timeBlocksRepo.insertTimeBlock(
       {
-        staffId: dee,
+        staffId: drew,
         kind: 'dayOff',
         startAt: bounds.start,
         endAt: bounds.end,
@@ -104,15 +104,15 @@ describe('GET /api/availability/next', () => {
       new Date(),
     );
     const afterDayOff = await next();
-    expect(afterDayOff.chairs.find((c) => c.staff.id === dee)?.status).toBe('off');
-    expect(afterDayOff.chairs.find((c) => c.staff.id === marcus)?.status).toBe('in');
+    expect(afterDayOff.chairs.find((c) => c.staff.id === drew)?.status).toBe('off');
+    expect(afterDayOff.chairs.find((c) => c.staff.id === lee)?.status).toBe('in');
     await closuresRepo.upsertClosure(
       { date: today, kind: 'closed', intervals: [], label: 'Test' },
       new Date(),
     );
     const closed = await next();
     expect(closed.chairs.every((c) => c.status === 'closed')).toBe(true);
-    const m = closed.chairs.find((c) => c.staff.id === marcus);
+    const m = closed.chairs.find((c) => c.staff.id === lee);
     expect(m?.nextOpenLabel?.startsWith('Tomorrow ')).toBe(true);
     await db().collection('closures').deleteMany({});
   });
@@ -120,17 +120,17 @@ describe('GET /api/availability/next', () => {
 
 describe('GET /api/staff/:slug/openings', () => {
   it('returns the next starts in order, by alias too, and 404 for a stranger', async () => {
-    const res = await call(server.baseUrl, 'GET', '/api/staff/marcus/openings?count=3');
+    const res = await call(server.baseUrl, 'GET', '/api/staff/lee/openings?count=3');
     expect(res.status).toBe(200);
     const body = staffOpeningsResponseSchema.parse(res.body);
-    expect(body.staff.slug).toBe('marcus');
-    expect(body.service?.id).toBe(serviceSeedId('classic-cut'));
+    expect(body.staff.slug).toBe('lee');
+    expect(body.service?.id).toBe(serviceSeedId('haircut'));
     expect(body.openings).toHaveLength(3);
     const times = body.openings.map((o) => new Date(o.startAt).getTime());
     expect([...times].sort((a, b) => a - b)).toEqual(times);
     expect(body.openings[0]?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect((await call(server.baseUrl, 'GET', '/api/staff/nobody/openings')).status).toBe(404);
-    expect((await call(server.baseUrl, 'GET', '/api/staff/marcus/openings?count=99')).status).toBe(
+    expect((await call(server.baseUrl, 'GET', '/api/staff/lee/openings?count=99')).status).toBe(
       400,
     );
   });
@@ -142,7 +142,7 @@ describe('GET /api/staff/:slug/openings', () => {
         await call(
           server.baseUrl,
           'GET',
-          `/api/availability/days?serviceIds=${serviceSeedId('classic-cut')}&staff=marcus&from=${from}&to=${from}`,
+          `/api/availability/days?serviceIds=${serviceSeedId('haircut')}&staff=lee&from=${from}&to=${from}`,
         )
       ).body,
     );

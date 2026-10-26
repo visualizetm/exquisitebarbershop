@@ -6,11 +6,18 @@ import type {
   ConflictOutcome,
   ConflictResolution,
   OutboxMessageView,
+  ReviewsRequest,
 } from '../../shared/api/admin';
+import { pruneServicePrices } from '../../shared/lib/servicePricing';
 import { shopDayBounds } from '../../shared/lib/time';
 import type { EmailOutboxDocument } from '../../shared/schemas/emailOutbox';
 import type { ServiceDocument, ServiceInput, ServiceUpdate } from '../../shared/schemas/service';
-import type { ShopSettingsInput } from '../../shared/schemas/shopSettings';
+import type {
+  GoogleSettings,
+  ReviewsSettings,
+  ShopSettingsInput,
+  ShopSettingsUpdate,
+} from '../../shared/schemas/shopSettings';
 import type { StaffDocument, StaffInput, StaffUpdate } from '../../shared/schemas/staff';
 import { withTransaction } from '../db/transaction';
 import type { Principal } from '../http/types';
@@ -160,6 +167,8 @@ export function toStaffView(s: StaffDocument): AdminStaffView {
     bio: s.bio,
     chairNumber: s.chairNumber,
     serviceIds: s.serviceIds,
+    // Read with a default: staff documents written before per person prices have no field.
+    servicePrices: s.servicePrices ?? [],
     photoUrl: s.photoUrl,
     instagramHandle: s.instagramHandle,
     sortOrder: s.sortOrder,
@@ -186,6 +195,11 @@ export async function createStaff(principal: Principal, input: StaffInput, meta:
 /**
  * Updates a chair. Dropping a service the chair has upcoming bookings for goes
  * through the conflict rule; other edits never leave a booking stranded.
+ *
+ * Prices follow the menu: a request that changes only the services drops the prices of any service
+ * it removes, and a request that changes the prices is checked against the menu the chair will
+ * have afterwards (one price per service, only for services it offers). Bookings already made keep
+ * the price they were booked with.
  */
 export async function updateStaff(
   principal: Principal,
@@ -193,9 +207,17 @@ export async function updateStaff(
   input: Omit<StaffUpdate, 'slug'> & { resolutions?: Resolutions },
   meta: ServiceMeta,
 ): Promise<Changed<{ staff: AdminStaffView } & ConflictOutcome>> {
-  const { resolutions, ...patch } = input;
+  const { resolutions, ...requested } = input;
   const before = await staffRepo.findStaffById(id);
   if (!before || before.deletedAt) throw new AppError('NOT_FOUND', 'Staff member was not found');
+  const patch: typeof requested = { ...requested };
+  const beforePrices = before.servicePrices ?? [];
+  if (patch.servicePrices !== undefined) {
+    staffRepo.assertPricesMatchMenu(patch.serviceIds ?? before.serviceIds, patch.servicePrices);
+  } else if (patch.serviceIds) {
+    const kept = pruneServicePrices(patch.serviceIds, beforePrices);
+    if (kept.length !== beforePrices.length) patch.servicePrices = kept;
+  }
   const removed = patch.serviceIds
     ? before.serviceIds.filter((s) => !patch.serviceIds?.includes(s))
     : [];
@@ -218,6 +240,21 @@ export async function updateStaff(
         (b) => b.staffId === id && b.services.some((s) => removed.includes(s.serviceId)),
       ),
   });
+  const afterPrices = change.result.servicePrices ?? [];
+  if (JSON.stringify(afterPrices) !== JSON.stringify(beforePrices)) {
+    // Prices get their own entry with both sides, so the log answers "who changed Drew's prices".
+    await audit(
+      principal,
+      {
+        action: 'staff.prices.update',
+        entityType: 'staff',
+        entityId: id,
+        before: { servicePrices: beforePrices },
+        after: { servicePrices: afterPrices },
+      },
+      meta,
+    );
+  }
   return {
     body: {
       staff: toStaffView(change.result),
@@ -306,13 +343,15 @@ export async function getSettings(): Promise<{ settings: ShopSettingsInput }> {
 
 export async function putSettings(
   principal: Principal,
-  input: ShopSettingsInput,
+  input: ShopSettingsUpdate,
   meta: ServiceMeta,
 ) {
   const before = await getSettings();
   await withTransaction(async (session) => {
     await shopSettingsRepo.updateShopSettings(input, meta.now, { session });
   });
+  // The audit records what is stored now, which keeps any group the save left out.
+  const after = await getSettings();
   await audit(
     principal,
     {
@@ -320,7 +359,74 @@ export async function putSettings(
       entityType: 'shopSettings',
       entityId: 'shop',
       before: before.settings,
-      after: input,
+      after: after.settings,
+    },
+    meta,
+  );
+  return after;
+}
+
+/** What the audit log keeps of a Reviews save: the switch, the rating and each review's place. */
+function reviewsAuditView(reviews: ReviewsSettings, google: GoogleSettings) {
+  return {
+    enabled: reviews.enabled,
+    google: {
+      rating: google.rating,
+      reviewCount: google.reviewCount,
+      ratingCheckedOn: google.ratingCheckedOn,
+    },
+    items: reviews.items.map((r) => ({
+      id: r.id,
+      name: r.name,
+      show: r.show,
+      sortOrder: r.sortOrder,
+    })),
+  };
+}
+
+/**
+ * Website, Reviews: show or hide each review, put them in order, switch the section, and copy the
+ * Google rating in. The list must name every stored review exactly once; text, names and stars are
+ * never taken from the request, so nothing typed in the dashboard can reach a quote.
+ */
+export async function putReviews(principal: Principal, input: ReviewsRequest, meta: ServiceMeta) {
+  const { before, after } = await withTransaction(async (session) => {
+    const stored = await shopSettingsRepo.requireShopSettings({ session });
+    let items = stored.reviews.items;
+    if (input.items) {
+      const byId = new Map(items.map((r) => [r.id, r]));
+      const sameSet =
+        input.items.length === items.length && input.items.every((i) => byId.has(i.id));
+      if (!sameSet) {
+        throw new AppError(
+          'CONFLICT',
+          'The reviews changed since this page was opened. Reload the page and try again.',
+        );
+      }
+      // The position in the list is the order on the site, 10 apart like the service menu.
+      items = input.items.flatMap((entry, index) => {
+        const review = byId.get(entry.id);
+        return review ? [{ ...review, show: entry.show, sortOrder: index * 10 }] : [];
+      });
+    }
+    const updated = await shopSettingsRepo.updateReviewSettings(
+      {
+        reviews: { enabled: input.enabled ?? stored.reviews.enabled, items },
+        google: input.google ? { ...stored.google, ...input.google } : stored.google,
+      },
+      meta.now,
+      { session },
+    );
+    return { before: stored, after: updated };
+  });
+  await audit(
+    principal,
+    {
+      action: 'settings.reviews.update',
+      entityType: 'shopSettings',
+      entityId: 'shop',
+      before: reviewsAuditView(before.reviews, before.google),
+      after: reviewsAuditView(after.reviews, after.google),
     },
     meta,
   );

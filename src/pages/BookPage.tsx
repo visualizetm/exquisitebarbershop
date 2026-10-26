@@ -30,6 +30,8 @@ import { StaffPicker } from '@/components/booking/StaffPicker';
 import { StepHeading } from '@/components/booking/StepHeading';
 import { TimePicker } from '@/components/booking/TimePicker';
 import { ApiRequestError, apiRequest } from '@/lib/api';
+import { qualifiedStaff } from '@/lib/booking/helpers';
+import { bookingQuote, chairServices, menuServices } from '@/lib/menuPrices';
 import {
   clearIdempotencyKey,
   idempotencyKeyFor,
@@ -185,7 +187,15 @@ export function BookPage() {
   // An alias slug on a printed card resolves to the current slug and the address is corrected.
   useEffect(() => {
     if (staff.status !== 'ready' || !selection.staff || selection.staff === 'any') return;
-    if (staff.data.staff.some((s) => s.slug === selection.staff)) return;
+    const listed = staff.data.staff.find((s) => s.slug === selection.staff);
+    if (listed) {
+      // Someone who takes no online bookings (Iniya), or has nothing on the menu yet, cannot be
+      // picked here: book with anyone free.
+      if (!listed.acceptsOnlineBooking || listed.serviceIds.length === 0) {
+        setParams(writeSelection({ ...selection, staff: 'any' }), { replace: true });
+      }
+      return;
+    }
     const requested = selection.staff;
     apiRequest(`/api/staff/${encodeURIComponent(requested)}`, publicStaffResponseSchema)
       .then((result) => {
@@ -215,9 +225,36 @@ export function BookPage() {
   }
 
   const allServices = services.data.services;
-  const chosenServices = selection.serviceIds
+  // A chair chosen already (a printed card, a Book button on its page) only does its own menu, and
+  // another chair's service would end on an empty calendar. So its menu is all that is listed.
+  const preselected =
+    selection.staff && selection.staff !== 'any'
+      ? staff.data.staff.find((s) => s.slug === selection.staff)
+      : undefined;
+  const chairMenu =
+    preselected?.acceptsOnlineBooking && preselected.serviceIds.length > 0
+      ? preselected.serviceIds
+      : null;
+  // Every price on this page is the chosen chair's own, or with first available the lowest among
+  // the chairs that could be assigned ("From $x"). The booking itself is priced by the server for
+  // the chair it assigns, so the confirmation shows the final figure.
+  const pickedServices = selection.serviceIds
     .map((id) => allServices.find((s) => s.id === id))
     .filter((s) => s !== undefined);
+  const chosenChair =
+    selection.staff && selection.staff !== 'any'
+      ? (staff.data.staff.find((s) => s.slug === selection.staff) ?? null)
+      : null;
+  const bookable = staff.data.staff.filter((s) => s.acceptsOnlineBooking);
+  const { services: chosenServices, quote } = bookingQuote(
+    pickedServices,
+    chosenChair,
+    qualifiedStaff(staff.data.staff, selection.serviceIds),
+  );
+  const pickerServices =
+    chairMenu && preselected
+      ? chairServices(allServices, preselected)
+      : menuServices(allServices, bookable);
   const chosenStaff =
     selection.staff === 'any'
       ? 'Anyone available'
@@ -343,7 +380,17 @@ export function BookPage() {
       case 'services':
         return (
           <ServicePicker
-            services={allServices}
+            services={pickerServices}
+            totals={
+              quote
+                ? { cents: quote.totalCents, minutes: quote.totalMinutes, from: quote.from }
+                : undefined
+            }
+            chairName={chairMenu ? preselected?.name : undefined}
+            onShowAll={() => {
+              // Any chair: the services stay chosen and the calendar then looks at every chair.
+              update({ staff: 'any' }, 'services');
+            }}
             selected={selection.serviceIds}
             max={shop.data.booking.maxServicesPerBooking}
             onChange={(ids) => {
@@ -360,6 +407,7 @@ export function BookPage() {
           <StaffPicker
             staff={staff.data.staff}
             serviceIds={selection.serviceIds}
+            services={pickedServices}
             selected={selection.staff}
             allowFirstAvailable={shop.data.booking.allowFirstAvailable}
             onChange={(selector) => {

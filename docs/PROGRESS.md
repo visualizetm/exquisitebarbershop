@@ -445,3 +445,180 @@ commit, and what is still open.
 - Captures: `tests/e2e/p11-capture.ts` (`milestones`, `guide`, `m6`, `recordings`); montages per milestone in
   `docs/screens/p11/m*/`; recordings in `docs/screens/p11/recordings/`.
 - Tests: `tests/e2e/chrome.spec.ts`, `outage.spec.ts`, the demo notice suite in `tests/e2e/demo/demo.spec.ts`.
+
+## Prompt 12
+
+### M1: shop facts, hours, the team and the Iniya rules
+
+- Shipped: the real address (Suite F), phone, hours (closed Monday, 10:00 to 19:00 Tuesday to Sunday),
+  announcement and Google block in `seed/shop.ts`; the five real people with their own menus and hours; the
+  15 real services (shop prices, no per barber overrides yet); `settings.google` (zod, backfilled for old
+  documents, served on `/api/shop`); `shared/lib/google.ts` (Maps and write-a-review links, used by every
+  Directions button); `shared/lib/email.ts` (the placeholder email never reaches a public page, the JSON-LD
+  or the calendar file); the JSON-LD with the phone, Suite F, hours and the Instagram page and no rating.
+- Iniya: the card says "Book through Instagram" and opens her Instagram (Home) or her page (Chairs); her page
+  has the same button and no Book button; `/book?barber=iniya` moves to anyone available; first available,
+  the picker and availability already skipped her and now have tests that prove it; her page stays in the
+  sitemap. The barber walk-in form and the owner's New booking panel list only the services the chosen chair
+  offers, because the menus are no longer the same for everyone.
+- Tests: the old barbers (marcus, dee, tre, jay, kris), services and fake phone were migrated across the
+  integration, unit and end to end suites, `scripts/` and the Kit; new `tests/integration/realShop.test.ts`,
+  `tests/unit/google.test.ts`, `tests/unit/offlineBooking.test.ts`, `tests/e2e/realshop.spec.ts`; the demo
+  spec expects the five real names.
+- Review fix-up: the public booking flow lists only the preselected chair's services (with a "See every
+  service" button), the calendar download carries Suite F, a settings save without `google` keeps the stored
+  value, Iniya's page snippet no longer promises openings, the new-tab links say so to screen readers, and the
+  hollow Iniya flag test now has hours and a menu so it fails if the flag is ignored. New tests:
+  `tests/unit/offeredServices.test.ts`, `chairDescription` and `addressLine` unit cases, the settings and Iniya
+  integration cases, and a "a chair only lists the services it does" group in `tests/e2e/realshop.spec.ts`
+  (public flow, owner New booking panel, barber walk-in form). Decisions D12-20 to D12-25. The owner guide PDF
+  is re-rendered in milestone 5.
+
+### M2: per barber prices
+
+- Shipped: `staff.servicePrices` (optional `{serviceId, priceCents, durationMinutes?}` list, zod in `shared`,
+  validated on the staff create and update routes); `shared/lib/servicePricing.ts`, the one helper behind every
+  price (chosen or assigned barber, first available as a "from" price, several services, the price list); the
+  seed overrides for Dontrise, Drew and Nelly from the menus.
+- Server: the availability engine quotes per chair (a chair's own time decides which starts it gets and where its
+  slot ends), booking create, walk-in and phone bookings store the assigned chair's price, lines and minutes,
+  reschedule keeps them on the same chair and re-resolves on a move to another chair, next openings and a chair's
+  openings use the chair's own times, `/api/staff` carries the prices, and `staff.prices.update` is audited with
+  both sides. Emails, the ticket, the manage page, the admin views and the team portal read the stored snapshot.
+- Client: `/services` and the Home menu show "From $x" where barbers differ, a chair page shows that person's
+  prices and minutes, the booking steps price the chosen chair (or the lowest total for first available) and the
+  barber step shows each person's total, the owner New booking panel and the barber walk-in form price per chair,
+  and Team has a Prices tab (`PriceOverrideEditor`, also in `/kit` and `DESIGN-SYSTEM.md` with its states).
+- Tests: `tests/unit/servicePricing.test.ts`, `staffPrices.test.ts`, per chair cases in `availability.test.ts`,
+  `tests/integration/barberPrices.test.ts` (override price and time on the booking, emails, admin and manage
+  views, first available, reschedule, validation, owner only), `tests/e2e/prices.spec.ts`; the Prices tab is in
+  the Team axe run and `/kit` lists the new section. Decisions D12-26 to D12-40.
+
+### M3: seed photos
+
+- Shipped: `server/services/seedPhotos.ts` loads `seed/photos/manifest.json` (or SEED_PHOTOS_DIR) through the
+  active storage driver as normal photo records (kind, alt, sortOrder and the new optional `home` flag from the
+  manifest, no chair, width and height from the WebP header via `server/lib/webpSize.ts`, no new dependency). It
+  is idempotent (`_id = seedId('photo', file)`; an existing record, even a deleted one, is kept, and the hero
+  only fills an empty slot), skips missing files with one warning that names them, and never throws for a
+  missing file, manifest or storage. Object keys come from the database, the file and its bytes. Server writes
+  go through `storePhotoBytes` (shared with photos:migrate; Cloudinary gets the signed form).
+- Hooks: bootstrap's demo branch runs it, so the first visit setup and Demo data, Reset both load the photos;
+  `npm run photos:seed` (`scripts/photos-seed.ts`) does it for a real launch. DEPLOY.md section 11 says how,
+  and that the live showcase needs a Reset after deploy.
+- Bundle: `vercel.json` `includeFiles` is `{server/bundle/**,seed/photos/**}`; the loader reads the folder at
+  run time. `test:vercel-function` copies the `includeFiles` set into the nft shape, reads Vercel's
+  `filePathMap` for the `vercel build` shape (that is where `vercel build` lists included files), and proves
+  in both that setup serves `exq-01-hero.webp` byte for byte and seeds every delivered gallery photo.
+- Placements: the hero with a photo is an ink band; on phones and tablets the photo fills it behind
+  `--scrim-photo` (new token, contrast worked out in DESIGN-SYSTEM.md) and the small labels turn white; from
+  1024px it sits in its own column. The hero photo lost its reveal wrapper (LCP). Home "the work" asks
+  `/api/gallery?home=true` (marked photos first) and shows six, or one row of three with three to five, or
+  nothing under three. A chair page shows its credited work, else up to three shop photos labeled "From the
+  shop", else nothing. Gallery chips already hide while nobody is credited. Crops: hero `85% 30%`, tiles
+  `50% 35%` (checked on a contact sheet of all 15 photos). Visit has no storefront slot (open item).
+- Photos: the milestone started with 3 of 16; the lead added the rest during it (a83d278) and dropped
+  exq-15 (b25a294), so all 15 manifest photos load now and Home shows the six marked photos.
+- Tests: `tests/unit/webpSize.test.ts`, `tests/unit/workPhotos.test.ts`, `tests/integration/seedPhotos.test.ts`
+  (stores, sizes, idempotent, keeps deleted and owner heroes, picks up a new file, one warning, never throws,
+  the public API in manifest and Home order), demo setup and reset cases in `tests/integration/demo.test.ts`
+  (fixture folder), and the demo e2e now reads the manifest for what to expect (not run in this milestone).
+  Full vitest 579 passed; build and `test:vercel-function` (97 passed) green. Decisions D12-41 to D12-55.
+- Known gaps for milestone 5: no screenshots yet of the new hero, Home work and chair strips (Rob's rule: no
+  Playwright until milestone 5); Website, Home photo still previews the phone hero as a 4:5 frame while phones
+  now show the photo behind the text; the owner cannot change the Home pick in the dashboard yet.
+
+### M4: reviews
+
+- Shipped: `settings.reviews` (`{ enabled, items }`, zod in `shared/schemas/shopSettings.ts`: at most 30,
+  text up to 600, stars 1 to 5, source google or thecut, optional YYYY-MM-DD date, `staffId`, show, sort
+  order), backfilled as empty for older documents; `shared/lib/reviews.ts` (which reviews show, a chair's
+  three, the month label, the "4.7 on Google from 15 reviews" line). The seed holds the 18 real reviews word
+  for word from `reviews_for_site` (Google without Wesley T., Lamont I. short, Dontrise's three on his chair,
+  Drew's five and Nelly's four from theCut with no date), all shown, Home's three first.
+- Server: `PUT /api/admin/reviews` (owner only, strict: show, hide and order every stored review, the
+  section switch, and the Google rating, count and date; no text, no new review, no place id), one
+  transaction, audit `settings.reviews.update`. `PUT /api/admin/settings` strips `reviews`, so a save that
+  omits them keeps them and one that carries them changes nothing. `/api/shop` serves only the shown
+  reviews, none while the section is off.
+- Client: Home "What clients say" after the work (the rating line with "Read them on Google" and "Leave a
+  review", then the first three shown: Unique D., Ricardo E., Routine Life Fitness); a chair page shows up to
+  three of its own under the menu; both hide when nothing would show. New `Stars`, `RatingLine`, `ReviewCard`
+  and `ReviewList` (`src/components/site`) and `ReviewsEditor` with the Website, Reviews tab
+  (`ReviewsPanel`): loading, error and empty states, a toast on every save. All in `/kit` (section "Reviews")
+  and `DESIGN-SYSTEM.md`. JSON-LD still has no rating markup.
+- Tests: `tests/unit/reviews.test.ts` (schema limits, stars, sources, text length, date format, the strict
+  request, which reviews show), `tests/integration/reviews.test.ts` (seeded content equals the data file,
+  the public API sends only shown reviews, show, hide, reorder and the rating through the route, validation
+  and conflict errors change nothing, owner only, the audit entry, the settings save keeps the reviews),
+  the route in `authz.test.ts`, and the JSON-LD test now passes reviews in. `tests/e2e/kit.spec.ts` lists the
+  new section (not run: no Playwright in this milestone). Decisions D12-56 to D12-66.
+- Open for Dontrise: permission to use the reviews, and whether "Mike" in two of Nelly's reviews is fine.
+
+### M5: copy sweep, guides and docs (part A)
+
+- Copy sweep over `src`, `server` (with the email templates), `shared`, `seed`, `scripts`, `tests/helpers` and
+  the living docs: no old stand-in phone, no personal number, no made up barber names, no em dashes, no emoji in
+  code or copy. Two written-in numbers fixed: the Visit page's "2 hours" and the manage page's "1 hours" now
+  read the cutoff setting through `src/lib/booking/policy.ts`. The copy rules unit test now covers `server`,
+  `scripts`, `tests/helpers` and the living docs, and fails on the old names and numbers in the copy and guides.
+- Gallery tab: crediting a photo and saving its alt text now show a toast, like every other save.
+- `docs/OWNER-GUIDE.md`: Team, Prices; Website, Reviews (show, hide, order, the switch); the Google rating
+  fields; crediting gallery photos to a barber; a "Check before the real launch" section listing every
+  PLACEHOLDER for Dontrise. `docs/OWNER-GUIDE.pdf` re-rendered with `scripts/guide-pdf.ts`, which now keeps
+  wrapped lines together and list numbers right. `docs/BARBER-GUIDE.md`: the walk-in list and photo credits.
+- `docs/ARCHITECTURE.md` (google and reviews settings, the pricing rule, the booking snapshot, the seed photo
+  id), `docs/DESIGN-SYSTEM.md` (ReviewsPanel, photo rules), `docs/DEPLOY.md` section 11 (what the seed holds,
+  Reset after deploy, Cloudinary for a real launch), `docs/SITE-REPORT.md` (prompt 12 additions, open items).
+- `/kit`: ReviewsPanel's loading and error states (`ReviewsPanelState`) join the Reviews block;
+  `tests/e2e/kit.spec.ts` checks the states of RatingLine, ReviewCard, PriceOverrideEditor, ReviewsEditor and
+  ReviewsPanel, and finds kit blocks by class (not run: Playwright waits for the milestone 5 captures).
+- Tests: new `tests/unit/bookingPolicy.test.ts`; `copyRules.test.ts` and `pii.test.ts` updated. Full vitest
+  613 passed in 82 files; typecheck, lint, build and format:check green. Decisions D12-67 to D12-74.
+- Left for part B: screenshots at 390 and 1280, Lighthouse and axe, recapturing the owner guide screens (they
+  still show the sample barbers from prompt 11) and re-rendering the PDF, and the report.
+
+### M5: screenshots, axe and Lighthouse (part B)
+
+- Screens: `tests/e2e/p12-capture.ts` (demo build on 4176 after Demo data, Reset; reads only) saved Home, Gallery,
+  Services, Drew, Iniya and Visit at 390 and 1280 in light and dark (first screen `-top` and full page), the
+  owner's Website, Reviews, Home photo and Gallery tabs and Team, Prices (Drew) at 390 and 1280, and montages,
+  in `docs/screens/p12/`. Real state only: all 15 photos are delivered, so no fixture set (D12-75).
+- Fixed from the screenshots: the hero title and info values were ink on the ink photo band in the light theme
+  at every width (D12-76); the Website, Gallery tab scrolled sideways at 1280 because the row tooltips carried
+  the full alt text (`IconButton` `tip`, D12-77). No public page overflows at 390 or 1280.
+- Axe and the design rules: `tests/e2e/rules.spec.ts` adds Drew's and Iniya's pages and a "with the shop
+  photos" group (stubbed real photos, D12-78): axe at 390 and 1280 in light and dark, alt text and sizes, the
+  hero first screen with the photo and the colors over it. 17 passed in one run.
+- Lighthouse mobile once on the demo build with the photos: Home 81, Gallery 74, Drew 93, accessibility 100,
+  CLS 0 (D12-79, `docs/screens/p12/lighthouse.json`). Home and Gallery miss the 85 target because the GridFS
+  photos are served full size; not fixed here.
+- The red display line over the hero photo measures 3.99:1 at 390 (large text passes 3:1, the checklist asks
+  4.5:1); left for Rob (D12-80).
+- Not done in this part: the owner guide screens (still the prompt 11 sample barbers) and the report.
+
+### M6: review fixes (moves reprice, exact chair prices, hero red, settings, sitemap)
+
+- Moves reprice (Rob, D12-81): the resolver's Move prices the booking for the new chair with the shared
+  `quoteMove` and stores its lines, minutes, total, end time and locks over the new length in the same
+  transaction; a length that does not fit is not offered and fails cleanly. `moveOptions` carry each chair's
+  price and minutes ("Drew, $40" in the Move to list, a "With Drew: $40, 45 min (now $50, 75 min)" line
+  under it), the owner's Reschedule shows the price per barber too, and the customer is emailed the new
+  barber and price (link version up, like a reschedule).
+- Exact chair prices (Rob, D12-82): one person's price is never "From" (chair pages, a chosen barber in
+  booking, the ticket, emails, admin, Team, Services); "From" only on `/services`, the Home menu and first
+  available.
+- Hero red (Rob, D12-80): "Exquisite" was already #FF5470 (`--red-on-dark`) on the photo in both themes but
+  measured 3.99:1 at 390 and 3.67:1 at 768 on the real photo; `--scrim-photo` went from 80% to 87% ink, the
+  lightest step that passes: 4.75:1 at 390 and 4.51:1 at 768 (86% gives 4.34:1). Measured once on the demo
+  build with the title hidden (the milestone 5 method); `tests/unit/heroScrim.test.ts` and the rules spec
+  hold it. The `docs/screens/p12/` hero shots still show the 80% scrim (no p12 recapture, per Rob).
+- Review findings: a settings save no longer writes the Google block (D12-84); the sitemap skips chairs that
+  take no online bookings, Iniya included (D12-85); the placeholder email literal moved into `seed/shop.ts`
+  (D12-86). Rejected: the hidden barber walk-in claim (a hidden barber has no portal session, D12-87).
+  Deferred to the final step: the owner guide screens and PDF (Rob), the report. Lighthouse stays open (D12-83).
+- Tests: new `tests/unit/heroScrim.test.ts`, `menuPrices.test.ts`, `moveOption.test.ts`; four new resolver move
+  tests (prices on the options, override to shop price and back with cents, minutes, end, locks and the email,
+  a longer length that does not fit); the two tab Google test; the sitemap and email location tests. E2e
+  expectations updated for exact chair prices, the move option prices and the sitemap (not run here; the final
+  gate runs them).

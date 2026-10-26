@@ -21,6 +21,15 @@
   --info: #1f5fad;
   /* gray text on ink: 7.6:1 on --ink */
   --mute-on-dark: #a8a8a8;
+  /*
+   * The scrim between a photo and the text on it (the hero on phones and tablets). Red text on a
+   * photo or on ink is always --red-on-dark (#FF5470), never --red: the hero band is .exq-dark in
+   * both themes. 87% ink is the lightest scrim that keeps "Exquisite" at 4.5:1 over the shop's hero
+   * photo: the brightest pixel under the line measures 4.75:1 at 390 and 4.51:1 at 768 (86% gives
+   * 4.34:1 at 768). Over a pure white photo white text keeps 13.2:1, --line 9.4:1 and the red line
+   * 4.2:1 (large text, 3:1 needed). See D12-80.
+   */
+  --scrim-photo: color-mix(in srgb, var(--ink) 87%, transparent);
 
   --font: 'Jost Variable', 'Jost', system-ui, sans-serif;
 

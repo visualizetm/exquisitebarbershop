@@ -24,7 +24,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": "server/bundle/**",
+      "includeFiles": "{server/bundle/**,seed/photos/**}",
       "excludeFiles": ".data/**"
     }
   },

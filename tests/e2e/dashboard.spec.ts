@@ -56,7 +56,7 @@ test.describe('the owner dashboard shell', () => {
     page,
     context,
   }) => {
-    const { code, phone } = await bookPublicly(page, 'dee', { name: 'Zoë Searchable' });
+    const { code, phone } = await bookPublicly(page, 'drew', { name: 'Zoë Searchable' });
     await context.clearCookies();
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
@@ -99,7 +99,7 @@ test.describe('the owner dashboard shell', () => {
       page,
       context,
     }) => {
-      const { code } = await bookPublicly(page, 'tre', { name: 'Axe Customer' });
+      const { code } = await bookPublicly(page, 'nelly', { name: 'Axe Customer' });
       await context.clearCookies();
       await page.addInitScript((t) => {
         localStorage.setItem('exq-theme', t);
@@ -184,10 +184,10 @@ test.describe('the owner dashboard shell', () => {
     const before = Number((await walkIns.textContent()) ?? '0');
     await page.getByRole('button', { name: 'Walk-in' }).click();
     const panel = page.getByRole('dialog', { name: 'New booking' });
-    await panel.getByLabel(/Classic Cut/).check();
+    await panel.getByLabel(/^Haircut(?! and| with)/).check();
     // Any chair: an earlier run on the same server may already have one in the chair now.
     const chair =
-      ['Dontrise', 'Marcus', 'Dee', 'Tre', 'Jay', 'Kris'][Math.floor(Math.random() * 6)] ?? 'Kris';
+      ['Dontrise', 'Lee', 'Drew', 'Nelly Cutz'][Math.floor(Math.random() * 4)] ?? 'Dontrise';
     await panel.getByLabel('Barber').selectOption({ label: chair });
     await panel.getByLabel('Client name').fill('Walk In Visitor');
     await panel
@@ -201,14 +201,17 @@ test.describe('the owner dashboard shell', () => {
     await expect(page.locator('.exq-activity__item', { hasText: 'Walk In Visitor' })).toContainText(
       'Walk-in',
     );
-    // Now and next shows who is in Kris's chair, and opens the booking.
+    // Now and next shows who is in that chair, and opens the booking.
     await page
       .locator('.exq-activity__item', { hasText: 'Walk In Visitor' })
       .getByRole('button')
       .click();
-    await expect(
-      page.getByRole('dialog', { name: 'Booking' }).getByText('Walk In Visitor').first(),
-    ).toBeVisible();
+    const sheet = page.getByRole('dialog', { name: 'Booking' });
+    await expect(sheet.getByText('Walk In Visitor').first()).toBeVisible();
+    // Cancelled again, so the chair is free for the barber portal and team tests that follow.
+    await sheet.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await sheet.getByRole('button', { name: 'Cancel booking' }).click();
+    await expect(sheet.locator('.exq-status-chip[data-status="cancelled"]')).toBeVisible();
   });
 });
 
@@ -243,7 +246,7 @@ test.describe('the bookings page', () => {
     page,
     context,
   }) => {
-    await bookPublicly(page, 'jay', { name: 'Deep Link' });
+    await bookPublicly(page, 'nelly', { name: 'Deep Link' });
     await context.clearCookies();
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
@@ -268,7 +271,7 @@ test.describe('the bookings page', () => {
     page,
     context,
   }) => {
-    const { code } = await bookPublicly(page, 'kris', { name: 'Cancel Me' });
+    const { code } = await bookPublicly(page, 'drew', { name: 'Cancel Me' });
     await context.clearCookies();
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
@@ -329,7 +332,7 @@ test.describe('the announcement quick action', () => {
     } finally {
       // Put the original strip back, so the tests after this one see the same site.
       await page.getByRole('button', { name: 'Edit announcement' }).click();
-      await panel.getByLabel('Text').fill('Walk ins welcome');
+      await panel.getByLabel('Text').fill('Walk-ins welcome');
       await panel.getByLabel('Link label (optional)').fill('Book online');
       await panel.getByLabel('Link address').fill('/book');
       await panel.getByLabel('Last day it shows (optional)').fill('');

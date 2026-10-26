@@ -41,6 +41,11 @@ export const photoDocumentSchema = z.object({
   height: z.int().min(1).max(10_000),
   alt: z.string().trim().min(1).max(200),
   sortOrder: z.int().min(0),
+  /**
+   * Gallery photos the shop picked for the Home page ("the work"). Set by the seed photo loader
+   * from the manifest; photos without it still fill Home after the picked ones.
+   */
+  home: z.boolean().optional(),
   createdBy: actorSchema,
   createdAt: z.date(),
   /** Soft delete. The object is removed from storage afterwards (purgedAt). */

@@ -158,6 +158,7 @@ export function GalleryPanel() {
   async function patch(
     photo: AdminPhotoView,
     body: { alt?: string; sortOrder?: number; staffId?: string | null },
+    done: string,
   ) {
     setError(null);
     try {
@@ -166,6 +167,7 @@ export function GalleryPanel() {
         body,
       });
       setVersion((v) => v + 1);
+      toast({ text: done, tone: 'ok' });
     } catch (err) {
       setError(err);
     }
@@ -344,13 +346,14 @@ export function GalleryPanel() {
               <GalleryFields
                 photo={p}
                 chairs={chairs}
-                onSave={(body) => {
-                  void patch(p, body);
+                onSave={(body, done) => {
+                  void patch(p, body, done);
                 }}
               />
               <div className="exq-svc__actions">
                 <IconButton
                   label={`Move ${p.alt} up`}
+                  tip="Move up"
                   icon={<ArrowUp aria-hidden="true" />}
                   disabled={index === 0}
                   onClick={() => {
@@ -359,6 +362,7 @@ export function GalleryPanel() {
                 />
                 <IconButton
                   label={`Move ${p.alt} down`}
+                  tip="Move down"
                   icon={<ArrowDown aria-hidden="true" />}
                   disabled={index === shown.length - 1}
                   onClick={() => {
@@ -367,6 +371,7 @@ export function GalleryPanel() {
                 />
                 <IconButton
                   label={`Remove ${p.alt}`}
+                  tip="Remove"
                   icon={<Trash01 aria-hidden="true" />}
                   onClick={() => {
                     setRemoving(p);
@@ -418,7 +423,8 @@ function GalleryFields({
 }: {
   photo: AdminPhotoView;
   chairs: { id: string; name: string }[];
-  onSave: (body: { alt?: string; staffId?: string | null }) => void;
+  /** Saves one change; `done` is the line the toast shows once it is saved. */
+  onSave: (body: { alt?: string; staffId?: string | null }, done: string) => void;
 }) {
   const [alt, setAlt] = useState(photo.alt);
   return (
@@ -427,7 +433,8 @@ function GalleryFields({
         className="exq-gphoto__alt"
         onSubmit={(e) => {
           e.preventDefault();
-          if (alt.trim() && alt.trim() !== photo.alt) onSave({ alt: alt.trim() });
+          if (alt.trim() && alt.trim() !== photo.alt)
+            onSave({ alt: alt.trim() }, 'Alt text saved.');
         }}
       >
         <Input
@@ -452,7 +459,13 @@ function GalleryFields({
         label="Credit the work to"
         value={photo.staffId ?? ''}
         onChange={(e) => {
-          onSave({ staffId: e.target.value === '' ? null : e.target.value });
+          const name = chairs.find((c) => c.id === e.target.value)?.name;
+          onSave(
+            { staffId: e.target.value === '' ? null : e.target.value },
+            name
+              ? `Credited to ${name}. It now shows on ${name}'s page too.`
+              : 'Credit removed. The photo stays in the gallery.',
+          );
         }}
       >
         <option value="">Nobody in particular</option>

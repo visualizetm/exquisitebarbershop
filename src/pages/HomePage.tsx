@@ -5,8 +5,11 @@ import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import { galleryResponseSchema } from '@shared/api/photos';
 import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
+import { HOME_REVIEWS } from '@shared/lib/reviews';
 import { HoursTable } from '@/components/site/HoursTable';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
+import { RatingLine } from '@/components/site/RatingLine';
+import { ReviewList } from '@/components/site/ReviewCard';
 import { ServiceRows } from '@/components/site/ServiceRows';
 import { TodaysChairs } from '@/components/site/TodaysChairs';
 import {
@@ -20,11 +23,13 @@ import {
   Reveal,
   SectionHead,
 } from '@/components/ui';
+import { menuServices } from '@/lib/menuPrices';
+import { HOME_WORK_MAX, homeWork } from '@/lib/workPhotos';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
 import { hoursLabel } from '@/lib/hours';
-import { directionsUrl, todayKey } from '@/lib/shop';
+import { addressLine, directionsUrl, todayKey } from '@/lib/shop';
 
 export function HomePage() {
   const shop = useShop();
@@ -32,21 +37,30 @@ export function HomePage() {
     title: null,
     description:
       shop.status === 'ready'
-        ? `${shop.data.tagline}. Barbers and stylists under one roof at ${shop.data.address.line1}, ${shop.data.address.city}, ${shop.data.address.state}. Pick your chair and book online in under a minute.`
+        ? `${shop.data.tagline}. Barbers and stylists under one roof at ${addressLine(shop.data.address)}. Pick your chair and book online in under a minute.`
         : undefined,
   });
   const staff = useApi('/api/staff', publicStaffListResponseSchema);
   const services = useApi('/api/services', publicServicesResponseSchema);
-  const gallery = useApi('/api/gallery?limit=6', galleryResponseSchema);
+  // Home order: the photos the shop picked for Home first, then the rest of the gallery.
+  const gallery = useApi(
+    `/api/gallery?home=true&limit=${String(HOME_WORK_MAX)}`,
+    galleryResponseSchema,
+  );
+  const work = gallery.status === 'ready' ? homeWork(gallery.data.photos) : [];
   const data = shop.status === 'ready' ? shop.data : null;
   const hero = data?.heroPhoto ?? null;
   const today = data ? data.hours[todayKey()] : null;
   const where = data ? `${data.address.city} ${data.address.state}` : 'Brookhaven PA';
+  // The server sends only shown reviews, in the owner's order, and none while the section is off.
+  const reviews = (data?.reviews ?? []).slice(0, HOME_REVIEWS);
 
   return (
     <article className="exq-home" data-state={shop.status}>
+      {/* With a photo the hero is an ink band: on phones the photo fills it behind a scrim, from
+          1024px it sits in its own column. Without one the text stands alone on the page. */}
       <section
-        className="exq-hero exq-home__hero"
+        className={`exq-hero exq-home__hero${hero ? ' exq-dark' : ''}`}
         data-state={hero ? 'photo' : 'text'}
         aria-labelledby="exq-hero-title"
       >
@@ -100,20 +114,22 @@ export function HomePage() {
                 <dd>{data?.address.line1 ?? ''}</dd>
               </div>
               <div>
-                <dt>Walk ins</dt>
+                <dt>Walk-ins</dt>
                 <dd>Welcome</dd>
               </div>
             </dl>
           </div>
           {hero ? (
-            <Reveal kind="wipe" className="exq-hero__photo">
+            // The LCP image: eager, fetchpriority high, its own width and height, never hidden by
+            // a reveal.
+            <div className="exq-hero__photo">
               <PhotoFrame
                 photo={hero}
                 name="The shop"
                 priority
                 sizes="(min-width: 1024px) 480px, 100vw"
               />
-            </Reveal>
+            </div>
           ) : null}
         </div>
       </section>
@@ -136,8 +152,15 @@ export function HomePage() {
       <section className="exq-band exq-dark exq-home__services" aria-labelledby="exq-home-services">
         <div className="exq-wrap exq-section">
           <SectionHead label="The menu" title="Services" id="exq-home-services" />
-          {services.status === 'ready' ? (
-            <ServiceRows services={services.data.services} limit={5} showDescription />
+          {services.status === 'ready' && staff.status !== 'loading' ? (
+            <ServiceRows
+              services={menuServices(
+                services.data.services,
+                staff.status === 'ready' ? staff.data.staff : [],
+              )}
+              limit={5}
+              showDescription
+            />
           ) : services.status === 'error' ? (
             <ErrorState title="The menu did not load">Call the shop for prices.</ErrorState>
           ) : null}
@@ -149,14 +172,29 @@ export function HomePage() {
         </div>
       </section>
 
-      {gallery.status === 'ready' && gallery.data.photos.length > 0 ? (
-        <section className="exq-wrap exq-section exq-home__work" aria-labelledby="exq-home-work">
+      {work.length > 0 ? (
+        <section
+          className="exq-wrap exq-section exq-home__work"
+          aria-labelledby="exq-home-work"
+          data-count={String(work.length)}
+        >
           <SectionHead label="The work" title="Fresh from the chairs" id="exq-home-work">
             <Link className="exq-link-row" to="/gallery">
               See the gallery
             </Link>
           </SectionHead>
-          <PhotoGrid photos={gallery.data.photos} columns="work" />
+          <PhotoGrid photos={work} columns="work" />
+        </section>
+      ) : null}
+
+      {data && reviews.length > 0 ? (
+        <section
+          className="exq-wrap exq-section exq-home__reviews"
+          aria-labelledby="exq-home-reviews"
+        >
+          <SectionHead label="Reviews" title="What clients say" id="exq-home-reviews" />
+          {data.google ? <RatingLine google={data.google} shopName={data.name} /> : null}
+          <ReviewList reviews={reviews} />
         </section>
       ) : null}
 
@@ -175,7 +213,7 @@ export function HomePage() {
               </address>
               <p className="exq-visit__actions">
                 <ButtonAnchor
-                  href={directionsUrl(data.address)}
+                  href={directionsUrl(data)}
                   variant="outline"
                   target="_blank"
                   rel="noopener noreferrer"

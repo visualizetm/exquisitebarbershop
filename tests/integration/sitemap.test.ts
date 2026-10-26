@@ -27,18 +27,27 @@ describe('GET /sitemap.xml', () => {
     for (const path of ['/', '/services', '/chairs', '/gallery', '/visit', '/book']) {
       expect(xml).toContain(`<loc>http://localhost:5173${path}</loc>`);
     }
-    expect(xml).toContain('<loc>http://localhost:5173/chairs/marcus</loc>');
+    expect(xml).toContain('<loc>http://localhost:5173/chairs/lee</loc>');
     expect(xml).not.toContain('/admin');
     expect(xml).not.toContain('/manage');
   });
 
+  it('skips a chair that takes no online bookings (Iniya books on Instagram)', async () => {
+    const xml = String((await call(server.baseUrl, 'GET', '/api/sitemap.xml')).body.text);
+    expect(xml).not.toContain('/chairs/iniya<');
+    await staffRepo.updateStaff(staffSeedId('drew'), { acceptsOnlineBooking: false }, NOW);
+    const without = String((await call(server.baseUrl, 'GET', '/api/sitemap.xml')).body.text);
+    expect(without).not.toContain('/chairs/drew<');
+    await staffRepo.updateStaff(staffSeedId('drew'), { acceptsOnlineBooking: true }, NOW);
+  });
+
   it('drops a chair that is removed or hidden from the website', async () => {
-    await staffRepo.updateStaff(staffSeedId('marcus'), { showOnWebsite: false }, NOW);
-    await staffRepo.softDeleteStaff(staffSeedId('tre'), NOW);
+    await staffRepo.updateStaff(staffSeedId('lee'), { showOnWebsite: false }, NOW);
+    await staffRepo.softDeleteStaff(staffSeedId('nelly'), NOW);
     const res = await call(server.baseUrl, 'GET', '/api/sitemap.xml');
     const xml = String(res.body.text);
-    expect(xml).not.toContain('/chairs/marcus<');
-    expect(xml).not.toContain('/chairs/tre<');
-    expect(xml).toContain('/chairs/dee<');
+    expect(xml).not.toContain('/chairs/lee<');
+    expect(xml).not.toContain('/chairs/nelly<');
+    expect(xml).toContain('/chairs/drew<');
   });
 });

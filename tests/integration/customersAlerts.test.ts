@@ -30,10 +30,10 @@ let server: TestServer;
 let ownerCookie: string;
 let barberCookie: string;
 const THU = nextDate(4, 3);
-const marcus = staffSeedId('marcus');
-const tre = staffSeedId('tre');
-const dee = staffSeedId('dee');
-const cut = serviceSeedId('classic-cut');
+const lee = staffSeedId('lee');
+const nelly = staffSeedId('nelly');
+const drew = staffSeedId('drew');
+const cut = serviceSeedId('haircut');
 
 const asOwner = (method: string, path: string, body?: unknown) =>
   call(server.baseUrl, method, path, {
@@ -105,7 +105,7 @@ beforeAll(async () => {
   ownerCookie = await sessionCookie(
     (await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') }))._id,
   );
-  barberCookie = await teamCookie(marcus);
+  barberCookie = await teamCookie(lee);
 });
 afterAll(async () => {
   await server.close();
@@ -128,22 +128,22 @@ beforeEach(async () => {
 
 describe('the customer list', () => {
   it('groups bookings by phone with visits, no shows, last visit and the usual barber', async () => {
-    await seedBooking(marcus, '10:00', {
+    await seedBooking(lee, '10:00', {
       name: 'Sam Rivera',
       phone: '+12155550111',
       status: 'completed',
     });
-    await seedBooking(marcus, '11:00', {
+    await seedBooking(lee, '11:00', {
       name: 'Sam Rivera',
       phone: '+12155550111',
       status: 'completed',
     });
-    await seedBooking(tre, '12:00', {
+    await seedBooking(nelly, '12:00', {
       name: 'Sam Rivera',
       phone: '+12155550111',
       status: 'noShow',
     });
-    await seedBooking(dee, '10:00', { name: 'Lee Park', phone: '+12155550122' });
+    await seedBooking(drew, '10:00', { name: 'Pat Parker', phone: '+12155550122' });
 
     const list = customerListResponseSchema.parse(
       (await asOwner('GET', '/api/admin/customer-list')).body,
@@ -156,22 +156,22 @@ describe('the customer list', () => {
       bookings: 3,
       visits: 2,
       noShows: 1,
-      usualBarber: 'Marcus',
+      usualBarber: 'Lee',
       hasNotes: false,
     });
     expect(sam?.lastVisitAt).not.toBeNull();
-    const lee = list.rows.find((r) => r.name === 'Lee Park');
-    expect(lee?.visits).toBe(0);
-    expect(lee?.lastVisitAt).toBeNull();
+    const pat = list.rows.find((r) => r.name === 'Pat Parker');
+    expect(pat?.visits).toBe(0);
+    expect(pat?.lastVisitAt).toBeNull();
   });
 
   it('searches by name prefix, phone and last four digits, and sorts', async () => {
-    await seedBooking(marcus, '10:00', {
+    await seedBooking(lee, '10:00', {
       name: 'Zoë Adams',
       phone: '+12155550133',
       status: 'completed',
     });
-    await seedBooking(dee, '10:00', { name: 'Bo Brown', phone: '+12155550144' });
+    await seedBooking(drew, '10:00', { name: 'Bo Brown', phone: '+12155550144' });
     const find = async (q: string) =>
       customerListResponseSchema
         .parse((await asOwner('GET', `/api/admin/customer-list?q=${encodeURIComponent(q)}`)).body)
@@ -187,7 +187,7 @@ describe('the customer list', () => {
   });
 
   it('keeps a private note per customer: saved, shown on the detail, removed when emptied', async () => {
-    await seedBooking(marcus, '10:00', { name: 'Noted Customer', phone: '+12155550155' });
+    await seedBooking(lee, '10:00', { name: 'Noted Customer', phone: '+12155550155' });
     const saved = await asOwner('PUT', '/api/admin/customers/notes', {
       phone: '(215) 555-0155',
       notes: 'Prefers the quiet chair.',
@@ -197,7 +197,7 @@ describe('the customer list', () => {
       (await asOwner('GET', '/api/admin/customers?phone=2155550155')).body,
     );
     expect(detail.notes).toBe('Prefers the quiet chair.');
-    expect(detail.usualBarber?.name).toBe('Marcus');
+    expect(detail.usualBarber?.name).toBe('Lee');
     const list = customerListResponseSchema.parse(
       (await asOwner('GET', '/api/admin/customer-list')).body,
     );
@@ -221,16 +221,16 @@ describe('the customer list', () => {
 
 describe('the week schedule', () => {
   it('counts bookings per chair and day, leaving out cancelled ones', async () => {
-    await seedBooking(marcus, '10:00');
-    await seedBooking(marcus, '11:00');
-    const gone = await seedBooking(marcus, '12:00');
+    await seedBooking(lee, '10:00');
+    await seedBooking(lee, '11:00');
+    const gone = await seedBooking(lee, '12:00');
     await asOwner('POST', `/api/admin/bookings/${gone._id}/cancel`, { notify: false });
     const week = scheduleWeekResponseSchema.parse(
       (await asOwner('GET', `/api/admin/schedule/week?date=${THU}`)).body,
     );
     expect(week.days).toHaveLength(7);
     expect(week.days[0]?.label).toBe('Mon');
-    const row = week.rows.find((r) => r.staff.slug === 'marcus');
+    const row = week.rows.find((r) => r.staff.slug === 'lee');
     expect(row?.cells.find((c) => c.date === THU)).toMatchObject({ count: 2, status: 'working' });
     expect(row?.cells.filter((c) => c.date !== THU).every((c) => c.count === 0)).toBe(true);
   });
@@ -241,12 +241,12 @@ describe('alerts and the owner decision', () => {
     // The barber's time off exists, with the booking left in place.
     await timeBlocksRepo.insertTimeBlock(
       {
-        staffId: marcus,
+        staffId: lee,
         kind: 'timeOff',
         startAt: new Date(slotAt(THU, '08:00')),
         endAt: new Date(slotAt(THU, '21:00')),
         reason: null,
-        createdBy: { type: 'barber', userId: null, staffId: marcus },
+        createdBy: { type: 'barber', userId: null, staffId: lee },
       },
       new Date(),
     );
@@ -254,7 +254,7 @@ describe('alerts and the owner decision', () => {
     return alertsRepo.insertAlert(
       {
         kind: 'barberOut',
-        staffId: marcus,
+        staffId: lee,
         fromDate: THU,
         toDate: THU,
         startAt: new Date(slotAt(THU, '08:00')),
@@ -266,18 +266,18 @@ describe('alerts and the owner decision', () => {
   }
 
   it('shows an open alert on the overview with how many bookings still need a decision', async () => {
-    const a = await seedBooking(marcus, '10:00');
-    await seedBooking(marcus, '11:00');
+    const a = await seedBooking(lee, '10:00');
+    await seedBooking(lee, '11:00');
     await raiseBarberOut(a);
     const o = overviewResponseSchema.parse((await asOwner('GET', '/api/admin/overview')).body);
     expect(o.alerts).toHaveLength(1);
-    expect(o.alerts[0]).toMatchObject({ kind: 'barberOut', staffName: 'Marcus', affectedCount: 2 });
+    expect(o.alerts[0]).toMatchObject({ kind: 'barberOut', staffName: 'Lee', affectedCount: 2 });
   });
 
   it('asks for a choice per booking, applies Move, Keep and Cancel together, and closes the alert', async () => {
-    const a = await seedBooking(marcus, '10:00');
-    const b = await seedBooking(marcus, '11:00');
-    const c = await seedBooking(marcus, '12:00');
+    const a = await seedBooking(lee, '10:00');
+    const b = await seedBooking(lee, '11:00');
+    const c = await seedBooking(lee, '12:00');
     const alert = await raiseBarberOut(a);
     // No choices: the list comes back with the chairs each booking can move to.
     const ask = await asOwner('POST', `/api/admin/alerts/${alert._id}/resolve`, {});
@@ -287,14 +287,14 @@ describe('alerts and the owner decision', () => {
     expect(affected.every((x) => (x.moveOptions ?? []).length > 0)).toBe(true);
     // Only two of three decided: refused, nothing changed.
     const partial = await asOwner('POST', `/api/admin/alerts/${alert._id}/resolve`, {
-      resolutions: [{ bookingId: a._id, action: 'move', toStaffId: tre }],
+      resolutions: [{ bookingId: a._id, action: 'move', toStaffId: nelly }],
     });
     expect(partial.status).toBe(409);
-    expect((await bookingsRepo.findBookingById(a._id))?.staffId).toBe(marcus);
+    expect((await bookingsRepo.findBookingById(a._id))?.staffId).toBe(lee);
 
     const done = await asOwner('POST', `/api/admin/alerts/${alert._id}/resolve`, {
       resolutions: [
-        { bookingId: a._id, action: 'move', toStaffId: tre },
+        { bookingId: a._id, action: 'move', toStaffId: nelly },
         { bookingId: b._id, action: 'keep' },
         { bookingId: c._id, action: 'cancel' },
       ],
@@ -305,7 +305,7 @@ describe('alerts and the owner decision', () => {
       kept: [b._id],
       cancelled: [c._id],
     });
-    expect((await bookingsRepo.findBookingById(a._id))?.staffId).toBe(tre);
+    expect((await bookingsRepo.findBookingById(a._id))?.staffId).toBe(nelly);
     expect((await bookingsRepo.findBookingById(b._id))?.status).toBe('confirmed');
     expect((await bookingsRepo.findBookingById(c._id))?.status).toBe('cancelled');
     expect((await alertsRepo.findAlertById(alert._id))?.status).toBe('resolved');
@@ -317,11 +317,11 @@ describe('alerts and the owner decision', () => {
   });
 
   it('approves a time off request by creating the time off with the owner choices, or declines it', async () => {
-    const a = await seedBooking(marcus, '10:00');
+    const a = await seedBooking(lee, '10:00');
     const request = await alertsRepo.insertAlert(
       {
         kind: 'timeOffRequest',
-        staffId: marcus,
+        staffId: lee,
         fromDate: THU,
         toDate: THU,
         startAt: new Date(slotAt(THU, '08:00')),
@@ -334,16 +334,16 @@ describe('alerts and the owner decision', () => {
     const ask = await asOwner('POST', `/api/admin/alerts/${request._id}/resolve`, {});
     expect(ask.status).toBe(409);
     const ok = await asOwner('POST', `/api/admin/alerts/${request._id}/resolve`, {
-      resolutions: [{ bookingId: a._id, action: 'move', toStaffId: tre }],
+      resolutions: [{ bookingId: a._id, action: 'move', toStaffId: nelly }],
     });
     expect(ok.status).toBe(200);
-    expect(await db().collection('timeBlocks').countDocuments({ staffId: marcus })).toBe(1);
+    expect(await db().collection('timeBlocks').countDocuments({ staffId: lee })).toBe(1);
     expect((await alertsRepo.findAlertById(request._id))?.status).toBe('resolved');
 
     const other = await alertsRepo.insertAlert(
       {
         kind: 'timeOffRequest',
-        staffId: dee,
+        staffId: drew,
         fromDate: THU,
         toDate: THU,
         startAt: new Date(slotAt(THU, '08:00')),
@@ -355,6 +355,6 @@ describe('alerts and the owner decision', () => {
     const declined = await asOwner('POST', `/api/admin/alerts/${other._id}/dismiss`, {});
     expect(declined.status).toBe(200);
     expect((await alertsRepo.findAlertById(other._id))?.status).toBe('dismissed');
-    expect(await db().collection('timeBlocks').countDocuments({ staffId: dee })).toBe(0);
+    expect(await db().collection('timeBlocks').countDocuments({ staffId: drew })).toBe(0);
   });
 });

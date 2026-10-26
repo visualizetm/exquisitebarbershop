@@ -27,7 +27,7 @@ describe('seed', () => {
       ownerLogin: 'skipped',
     });
     expect(await servicesRepo.listPublicServices()).toHaveLength(servicesSeed.length);
-    expect(await staffRepo.listPublicStaff()).toHaveLength(6);
+    expect(await staffRepo.listPublicStaff()).toHaveLength(5);
   });
 
   it('seeded staff reference seeded services and have hours', async () => {
@@ -44,10 +44,10 @@ describe('seed', () => {
   });
 
   it('does not clobber owner edits', async () => {
-    const marcus = staffSeedId('marcus');
-    await staffRepo.updateStaff(marcus, { name: 'Real Name' }, NOW);
+    const lee = staffSeedId('lee');
+    await staffRepo.updateStaff(lee, { name: 'Real Name' }, NOW);
     await runSeed(db(), NOW);
-    expect((await staffRepo.findStaffById(marcus))?.name).toBe('Real Name');
+    expect((await staffRepo.findStaffById(lee))?.name).toBe('Real Name');
   });
 
   it('creates the owner login once, linked to the owner chair, and refuses weak passwords', async () => {

@@ -1,0 +1,273 @@
+{
+  "_meta": {
+    "collected": "2026-10-25",
+    "sources": {
+      "google": "Apify compass/crawler-google-places run G6XPTqpWHVewI5CdF (dataset L4BwLab1vlF6DoyKp)",
+      "instagram_shop": "Apify apify/instagram-scraper runs HGt9VncPy46GzSR2V (profile) and PMlDse9OyRfxYKJo2 (46 posts, dataset WvbBahmJkgIIzpBO0)",
+      "instagram_team": "Apify apify/instagram-scraper run pfWa4FNENG4oSgSxD (dataset 2orAgfvycdbUFBChe)",
+      "booking_pages": "Read in Chrome on 2026-10-25: getsquire.com (Dontrise), app.thecut.co (Drew2Sharp, Nelly Cutz), softlooksbyiniyathestylist.as.me (Iniya)"
+    },
+    "warning": "Instagram CDN image URLs are signed and expire around 2026-10-30. Download the picks before then or re-scrape."
+  },
+
+  "business": {
+    "name": "Exquisite Barber & Beauty Lounge",
+    "tagline": "Gifted Hands",
+    "category": "Barber shop",
+    "address": {
+      "street": "3309 Edgmont Ave",
+      "unit": "Suite F",
+      "city": "Brookhaven",
+      "state": "PA",
+      "zip": "19015",
+      "unit_conflict": "Google and Drew's theCut page say Suite F. Squire says Unit 4. Confirm with Dontrise."
+    },
+    "phone": "(610) 609-0786",
+    "phone_source": "Google Business Profile",
+    "other_phone_seen": "(252) 560-9806 is Dontrise's text line for Sunday appointments (his Squire menu). Not the shop line.",
+    "geo": { "lat": 39.8699109, "lng": -75.3829094, "plus_code": "VJ98+XR Brookhaven, Pennsylvania" },
+    "google": {
+      "place_id": "ChIJISdW6zTpxokRzSBEJjMQU4M",
+      "cid": "9462925053906919629",
+      "maps_url": "https://www.google.com/maps/search/?api=1&query=Exquisite%20Barber%20%26%20Beauty%20Lounge&query_place_id=ChIJISdW6zTpxokRzSBEJjMQU4M",
+      "review_url_hint": "https://search.google.com/local/writereview?placeid=ChIJISdW6zTpxokRzSBEJjMQU4M",
+      "rating": 4.7,
+      "review_count": 15,
+      "distribution": { "5": 14, "4": 0, "3": 0, "2": 0, "1": 1 },
+      "review_tags": ["haircut (3)", "cleanliness (2)", "thoroughness (2)"],
+      "owner_description": "Professional Barbers , giving great quality haircuts .",
+      "attributes": ["Onsite services", "Wheelchair accessible parking lot", "Restroom", "Good for kids"],
+      "claimed": true
+    },
+    "instagram": {
+      "handle": "exquisitebarberbeauty",
+      "bio": "Exquisite Barber & Beauty Lounge. OPEN NOW , walk-ins welcome 7 days a week. 3309 Edgmont ave , Brookhaven PA",
+      "followers": 327,
+      "posts": 46
+    },
+    "booking": {
+      "squire_shop": "https://getsquire.com/discover/barbershop/exquisite-barber-and-beauty-lounge-brookhaven",
+      "squire_note": "Shop is on Squire, but only Dontrise is listed there. Squire shows 5.0 from 2 reviews."
+    }
+  },
+
+  "hours": {
+    "google": {
+      "Monday": "Closed",
+      "Tuesday": "10 AM to 7 PM",
+      "Wednesday": "10 AM to 7 PM",
+      "Thursday": "10 AM to 7 PM",
+      "Friday": "10 AM to 7 PM",
+      "Saturday": "10 AM to 7 PM",
+      "Sunday": "10 AM to 7 PM"
+    },
+    "conflicts": [
+      "Instagram bio says walk-ins welcome 7 days a week.",
+      "Instagram post (Nov 19 2025) says walk-ins welcome Monday through Saturday.",
+      "Drew's theCut: Tues to Sat 10am to 6pm, plus premium hours 6pm to 10pm.",
+      "Dontrise's Squire: Sunday cuts need a deposit and a text first.",
+      "The only 1 star Google review (Sep 2025) is about the shop showing open on Sunday with nobody there."
+    ],
+    "recommendation": "Confirm real hours with Dontrise. Likely: Tue to Sat walk-ins, Sunday by appointment only, Monday closed. Fix Google hours to match whatever the site says."
+  },
+
+  "team_found": [
+    {
+      "name": "Dontrise",
+      "known_as": "Trise Philly Barber",
+      "instagram": "dontrisethebarber",
+      "followers": 6578,
+      "bio_points": ["Team Barber for the NY Jets", "Travel barber", "Hair Unit Certified", "AKN Certified"],
+      "booking": "https://getsqr.co/dontrise",
+      "role": "Owner (per Rob)",
+      "praised_in_reviews": ["patient", "attention to detail", "all hair types", "great with kids", "professional", "communicative"]
+    },
+    {
+      "name": "Lee",
+      "known_as": "Lee Da Barber",
+      "instagram": "lee_dabarber_",
+      "followers": 1770,
+      "booking": "not found",
+      "flag": "A Dec 2025 Google review calls Lee 'the owner', and a Nov 2025 Google review posted as 'Lee the Barber' says 'I am the owner.' Rob has Dontrise as owner. Ask how they want ownership shown."
+    },
+    {
+      "name": "Drew",
+      "known_as": "2Sharp",
+      "instagram": "drew2sharp",
+      "followers": 617,
+      "bio_points": ["PA Licensed Barber", "Certified Sensory-Safe", "All hair types, designs, color, perm, big chops, facial treatments, hair and hairline restoration"],
+      "booking": "https://app.thecut.co/barbers/Drew2Sharp-ach0pyz",
+      "thecut_rating": "5.0 from 212 reviews",
+      "schedule": "Tue to Sat 10am to 6pm, premium 6pm to 10pm"
+    },
+    {
+      "name": "Mike",
+      "known_as": "Nelly Cutz",
+      "instagram": "nellycutz_",
+      "followers": 1441,
+      "booking": "https://app.thecut.co/barbers/nellycutz-mn7x24y",
+      "thecut_rating": "4.9 from 72 reviews",
+      "note": "Reviews call him Mike. Some clients since 2018. Offers house calls."
+    },
+    {
+      "name": "Iniya",
+      "known_as": "Iniya the Stylist",
+      "instagram": "iniyathestylist",
+      "bio_points": ["Braider since 2020", "Braids, wigs and more", "Based in DE"],
+      "booking": "https://softlooksbyiniyathestylist.as.me/ (online booking currently turned off)",
+      "note": "Posted from the shop in June 2026 ('At exquisites we really do it all'). Confirm she is still on the team."
+    }
+  ],
+  "team_note": "Project brief says owner plus 5 barbers. Found 5 people above (4 barbers plus 1 braider). Confirm the final lineup, names as they want them shown, and photos.",
+
+  "services_by_barber": {
+    "Dontrise (Squire)": [
+      { "name": "Mens Cut", "price": 50, "duration": "1h 15m" },
+      { "name": "Design Cuts", "price": 70, "duration": "1h" },
+      { "name": "Color And Cut With Design", "price": 130, "duration": "3h", "note": "Deposit required" },
+      { "name": "Kids Cut With Design", "price": 40, "duration": "1h 30m" },
+      { "name": "Color And Cut", "price": 100, "duration": "3h", "note": "$25 deposit, rest after service" },
+      { "name": "Line Ups No Taper", "price": 30, "duration": "40m" },
+      { "name": "Kids Cuts", "price": 30, "duration": "45m" },
+      { "name": "Friends Cut (two people together)", "price": 110, "duration": "2h 10m" },
+      { "name": "Sunday Cuts", "price": 100, "duration": "1h 15m", "note": "Deposit required, text first" },
+      { "name": "Female Haircut", "price": 45, "duration": "1h 15m" },
+      { "name": "Father & Son Haircut", "price": 70, "duration": "1h 45m" }
+    ],
+    "Drew2Sharp (theCut)": [
+      { "name": "Adult Cut", "price": 40, "duration": "45m", "desc": "Full haircut, lineup, with straight razor finish." },
+      { "name": "Adult Cut w/ Beard", "price": 45, "duration": "45m", "desc": "Includes beard trim and beard lineup." },
+      { "name": "Big Chop (Transformation Cut)", "price": 50, "duration": "1h 15m", "desc": "For major changes where a lot of length comes off." },
+      { "name": "Kids Cut (12 and under)", "price": 25, "duration": "30m" },
+      { "name": "Adult Cut w/ Design", "price": 50, "duration": "1h" },
+      { "name": "After Hours Cut", "price": 80, "duration": "1h", "desc": "After 6 PM. Hair wash and beard included." },
+      { "name": "Adult Cut w/ Bigen", "price": 65, "duration": "1h 30m", "desc": "Permanent hair dye add on, lasts 5 to 10 shampoos." },
+      { "name": "Lineup", "price": 20, "duration": "20m", "desc": "Temple, forehead, neck. No cut, no fade." },
+      { "name": "Hot Towel w/ Steam Treatment", "price": 20, "duration": "15m", "desc": "Hot towel and steamer, then a cleansing and moisturizing treatment." },
+      { "name": "Perm w/ Cut", "price": 150, "duration": "2h 30m", "desc": "Full perm set, kit included, finished with a full haircut." },
+      { "name": "Eyebrows", "price": 10, "duration": "15m" }
+    ],
+    "Nelly Cutz (theCut)": [
+      { "name": "Adult Haircut (12+)", "price": 45, "duration": "45m" },
+      { "name": "Kids Haircut (11 and under)", "price": 20, "duration": "30m" },
+      { "name": "Steam, Hot Towel, and Fade", "price": 60, "duration": "1h" },
+      { "name": "House Call", "price": 200, "duration": "1h", "note": "Select days only" }
+    ],
+    "Iniya the Stylist": "Braids and wigs. No public menu (online booking off)."
+  },
+  "services_mentioned_elsewhere": [
+    "Wash and dry (Google review, Oct 2024)",
+    "Kids cuts (Google review context)",
+    "Braids (Iniya)",
+    "Hair color, waves, designs (Instagram posts)",
+    "Hot towel and steam treatment (Instagram, Aug 2025)",
+    "Straight to curly perm (Instagram, Aug 2025)",
+    "High burst fade with double V design (Instagram, Jul 2025)"
+  ],
+  "shop_level_menu_suggestion": {
+    "note": "Prices differ by barber. Show shop level 'from' prices and let each barber's page show their own menu. Confirm with Dontrise before publishing.",
+    "items": [
+      { "name": "Haircut", "from": 40 },
+      { "name": "Haircut with Beard", "from": 45 },
+      { "name": "Haircut with Design", "from": 50 },
+      { "name": "Kids Cut", "from": 20 },
+      { "name": "Lineup", "from": 20 },
+      { "name": "Hot Towel and Steam", "from": 20 },
+      { "name": "Color and Cut", "from": 65 },
+      { "name": "Female Haircut", "from": 45 },
+      { "name": "Father and Son", "from": 70 },
+      { "name": "Perm with Cut", "from": 150 },
+      { "name": "Eyebrows", "from": 10 },
+      { "name": "Braids", "from": null, "note": "Price on request" }
+    ]
+  },
+
+  "reviews_for_site": {
+    "rules": "Verbatim text only. Show first name and last initial. Link to Google for the source. Excluded: the 1 star review, the self review by 'Lee the Barber', and star only ratings with no text.",
+    "google": [
+      { "name": "Unique D.", "stars": 5, "date": "2025-11-25", "text": "Great environment been getting my haircut there for a while now and always feel welcomed when I come in for a haircut. The environment is very clean and the music is always good." },
+      { "name": "Ricardo E.", "stars": 5, "date": "2025-07-30", "text": "Great place! I walked in without an appointment and was helped right away. I loved the haircut, and the prices were very affordable. I’ll definitely be coming back!" },
+      { "name": "Daniel M.", "stars": 5, "date": "2024-10-26", "barber": "Dontrise", "text": "First time customer, Dontrise cut my son’s hair(9yo). I have no complaints. He was thorough,professional and made sure he was cutting to my son and I’s liking multiple times. Clean shop. I’m not easily pleased but this was a good experience as a first time customer. They also offer wash and dry services also." },
+      { "name": "Lamont I.", "stars": 5, "date": "2024-10-24", "barber": "Dontrise", "text": "Great barbershop. Dontrise is phenomenal barber. My guy can all types of hair. Patience and his attention to detail is everything. Great customer service.", "short": "Great barbershop. Dontrise is phenomenal barber. ... Patience and his attention to detail is everything. Great customer service." },
+      { "name": "Routine Life Fitness", "stars": 5, "date": "2024-09-24", "barber": "Dontrise", "text": "10/10!! This was my first time here and I will definitely be returning. Dontrise was professional, patient and very knowledgeable and communicative. My cut was super sharp!! One of the best cuts I’ve gotten in a min." },
+      { "name": "Shamarr M.", "stars": 5, "date": "2025-09-14", "text": "Soon as I sat in the chair I felt at home this is officially my go to." },
+      { "name": "Wesley T.", "stars": 5, "date": "2025-12-17", "barber": "Lee", "text": "Lee Da Barber the owner was nothing less than exceptional with their service and preciseness of my haircut. I will definitely be booking again !", "flag": "Calls Lee the owner. Use only after the ownership question is settled." },
+      { "name": "Basil S.", "stars": 5, "date": "2026-10-16", "text": "Amazing haircut’s the entire shop is sharp" },
+      { "name": "Frankie", "stars": 5, "date": "2024-10-02", "text": "best barber around 10/10 cut and a got me in as soon as i walked in the door" },
+      { "name": "Margaret A.", "stars": 5, "date": "2026-02-14", "text": "Love this place already!!!!" }
+    ],
+    "thecut_drew": [
+      { "name": "Tom R.", "text": "Attention to detail and communication skills already at an elite level stayed in constant dialogue every step of the cut. Sharpest I’ve been in years, definitely coming back" },
+      { "name": "Alexis M.", "text": "It was our first time going to this barber, and my boys got some of the best haircuts they’ve had in a long time! They’re tender-headed, and the barber was very patient and gentle with them. We’ll definitely be back and highly recommend!" },
+      { "name": "Mark G.", "text": "Drew has great communication, makes recommendations for your haircut but ultimately gives you exactly what you want. Will book again soon!" },
+      { "name": "Jourdan S.", "text": "No cap Drew is one of the best barbers I have met. His attention to detail and the effort he puts into every single cut is unmatched." },
+      { "name": "Mike R.", "text": "Great atmosphere, great barber! Drew is very professional and considerate. Definitely will be going back" }
+    ],
+    "thecut_nelly": [
+      { "name": "Paul H.", "text": "Been getting haircuts by Mike since 2018 … he cuts me and my 4 year old routinely . Perfection everytime , I won’t let anybody else touch our heads" },
+      { "name": "Christian T.", "text": "I’ve been around the area for 4 years now. Buddy of mine suggested I go to Mike. I’m glad I listened because Mike has been my barber ever since. Hands down best barber I’ve had." },
+      { "name": "Dylan M.", "text": "Nelly is reliable, and sharp. Definitely would recommend" },
+      { "name": "Jesse W.", "text": "Sharp cut, super quick and cool dude." }
+    ],
+    "stats_for_site": "4.7 on Google (15 reviews). Drew 5.0 on theCut (212). Nelly Cutz 4.9 on theCut (72). Use real numbers only."
+  },
+
+  "images": {
+    "storefront": {
+      "status": "No clean storefront photo found. Google has only 4 owner photos (all haircuts) plus Street View, which cannot be reused on the site.",
+      "fallback": { "id": "IG-C_i7aFSxl1j", "post": "https://www.instagram.com/p/C_i7aFSxl1j/", "what": "Video cover, stone facade and entry door with a person standing at the door, no sign visible, 1080x1920", "url": "https://instagram.ftgz4-1.fna.fbcdn.net/v/t51.71878-15/503267223_601414605728768_2436510184653211712_n.jpg?stp=dst-jpg_e15_tt6&_nc_cat=111&_nc_map=urlgen_bucketless&ig_cache_key=MzQ1MDU4MTU0MTY1MzQ3MDU2Mw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkNMSVBTLnhwaWRzLjEwODAuc2RyLnZpZGVvX2RlZmF1bHRfY292ZXJfZnJhbWUuQzMifQ%3D%3D&_nc_ohc=rpVs2ERHj5gQ7kNvwEQuG46&_nc_oc=AdrIgAVS2WumqHC6rx5lRHUhUoX_2cuPnwtnxYmP08sUkYUGlf-_e2b4A-A5Ngy6G5o&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=instagram.ftgz4-1.fna&_nc_gid=AKh0VeoMSIQ7xaXQFJihrw&_nc_ss=7a20f&oh=00_AQMNGiCYy7x08NRkQnhwO7ELNr-RPENttNFWx_bP15I8Sg&oe=6AE4022B" },
+      "recommendation": "Shoot the storefront in person (daylight, straight on, sign visible) or get one from Dontrise. Use the fallback only as a placeholder."
+    },
+    "google_photos": [
+      { "id": "G1", "what": "Full beard and fade, client reclined, side profile", "size": "1920 max", "url": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SiBP7osrOEQghhsy9JiMDnW41pG3r8HJOvDL3OEEhgyQ5XLUZOUkH9voTkoPbTErPl246agFEiX9N36KXENziAigcckKtGEtjbt1d0Vo3dUp8jh0ZroSXuMH2WgMfXfTkIzyntKE4fUXU=w1920-h1080-k-no" },
+      { "id": "G2", "what": "Low fade with sharp lineup, red cape", "size": "1920 max", "url": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9SNWvX0_reKBiQ0pX-mQ-U-sQBj01x8BkQKIm__beT5ZnIC5ehhQDtsGVTAj2cfXk6bq80EgbNJHGk6iNtWalACdC4Ic05hTxrW9xbipolBKmaLuuEKov6jJuL_fuOG8q6GqXMq=w1920-h1080-k-no" },
+      { "id": "G3", "what": "Taper with hard part line, side profile", "size": "1920 max", "url": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9TigeJhwqszo0xAHyVvXpt730ohEQypRzWsDdWgL05AnfdIa-UBMCd2RoSicxOBblYZolXm4gb2aE1NUIOBSAWHmXJm9mTxxb6Tjyq-cxy_xRefI-OY7-JbRlOpSd_JHRjupPkyMg=w1920-h1080-k-no" },
+      { "id": "G4", "what": "Curly top with taper, shop chairs in background", "size": "1920 max", "url": "https://lh3.googleusercontent.com/gps-cs-s/ANWiy9RTwxe1D0MtoTgGPbNeSZbmJ7Qxx-Qt279ws2gH4U4Scl9JKS85OEhw7GXwhZqp_-3pX2EPunDyCmYO4zYxCN3oYpBc05uvyxBkX-WpzTuSXfYWzzhlAJv565pQ1JG_hoanhwqY=w1920-h1080-k-no" }
+    ],
+    "instagram_picks": [
+      { "id": "IG-DQNa4GmgG-q", "use": "hero or about (barber smiling with client in chair)", "size": "1440x1920", "post": "https://www.instagram.com/p/DQNa4GmgG-q/", "url": "https://instagram.fudi1-2.fna.fbcdn.net/v/t51.82787-15/569310378_17902657413273397_8835921302615710967_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=101&_nc_map=urlgen_bucketless&ig_cache_key=Mzc1MDc3MjI2OTI1Nzg3OTQ2Ng%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=_74nGiZex-UQ7kNvwFpUcXr&_nc_oc=Adq5S2pbBz8MDYTZeXxxJhtoEu_A_dPbYJ9Ne9iZTfSqG95MsrELcXRxltRwXzpwGxXwkxvVdZLNOJb-vxhGz7n6&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=instagram.fudi1-2.fna&_nc_gid=vIdj__Hj2NiRJp3orL9trw&_nc_ss=7a20f&oh=00_AQPBGApyYGphPhLoJ52Lbs9Aa1z2WFinYN4vaOGGNK9R0w&oe=6AE4353C" },
+      { "id": "IG-DdR0g2JKydZ", "use": "gallery (waves and beard, shop interior behind)", "size": "1440", "post": "https://www.instagram.com/p/DdR0g2JKydZ/", "url": "https://scontent-fra3-2.cdninstagram.com/v/t51.82787-15/810996469_17947212435273397_6413295827905829157_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=111&ig_cache_key=Mzk4NjE5ODEwMDc3NzMxNDEzNw%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMzA3Mi5oZHIucmVndWxhcl9waG90by5DMiJ9&_nc_ohc=wZG4_yQ7Q6MQ7kNvwGduKzM&_nc_oc=AdoUvorkry7ywsPEUs12y5E61k6V7b52lBWrjKJlGSqmTx9oR81BGfporU0HtvHqUaI&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-fra3-2.cdninstagram.com&_nc_gid=MTyVZ09WJF_DKZjiLINntQ&_nc_ss=7a20f&oh=00_AQN9ucksRE_VTuVGeWmpDpnb2Z71N9F_XbQH5K9JtDDdgw&oe=6AE3FFA8" },
+      { "id": "IG-DWuNDUKCvdu", "use": "gallery (skin fade, clean lineup)", "size": "1440", "post": "https://www.instagram.com/p/DWuNDUKCvdu/", "url": "https://scontent-mad1-1.cdninstagram.com/v/t51.82787-15/658828618_17922294852273397_3442986908567637370_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=105&ig_cache_key=Mzg2ODA4NjUzMjM2NDIzNjY1NA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=sWHO9PfQnBsQ7kNvwFs0QSt&_nc_oc=AdpEkxuGRNwVB6GsIGmkkc1T72YgAZ0tHxN04x-y2wRqlACFL1SGagOgml1zWyWZLqM&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-mad1-1.cdninstagram.com&_nc_gid=9mnsEXIHJbLNvQOa4uPrfA&_nc_ss=7a20f&oh=00_AQOdzs_DUEjJWrjUZjEunm4_4PgaKPbc90uG_eYxl7yX1Q&oe=6AE427D0" },
+      { "id": "IG-DR927JPgBr2", "use": "gallery (curly top, beard)", "size": "1440", "post": "https://www.instagram.com/p/DR927JPgBr2/", "url": "https://scontent-gru2-1.cdninstagram.com/v/t51.82787-15/590354857_17907232947273397_7933236493311548756_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=109&ig_cache_key=Mzc4MjQyMDgyMDk0NTU0MTg3OA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=dW3cjGpqgy8Q7kNvwHHa4pr&_nc_oc=AdqAMdg2LN-DbBnAzohhWdMy8sJffzYeT9EuppfowEkWDOOAFNnbQ0MfuRi7W7k0-5A&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-gru2-1.cdninstagram.com&_nc_gid=xlkRnz-ZcOZvOJoxHLIPmA&_nc_ss=7a20f&oh=00_AQNgSCqVLjoj2vbF83NqYtsdrOiDQv1-JZSPslktrpsRTw&oe=6AE40092" },
+      { "id": "IG-DR7SEUDAHW8", "use": "gallery (afro taper, beard)", "size": "1440", "post": "https://www.instagram.com/p/DR7SEUDAHW8/", "url": "https://instagram.fbcn14-1.fna.fbcdn.net/v/t51.82787-15/590569517_17907122430273397_3737185850853551561_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=105&_nc_map=urlgen_bucketless&ig_cache_key=Mzc4MTY5NTc3MzM0Nzk2ODQ0NA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=abT_X5d8ucAQ7kNvwFnJAsa&_nc_oc=Ado3TlMXwWqWJzJTtM6HcFFNqlTLSvS4lIZPsMZ8QdIpizTK92w_H-NoTmTKTIF5v90&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=instagram.fbcn14-1.fna&_nc_gid=nBR9_th2KPdOmuwxsk2mtQ&_nc_ss=7a20f&oh=00_AQMLxJUNkmwSXPbu5KWstr1ojgAvHlG7_Da6shpaGCmkvA&oe=6AE40417" },
+      { "id": "IG-DMdm5W9xvgR", "use": "gallery (full beard, waves)", "size": "1440x1920", "post": "https://www.instagram.com/p/DMdm5W9xvgR/", "url": "https://scontent-fra3-2.cdninstagram.com/v/t51.82787-15/523214270_17892183036273397_3362237504573692933_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=104&ig_cache_key=MzY4MzI3MTEzNzY5NTI5OTYwMQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=02gvVmfZOJMQ7kNvwEFWGX7&_nc_oc=AdrUs3xsfNgE_wWXP1UFIZa9y_Edz581NAMdHuHuwkcnOFy3gtvPtLWnE21Fg0MuTlmMoJKqGCZYOkzTRe_ANO0g&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-fra3-2.cdninstagram.com&_nc_gid=hY7nSLJ9cxDcDduT2u7Uxw&_nc_ss=7a20f&oh=00_AQPBdyzNuhDSnry8ZKtaqilfB72npimT-WPJC2Ix9SIwyA&oe=6AE425DD" },
+      { "id": "IG-DN74lBWgIGC", "use": "gallery (low fade with part)", "size": "1440x1920", "post": "https://www.instagram.com/p/DN74lBWgIGC/", "url": "https://scontent-ssn1-1.cdninstagram.com/v/t51.82787-15/539830388_17896388220273397_6060026854296599339_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=102&ig_cache_key=MzcwOTgwNzU1Mjc0NjI1ODgxOA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=Jy1_6hAmP8IQ7kNvwGRlbPi&_nc_oc=Adr18VIaVPI3-XksQjOP4tXDtPPOFbTzPv7X_1Jy3nuMkTOdZgGQ3iobyA5rpxaflBY&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ssn1-1.cdninstagram.com&_nc_gid=Xnav5oTlnCecEapZRbBVCg&_nc_ss=7a20f&oh=00_AQPLaktrPfn3hfzV-QXPiHY7jTOerhQFGu89lwRWpXg2uA&oe=6AE42A4C" },
+      { "id": "IG-DARD0KhxoXZ", "use": "gallery (curly top taper)", "size": "1440x1800", "post": "https://www.instagram.com/p/DARD0KhxoXZ/", "url": "https://scontent-waw2-2.cdninstagram.com/v/t51.82787-15/658924250_18111997963752292_1315482256878878944_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=105&ig_cache_key=MzQ2MzU2NjM2NzI4MTAyMjQyNQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=qR0M6J20_FkQ7kNvwGChIVu&_nc_oc=Adq8ezyk8d_Z5m-Qe_lrX0o2kZfh03DNbubt24jo9dsDE8RKr1uIlreTGu8j10MhoNE&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-waw2-2.cdninstagram.com&_nc_gid=_Nv3duu8ud7yFqifHXWpoQ&_nc_ss=7a20f&oh=00_AQM5ddrJ1_C5X804YHqGaEiGWDqFSJpQ7V4KM2KP4ZAD5A&oe=6AE42792" },
+      { "id": "IG-DBJZvvYR3dj", "use": "gallery, beauty side (pink and purple color waves)", "size": "1290x1290", "post": "https://www.instagram.com/p/DBJZvvYR3dj/", "url": "https://scontent-itm1-1.cdninstagram.com/v/t51.82787-15/626195264_18040308251727298_9046517988711825939_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=111&ig_cache_key=MzQ3OTQyNTQxODk3MTgwNTUzOQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTI5MC5zZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=VNL0vNEH4moQ7kNvwEHmgb_&_nc_oc=AdokKCTrktRhcPrYHMxblea_4Dffmkqfohu5W9f4TuNvpBm3S-ggEHau59Y4HheT2JFhKalObZ6e_cTVckOkzJ7N&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-itm1-1.cdninstagram.com&_nc_gid=rBIMb_Izv2JNFhUV9Cq7Fg&_nc_ss=7a20f&oh=00_AQNuAczY_VlfTs7DD4VXr5AxuM0pNKowmuVwmAX1ADrr0g&oe=6AE4055D" },
+      { "id": "IG-C_zFM5CR5I5", "use": "kids section (kid fade with design)", "size": "1440x1800", "post": "https://www.instagram.com/p/C_zFM5CR5I5/", "url": "https://scontent-ham3-1.cdninstagram.com/v/t51.82787-15/618927571_17908937925313254_3481557303660185786_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=108&ig_cache_key=MzQ1NTEyODIxNTIzMTEwNzY0MQ%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5zZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=o04KOPbm1WUQ7kNvwFMpH1i&_nc_oc=Ado3MVVFv2utfni1vBjpel-N64SCU94plyxLF5NFBKPkpUDnFGxNECFEoace3ObODGAhH3B0kntvMvpFpyXR3uU2&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-ham3-1.cdninstagram.com&_nc_gid=0YxFeH_IIzi5Z8oJCZ951w&_nc_ss=7a20f&oh=00_AQMaLhvOhsTMrBwkRqt3692w3Sd3f_yJwUBHMboX_gZmfQ&oe=6AE42DE0" },
+      { "id": "IG-C_zFJl3RkQO", "use": "kids section (kid with lightning design)", "size": "1440x1800", "post": "https://www.instagram.com/p/C_zFJl3RkQO/", "url": "https://scontent-man2-1.cdninstagram.com/v/t51.82787-15/619503063_17914315644123504_8278010840620731220_n.jpg?stp=dst-jpg_e35_tt6&_nc_cat=101&ig_cache_key=MzQ1NTEyNzk4ODQ4Njk0Nzg1NA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkZFRUQueHBpZHMuMTQ0MC5zZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=vaRiRY_zJFkQ7kNvwFgRX1e&_nc_oc=AdrbxwFn230hHSgYX0akUCREpgmOMIR9rR-LceNEdp7qWDnBLVIY2V6V73HFzH2RNtk&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=scontent-man2-1.cdninstagram.com&_nc_gid=22JbC_Bbigx_ZhgE8a28kQ&_nc_ss=7a20f&oh=00_AQMqqaZB2H3tId0h0KivXzNspTUGhw8KRdLku95cqLVR9Q&oe=6AE428EE" },
+      { "id": "IG-C-GQG_fJyPn-a", "use": "gallery (hard part with taper, older client)", "size": "1440x1440", "post": "https://www.instagram.com/p/C-GQG_fJyPn/", "url": "https://instagram.fmel5-1.fna.fbcdn.net/v/t51.82787-15/656454772_18142851472494050_3285269492459090023_n.jpg?stp=dst-jpegr_e35_tt6&_nc_cat=108&_nc_map=urlgen_bucketless&ig_cache_key=MzQyNDQ5NTQwODgwMjg0OTExMA%3D%3D.3-ccb7-5&ccb=7-5&_nc_sid=58cdad&efg=eyJ2ZW5jb2RlX3RhZyI6IkNBUk9VU0VMX0lURU0ueHBpZHMuMTQ0MC5oZHIucmVndWxhcl9waG90by5DMyJ9&_nc_ohc=Cfr_G3X4gWkQ7kNvwEgQgN0&_nc_oc=AdrHV2VvjTK3E7uN-rwHm429oh18IIhtQ4A0c9fF6MdvbNHhSc5sMHjEjmhJg8QpZ88&_nc_ad=z-m&_nc_cid=0&_nc_zt=23&_nc_ht=instagram.fmel5-1.fna&_nc_gid=LR9qSvLg88AdbbLZQENR4g&_nc_ss=7a20f&oh=00_AQP8SPOX8_gRdwQl4unpgYbOKZ6yVsZvkfwPiP-DbRJDvQ&oe=6AE41A2F" }
+    ],
+    "video_covers_worth_considering": [
+      { "post": "https://www.instagram.com/p/Dc61sLUK2Oo/", "what": "Gray beard trim, red cape (good for beard service)" },
+      { "post": "https://www.instagram.com/p/Dbri0EzORky/", "what": "Nelly Cutz taper, bright green cape, 177 likes" },
+      { "post": "https://www.instagram.com/p/DRBFfKKADOg/", "what": "360 waves" },
+      { "post": "https://www.instagram.com/p/DaI1tzoRVzc/", "what": "Iniya braiding locs in the shop (beauty side)" }
+    ],
+    "do_not_use": [
+      "The old circular barber pole logo (Google photo and IG posts C-D88jBpQaQ, C-GQG c). Replaced by the new brand.",
+      "Google review photo of a text message (from the 1 star review).",
+      "Reviewer selfie in a car (Google review photo).",
+      "Google Street View imagery (license does not allow reuse on the site)."
+    ],
+    "rights_note": "These are the shop's own and its barbers' posts. Get Dontrise's OK, and each barber's OK for posts from their own accounts (Drew, Nelly, Iniya)."
+  },
+
+  "copy_facts": [
+    "Walk-ins welcome (Google reviews and Instagram both say so).",
+    "Clean shop, good music, welcoming (repeated in reviews).",
+    "Good with kids and tender headed kids (multiple reviews).",
+    "All hair types, designs, color, perms, waves, braids.",
+    "Dontrise is a team barber for the New York Jets (his Instagram bio and a May 2026 shop post).",
+    "Hashtags used: #delcobarber #brookhavenbarber #pabarber #phillybarber."
+  ],
+
+  "open_questions_for_dontrise": [
+    "Real hours, and whether Sunday is appointment only.",
+    "Suite F or Unit 4.",
+    "Final team lineup and how Lee is credited (a Google review and a self review call Lee the owner).",
+    "One shop price list, or each barber keeps their own prices?",
+    "Keep Squire and theCut, or move all booking to the new site?",
+    "Permission to use the photos and reviews, and a real storefront photo."
+  ]
+}

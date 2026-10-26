@@ -7,11 +7,14 @@ import {
   publicStaffResponseSchema,
   staffOpeningsQuerySchema,
   staffOpeningsResponseSchema,
+  type PublicReview,
   type PublicService,
   type PublicStaff,
 } from '../../../shared/api/public';
+import { publicEmail } from '../../lib/publicEmail';
+import { shownReviews } from '../../../shared/lib/reviews';
 import { shopDateOf } from '../../../shared/lib/time';
-import { announcementIsLive } from '../../../shared/schemas/shopSettings';
+import { announcementIsLive, type ReviewItem } from '../../../shared/schemas/shopSettings';
 import type { ServiceDocument } from '../../../shared/schemas/service';
 import type { StaffDocument } from '../../../shared/schemas/staff';
 import { getEnv } from '../../env';
@@ -54,10 +57,25 @@ export function toPublicStaff(doc: StaffDocument): PublicStaff {
     bio: doc.bio,
     chairNumber: doc.chairNumber,
     serviceIds: doc.serviceIds,
+    // Prices are the public menu, so they travel with the person. Old documents have none.
+    servicePrices: doc.servicePrices ?? [],
     photoUrl: doc.photoUrl,
     instagramHandle: doc.instagramHandle,
     acceptsOnlineBooking: doc.acceptsOnlineBooking,
     sortOrder: doc.sortOrder,
+  };
+}
+
+/** Only what a review card prints. Whether it shows and its order are already applied. */
+export function toPublicReview(item: ReviewItem): PublicReview {
+  return {
+    id: item.id,
+    name: item.name,
+    text: item.text,
+    stars: item.stars,
+    source: item.source,
+    date: item.date ?? null,
+    staffId: item.staffId,
   };
 }
 
@@ -79,7 +97,7 @@ export const publicRoutes: RouteDefinition[] = [
         tagline: settings.tagline,
         address: settings.address,
         phone: settings.phone,
-        email: settings.email,
+        email: publicEmail(settings.email),
         instagramHandle: settings.instagramHandle,
         timezone: settings.timezone,
         hours: hours?.days ?? EMPTY_WEEK,
@@ -98,6 +116,9 @@ export const publicRoutes: RouteDefinition[] = [
           enabled: announcementIsLive(settings.announcement, shopDateOf(ctx.now)),
         },
         social: settings.social,
+        google: settings.google,
+        // Hidden reviews, and every review while the section is off, never leave the server.
+        reviews: shownReviews(settings.reviews).map(toPublicReview),
         heroPhoto: hero,
         maintenance: getEnv().MAINTENANCE_MODE === 'true',
         demo: demoEnabled(),
@@ -123,7 +144,10 @@ export const publicRoutes: RouteDefinition[] = [
     handler: async () => {
       const staff = await staffRepo.listPublicStaff();
       const base = getEnv().APP_BASE_URL.replace(/\/$/, '');
-      const paths = [...SITEMAP_PATHS, ...staff.map((s) => `/chairs/${s.slug}`)];
+      // Like first available and the booking staff picker, the sitemap skips a chair that takes no
+      // online bookings (Iniya books on Instagram). Her page itself still works and is linked.
+      const bookable = staff.filter((s) => s.acceptsOnlineBooking);
+      const paths = [...SITEMAP_PATHS, ...bookable.map((s) => `/chairs/${s.slug}`)];
       const urls = paths.map((p) => `  <url><loc>${escapeXml(`${base}${p}`)}</loc></url>`);
       const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
       return {

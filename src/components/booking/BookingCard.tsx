@@ -1,7 +1,7 @@
 import { formatCents, priceLabel } from '@shared/lib/money';
 import { formatShopDateTime } from '@shared/lib/time';
 import { Button } from '@/components/ui';
-import { cancelPolicyLabel } from '@/lib/booking/helpers';
+import { cancelPolicyLabel } from '@/lib/booking/policy';
 import type { SummaryItem } from './BookingSummary';
 
 export interface BookingCardProps {

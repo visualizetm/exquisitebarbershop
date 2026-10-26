@@ -42,6 +42,13 @@ import {
   type LightboxPhoto,
 } from '@/components/ui';
 import { BarView } from '@/components/ui/BottomBar';
+import { PriceOverrideEditor } from '@/admin/team/PriceOverrideEditor';
+import { ReviewsEditor } from '@/admin/website/ReviewsEditor';
+import { ReviewsPanelState } from '@/admin/website/ReviewsPanel';
+import { RatingLine } from '@/components/site/RatingLine';
+import { ReviewList } from '@/components/site/ReviewCard';
+import type { AdminServiceView } from '@shared/api/admin';
+import type { GoogleSettings, ReviewItem } from '@shared/schemas/shopSettings';
 import { usePageTitle } from '@/lib/usePageTitle';
 import '@/styles/dashboard.css';
 
@@ -57,6 +64,79 @@ function sample(label: string, w: number, h: number): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${String(w)}" height="${String(h)}"><rect width="100%" height="100%" fill="#555"/><text x="50%" y="50%" fill="#fff" font-family="sans-serif" font-size="${String(Math.round(w / 8))}" text-anchor="middle" dominant-baseline="middle">${label}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
+/** The real shop prices for Haircut, Lineup and Kids Cut, and Dontrise's own entries for two of them. */
+const PRICE_SERVICES: AdminServiceView[] = [
+  ['Haircut', 4000, true, 45],
+  ['Lineup', 2000, true, 20],
+  ['Kids Cut', 2000, true, 30],
+].map(([name, priceCents, priceFrom, durationMinutes], index) => ({
+  id: String(index + 1).repeat(24),
+  name: String(name),
+  group: 'Barber' as const,
+  description: '',
+  priceCents: Number(priceCents),
+  priceFrom: Boolean(priceFrom),
+  durationMinutes: Number(durationMinutes),
+  bufferMinutes: null,
+  sortOrder: index,
+  isActive: true,
+  deletedAt: null,
+}));
+const PRICE_SAVED = [
+  { serviceId: '1'.repeat(24), priceCents: 5000, durationMinutes: 75 },
+  { serviceId: '2'.repeat(24), priceCents: 3000, durationMinutes: 40 },
+];
+
+/** Three of the shop's real reviews (a short Google one, an undated theCut one, a long one). */
+const REVIEWS: ReviewItem[] = [
+  {
+    id: 'a'.repeat(24),
+    name: 'Shamarr M.',
+    source: 'google',
+    stars: 5,
+    date: '2025-09-14',
+    text: 'Soon as I sat in the chair I felt at home this is officially my go to.',
+    staffId: null,
+    show: true,
+    sortOrder: 0,
+  },
+  {
+    id: 'b'.repeat(24),
+    name: 'Jesse W.',
+    source: 'thecut',
+    stars: 5,
+    text: 'Sharp cut, super quick and cool dude.',
+    staffId: '4'.repeat(24),
+    show: true,
+    sortOrder: 10,
+  },
+  {
+    id: 'c'.repeat(24),
+    name: 'Daniel M.',
+    source: 'google',
+    stars: 5,
+    date: '2024-10-26',
+    text: 'First time customer, Dontrise cut my son’s hair(9yo). I have no complaints. He was thorough,professional and made sure he was cutting to my son and I’s liking multiple times. Clean shop. I’m not easily pleased but this was a good experience as a first time customer. They also offer wash and dry services also.',
+    staffId: '5'.repeat(24),
+    show: false,
+    sortOrder: 20,
+  },
+];
+const REVIEW_CARDS = REVIEWS.map((r) => ({ ...r, date: r.date ?? null }));
+/** The shop's Google block as read on 2026-10-25, and one with only the place id. */
+const GOOGLE: GoogleSettings = {
+  placeId: 'ChIJISdW6zTpxokRzSBEJjMQU4M',
+  rating: 4.7,
+  reviewCount: 15,
+  ratingCheckedOn: '2026-10-25',
+};
+const GOOGLE_UNRATED: GoogleSettings = {
+  ...GOOGLE,
+  rating: 0,
+  reviewCount: 0,
+  ratingCheckedOn: '',
+};
+
 const PHOTO = { url: sample('4:5', 400, 500), width: 400, height: 500, alt: 'Sample portrait' };
 const LIGHTBOX: LightboxPhoto[] = [1, 2, 3].map((n) => ({
   id: String(n),
@@ -64,7 +144,7 @@ const LIGHTBOX: LightboxPhoto[] = [1, 2, 3].map((n) => ({
   width: 800,
   height: 600,
   alt: `Sample photo ${String(n)}`,
-  barber: { name: 'Marcus', slug: 'marcus' },
+  barber: { name: 'Lee', slug: 'lee' },
 }));
 
 /** Every component in every state, for one theme. */
@@ -77,7 +157,7 @@ function Specimen() {
   const [chip, setChip] = useState('all');
   const [time, setTime] = useState('10:00 AM');
   const [picked, setPicked] = useState<string[]>(['cut']);
-  const [chair, setChair] = useState('marcus');
+  const [chair, setChair] = useState('dontrise');
   const [step, setStep] = useState<(typeof STEPS)[number]['key']>('barber');
 
   return (
@@ -88,21 +168,21 @@ function Specimen() {
           <TopStrip
             announcement={{
               enabled: true,
-              text: 'Walk ins welcome',
+              text: 'Walk-ins welcome',
               linkLabel: 'Book online',
               linkUrl: '/book',
               endsOn: '',
             }}
             loading={false}
           />
-          <Header phone="+16105550100" />
+          <Header phone="+16106090786" />
         </div>
         <div className="exq-kit__frame" data-label="Bottom bar, default">
           <BarView
             state="shown"
             style={{ position: 'static' }}
             config={{
-              left: { label: 'Call', href: 'tel:+16105550100', tone: 'ink' },
+              left: { label: 'Call', href: 'tel:+16106090786', tone: 'ink' },
               right: { label: 'Book now', to: '/book', tone: 'paper' },
             }}
           />
@@ -115,8 +195,8 @@ function Specimen() {
               mode: 'booking',
               summary: (
                 <>
-                  <span>From $75</span>
-                  <span>45 min with Marcus</span>
+                  <span>From $40</span>
+                  <span>45 min with Lee</span>
                 </>
               ),
               left: { label: 'Back', onClick: () => undefined, tone: 'ink' },
@@ -196,7 +276,7 @@ function Specimen() {
           <Input label="Disabled" disabled defaultValue="Locked" />
           <Select label="Select" hint="First available picks the least booked chair">
             <option>First available</option>
-            <option>Marcus</option>
+            <option>Lee</option>
           </Select>
           <Textarea label="Textarea" placeholder="Anything we should know?" />
         </div>
@@ -252,8 +332,8 @@ function Specimen() {
         <h3>Option cards</h3>
         <div className="exq-grid" data-md="2">
           {[
-            { id: 'cut', name: 'Classic Cut', desc: 'Clipper or scissor cut.', price: '$30' },
-            { id: 'fade', name: 'Skin Fade', desc: 'Down to the skin.', price: '$35' },
+            { id: 'cut', name: 'Haircut', desc: 'Full haircut and lineup.', price: 'From $40' },
+            { id: 'fade', name: 'Lineup', desc: 'Temple, forehead and neck.', price: 'From $20' },
           ].map((o) => (
             <OptionCard
               key={o.id}
@@ -269,9 +349,9 @@ function Specimen() {
           <OptionCard
             selected={false}
             disabled
-            title="Hot Towel Shave"
+            title="Hot Towel and Steam"
             description="Unavailable today."
-            meta={<span className="exq-price">$40</span>}
+            meta={<span className="exq-price">$20</span>}
           />
         </div>
       </section>
@@ -281,15 +361,15 @@ function Specimen() {
         <Label>The menu</Label>
         <SectionHead label="The crew" title="Pick your chair" />
         <p className="exq-display">Display</p>
-        <p className="exq-price">$35</p>
+        <p className="exq-price">$40</p>
         <div className="exq-kit__ink exq-dark">
           <PriceRow
-            name="Classic Cut"
-            description="Clipper or scissor cut with a clean lineup."
-            price="$30"
+            name="Haircut"
+            description="Full haircut and lineup with a straight razor finish."
+            price="From $40"
             to="/book"
           />
-          <PriceRow name="Skin Fade" description="Down to the skin, blended." price="From $35" />
+          <PriceRow name="Lineup" description="Temple, forehead and neck." price="From $20" />
         </div>
       </section>
 
@@ -308,38 +388,46 @@ function Specimen() {
         <h3>Chair cards</h3>
         <div className="exq-grid" data-cols="2" data-md="3" data-lg="4">
           <ChairCard
-            name="Marcus"
-            specialty="Fades and tapers"
+            name="Lee"
+            specialty="Precision cuts"
             chairNumber={1}
             photo={PHOTO}
             status="next-open"
             statusLabel="Next open 2:15 PM"
           />
           <ChairCard
-            name="Dee"
-            specialty="Braids"
+            name="Drew"
+            specialty="Designs, color and perms"
             chairNumber={2}
             photo={null}
             status="in"
             statusLabel="In today"
           />
           <ChairCard
-            name="Tre"
-            specialty="Color"
+            name="Nelly Cutz"
+            specialty="Fades and tapers"
             chairNumber={4}
             photo={null}
             status="off"
             statusLabel="Off today"
           />
           <ChairCard
-            name="Jay"
-            specialty="Cuts"
+            name="Dontrise"
+            specialty="Fades, designs and color"
+            chairNumber={1}
+            photo={null}
+            selected={chair === 'dontrise'}
+            onSelect={() => {
+              setChair(chair === 'dontrise' ? 'lee' : 'dontrise');
+            }}
+          />
+          <ChairCard
+            name="Iniya"
+            specialty="Braids and wigs"
             chairNumber={5}
             photo={null}
-            selected={chair === 'jay'}
-            onSelect={() => {
-              setChair(chair === 'jay' ? 'marcus' : 'jay');
-            }}
+            statusLabel="Book through Instagram"
+            href="https://instagram.com/iniyathestylist"
           />
           <ChairCardSkeleton />
         </div>
@@ -363,11 +451,11 @@ function Specimen() {
           code="K7M-4QX2"
           heading="You are booked"
           rows={[
-            { label: 'Chair', value: 'Marcus' },
+            { label: 'Chair', value: 'Lee' },
             { label: 'When', value: 'Thu, Oct 22, 2:15 PM' },
-            { label: 'Services', value: 'Classic Cut' },
+            { label: 'Services', value: 'Haircut' },
           ]}
-          total="$30"
+          total="$40"
           actions={<Button variant="outline">Manage this booking</Button>}
         />
       </section>
@@ -532,7 +620,7 @@ function Specimen() {
             state="ready"
             rows={[
               { id: '1', when: 'Today 10:00 AM', who: 'Sam Rivera' },
-              { id: '2', when: 'Today 11:00 AM', who: 'Lee Park' },
+              { id: '2', when: 'Today 11:00 AM', who: 'Pat Parker' },
             ]}
             rowKey={(r) => r.id}
             columns={[
@@ -589,6 +677,93 @@ function Specimen() {
           <IconButton label="Copy manage link" icon={<Copy01 aria-hidden="true" />} />
         </p>
         <PinPad label="Enter your PIN" onComplete={() => undefined} />
+      </section>
+
+      <section className="exq-kit__block" aria-label="Barber prices">
+        <h2>Barber prices</h2>
+        <p className="exq-muted">
+          A barber&apos;s own price and time for a service. Empty means the shop&apos;s. The first
+          editor starts with two entries saved and Save off; change a field to turn it on, type a
+          letter in a price to see the field error, press Save to see it work. The second one is
+          refused by the server. The third has no services to price.
+        </p>
+        <div className="exq-panel">
+          <PriceOverrideEditor
+            staffName="Dontrise"
+            services={PRICE_SERVICES}
+            saved={PRICE_SAVED}
+            onSave={async () => {
+              await new Promise((resolve) => setTimeout(resolve, 900));
+              toast({ text: 'Prices saved.', tone: 'ok' });
+            }}
+          />
+        </div>
+        <div className="exq-panel">
+          <PriceOverrideEditor
+            staffName="Dontrise"
+            services={PRICE_SERVICES.slice(0, 1)}
+            saved={[]}
+            onSave={() => Promise.reject(new Error('The prices were not saved. Try again.'))}
+          />
+        </div>
+        <div className="exq-panel">
+          <PriceOverrideEditor
+            staffName="Dontrise"
+            services={[]}
+            saved={[]}
+            onSave={() => Promise.resolve()}
+            onChooseServices={() => undefined}
+          />
+        </div>
+      </section>
+
+      <section className="exq-kit__block" aria-label="Reviews">
+        <h2>Reviews</h2>
+        <p className="exq-muted">
+          The rating line with a rating, then with only the place id (the links alone). The cards: a
+          dated Google review, an undated theCut one and a long one. Below, the Website, Reviews
+          editor: change the rating to see Save turn on, type a letter to see the field error, hide
+          or move a review to see it save. The second editor is refused by the server; the third has
+          no reviews and the section off. Last, the Website, Reviews tab (ReviewsPanel) while it
+          loads and when the settings do not arrive.
+        </p>
+        <RatingLine google={GOOGLE} />
+        <RatingLine google={GOOGLE_UNRATED} />
+        <ReviewList reviews={REVIEW_CARDS} />
+        <div className="exq-panel">
+          <ReviewsEditor
+            enabled
+            google={GOOGLE}
+            items={REVIEWS}
+            staffNames={{ ['4'.repeat(24)]: 'Nelly Cutz', ['5'.repeat(24)]: 'Dontrise' }}
+            onSave={async (_change, done) => {
+              await new Promise((resolve) => setTimeout(resolve, 900));
+              toast({ text: done, tone: 'ok' });
+            }}
+          />
+        </div>
+        <div className="exq-panel">
+          <ReviewsEditor
+            enabled
+            google={GOOGLE}
+            items={REVIEWS.slice(0, 1)}
+            onSave={() => Promise.reject(new Error('The reviews were not saved. Try again.'))}
+          />
+        </div>
+        <div className="exq-panel">
+          <ReviewsEditor
+            enabled={false}
+            google={GOOGLE_UNRATED}
+            items={[]}
+            onSave={() => Promise.resolve()}
+          />
+        </div>
+        <div className="exq-panel">
+          <ReviewsPanelState state="loading" />
+        </div>
+        <div className="exq-panel">
+          <ReviewsPanelState state="error" />
+        </div>
       </section>
 
       <section className="exq-kit__block" aria-label="Motion">

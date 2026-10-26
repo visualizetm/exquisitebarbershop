@@ -12,7 +12,7 @@ import { call, nextDate, startTestServer, type TestServer } from '../helpers/boo
 
 const { db } = useTestDb();
 let server: TestServer;
-const cutId = serviceSeedId('classic-cut');
+const cutId = serviceSeedId('haircut');
 
 beforeAll(async () => {
   await runSeed(db(), NOW);
@@ -28,35 +28,38 @@ describe('GET /api/availability', () => {
     const res = await call(
       server.baseUrl,
       'GET',
-      `/api/availability?date=${wed}&serviceIds=${cutId}&staff=marcus`,
+      `/api/availability?date=${wed}&serviceIds=${cutId}&staff=lee`,
     );
     expect(res.status).toBe(200);
     const parsed = availabilityResponseSchema.parse(res.body);
-    expect(parsed.durationMinutes).toBe(40);
+    // 45 minutes plus the 10 minute buffer.
+    expect(parsed.durationMinutes).toBe(55);
     expect(parsed.slots.length).toBeGreaterThan(20);
-    expect(parsed.slots.every((s) => s.staffId === staffSeedId('marcus'))).toBe(true);
+    expect(parsed.slots.every((s) => s.staffId === staffSeedId('lee'))).toBe(true);
     expect(parsed.reason).toBeNull();
     expect(res.headers.get('cache-control')).toBe('public, max-age=10');
   });
 
   it('explains empty days and validates input', async () => {
-    const sun = nextDate(7, 3);
+    const mon = nextDate(1, 3);
     const closed = availabilityResponseSchema.parse(
-      (await call(server.baseUrl, 'GET', `/api/availability?date=${sun}&serviceIds=${cutId}`)).body,
+      (await call(server.baseUrl, 'GET', `/api/availability?date=${mon}&serviceIds=${cutId}`)).body,
     );
     expect(closed.reason).toBe('closed');
     expect(closed.closedReason).toBe('The shop is closed that day');
-    const tue = nextDate(2, 3);
+    // Drew works Tuesday to Saturday, so Sunday is his day off while the shop is open.
+    const sun = nextDate(7, 3);
     const off = availabilityResponseSchema.parse(
       (
         await call(
           server.baseUrl,
           'GET',
-          `/api/availability?date=${tue}&serviceIds=${cutId}&staff=dee`,
+          `/api/availability?date=${sun}&serviceIds=${cutId}&staff=drew`,
         )
       ).body,
     );
     expect(off.reason).toBe('dayOff');
+    const tue = nextDate(2, 3);
     const bad = await call(
       server.baseUrl,
       'GET',
@@ -74,7 +77,7 @@ describe('GET /api/availability', () => {
         await call(
           server.baseUrl,
           'GET',
-          `/api/availability?date=${tue}&serviceIds=${serviceSeedId('silk-press')}&staff=marcus`,
+          `/api/availability?date=${tue}&serviceIds=${serviceSeedId('female-cut')}&staff=lee`,
         )
       ).body,
     );
@@ -88,19 +91,19 @@ describe('GET /api/availability', () => {
   });
 
   it('resolves an old slug alias', async () => {
-    const dee = await staffRepo.findStaffById(staffSeedId('dee'));
-    await staffRepo.renameStaffSlug(dee?._id ?? '', 'dee-renamed', NOW);
+    const drew = await staffRepo.findStaffById(staffSeedId('drew'));
+    await staffRepo.renameStaffSlug(drew?._id ?? '', 'drew-renamed', NOW);
     const wed = nextDate(3, 3);
     const res = availabilityResponseSchema.parse(
       (
         await call(
           server.baseUrl,
           'GET',
-          `/api/availability?date=${wed}&serviceIds=${cutId}&staff=dee`,
+          `/api/availability?date=${wed}&serviceIds=${cutId}&staff=drew`,
         )
       ).body,
     );
-    expect(res.slots[0]?.staffId).toBe(staffSeedId('dee'));
+    expect(res.slots[0]?.staffId).toBe(staffSeedId('drew'));
   });
 });
 
@@ -115,8 +118,14 @@ describe('GET /api/availability/days', () => {
     const parsed = availabilityDaysResponseSchema.parse(res.body);
     expect(parsed.days).toHaveLength(31);
     expect(parsed.availableDates.length).toBeGreaterThan(15);
-    const sundays = parsed.days.filter((d) => new Date(`${d.date}T12:00:00Z`).getUTCDay() === 0);
-    expect(sundays.every((d) => d.reason === 'closed' && !d.available)).toBe(true);
+    const mondays = parsed.days.filter((d) => new Date(`${d.date}T12:00:00Z`).getUTCDay() === 1);
+    expect(mondays.every((d) => d.reason === 'closed' && !d.available)).toBe(true);
+    // Sunday is a working day now. Today is left out: it may already be past closing.
+    const sundays = parsed.days
+      .slice(1)
+      .filter((d) => new Date(`${d.date}T12:00:00Z`).getUTCDay() === 0);
+    expect(sundays.length).toBeGreaterThan(0);
+    expect(sundays.every((d) => d.available)).toBe(true);
     expect(res.headers.get('cache-control')).toBe('public, max-age=30');
   });
 

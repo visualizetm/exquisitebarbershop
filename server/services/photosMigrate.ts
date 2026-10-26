@@ -3,6 +3,7 @@ import { photosRepo } from '../repos';
 import { createCloudinaryDriver } from '../storage/cloudinary';
 import { createLocalDriver } from '../storage/local';
 import { createMongoDriver } from '../storage/mongo';
+import { storePhotoBytes } from '../storage/serverUpload';
 import type { StorageDriver } from '../storage/types';
 
 export type MigrationSource = 'mongo' | 'local';
@@ -94,18 +95,7 @@ export async function migratePhotos(options: {
         log(`${photo.key}: would copy ${String(bytes.length)} bytes to ${newKey}`);
         continue;
       }
-      const upload = await target.presignUpload({
-        key: newKey,
-        contentType: 'image/webp',
-        size: bytes.length,
-        expiresInSeconds: 300,
-      });
-      if (upload.method !== 'POST') throw new Error('Unexpected upload method');
-      const form = new FormData();
-      for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
-      form.append('file', new Blob([bytes], { type: 'image/webp' }), 'photo.webp');
-      const res = await fetch(upload.url, { method: 'POST', body: form });
-      if (!res.ok) throw new Error(`Cloudinary answered ${String(res.status)}`);
+      await storePhotoBytes(target, newKey, bytes, 'image/webp');
       const stored = await target.head(newKey);
       if (stored?.size !== bytes.length) throw new Error('The copy did not read back');
       await photosRepo.rekeyPhoto(photo._id, photo.key, newKey);

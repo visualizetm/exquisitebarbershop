@@ -4,6 +4,13 @@ import { centsSchema, idSchema, nonEmptyText, timestampsSchema } from './common'
 export const serviceGroupSchema = z.enum(['Barber', 'Beauty']);
 export type ServiceGroup = z.infer<typeof serviceGroupSchema>;
 
+/** Minutes for one service: a multiple of five, between five minutes and eight hours. */
+export const serviceDurationSchema = z
+  .int()
+  .min(5)
+  .max(8 * 60)
+  .multipleOf(5);
+
 export const serviceDocumentSchema = z
   .object({
     _id: idSchema,
@@ -13,11 +20,7 @@ export const serviceDocumentSchema = z
     priceCents: centsSchema,
     /** When true the price is a starting point and the UI shows "From $x". */
     priceFrom: z.boolean(),
-    durationMinutes: z
-      .int()
-      .min(5)
-      .max(8 * 60)
-      .multipleOf(5),
+    durationMinutes: serviceDurationSchema,
     /** Cleanup gap after this service. Null means use the shop default buffer. */
     bufferMinutes: z.int().min(0).max(60).multipleOf(5).nullable().default(null),
     sortOrder: z.int().min(0),

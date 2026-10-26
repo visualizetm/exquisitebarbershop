@@ -72,20 +72,20 @@ interface SamplePlan {
 }
 
 const PLAN: readonly SamplePlan[] = [
-  { chair: 'marcus', service: 'skin-fade', day: 0, hour: 15, source: 'online', customer: 0 },
-  { chair: 'dee', service: 'classic-cut', day: 0, hour: 16, source: 'online', customer: 1 },
-  { chair: 'dontrise', service: 'cut-and-beard', day: 0, hour: 14, source: 'phone', customer: 2 },
-  { chair: 'tre', service: 'cut-and-beard', day: 1, hour: 10, source: 'online', customer: 3 },
-  { chair: 'marcus', service: 'classic-cut', day: 1, hour: 13, source: 'online', customer: 4 },
-  { chair: 'jay', service: 'kids-cut', day: 1, hour: 15, source: 'phone', customer: 5 },
-  { chair: 'kris', service: 'skin-fade', day: 2, hour: 14, source: 'online', customer: 6 },
-  { chair: 'dee', service: 'hot-towel-shave', day: 2, hour: 11, source: 'online', customer: 7 },
-  { chair: 'dontrise', service: 'skin-fade', day: 3, hour: 12, source: 'online', customer: 8 },
-  { chair: 'tre', service: 'classic-cut', day: 0, hour: 0, source: 'walkIn', customer: 3 },
-  { chair: 'jay', service: 'lineup', day: 0, hour: 0, source: 'walkIn', customer: 5 },
+  { chair: 'lee', service: 'haircut', day: 0, hour: 15, source: 'online', customer: 0 },
+  { chair: 'drew', service: 'cut-beard', day: 0, hour: 16, source: 'online', customer: 1 },
+  { chair: 'dontrise', service: 'cut-design', day: 0, hour: 14, source: 'phone', customer: 2 },
+  { chair: 'nelly', service: 'steam-fade', day: 1, hour: 10, source: 'online', customer: 3 },
+  { chair: 'lee', service: 'lineup', day: 1, hour: 13, source: 'online', customer: 4 },
+  { chair: 'dontrise', service: 'kids-cut', day: 1, hour: 15, source: 'phone', customer: 5 },
+  { chair: 'drew', service: 'haircut', day: 2, hour: 14, source: 'online', customer: 6 },
+  { chair: 'nelly', service: 'haircut', day: 2, hour: 11, source: 'online', customer: 7 },
+  { chair: 'dontrise', service: 'haircut', day: 3, hour: 12, source: 'online', customer: 8 },
+  { chair: 'nelly', service: 'kids-cut', day: 0, hour: 0, source: 'walkIn', customer: 3 },
+  { chair: 'lee', service: 'lineup', day: 0, hour: 0, source: 'walkIn', customer: 5 },
 ];
 
-/** How many days ahead a sample looks for an open day. The seed hours close two days a week. */
+/** How many days ahead a sample looks for an open day. The seed hours close Mondays, and Drew's Sundays. */
 const LOOKAHEAD_DAYS = 14;
 
 /**
@@ -120,7 +120,7 @@ async function workingNow(chair: string, now: Date): Promise<boolean> {
   const ctx = await loadAvailabilityContext({
     fromDate: today,
     toDate: today,
-    serviceIds: [serviceSeedId('classic-cut')],
+    serviceIds: [serviceSeedId('haircut')],
     now,
   });
   const { ranges } = workingRangesFor(staffSeedId(chair), today, ctx);
@@ -291,7 +291,8 @@ export async function ensureDemoReady(
 
 /**
  * "Reset demo data": wipes the shop, photos and sample bookings and loads the seed
- * again from scratch. The owner login (and its session) stays, so the person who
+ * again from scratch, the photos in seed/photos included (bootstrap runs the seed photo
+ * loader). The owner login (and its session) stays, so the person who
  * pressed the button is still signed in.
  */
 export async function resetDemoData(

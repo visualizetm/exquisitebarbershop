@@ -1,0 +1,48 @@
+{
+  "note": "Lighthouse mobile (simulated throttling) on the demo build (npm run e2e:prod-server -- --port=4176 --profile=demo: the built bundle over https with brotli, the 15 seed photos in GridFS), one run per page on 2026-10-25.",
+  "pages": [
+    {
+      "url": "/",
+      "performance": 81,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "seo": 63,
+      "fcp": "1.9\u00a0s",
+      "lcp": "3.6\u00a0s",
+      "tbt": "350\u00a0ms",
+      "cls": "0",
+      "speedIndex": "2.0\u00a0s",
+      "imageBytes": 132859,
+      "imageDeliverySavings": "Est savings of 65\u00a0KiB"
+    },
+    {
+      "url": "/gallery",
+      "performance": 74,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "seo": 63,
+      "fcp": "2.0\u00a0s",
+      "lcp": "7.6\u00a0s",
+      "tbt": "100\u00a0ms",
+      "cls": "0",
+      "speedIndex": "2.2\u00a0s",
+      "imageBytes": 900396,
+      "imageDeliverySavings": "Est savings of 781\u00a0KiB"
+    },
+    {
+      "url": "/chairs/drew",
+      "performance": 93,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "seo": 63,
+      "fcp": "2.0\u00a0s",
+      "lcp": "2.9\u00a0s",
+      "tbt": "120\u00a0ms",
+      "cls": "0",
+      "speedIndex": "2.0\u00a0s",
+      "imageBytes": 19492,
+      "imageDeliverySavings": ""
+    }
+  ],
+  "lighthouseVersion": "13.5.0"
+}

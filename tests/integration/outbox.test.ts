@@ -38,7 +38,7 @@ beforeEach(async () => {
   setChannel('email', null);
 });
 
-const staffStub = { _id: staffSeedId('dee'), name: 'Dee', slug: 'dee' };
+const staffStub = { _id: staffSeedId('drew'), name: 'Drew', slug: 'drew' };
 
 async function enqueueFor(
   event: 'confirmed' | 'cancelled',
@@ -333,8 +333,8 @@ describe('outbox', () => {
       const res = await call(server.baseUrl, 'POST', '/api/bookings', {
         headers: { 'idempotency-key': idemKey() },
         body: {
-          serviceIds: [serviceSeedId('classic-cut')],
-          staff: 'jay',
+          serviceIds: [serviceSeedId('haircut')],
+          staff: 'nelly',
           startAt: slotAt(nextDate(5, 3), '10:00'),
           customer: { name: 'After', phone: phone(), email: 'after@example.com' },
         },

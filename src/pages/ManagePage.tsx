@@ -21,6 +21,7 @@ import { StepHeading } from '@/components/booking/StepHeading';
 import { TimePicker } from '@/components/booking/TimePicker';
 import { Button, ButtonLink, Link, Sheet, Ticket, TimeChip, useToast } from '@/components/ui';
 import { ApiRequestError, apiRequest } from '@/lib/api';
+import { cutoffSpan } from '@/lib/booking/policy';
 import { slotLabel } from '@/lib/booking/state';
 import { useApi } from '@/lib/useApi';
 import { usePageMeta } from '@/lib/usePageTitle';
@@ -249,7 +250,7 @@ export function ManagePage() {
           </p>
           {!data.canCancel && booking.status === 'confirmed' ? (
             <p className="exq-manage-view__cutoff">
-              Online changes close {data.cutoffs.cancelMinutes / 60} hours before the appointment.
+              Online changes close {cutoffSpan(data.cutoffs.cancelMinutes)} before the appointment.
               Please call the shop to make changes now.
             </p>
           ) : null}

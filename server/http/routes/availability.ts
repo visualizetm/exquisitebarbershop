@@ -10,8 +10,12 @@ import { AppError } from '../../lib/errors';
 import {
   bookingWindowEnd,
   computeAvailability,
+  effectiveBufferMinutes,
   REASON_TEXT,
   resolveStaffSelector,
+  serviceMinutesOf,
+  type AvailabilityContext,
+  type AvailabilityResult,
 } from '../../services/availability';
 import { loadAvailabilityContext } from '../../services/availabilityData';
 import { nextOpenings } from '../../services/nextOpening';
@@ -20,6 +24,18 @@ import type { RouteDefinition } from '../types';
 
 /** Longest range the days endpoint will compute in one call. */
 const MAX_DAYS = 62;
+
+/**
+ * Minutes one appointment holds a chair, services plus cleanup. Chairs can differ (a chair's own
+ * time for a service replaces the shop's), so this is the shortest of the chairs offered; every
+ * slot carries its own chair and end. With no chair offered it is the shop's own time.
+ */
+function shortestTotalMinutes(result: AvailabilityResult, ctx: AvailabilityContext): number {
+  const totals = [...result.quotes.values()].map((q) => q.totalMinutes);
+  return totals.length > 0
+    ? Math.min(...totals)
+    : serviceMinutesOf(ctx.services) + effectiveBufferMinutes(ctx.services, ctx.settings);
+}
 
 export const availabilityRoutes: RouteDefinition[] = [
   {
@@ -53,7 +69,7 @@ export const availabilityRoutes: RouteDefinition[] = [
       const day = result.days[0];
       const body = availabilityResponseSchema.parse({
         date: query.date,
-        durationMinutes: result.totalMinutes,
+        durationMinutes: shortestTotalMinutes(result, data),
         slots: (day?.slots ?? []).map((s) => ({
           startAt: s.startAt.toISOString(),
           endAt: s.endAt.toISOString(),

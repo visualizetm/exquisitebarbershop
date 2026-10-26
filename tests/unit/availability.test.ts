@@ -42,6 +42,12 @@ function barber(overrides = {}) {
   return staff({ serviceIds: [cut._id, beard._id], ...overrides });
 }
 
+function quoteOf(result: ReturnType<typeof computeAvailability>, chair: { _id: string }) {
+  const quote = result.quotes.get(chair._id);
+  if (!quote) throw new Error('no quote for the chair');
+  return quote;
+}
+
 function oneDay(ctx: ReturnType<typeof context>, selector = 'any', date = DATE) {
   const result = computeAvailability({ fromDate: date, toDate: date, staff: selector }, ctx);
   const day = result.days[0];
@@ -173,7 +179,7 @@ describe('availability: one chair, one day', () => {
       staffHours: new Map([[b._id, nineToFive]]),
     });
     const { day, result } = oneDay(ctx, b.slug);
-    expect(result.totalMinutes).toBe(30);
+    expect(quoteOf(result, b).totalMinutes).toBe(30);
     expect(day.reason).toBeNull();
     const times = hhmmList(day.slots.map((s) => s.startAt));
     expect(times[0]).toBe('09:00');
@@ -192,7 +198,7 @@ describe('availability: one chair, one day', () => {
       settings: settings({ bufferMinutes: 10 }),
     });
     const { day, result } = oneDay(ctx, b.slug);
-    expect(result.totalMinutes).toBe(40);
+    expect(quoteOf(result, b).totalMinutes).toBe(40);
     // 16:30 + 30 min ends exactly at 17:00; its 10 minute buffer runs to 17:10.
     expect(hhmmList(day.slots.map((s) => s.startAt)).at(-1)).toBe('16:30');
     expect(hhmmList(day.slots.map((s) => s.startAt))).not.toContain('16:45');
@@ -244,8 +250,8 @@ describe('availability: one chair, one day', () => {
       bookings: [existing],
     });
     const { day, result } = oneDay(ctx, b.slug);
-    expect(result.bufferMinutes).toBe(20);
-    expect(result.totalMinutes).toBe(110);
+    expect(quoteOf(result, b).bufferMinutes).toBe(20);
+    expect(quoteOf(result, b).totalMinutes).toBe(110);
     const times = hhmmList(day.slots.map((s) => s.startAt));
     // 09:00 booking blocks until 09:40; first grid start after that is 09:45.
     expect(times[0]).toBe('09:45');
@@ -261,7 +267,7 @@ describe('availability: one chair, one day', () => {
       staffHours: new Map([[b._id, nineToFive]]),
     });
     const { day, result } = oneDay(ctx, b.slug);
-    expect(result.serviceMinutes).toBe(45);
+    expect(quoteOf(result, b).serviceMinutes).toBe(45);
     expect(day.slots[0]?.endAt).toEqual(at(DATE, '09:45'));
     expect(hhmmList(day.slots.map((s) => s.startAt)).at(-1)).toBe('16:15');
   });
@@ -656,6 +662,124 @@ describe('availability: first available', () => {
       at('2026-03-16', '09:15'),
     ]);
     expect(nextOpenSlots(result, at('2026-03-17', '00:00'), 3)).toEqual([]);
+  });
+});
+
+describe('availability: chairs with their own times', () => {
+  // The shop's Cut takes 30 minutes; the slow chair takes 75 for it.
+  const slowOverride = [{ serviceId: cut._id, priceCents: 5000, durationMinutes: 75 }];
+
+  it('each chair is measured with its own time for the service', () => {
+    const quick = barber({ sortOrder: 0 });
+    const slow = barber({ sortOrder: 1, servicePrices: slowOverride });
+    const ctx = context({
+      services: [cut],
+      staff: [quick, slow],
+      staffHours: new Map([
+        [quick._id, nineToFive],
+        [slow._id, nineToFive],
+      ]),
+    });
+    const { result, day } = oneDay(ctx);
+    expect(quoteOf(result, quick)).toMatchObject({ serviceMinutes: 30, totalMinutes: 30 });
+    expect(quoteOf(result, slow)).toMatchObject({ serviceMinutes: 75, totalMinutes: 75 });
+    expect(quoteOf(result, slow).price.totalCents).toBe(5000);
+    expect(quoteOf(result, quick).price.totalCents).toBe(3000);
+    // Everyone works 9 to 5: the quick chair starts as late as 16:30, the slow one as late as 15:45.
+    const byStaff = new Map(day.byStaff.map((d) => [d.staffId, hhmmList(d.starts)]));
+    expect(byStaff.get(quick._id)?.at(-1)).toBe('16:30');
+    expect(byStaff.get(slow._id)?.at(-1)).toBe('15:45');
+  });
+
+  it('a start only the quick chair can finish before closing lists only that chair', () => {
+    const quick = barber({ sortOrder: 0 });
+    const slow = barber({ sortOrder: 1, servicePrices: slowOverride });
+    const ctx = context({
+      services: [cut],
+      staff: [quick, slow],
+      staffHours: new Map([
+        [quick._id, nineToFive],
+        [slow._id, nineToFive],
+      ]),
+    });
+    const { day } = oneDay(ctx);
+    const late = day.slots.find((slot) => hhmmList([slot.startAt])[0] === '16:30');
+    expect(late?.candidates).toEqual([quick._id]);
+    const early = day.slots.find((slot) => hhmmList([slot.startAt])[0] === '10:00');
+    expect(early?.candidates).toHaveLength(2);
+  });
+
+  it('the slot ends when the chair it goes to ends, not when another chair would', () => {
+    const slow = barber({ sortOrder: 0, servicePrices: slowOverride });
+    const quick = barber({ sortOrder: 1 });
+    const ctx = context({
+      services: [cut],
+      staff: [slow, quick],
+      staffHours: new Map([
+        [slow._id, nineToFive],
+        [quick._id, nineToFive],
+      ]),
+    });
+    const { day } = oneDay(ctx);
+    const first = day.slots[0];
+    // Equal bookings: display order puts the slow chair first, so its 75 minutes show.
+    expect(first?.staffId).toBe(slow._id);
+    expect(first?.endAt).toEqual(at(DATE, '10:15'));
+    // Naming the quick chair measures 30 minutes for the same start.
+    const named = oneDay(ctx, quick._id).day.slots[0];
+    expect(named?.endAt).toEqual(at(DATE, '09:30'));
+  });
+
+  it('a booked slow chair blocks its own, longer, time', () => {
+    const slow = barber({ servicePrices: slowOverride });
+    const ctx = context({
+      services: [cut],
+      staff: [slow],
+      staffHours: new Map([[slow._id, nineToFive]]),
+      bookings: [booking({ staffId: slow._id, startAt: at(DATE, '11:00'), durationMinutes: 30 })],
+    });
+    const times = hhmmList(oneDay(ctx, slow.slug).day.slots.map((s) => s.startAt));
+    // A 75 minute service starting at 10:00 would run into the 11:00 booking.
+    expect(times).toContain('09:45');
+    expect(times).not.toContain('10:00');
+    expect(times).toContain('11:30');
+  });
+
+  it('a rescheduled booking keeps the length it was booked with on its own chair only', () => {
+    const slow = barber({ sortOrder: 0, servicePrices: slowOverride });
+    const quick = barber({ sortOrder: 1 });
+    const ctx = context({
+      services: [cut],
+      staff: [slow, quick],
+      staffHours: new Map([
+        [slow._id, nineToFive],
+        [quick._id, nineToFive],
+      ]),
+    });
+    const result = computeAvailability(
+      {
+        fromDate: DATE,
+        toDate: DATE,
+        staff: 'any',
+        keep: { staffId: slow._id, serviceMinutes: 45 },
+      },
+      ctx,
+    );
+    expect(quoteOf(result, slow).serviceMinutes).toBe(45);
+    // Only the chair the booking sits on is pinned; the price stays the chair's current one.
+    expect(quoteOf(result, quick).serviceMinutes).toBe(30);
+    expect(quoteOf(result, slow).price.totalCents).toBe(5000);
+  });
+
+  it('a record from before per chair prices still gets the shop time', () => {
+    const old = barber();
+    expect('servicePrices' in old).toBe(false);
+    const ctx = context({
+      services: [cut],
+      staff: [old],
+      staffHours: new Map([[old._id, nineToFive]]),
+    });
+    expect(quoteOf(oneDay(ctx).result, old)).toMatchObject({ serviceMinutes: 30 });
   });
 });
 

@@ -17,16 +17,18 @@ export interface PhotoInput {
   height: number;
   alt: string;
   sortOrder: number;
+  home?: boolean;
   createdBy: Actor;
 }
 
+/** `id` is for the seed photo loader, whose ids are derived from the file name. */
 export async function insertPhoto(
   input: PhotoInput,
   now: Date,
-  options?: RepoOptions,
+  options?: RepoOptions & { id?: string },
 ): Promise<PhotoDocument> {
   const doc = photoDocumentSchema.parse({
-    _id: newId(),
+    _id: options?.id ?? newId(),
     ...input,
     createdAt: now,
     deletedAt: null,

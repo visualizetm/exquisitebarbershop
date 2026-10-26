@@ -17,29 +17,29 @@ test("the home strip shows today's chairs and each card books that chair", async
     '.exq-home__chairs .exq-chaircard[data-state]:not([data-state="loading"])',
   );
   await expect(cards.first()).toBeVisible();
-  expect(await cards.count()).toBeGreaterThanOrEqual(6);
-  const marcus = cards.filter({ hasText: 'Marcus' });
-  await expect(marcus).toHaveAttribute('href', '/book?barber=marcus');
-  await expect(marcus.locator('.exq-chaircard__badge')).toHaveText(/Chair \d\d/);
-  await marcus.click();
-  await expect(page).toHaveURL(/\/book\?barber=marcus/);
+  expect(await cards.count()).toBeGreaterThanOrEqual(5);
+  const lee = cards.filter({ hasText: 'Lee' });
+  await expect(lee).toHaveAttribute('href', '/book?barber=lee');
+  await expect(lee.locator('.exq-chaircard__badge')).toHaveText(/Chair \d\d/);
+  await lee.click();
+  await expect(page).toHaveURL(/\/book\?barber=lee/);
   await expect(page.getByRole('heading', { name: 'Choose your services' })).toBeVisible();
 });
 
 test('a next-opening chip on the profile lands on the details step with that time', async ({
   page,
 }) => {
-  await page.goto('/chairs/marcus');
-  await expect(page.getByRole('heading', { name: 'Marcus', exact: true })).toBeVisible();
+  await page.goto('/chairs/lee');
+  await expect(page.getByRole('heading', { name: 'Lee', exact: true })).toBeVisible();
   const chip = page.locator('.exq-chair__openings .exq-timechip').first();
   await expect(chip).toBeVisible();
   const startAt = (await chip.getAttribute('data-start')) ?? '';
   expect(startAt).not.toBe('');
   await chip.click();
-  await expect(page).toHaveURL(/\/book\?.*barber=marcus.*time=/);
+  await expect(page).toHaveURL(/\/book\?.*barber=lee.*time=/);
   await expect(page.getByRole('heading', { name: 'Your details' })).toBeFocused();
   await expect(page.locator('.exq-book-summary, .exq-booking-summary').first()).toContainText(
-    'Marcus',
+    'Lee',
   );
   // Backing up to the time step shows the chosen time selected.
   await page
@@ -51,7 +51,46 @@ test('a next-opening chip on the profile lands on the details step with that tim
   ).toBeVisible();
 });
 
-test('the gallery opens a photo in the lightbox with the barber and a book link', async ({
+test('an uncredited gallery photo opens in the lightbox with no barber line and no book link', async ({
+  page,
+  context,
+}) => {
+  await signInAsOwner(page);
+  await uploadSamplePhoto(page, {
+    kind: 'gallery',
+    alt: 'Shop work, not credited',
+    label: 'SHOP',
+    color: '#1f3a5f',
+  });
+  // Home shows "the work" only once the gallery holds three photos (HOME_WORK_MIN, D12-49).
+  for (const [label, color] of [
+    ['ONE', '#3f5f1f'],
+    ['TWO', '#5f3f1f'],
+  ] as const) {
+    await uploadSamplePhoto(page, { kind: 'gallery', alt: `Shop work ${label}`, label, color });
+  }
+  await context.clearCookies();
+
+  await page.goto('/gallery');
+  await expect(page.getByRole('heading', { name: 'The work' })).toBeVisible();
+  await page
+    .locator('.exq-photo-grid__button', { has: page.locator('img[alt="Shop work, not credited"]') })
+    .first()
+    .click();
+  const dialog = page.locator('dialog.exq-dialog[open]');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('img[alt="Shop work, not credited"]').first()).toBeVisible();
+  // No photo is credited to a chair yet, so there is no barber line and no book link.
+  await expect(dialog.getByRole('heading', { name: /^By / })).toHaveCount(0);
+  await expect(dialog.getByRole('link', { name: /^Book / })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  // The home page shows the work section now that three photos exist.
+  await page.goto('/');
+  await expect(page.locator('.exq-home__work .exq-photo-grid__item').first()).toBeVisible();
+});
+
+test('a photo credited to a barber shows the name and a book link in the lightbox', async ({
   page,
   context,
 }) => {
@@ -59,49 +98,43 @@ test('the gallery opens a photo in the lightbox with the barber and a book link'
   const ids = await staffIds(page);
   await uploadSamplePhoto(page, {
     kind: 'gallery',
-    staffId: ids.dee ?? '',
-    alt: 'Knotless braids by Dee',
-    label: 'DEE',
+    staffId: ids.drew ?? '',
+    alt: 'Design by Drew',
+    label: 'DREW',
     color: '#C8102E',
   });
   await context.clearCookies();
 
   await page.goto('/gallery');
-  await expect(page.getByRole('heading', { name: 'The work' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Dee/ }).first()).toBeVisible();
-  const tile = page.locator('.exq-photo-grid__button', {
-    has: page.locator('img[alt="Knotless braids by Dee"]'),
-  });
-  await tile.first().click();
+  await expect(page.getByRole('link', { name: /Drew/ }).first()).toBeVisible();
+  await page
+    .locator('.exq-photo-grid__button', { has: page.locator('img[alt="Design by Drew"]') })
+    .first()
+    .click();
   const dialog = page.locator('dialog.exq-dialog[open]');
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: 'By Dee' })).toBeVisible();
-  await expect(dialog.locator('img[alt="Knotless braids by Dee"]').first()).toBeVisible();
-  await expect(dialog.getByRole('link', { name: 'Book Dee' })).toHaveAttribute(
+  await expect(dialog.getByRole('heading', { name: 'By Drew' })).toBeVisible();
+  await expect(dialog.locator('img[alt="Design by Drew"]').first()).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Book Drew' })).toHaveAttribute(
     'href',
-    '/book?barber=dee',
+    '/book?barber=drew',
   );
-  await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  // The home page shows the work section once a photo exists.
-  await page.goto('/');
-  await expect(page.locator('.exq-home__work .exq-photo-grid__item').first()).toBeVisible();
 });
 
 test('a profile page carries its own title, description, canonical and the shop JSON-LD', async ({
   page,
 }) => {
-  await page.goto('/chairs/marcus');
-  await expect(page.locator('.exq-chair__name')).toHaveText('Marcus');
-  await expect(page).toHaveTitle('Marcus | Exquisite Barber & Beauty Lounge');
+  await page.goto('/chairs/lee');
+  await expect(page.locator('.exq-chair__name')).toHaveText('Lee');
+  await expect(page).toHaveTitle('Lee | Exquisite Barber & Beauty Lounge');
   await expect(page.locator('meta[name="description"]')).toHaveAttribute(
     'content',
-    /^Marcus, .* at Exquisite Barber & Beauty Lounge in Brookhaven, PA\./,
+    /^Lee, .* at Exquisite Barber & Beauty Lounge in Brookhaven, PA\./,
   );
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/chairs\/marcus$/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/chairs\/lee$/);
   await expect(page.locator('meta[property="og:url"]')).toHaveAttribute(
     'content',
-    /\/chairs\/marcus$/,
+    /\/chairs\/lee$/,
   );
   const jsonLd = JSON.parse(
     (await page.locator('script[type="application/ld+json"]').textContent()) ?? '{}',
@@ -113,5 +146,5 @@ test('a profile page carries its own title, description, canonical and the shop 
   // The sitemap built by the API lists the profile.
   const sitemap = await page.request.get('/sitemap.xml');
   expect(sitemap.headers()['content-type']).toContain('application/xml');
-  expect(await sitemap.text()).toContain('/chairs/marcus</loc>');
+  expect(await sitemap.text()).toContain('/chairs/lee</loc>');
 });

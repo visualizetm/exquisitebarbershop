@@ -150,6 +150,10 @@ export async function rescheduleBooking(
     startAt: Date;
     endAt: Date;
     bufferMinutes: number;
+    /** Only when the booking moves to a chair with other prices: the services as that chair does them. */
+    services?: BookingDocument['services'];
+    durationMinutes?: number;
+    totalPriceCents?: number;
   },
   now: Date,
   options?: RepoOptions,
@@ -485,19 +489,31 @@ export async function listBookingsStartingBetween(
 }
 
 /**
- * Gives a confirmed booking to another chair at the same time. The time does not change, so the
- * customer's manage link stays valid (no token version bump).
+ * Gives a confirmed booking to another chair at the same start, with that chair's price and length
+ * (the end follows it). Lock changes happen in the service, inside the same transaction. The
+ * customer is emailed the change, so the manage link version moves up like a reschedule: the
+ * newest email holds the working link, and the calendar file's SEQUENCE rises so a calendar replaces
+ * the old event.
  */
 export async function moveBookingToStaff(
   id: string,
-  staffId: string,
+  change: {
+    staffId: string;
+    endAt: Date;
+    services: BookingDocument['services'];
+    durationMinutes: number;
+    totalPriceCents: number;
+  },
   now: Date,
   options?: RepoOptions,
 ): Promise<BookingDocument> {
   const col = await collection('bookings');
   const updated = await col.findOneAndUpdate(
     { _id: id, status: 'confirmed' },
-    { $set: { staffId, staffRequested: true, updatedAt: now } },
+    {
+      $set: { ...change, staffRequested: true, updatedAt: now },
+      $inc: { manageTokenVersion: 1 },
+    },
     { returnDocument: 'after', ...sessionOf(options) },
   );
   if (!updated)

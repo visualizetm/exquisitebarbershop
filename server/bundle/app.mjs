@@ -971,8 +971,8 @@ var require_db_connections = __commonJS({
         clearTimeout(idleTimeout);
         idleTimeoutResolve();
       }
-      const promise2 = new Promise((resolve2) => {
-        idleTimeoutResolve = resolve2;
+      const promise2 = new Promise((resolve3) => {
+        idleTimeoutResolve = resolve3;
       });
       const deadline = (0, import_deadline.getDeadline)();
       const remainingDuration = deadline ? deadline.getTime() - Date.now() - 1e3 : maximumDuration;
@@ -1196,7 +1196,7 @@ var require_websocket = __commonJS({
         noServer: true,
         maxPayload: options.maxPayload ?? DEFAULT_MAX_PAYLOAD
       });
-      const ws = await new Promise((resolve2, reject) => {
+      const ws = await new Promise((resolve3, reject) => {
         const cleanup = () => {
           socket.removeListener("error", onError);
           socket.removeListener("close", onClose);
@@ -1213,7 +1213,7 @@ var require_websocket = __commonJS({
         };
         const resolveUpgrade = (ws2) => {
           cleanup();
-          resolve2(ws2);
+          resolve3(ws2);
         };
         const onError = (err) => rejectUpgrade(err);
         const onClose = () => rejectUpgrade(
@@ -1324,6 +1324,7 @@ __export(shopSettingsRepo_exports, {
   createShopSettingsIfMissing: () => createShopSettingsIfMissing,
   getShopSettings: () => getShopSettings,
   requireShopSettings: () => requireShopSettings,
+  updateReviewSettings: () => updateReviewSettings,
   updateShopSettings: () => updateShopSettings
 });
 
@@ -6401,7 +6402,7 @@ var recursive = /* @__PURE__ */ new WeakMap();
 var NONE = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
-function isRecursive(inst, stack, resolve2) {
+function isRecursive(inst, stack, resolve3) {
   const cached4 = recursive.get(inst);
   if (cached4 !== void 0)
     return cached4 ? PROVEN : NONE;
@@ -6411,7 +6412,7 @@ function isRecursive(inst, stack, resolve2) {
   let result = NONE;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
-      const answer = isRecursive(child, stack, resolve2);
+      const answer = isRecursive(child, stack, resolve3);
       if (answer > result)
         result = answer;
     }
@@ -6422,7 +6423,7 @@ function isRecursive(inst, stack, resolve2) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve2) : NONE;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve3) : NONE;
       if (child > answer)
         answer = child;
     }
@@ -6486,7 +6487,7 @@ function isRecursive(inst, stack, resolve2) {
       break;
     // `$ZodLazy` caches its inner on the def, so a resolved edge is followed exactly
     case "lazy": {
-      const inner = def._cachedInner ?? (resolve2 ? inst._zod.innerType : void 0);
+      const inner = def._cachedInner ?? (resolve3 ? inst._zod.innerType : void 0);
       merge2(inner ? isRecursive(inner, stack, false) : ASSUMED);
       break;
     }
@@ -27786,6 +27787,56 @@ var featureFlagsSchema = external_exports.object({
   rewards: external_exports.boolean().default(false),
   smsReminders: external_exports.boolean().default(false)
 });
+var ratingSchema = external_exports.number().min(0).max(5).refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, {
+  message: "Use at most one decimal, for example 4.7"
+});
+var googleRatingFields = {
+  rating: ratingSchema,
+  reviewCount: external_exports.int().min(0).max(1e5),
+  /** The shop date the rating was last read from Google, or empty. */
+  ratingCheckedOn: external_exports.union([external_exports.literal(""), isoDateSchema])
+};
+var ratingNeedsCount = (g) => g.reviewCount === 0 || g.rating >= 1;
+var ratingNeedsCountIssue = {
+  path: ["rating"],
+  message: "Add the rating, or set the review count to 0"
+};
+var googleSettingsSchema = external_exports.object({
+  placeId: external_exports.string().trim().max(200).regex(/^[A-Za-z0-9_-]*$/, "A place id has only letters, digits, hyphens and underscores"),
+  ...googleRatingFields
+}).refine(ratingNeedsCount, ratingNeedsCountIssue);
+var googleRatingSchema = external_exports.strictObject(googleRatingFields).refine(ratingNeedsCount, ratingNeedsCountIssue);
+var DEFAULT_GOOGLE = {
+  placeId: "",
+  rating: 0,
+  reviewCount: 0,
+  ratingCheckedOn: ""
+};
+var REVIEW_SOURCES = ["google", "thecut"];
+var reviewSourceSchema = external_exports.enum(REVIEW_SOURCES);
+var MAX_REVIEWS = 30;
+var REVIEW_TEXT_MAX = 600;
+var reviewItemSchema = external_exports.object({
+  id: idSchema,
+  /** First name and last initial, as the reviewer shows it. */
+  name: nonEmptyText(80),
+  text: nonEmptyText(REVIEW_TEXT_MAX),
+  stars: external_exports.int().min(1).max(5),
+  source: reviewSourceSchema,
+  /** The day it was posted (shop date). theCut shows no exact date, so its reviews have none. */
+  date: isoDateSchema.optional(),
+  staffId: idSchema.nullable(),
+  show: external_exports.boolean(),
+  sortOrder: external_exports.int().min(0).max(1e4)
+});
+var reviewsSettingsSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  items: external_exports.array(reviewItemSchema).max(MAX_REVIEWS)
+}).refine((r) => new Set(r.items.map((i) => i.id)).size === r.items.length, {
+  path: ["items"],
+  message: "Each review needs its own id"
+});
+var DEFAULT_REVIEWS = { enabled: true, items: [] };
 var announcementLinkSchema = external_exports.string().trim().max(200).refine(
   (v) => v === "" || v.startsWith("/") && !v.startsWith("//") || v.startsWith("https://"),
   {
@@ -27808,7 +27859,7 @@ var announcementSchema = external_exports.object({
 });
 var DEFAULT_ANNOUNCEMENT = {
   enabled: true,
-  text: "Walk ins welcome",
+  text: "Walk-ins welcome",
   linkLabel: "Book online",
   linkUrl: "/book",
   endsOn: ""
@@ -27856,6 +27907,8 @@ var shopSettingsDocumentSchema = external_exports.object({
   permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
   announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
   social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
+  google: googleSettingsSchema.default(DEFAULT_GOOGLE),
+  reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
   nextOpenServiceId: idSchema.nullable().default(null)
 }).extend(timestampsSchema.shape);
@@ -27863,6 +27916,10 @@ var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   _id: true,
   createdAt: true,
   updatedAt: true
+});
+var shopSettingsUpdateSchema = shopSettingsInputSchema.omit({
+  reviews: true,
+  google: true
 });
 
 // server/db/client.ts
@@ -27911,6 +27968,11 @@ var photoDocumentSchema = external_exports.object({
   height: external_exports.int().min(1).max(1e4),
   alt: external_exports.string().trim().min(1).max(200),
   sortOrder: external_exports.int().min(0),
+  /**
+   * Gallery photos the shop picked for the Home page ("the work"). Set by the seed photo loader
+   * from the manifest; photos without it still fill Home after the picked ones.
+   */
+  home: external_exports.boolean().optional(),
   createdBy: actorSchema,
   createdAt: external_exports.date(),
   /** Soft delete. The object is removed from storage afterwards (purgedAt). */
@@ -28689,8 +28751,22 @@ var apiErrorSchema = external_exports.object({
         customerName: external_exports.string(),
         services: external_exports.array(external_exports.string()),
         hasEmail: external_exports.boolean(),
-        /** Chairs that do every service of this booking and are free for all of it: where it can move. */
-        moveOptions: external_exports.array(external_exports.object({ staffId: external_exports.string(), staffName: external_exports.string() })).optional()
+        /** What the booking costs and how long it takes now, on its own chair. */
+        totalPriceCents: external_exports.int().optional(),
+        durationMinutes: external_exports.int().optional(),
+        /**
+         * Chairs that do every service of this booking and are free for all of their own length:
+         * where it can move. Each carries what the booking costs and takes with that chair, so the
+         * owner sees the new price before confirming.
+         */
+        moveOptions: external_exports.array(
+          external_exports.object({
+            staffId: external_exports.string(),
+            staffName: external_exports.string(),
+            totalPriceCents: external_exports.int(),
+            durationMinutes: external_exports.int()
+          })
+        ).optional()
       })
     ).optional(),
     /** For SLOT_TAKEN: the next open times so the UI can offer them right away. */
@@ -28746,6 +28822,8 @@ function fill(doc) {
     permissions: { ...DEFAULT_STAFF_PERMISSIONS, ...stored.permissions },
     nextOpenServiceId: stored.nextOpenServiceId ?? null,
     announcement: { ...DEFAULT_ANNOUNCEMENT, ...stored.announcement },
+    google: { ...DEFAULT_GOOGLE, ...stored.google },
+    reviews: { ...DEFAULT_REVIEWS, ...stored.reviews },
     // Shops set up before the social links existed keep their Instagram link from the handle.
     social: stored.social ?? {
       ...DEFAULT_SOCIAL_LINKS,
@@ -28784,7 +28862,7 @@ async function createShopSettingsIfMissing(input2, now2, options) {
   return { created: result.upsertedCount === 1 };
 }
 async function updateShopSettings(input2, now2, options) {
-  const parsed = shopSettingsInputSchema.parse(input2);
+  const parsed = shopSettingsUpdateSchema.parse(input2);
   const col = await collection("shopSettings");
   const updated = await col.findOneAndUpdate(
     { _id: SHOP_SETTINGS_ID },
@@ -28794,10 +28872,23 @@ async function updateShopSettings(input2, now2, options) {
   if (!updated) throw new AppError("NOT_FOUND", "Shop settings were not found");
   return fill(updated);
 }
+async function updateReviewSettings(input2, now2, options) {
+  const reviews = reviewsSettingsSchema.parse(input2.reviews);
+  const google = googleSettingsSchema.parse(input2.google);
+  const col = await collection("shopSettings");
+  const updated = await col.findOneAndUpdate(
+    { _id: SHOP_SETTINGS_ID },
+    { $set: { reviews, google, updatedAt: now2 } },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
+  if (!updated) throw new AppError("NOT_FOUND", "Shop settings were not found");
+  return fill(updated);
+}
 
 // server/repos/staffRepo.ts
 var staffRepo_exports = {};
 __export(staffRepo_exports, {
+  assertPricesMatchMenu: () => assertPricesMatchMenu,
   findStaffById: () => findStaffById,
   findStaffByIds: () => findStaffByIds,
   findStaffBySlug: () => findStaffBySlug,
@@ -28809,8 +28900,123 @@ __export(staffRepo_exports, {
   updateStaff: () => updateStaff
 });
 
+// shared/lib/servicePricing.ts
+function isCents(value) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+function isMinutes(value) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+function offersService(staff, serviceId) {
+  return staff.serviceIds.includes(serviceId);
+}
+function overrideFor(staff, serviceId) {
+  return staff.servicePrices?.find((p) => p.serviceId === serviceId && isCents(p.priceCents));
+}
+function resolveServiceForStaff(service2, staff) {
+  const own2 = overrideFor(staff, service2.id);
+  return {
+    serviceId: service2.id,
+    priceCents: own2 ? own2.priceCents : service2.priceCents,
+    durationMinutes: isMinutes(own2?.durationMinutes) ? own2.durationMinutes : service2.durationMinutes,
+    priceFrom: false,
+    overridden: own2 !== void 0
+  };
+}
+function quoteForStaff(services, staff) {
+  if (!services.every((s2) => offersService(staff, s2.id))) return null;
+  const lines = services.map((s2) => resolveServiceForStaff(s2, staff));
+  return {
+    staffId: staff.id,
+    lines,
+    totalCents: lines.reduce((sum, l2) => sum + l2.priceCents, 0),
+    totalMinutes: lines.reduce((sum, l2) => sum + l2.durationMinutes, 0),
+    from: false
+  };
+}
+function quoteMove(booked, shopService, staff) {
+  return quoteForStaff(
+    booked.map((line) => {
+      const service2 = shopService(line.serviceId);
+      return {
+        id: line.serviceId,
+        priceCents: service2?.priceCents ?? line.priceCents,
+        priceFrom: false,
+        durationMinutes: service2?.durationMinutes ?? line.durationMinutes
+      };
+    }),
+    staff
+  );
+}
+function servicePriceIssues(serviceIds, prices) {
+  const issues = [];
+  const seen = /* @__PURE__ */ new Set();
+  prices.forEach((entry, index) => {
+    if (seen.has(entry.serviceId)) {
+      issues.push({ path: [index, "serviceId"], message: "Only one price per service" });
+    }
+    seen.add(entry.serviceId);
+    if (!serviceIds.includes(entry.serviceId)) {
+      issues.push({
+        path: [index, "serviceId"],
+        message: "This person does not offer that service"
+      });
+    }
+  });
+  return issues;
+}
+function pruneServicePrices(serviceIds, prices) {
+  return prices.filter((p) => serviceIds.includes(p.serviceId));
+}
+
+// shared/schemas/service.ts
+var serviceGroupSchema = external_exports.enum(["Barber", "Beauty"]);
+var serviceDurationSchema = external_exports.int().min(5).max(8 * 60).multipleOf(5);
+var serviceDocumentSchema = external_exports.object({
+  _id: idSchema,
+  name: nonEmptyText(80),
+  group: serviceGroupSchema,
+  description: external_exports.string().trim().max(500),
+  priceCents: centsSchema,
+  /** When true the price is a starting point and the UI shows "From $x". */
+  priceFrom: external_exports.boolean(),
+  durationMinutes: serviceDurationSchema,
+  /** Cleanup gap after this service. Null means use the shop default buffer. */
+  bufferMinutes: external_exports.int().min(0).max(60).multipleOf(5).nullable().default(null),
+  sortOrder: external_exports.int().min(0),
+  /** Temporarily hidden from booking without deleting. */
+  isActive: external_exports.boolean(),
+  deletedAt: external_exports.date().nullable()
+}).extend(timestampsSchema.shape);
+var serviceInputSchema = serviceDocumentSchema.omit({
+  _id: true,
+  deletedAt: true,
+  createdAt: true,
+  updatedAt: true
+});
+var serviceUpdateSchema = serviceInputSchema.partial();
+
 // shared/schemas/staff.ts
 var staffRoleSchema = external_exports.enum(["owner", "barber", "stylist"]);
+var SERVICE_PRICES_MAX = 100;
+var servicePriceSchema = external_exports.object({
+  serviceId: idSchema,
+  priceCents: centsSchema,
+  durationMinutes: serviceDurationSchema.optional()
+});
+var servicePricesSchema = external_exports.array(servicePriceSchema).max(SERVICE_PRICES_MAX).superRefine((list, ctx) => {
+  const seen = /* @__PURE__ */ new Set();
+  list.forEach((entry, index) => {
+    if (seen.has(entry.serviceId)) {
+      ctx.addIssue({
+        code: "custom",
+        path: [index, "serviceId"],
+        message: "Only one price per service"
+      });
+    }
+    seen.add(entry.serviceId);
+  });
+});
 var staffDocumentSchema = external_exports.object({
   _id: idSchema,
   /** Current public slug used in /chairs/:slug and /book?barber=. */
@@ -28831,6 +29037,11 @@ var staffDocumentSchema = external_exports.object({
   bio: external_exports.string().trim().max(2e3),
   chairNumber: external_exports.int().min(1).max(99).nullable(),
   serviceIds: external_exports.array(idSchema),
+  /**
+   * Per person prices and times that differ from the shop's. Optional: documents written
+   * before the field existed have none, which reads the same as an empty list.
+   */
+  servicePrices: servicePricesSchema.optional(),
   photoUrl: external_exports.url().nullable(),
   instagramHandle: external_exports.string().regex(/^[A-Za-z0-9._]{1,30}$/).nullable(),
   sortOrder: external_exports.int().min(0),
@@ -28873,8 +29084,19 @@ function slugKeysOf(slug, aliases) {
 function slugTaken(slug, cause) {
   return new AppError("SLUG_TAKEN", `The slug "${slug}" is already in use`, { cause });
 }
+function assertPricesMatchMenu(serviceIds, prices) {
+  const issues = servicePriceIssues(serviceIds, prices);
+  if (issues.length === 0) return;
+  throw new AppError("VALIDATION_ERROR", "Prices must match the services this person offers", {
+    details: issues.map((i) => ({
+      path: ["servicePrices", ...i.path].join("."),
+      message: i.message
+    }))
+  });
+}
 async function insertStaff(input2, now2, options) {
   const parsed = staffInputSchema.parse(input2);
+  assertPricesMatchMenu(parsed.serviceIds, parsed.servicePrices ?? []);
   const doc = staffDocumentSchema.parse({
     _id: options?.id ?? newId(),
     ...parsed,
@@ -28983,34 +29205,6 @@ __export(servicesRepo_exports, {
   softDeleteService: () => softDeleteService,
   updateService: () => updateService
 });
-
-// shared/schemas/service.ts
-var serviceGroupSchema = external_exports.enum(["Barber", "Beauty"]);
-var serviceDocumentSchema = external_exports.object({
-  _id: idSchema,
-  name: nonEmptyText(80),
-  group: serviceGroupSchema,
-  description: external_exports.string().trim().max(500),
-  priceCents: centsSchema,
-  /** When true the price is a starting point and the UI shows "From $x". */
-  priceFrom: external_exports.boolean(),
-  durationMinutes: external_exports.int().min(5).max(8 * 60).multipleOf(5),
-  /** Cleanup gap after this service. Null means use the shop default buffer. */
-  bufferMinutes: external_exports.int().min(0).max(60).multipleOf(5).nullable().default(null),
-  sortOrder: external_exports.int().min(0),
-  /** Temporarily hidden from booking without deleting. */
-  isActive: external_exports.boolean(),
-  deletedAt: external_exports.date().nullable()
-}).extend(timestampsSchema.shape);
-var serviceInputSchema = serviceDocumentSchema.omit({
-  _id: true,
-  deletedAt: true,
-  createdAt: true,
-  updatedAt: true
-});
-var serviceUpdateSchema = serviceInputSchema.partial();
-
-// server/repos/servicesRepo.ts
 async function insertService(input2, now2, options) {
   const parsed = serviceInputSchema.parse(input2);
   const doc = serviceDocumentSchema.parse({
@@ -29627,11 +29821,14 @@ async function listBookingsStartingBetween(range, options) {
   const col = await collection("bookings");
   return col.find({ startAt: { $gte: range.start, $lt: range.end } }, sessionOf(options)).sort({ startAt: 1 }).toArray();
 }
-async function moveBookingToStaff(id, staffId, now2, options) {
+async function moveBookingToStaff(id, change, now2, options) {
   const col = await collection("bookings");
   const updated = await col.findOneAndUpdate(
     { _id: id, status: "confirmed" },
-    { $set: { staffId, staffRequested: true, updatedAt: now2 } },
+    {
+      $set: { ...change, staffRequested: true, updatedAt: now2 },
+      $inc: { manageTokenVersion: 1 }
+    },
     { returnDocument: "after", ...sessionOf(options) }
   );
   if (!updated)
@@ -30463,7 +30660,7 @@ __export(photosRepo_exports, {
 });
 async function insertPhoto(input2, now2, options) {
   const doc = photoDocumentSchema.parse({
-    _id: newId(),
+    _id: options?.id ?? newId(),
     ...input2,
     createdAt: now2,
     deletedAt: null,
@@ -31728,21 +31925,164 @@ import { timingSafeEqual as timingSafeEqual3 } from "node:crypto";
 import { randomUUID } from "node:crypto";
 
 // seed/shop.ts
+var PLACEHOLDER_SHOP_EMAIL = "hello@exquisitebarberbeauty.com";
+var reviewsSeed = [
+  {
+    name: "Unique D.",
+    source: "google",
+    stars: 5,
+    date: "2025-11-25",
+    text: "Great environment been getting my haircut there for a while now and always feel welcomed when I come in for a haircut. The environment is very clean and the music is always good."
+  },
+  {
+    name: "Ricardo E.",
+    source: "google",
+    stars: 5,
+    date: "2025-07-30",
+    text: "Great place! I walked in without an appointment and was helped right away. I loved the haircut, and the prices were very affordable. I\u2019ll definitely be coming back!"
+  },
+  {
+    name: "Routine Life Fitness",
+    source: "google",
+    stars: 5,
+    date: "2024-09-24",
+    staffKey: "dontrise",
+    text: "10/10!! This was my first time here and I will definitely be returning. Dontrise was professional, patient and very knowledgeable and communicative. My cut was super sharp!! One of the best cuts I\u2019ve gotten in a min."
+  },
+  {
+    name: "Daniel M.",
+    source: "google",
+    stars: 5,
+    date: "2024-10-26",
+    staffKey: "dontrise",
+    text: "First time customer, Dontrise cut my son\u2019s hair(9yo). I have no complaints. He was thorough,professional and made sure he was cutting to my son and I\u2019s liking multiple times. Clean shop. I\u2019m not easily pleased but this was a good experience as a first time customer. They also offer wash and dry services also."
+  },
+  {
+    name: "Lamont I.",
+    source: "google",
+    stars: 5,
+    date: "2024-10-24",
+    staffKey: "dontrise",
+    text: "Great barbershop. Dontrise is phenomenal barber. ... Patience and his attention to detail is everything. Great customer service."
+  },
+  {
+    name: "Shamarr M.",
+    source: "google",
+    stars: 5,
+    date: "2025-09-14",
+    text: "Soon as I sat in the chair I felt at home this is officially my go to."
+  },
+  {
+    name: "Basil S.",
+    source: "google",
+    stars: 5,
+    date: "2026-10-16",
+    text: "Amazing haircut\u2019s the entire shop is sharp"
+  },
+  {
+    name: "Frankie",
+    source: "google",
+    stars: 5,
+    date: "2024-10-02",
+    text: "best barber around 10/10 cut and a got me in as soon as i walked in the door"
+  },
+  {
+    name: "Margaret A.",
+    source: "google",
+    stars: 5,
+    date: "2026-02-14",
+    text: "Love this place already!!!!"
+  },
+  {
+    name: "Tom R.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "Attention to detail and communication skills already at an elite level stayed in constant dialogue every step of the cut. Sharpest I\u2019ve been in years, definitely coming back"
+  },
+  {
+    name: "Alexis M.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "It was our first time going to this barber, and my boys got some of the best haircuts they\u2019ve had in a long time! They\u2019re tender-headed, and the barber was very patient and gentle with them. We\u2019ll definitely be back and highly recommend!"
+  },
+  {
+    name: "Mark G.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "Drew has great communication, makes recommendations for your haircut but ultimately gives you exactly what you want. Will book again soon!"
+  },
+  {
+    name: "Jourdan S.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "No cap Drew is one of the best barbers I have met. His attention to detail and the effort he puts into every single cut is unmatched."
+  },
+  {
+    name: "Mike R.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "drew",
+    text: "Great atmosphere, great barber! Drew is very professional and considerate. Definitely will be going back"
+  },
+  {
+    name: "Paul H.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "Been getting haircuts by Mike since 2018 \u2026 he cuts me and my 4 year old routinely . Perfection everytime , I won\u2019t let anybody else touch our heads"
+  },
+  {
+    name: "Christian T.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "I\u2019ve been around the area for 4 years now. Buddy of mine suggested I go to Mike. I\u2019m glad I listened because Mike has been my barber ever since. Hands down best barber I\u2019ve had."
+  },
+  {
+    name: "Dylan M.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "Nelly is reliable, and sharp. Definitely would recommend"
+  },
+  {
+    name: "Jesse W.",
+    source: "thecut",
+    stars: 5,
+    staffKey: "nelly",
+    text: "Sharp cut, super quick and cool dude."
+  }
+];
+function seedReviewItems() {
+  return reviewsSeed.map(({ staffKey, date: date5, ...review }, index) => ({
+    id: newId(),
+    ...review,
+    ...date5 === void 0 ? {} : { date: date5 },
+    staffId: staffKey ? staffSeedId(staffKey) : null,
+    show: true,
+    sortOrder: index * 10
+  }));
+}
 var shopSettingsSeed = {
   name: "Exquisite Barber & Beauty Lounge",
   tagline: "Gifted Hands",
+  // Suite F is on Google and on Drew's booking page. Squire says "Unit 4". Suite F wins until
+  // Dontrise says otherwise.
   address: {
     line1: "3309 Edgmont Ave",
-    line2: null,
+    line2: "Suite F",
     city: "Brookhaven",
     state: "PA",
     postalCode: "19015"
-    // PLACEHOLDER confirm ZIP
   },
-  phone: "(610) 555-0100",
-  // PLACEHOLDER
-  email: "hello@exquisitebarberbeauty.com",
-  // PLACEHOLDER
+  // The Google Business Profile number. Dontrise's personal text line is never published.
+  phone: "(610) 609-0786",
+  email: PLACEHOLDER_SHOP_EMAIL,
+  // PLACEHOLDER hidden on every public page while it is this value
   instagramHandle: "exquisitebarberbeauty",
   websiteUrl: null,
   // PLACEHOLDER final domain
@@ -31780,21 +32120,28 @@ var shopSettingsSeed = {
     rewards: false,
     smsReminders: false
   },
-  // PLACEHOLDER the owner edits this in Website, Announcement
   announcement: {
     enabled: true,
-    text: "Walk ins welcome",
+    text: "Walk-ins welcome",
     linkLabel: "Book online",
     linkUrl: "/book",
     endsOn: ""
   },
+  // TikTok and Facebook pages do not exist, so the footer shows only Instagram.
   social: {
     instagramUrl: "https://instagram.com/exquisitebarberbeauty",
     tiktokUrl: "",
-    // PLACEHOLDER
     facebookUrl: ""
-    // PLACEHOLDER
-  }
+  },
+  // Read from the Google Business Profile on 2026-10-25. The owner edits the rating and count in
+  // Website, Reviews; Google offers no free feed, so they are copied by hand.
+  google: {
+    placeId: "ChIJISdW6zTpxokRzSBEJjMQU4M",
+    rating: 4.7,
+    reviewCount: 15,
+    ratingCheckedOn: "2026-10-25"
+  },
+  reviews: { enabled: true, items: seedReviewItems() }
 };
 var ownerLoginSeed = {
   email: "owner@exquisitebarberbeauty.com",
@@ -31802,187 +32149,129 @@ var ownerLoginSeed = {
   staffKey: "dontrise"
 };
 var closed = [];
+var openDay = [{ start: "10:00", end: "19:00" }];
 var shopHoursSeed = {
   mon: closed,
-  tue: [{ start: "09:00", end: "19:00" }],
-  wed: [{ start: "09:00", end: "19:00" }],
-  thu: [{ start: "09:00", end: "19:00" }],
-  fri: [{ start: "09:00", end: "19:00" }],
-  sat: [{ start: "08:00", end: "17:00" }],
+  tue: openDay,
+  wed: openDay,
+  thu: openDay,
+  fri: openDay,
+  sat: openDay,
+  sun: openDay
+};
+var noOnlineHours = {
+  mon: closed,
+  tue: closed,
+  wed: closed,
+  thu: closed,
+  fri: closed,
+  sat: closed,
   sun: closed
 };
+function service(order, key, name, priceCents, priceFrom, durationMinutes, description, group = "Barber") {
+  return {
+    key,
+    input: {
+      name,
+      group,
+      description,
+      priceCents,
+      priceFrom,
+      durationMinutes,
+      sortOrder: order * 10,
+      isActive: true
+    }
+  };
+}
 var servicesSeed = [
-  {
-    key: "classic-cut",
-    input: {
-      name: "Classic Cut",
-      group: "Barber",
-      description: "Clipper or scissor cut with a clean lineup.",
-      priceCents: 3e3,
-      priceFrom: false,
-      durationMinutes: 30,
-      sortOrder: 10,
-      isActive: true
-    }
-  },
-  {
-    key: "skin-fade",
-    input: {
-      name: "Skin Fade",
-      group: "Barber",
-      description: "Fade down to the skin, blended and lined.",
-      priceCents: 3500,
-      priceFrom: false,
-      durationMinutes: 45,
-      sortOrder: 20,
-      isActive: true
-    }
-  },
-  {
-    key: "cut-and-beard",
-    input: {
-      name: "Cut and Beard",
-      group: "Barber",
-      description: "Haircut plus a shaped and lined beard.",
-      priceCents: 4500,
-      priceFrom: false,
-      durationMinutes: 45,
-      sortOrder: 30,
-      isActive: true
-    }
-  },
-  {
-    key: "beard-trim",
-    input: {
-      name: "Beard Trim and Lineup",
-      group: "Barber",
-      description: "Shape, trim and crisp edges.",
-      priceCents: 2e3,
-      priceFrom: false,
-      durationMinutes: 15,
-      sortOrder: 40,
-      isActive: true
-    }
-  },
-  {
-    key: "lineup",
-    input: {
-      name: "Lineup",
-      group: "Barber",
-      description: "Edge up only.",
-      priceCents: 1500,
-      priceFrom: false,
-      durationMinutes: 15,
-      sortOrder: 50,
-      isActive: true
-    }
-  },
-  {
-    key: "kids-cut",
-    input: {
-      name: "Kids Cut",
-      group: "Barber",
-      description: "Ages 12 and under.",
-      priceCents: 2500,
-      priceFrom: false,
-      durationMinutes: 30,
-      sortOrder: 60,
-      isActive: true
-    }
-  },
-  {
-    key: "hot-towel-shave",
-    input: {
-      name: "Hot Towel Shave",
-      group: "Barber",
-      description: "Straight razor shave with hot towels.",
-      priceCents: 3e3,
-      priceFrom: false,
-      durationMinutes: 30,
-      sortOrder: 70,
-      isActive: true
-    }
-  },
-  {
-    key: "hair-design",
-    input: {
-      name: "Hair Design",
-      group: "Barber",
-      description: "Custom parts and designs, priced by detail.",
-      priceCents: 1e3,
-      priceFrom: true,
-      durationMinutes: 15,
-      sortOrder: 80,
-      isActive: true
-    }
-  },
-  {
-    key: "silk-press",
-    input: {
-      name: "Silk Press",
-      group: "Beauty",
-      description: "Wash, blow dry and silk press.",
-      priceCents: 7500,
-      priceFrom: true,
-      durationMinutes: 90,
-      sortOrder: 110,
-      isActive: true
-    }
-  },
-  {
-    key: "wash-and-style",
-    input: {
-      name: "Wash and Style",
-      group: "Beauty",
-      description: "Shampoo, condition and style.",
-      priceCents: 5e3,
-      priceFrom: true,
-      durationMinutes: 60,
-      sortOrder: 120,
-      isActive: true
-    }
-  },
-  {
-    key: "twist-out",
-    input: {
-      name: "Natural Twist Out",
-      group: "Beauty",
-      description: "Defined twist out on natural hair.",
-      priceCents: 6500,
-      priceFrom: true,
-      durationMinutes: 75,
-      sortOrder: 130,
-      isActive: true
-    }
-  },
-  {
-    key: "braids",
-    input: {
-      name: "Braids",
-      group: "Beauty",
-      description: "Priced by style and length.",
-      priceCents: 12e3,
-      priceFrom: true,
-      durationMinutes: 180,
-      bufferMinutes: 20,
-      // PLACEHOLDER longer cleanup after braids
-      sortOrder: 140,
-      isActive: true
-    }
-  },
-  {
-    key: "locs-retwist",
-    input: {
-      name: "Locs Retwist",
-      group: "Beauty",
-      description: "Retwist and style.",
-      priceCents: 8500,
-      priceFrom: true,
-      durationMinutes: 120,
-      sortOrder: 150,
-      isActive: true
-    }
-  }
+  service(
+    1,
+    "haircut",
+    "Haircut",
+    4e3,
+    true,
+    45,
+    "Full haircut and lineup with a straight razor finish."
+  ),
+  service(
+    2,
+    "cut-beard",
+    "Haircut and Beard",
+    4500,
+    false,
+    45,
+    "Haircut plus beard trim and beard lineup."
+  ),
+  service(
+    3,
+    "cut-design",
+    "Haircut with Design",
+    5e3,
+    true,
+    60,
+    "Full haircut with a design of your choice."
+  ),
+  service(4, "kids-cut", "Kids Cut", 2e3, true, 30, "12 and under."),
+  service(
+    5,
+    "kids-design",
+    "Kids Cut with Design",
+    4e3,
+    false,
+    60,
+    "12 and under, with a design."
+  ),
+  service(6, "lineup", "Lineup", 2e3, true, 20, "Temple, forehead and neck. No cut, no fade."),
+  service(
+    7,
+    "hot-towel",
+    "Hot Towel and Steam",
+    2e3,
+    false,
+    15,
+    "Hot towel and steam to open the pores, then a cleanse and moisturizer. Add it to a cut."
+  ),
+  service(
+    8,
+    "steam-fade",
+    "Steam, Hot Towel and Fade",
+    6e3,
+    false,
+    60,
+    "A sharp fade finished with hot towel and steam."
+  ),
+  service(
+    9,
+    "big-chop",
+    "Big Chop",
+    5e3,
+    false,
+    75,
+    "For big changes where a lot of length comes off."
+  ),
+  service(
+    10,
+    "color-cut",
+    "Color and Cut",
+    6500,
+    true,
+    90,
+    "Permanent color with a full haircut. Dontrise asks for a $25 deposit before color."
+  ),
+  service(
+    11,
+    "perm-cut",
+    "Perm with Cut",
+    15e3,
+    false,
+    150,
+    "Full perm set, kit included, finished with a haircut."
+  ),
+  service(12, "eyebrows", "Eyebrows", 1e3, false, 15, "A quick trim and shape."),
+  // No description on Dontrise's menu, so none is invented.
+  service(13, "female-cut", "Female Haircut", 4500, false, 75, "", "Beauty"),
+  service(14, "father-son", "Father and Son", 7e3, false, 105, "Two cuts, booked together."),
+  service(15, "friends-cut", "Friends Cut", 11e3, false, 130, "Two people coming in together.")
 ];
 function serviceSeedId(key) {
   return seedId("service", key);
@@ -31990,37 +32279,73 @@ function serviceSeedId(key) {
 function staffSeedId(key) {
   return seedId("staff", key);
 }
-var barberServiceKeys = [
-  "classic-cut",
-  "skin-fade",
-  "cut-and-beard",
-  "beard-trim",
-  "lineup",
-  "kids-cut",
-  "hot-towel-shave",
-  "hair-design"
-];
-var beautyServiceKeys = ["silk-press", "wash-and-style", "twist-out", "braids", "locs-retwist"];
+var serviceKeysByStaff = {
+  dontrise: [
+    "haircut",
+    "cut-design",
+    "kids-cut",
+    "kids-design",
+    "lineup",
+    "color-cut",
+    "female-cut",
+    "father-son",
+    "friends-cut"
+  ],
+  // PLACEHOLDER Lee has no public menu, so he is given the services the shop prices.
+  lee: ["haircut", "cut-beard", "cut-design", "kids-cut", "lineup"],
+  drew: [
+    "haircut",
+    "cut-beard",
+    "cut-design",
+    "kids-cut",
+    "lineup",
+    "hot-towel",
+    "big-chop",
+    "color-cut",
+    "perm-cut",
+    "eyebrows"
+  ],
+  nelly: ["haircut", "kids-cut", "steam-fade"],
+  // Iniya takes bookings on Instagram, so nothing is bookable on this site.
+  iniya: []
+};
+var servicePriceKeysByStaff = {
+  dontrise: {
+    haircut: [5e3, 75],
+    "cut-design": [7e3],
+    "kids-cut": [3e3, 45],
+    "kids-design": [4e3, 90],
+    lineup: [3e3, 40],
+    "color-cut": [1e4, 180]
+  },
+  drew: { "kids-cut": [2500] },
+  nelly: { haircut: [4500] }
+};
+function servicePricesFor(staffKey) {
+  return Object.entries(servicePriceKeysByStaff[staffKey] ?? {}).map(
+    ([serviceKey, [price, minutes]]) => ({
+      serviceId: serviceSeedId(serviceKey),
+      priceCents: price,
+      ...minutes === void 0 ? {} : { durationMinutes: minutes }
+    })
+  );
+}
 var staffSeed = [
   {
     key: "dontrise",
     input: {
       slug: "dontrise",
       name: "Dontrise",
-      // owner, confirmed
       role: "owner",
-      title: "Owner and Master Barber",
-      // PLACEHOLDER
-      specialty: "Fades, beards and natural hair",
-      // PLACEHOLDER
-      bio: "Owner of Exquisite Barber & Beauty Lounge.",
-      // PLACEHOLDER
+      title: "Owner and Barber",
+      specialty: "Fades, designs and color",
+      bio: "Team barber for the New York Jets and a travel barber. Hair Unit and AKN certified.",
       chairNumber: 1,
       // PLACEHOLDER
-      serviceIds: [...barberServiceKeys, ...beautyServiceKeys].map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.dontrise.map(serviceSeedId),
+      servicePrices: servicePricesFor("dontrise"),
       photoUrl: null,
-      instagramHandle: "exquisitebarberbeauty",
+      instagramHandle: "dontrisethebarber",
       sortOrder: 0,
       acceptsOnlineBooking: true,
       showOnWebsite: true
@@ -32029,139 +32354,100 @@ var staffSeed = [
     // PLACEHOLDER
   },
   {
-    key: "marcus",
+    key: "lee",
     input: {
-      slug: "marcus",
-      name: "Marcus",
-      // PLACEHOLDER
+      slug: "lee",
+      name: "Lee",
       role: "barber",
       title: "Barber",
-      // PLACEHOLDER
-      specialty: "Skin fades and designs",
-      // PLACEHOLDER
+      specialty: "Precision cuts",
       bio: "",
-      // PLACEHOLDER
+      // PLACEHOLDER no public profile text was found
       chairNumber: 2,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
+      serviceIds: serviceKeysByStaff.lee.map(serviceSeedId),
       // PLACEHOLDER
+      servicePrices: servicePricesFor("lee"),
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "lee_dabarber_",
       sortOrder: 10,
       acceptsOnlineBooking: true,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, sat: [{ start: "08:00", end: "14:00" }] }
+    hours: shopHoursSeed
     // PLACEHOLDER
   },
   {
-    key: "dee",
+    key: "drew",
     input: {
-      slug: "dee",
-      name: "Dee",
-      // PLACEHOLDER
+      slug: "drew",
+      name: "Drew",
       role: "barber",
-      title: "Barber",
-      // PLACEHOLDER
-      specialty: "Classic cuts and hot towel shaves",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
+      title: "Barber, known as 2Sharp",
+      specialty: "Designs, color and perms",
+      bio: "PA licensed barber and certified sensory safe. Works with all hair types: designs, color, perms, big chops and hairline restoration.",
       chairNumber: 3,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.drew.map(serviceSeedId),
+      servicePrices: servicePricesFor("drew"),
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "drew2sharp",
       sortOrder: 20,
       acceptsOnlineBooking: true,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, tue: closed }
-    // PLACEHOLDER
+    // Drew's own theCut schedule: Tuesday to Saturday, 10:00 to 18:00.
+    hours: {
+      ...noOnlineHours,
+      tue: [{ start: "10:00", end: "18:00" }],
+      wed: [{ start: "10:00", end: "18:00" }],
+      thu: [{ start: "10:00", end: "18:00" }],
+      fri: [{ start: "10:00", end: "18:00" }],
+      sat: [{ start: "10:00", end: "18:00" }]
+    }
   },
   {
-    key: "tre",
+    key: "nelly",
     input: {
-      slug: "tre",
-      name: "Tre",
-      // PLACEHOLDER
+      slug: "nelly",
+      name: "Nelly Cutz",
       role: "barber",
       title: "Barber",
-      // PLACEHOLDER
-      specialty: "Kids cuts and beards",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
+      specialty: "Fades and tapers",
+      bio: "Delaware County barber. Ask for the steam, hot towel and fade.",
       chairNumber: 4,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.nelly.map(serviceSeedId),
+      servicePrices: servicePricesFor("nelly"),
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "nellycutz_",
       sortOrder: 30,
       acceptsOnlineBooking: true,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, wed: closed }
+    hours: shopHoursSeed
     // PLACEHOLDER
   },
   {
-    key: "jay",
+    key: "iniya",
     input: {
-      slug: "jay",
-      name: "Jay",
-      // PLACEHOLDER
-      role: "barber",
-      title: "Barber",
-      // PLACEHOLDER
-      specialty: "Tapers and lineups",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
+      slug: "iniya",
+      name: "Iniya",
+      role: "stylist",
+      title: "Braider",
+      specialty: "Braids and wigs",
+      bio: "Braiding since 2020. Book through Instagram for now.",
       chairNumber: 5,
       // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
+      serviceIds: serviceKeysByStaff.iniya,
+      servicePrices: servicePricesFor("iniya"),
       photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
+      instagramHandle: "iniyathestylist",
       sortOrder: 40,
-      acceptsOnlineBooking: true,
+      acceptsOnlineBooking: false,
       showOnWebsite: true
     },
-    hours: { ...shopHoursSeed, thu: closed }
-    // PLACEHOLDER
-  },
-  {
-    key: "kris",
-    input: {
-      slug: "kris",
-      name: "Kris",
-      // PLACEHOLDER
-      role: "barber",
-      title: "Barber",
-      // PLACEHOLDER
-      specialty: "Fades and hair designs",
-      // PLACEHOLDER
-      bio: "",
-      // PLACEHOLDER
-      chairNumber: 6,
-      // PLACEHOLDER
-      serviceIds: barberServiceKeys.map(serviceSeedId),
-      // PLACEHOLDER
-      photoUrl: null,
-      instagramHandle: null,
-      // PLACEHOLDER
-      sortOrder: 50,
-      acceptsOnlineBooking: true,
-      showOnWebsite: true
-    },
-    hours: { ...shopHoursSeed, fri: [{ start: "12:00", end: "19:00" }] }
-    // PLACEHOLDER
+    hours: noOnlineHours
   }
 ];
 
@@ -32284,13 +32570,13 @@ async function writeMedia(key, bytes, contentType) {
   const bucket = bucketOf(db);
   for (const old of await findFiles(db, { filename: key })) await bucket.delete(old._id);
   const mediaId = mediaIdOf(key);
-  await new Promise((resolve2, reject) => {
+  await new Promise((resolve3, reject) => {
     const stream = bucket.openUploadStream(key, {
       metadata: { contentType, ...mediaId ? { mediaId } : {} }
     });
     stream.on("error", reject);
     stream.on("finish", () => {
-      resolve2();
+      resolve3();
     });
     stream.end(Buffer.from(bytes));
   });
@@ -32510,13 +32796,13 @@ var UNSIGNABLE_HEADERS = /* @__PURE__ */ new Set([
   "connection"
 ]);
 var AwsClient = class {
-  constructor({ accessKeyId, secretAccessKey, sessionToken, service, region, cache: cache2, retries, initRetryMs }) {
+  constructor({ accessKeyId, secretAccessKey, sessionToken, service: service2, region, cache: cache2, retries, initRetryMs }) {
     if (accessKeyId == null) throw new TypeError("accessKeyId is a required option");
     if (secretAccessKey == null) throw new TypeError("secretAccessKey is a required option");
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
-    this.service = service;
+    this.service = service2;
     this.region = region;
     this.cache = cache2 || /* @__PURE__ */ new Map();
     this.retries = retries != null ? retries : 10;
@@ -32553,13 +32839,13 @@ var AwsClient = class {
       if (res.status < 500 && res.status !== 429) {
         return res;
       }
-      await new Promise((resolve2) => setTimeout(resolve2, Math.random() * this.initRetryMs * Math.pow(2, i)));
+      await new Promise((resolve3) => setTimeout(resolve3, Math.random() * this.initRetryMs * Math.pow(2, i)));
     }
     throw new Error("An unknown error occurred, ensure retries is not negative");
   }
 };
 var AwsV4Signer = class {
-  constructor({ method, url: url2, headers, body, accessKeyId, secretAccessKey, sessionToken, service, region, cache: cache2, datetime: datetime3, signQuery, appendSessionToken, allHeaders, singleEncode }) {
+  constructor({ method, url: url2, headers, body, accessKeyId, secretAccessKey, sessionToken, service: service2, region, cache: cache2, datetime: datetime3, signQuery, appendSessionToken, allHeaders, singleEncode }) {
     if (url2 == null) throw new TypeError("url is a required option");
     if (accessKeyId == null) throw new TypeError("accessKeyId is a required option");
     if (secretAccessKey == null) throw new TypeError("secretAccessKey is a required option");
@@ -32571,10 +32857,10 @@ var AwsV4Signer = class {
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
     let guessedService, guessedRegion;
-    if (!service || !region) {
+    if (!service2 || !region) {
       [guessedService, guessedRegion] = guessServiceRegion(this.url, this.headers);
     }
-    this.service = service || guessedService || "";
+    this.service = service2 || guessedService || "";
     this.region = region || guessedRegion || "us-east-1";
     this.cache = cache2 || /* @__PURE__ */ new Map();
     this.datetime = datetime3 || (/* @__PURE__ */ new Date()).toISOString().replace(/[:-]|\.\d{3}/g, "");
@@ -32730,37 +33016,37 @@ function guessServiceRegion(url2, headers) {
     return match3 != null ? ["s3", match3[1] || ""] : ["", ""];
   }
   const match2 = hostname3.replace("dualstack.", "").match(/([^.]{1,63})\.(?:([^.]{0,63})\.)?amazonaws\.com(?:\.cn)?$/);
-  let service = match2 && match2[1] || "";
+  let service2 = match2 && match2[1] || "";
   let region = match2 && match2[2];
   if (region === "us-gov") {
     region = "us-gov-west-1";
   } else if (region === "s3" || region === "s3-accelerate") {
     region = "us-east-1";
-    service = "s3";
-  } else if (service === "iot") {
+    service2 = "s3";
+  } else if (service2 === "iot") {
     if (hostname3.startsWith("iot.")) {
-      service = "execute-api";
+      service2 = "execute-api";
     } else if (hostname3.startsWith("data.jobs.iot.")) {
-      service = "iot-jobs-data";
+      service2 = "iot-jobs-data";
     } else {
-      service = pathname === "/mqtt" ? "iotdevicegateway" : "iotdata";
+      service2 = pathname === "/mqtt" ? "iotdevicegateway" : "iotdata";
     }
-  } else if (service === "autoscaling") {
+  } else if (service2 === "autoscaling") {
     const targetPrefix = (headers.get("X-Amz-Target") || "").split(".")[0];
     if (targetPrefix === "AnyScaleFrontendService") {
-      service = "application-autoscaling";
+      service2 = "application-autoscaling";
     } else if (targetPrefix === "AnyScaleScalingPlannerFrontendService") {
-      service = "autoscaling-plans";
+      service2 = "autoscaling-plans";
     }
-  } else if (region == null && service.startsWith("s3-")) {
-    region = service.slice(3).replace(/^fips-|^external-1/, "");
-    service = "s3";
-  } else if (service.endsWith("-fips")) {
-    service = service.slice(0, -5);
-  } else if (region && /-\d$/.test(service) && !/-\d$/.test(region)) {
-    [service, region] = [region, service];
+  } else if (region == null && service2.startsWith("s3-")) {
+    region = service2.slice(3).replace(/^fips-|^external-1/, "");
+    service2 = "s3";
+  } else if (service2.endsWith("-fips")) {
+    service2 = service2.slice(0, -5);
+  } else if (region && /-\d$/.test(service2) && !/-\d$/.test(region)) {
+    [service2, region] = [region, service2];
   }
-  return [HOST_SERVICES[service] || service, region || ""];
+  return [HOST_SERVICES[service2] || service2, region || ""];
 }
 
 // server/storage/r2.ts
@@ -32899,6 +33185,35 @@ function staffQualifies(staff, services) {
 function serviceMinutesOf(services) {
   return services.reduce((sum, s2) => sum + s2.durationMinutes, 0);
 }
+function pricedService(service2) {
+  return {
+    id: service2._id,
+    priceCents: service2.priceCents,
+    priceFrom: service2.priceFrom,
+    durationMinutes: service2.durationMinutes
+  };
+}
+function pricedStaff(staff) {
+  return {
+    id: staff._id,
+    sortOrder: staff.sortOrder,
+    serviceIds: staff.serviceIds,
+    servicePrices: staff.servicePrices ?? []
+  };
+}
+function quoteStaff(staff, services, settings, keepMinutes) {
+  const price = quoteForStaff(services.map(pricedService), pricedStaff(staff));
+  if (!price) return null;
+  const serviceMinutes = keepMinutes ?? price.totalMinutes;
+  const bufferMinutes = effectiveBufferMinutes(services, settings);
+  return {
+    staffId: staff._id,
+    serviceMinutes,
+    bufferMinutes,
+    totalMinutes: serviceMinutes + bufferMinutes,
+    price
+  };
+}
 function effectiveBufferMinutes(services, settings) {
   return services.reduce(
     (max, s2) => Math.max(max, s2.bufferMinutes ?? settings.bufferMinutes),
@@ -33003,7 +33318,7 @@ function isWithinWorkingTime(booking, staff, source) {
   );
 }
 function computeStaffDay(input2) {
-  const { staff, date: date5, dayKey, dayBounds, shopRanges, ctx, totalMinutes } = input2;
+  const { staff, date: date5, dayKey, dayBounds, shopRanges, ctx, quote } = input2;
   const working = chairRanges(staff._id, date5, dayKey, dayBounds, shopRanges, ctx);
   if (working.length === 0) return { staffId: staff._id, starts: [], reason: "dayOff" };
   const blocks = ctx.timeBlocks.filter(
@@ -33022,8 +33337,8 @@ function computeStaffDay(input2) {
   let freeBeforeLead = 0;
   for (const range of working) {
     for (let t = ceilToStep(range.start, step); ; t = addMinutes(t, step)) {
-      if (addMinutes(t, input2.serviceMinutes).getTime() > range.end.getTime()) break;
-      const candidate = { start: t, end: addMinutes(t, totalMinutes) };
+      if (addMinutes(t, quote.serviceMinutes).getTime() > range.end.getTime()) break;
+      const candidate = { start: t, end: addMinutes(t, quote.totalMinutes) };
       if (busy.some((b) => overlaps(b, candidate))) continue;
       if (t.getTime() < earliest.getTime()) {
         freeBeforeLead += 1;
@@ -33067,12 +33382,15 @@ function summarizeReason(byStaff) {
   return "outsideWindow";
 }
 function computeAvailability(request, ctx) {
-  const serviceMinutes = serviceMinutesOf(ctx.services);
-  const bufferMinutes = effectiveBufferMinutes(ctx.services, ctx.settings);
-  const totalMinutes = serviceMinutes + bufferMinutes;
   const selected = request.staff === "any" ? null : resolveStaffSelector(ctx.staff, request.staff);
   const pool = request.staff === "any" ? ctx.staff : selected ? [selected] : [];
   const qualified = pool.filter((s2) => staffQualifies(s2, ctx.services));
+  const quotes = /* @__PURE__ */ new Map();
+  for (const staff of qualified) {
+    const keep = request.keep?.staffId === staff._id ? request.keep.serviceMinutes : void 0;
+    const quote = quoteStaff(staff, ctx.services, ctx.settings, keep);
+    if (quote) quotes.set(staff._id, quote);
+  }
   const days = [];
   let cursor = shopDayStart(request.fromDate);
   const endDate = request.toDate;
@@ -33100,20 +33418,21 @@ function computeAvailability(request, ctx) {
       continue;
     }
     const dayBounds = shopDayBounds(date5);
-    const staffDays = qualified.map((staff) => ({
-      staff,
-      day: computeStaffDay({
+    const staffDays = qualified.flatMap((staff) => {
+      const quote = quotes.get(staff._id);
+      if (!quote) return [];
+      const day = computeStaffDay({
         staff,
         date: date5,
         dayKey,
         dayBounds,
         shopRanges,
         ctx,
-        totalMinutes,
-        serviceMinutes,
+        quote,
         excludeBookingId: request.excludeBookingId
-      })
-    }));
+      });
+      return [{ staff, day }];
+    });
     const byStaff = staffDays.map((sd) => sd.day);
     const byStart = /* @__PURE__ */ new Map();
     for (const { staff, day } of staffDays) {
@@ -33134,9 +33453,10 @@ function computeAvailability(request, ctx) {
       );
       slotIndex += 1;
       const startAt = new Date(time3);
+      const firstMinutes = quotes.get(ranked[0]._id)?.serviceMinutes ?? 0;
       return {
         startAt,
-        endAt: addMinutes(startAt, serviceMinutes),
+        endAt: addMinutes(startAt, firstMinutes),
         staffId: ranked[0]._id,
         candidates: ranked.map((s2) => s2._id)
       };
@@ -33148,7 +33468,7 @@ function computeAvailability(request, ctx) {
       slots
     });
   }
-  return { serviceMinutes, bufferMinutes, totalMinutes, staff: qualified, days };
+  return { quotes, staff: qualified, days };
 }
 function findSlot(result, startAt) {
   const date5 = shopDateOf(startAt);
@@ -33474,7 +33794,9 @@ var galleryQuerySchema = external_exports.object({
   /** A staff slug or alias. */
   staff: external_exports.string().min(1).max(60).optional(),
   cursor: external_exports.string().max(200).optional(),
-  limit: external_exports.coerce.number().int().min(1).max(60).default(24)
+  limit: external_exports.coerce.number().int().min(1).max(60).default(24),
+  /** The Home order: the photos the shop picked for Home first, then the rest of the gallery. */
+  home: external_exports.stringbool().optional()
 });
 var galleryResponseSchema = external_exports.object({
   photos: external_exports.array(galleryPhotoSchema),
@@ -33871,6 +34193,7 @@ var adminStaffViewSchema = external_exports.object({
   bio: external_exports.string(),
   chairNumber: external_exports.int().nullable(),
   serviceIds: external_exports.array(idSchema),
+  servicePrices: external_exports.array(servicePriceSchema).default([]),
   photoUrl: external_exports.string().nullable(),
   instagramHandle: external_exports.string().nullable(),
   sortOrder: external_exports.int(),
@@ -33880,8 +34203,18 @@ var adminStaffViewSchema = external_exports.object({
 });
 var staffListResponseSchema = external_exports.object({ staff: external_exports.array(adminStaffViewSchema) });
 var staffResponseSchema = external_exports.object({ staff: adminStaffViewSchema });
-var staffCreateRequestSchema = staffInputSchema;
-var staffUpdateRequestSchema = staffUpdateSchema.omit({ slug: true }).extend({ resolutions: resolutionsSchema });
+function checkPricesAgainstMenu(value, ctx) {
+  if (!value.serviceIds || !value.servicePrices) return;
+  for (const issue2 of servicePriceIssues(value.serviceIds, value.servicePrices)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["servicePrices", ...issue2.path],
+      message: issue2.message
+    });
+  }
+}
+var staffCreateRequestSchema = staffInputSchema.superRefine(checkPricesAgainstMenu);
+var staffUpdateRequestSchema = staffUpdateSchema.omit({ slug: true }).extend({ resolutions: resolutionsSchema }).superRefine(checkPricesAgainstMenu);
 var staffSlugRequestSchema = external_exports.object({ slug: slugSchema });
 var staffMutationResponseSchema = staffResponseSchema.extend(conflictOutcomeSchema.shape);
 var hoursResponseSchema = external_exports.object({
@@ -33910,7 +34243,17 @@ var closureUpsertRequestSchema = external_exports.intersection(
 );
 var closureResponseSchema = external_exports.object({ closure: closureViewSchema }).extend(conflictOutcomeSchema.shape);
 var settingsResponseSchema = external_exports.object({ settings: shopSettingsInputSchema });
-var settingsRequestSchema = shopSettingsInputSchema;
+var settingsRequestSchema = shopSettingsUpdateSchema;
+var reviewsRequestSchema = external_exports.strictObject({
+  /** Off hides the whole section on Home and the chair pages. */
+  enabled: external_exports.boolean().optional(),
+  google: googleRatingSchema.optional(),
+  items: external_exports.array(external_exports.strictObject({ id: idSchema, show: external_exports.boolean() })).max(MAX_REVIEWS).refine((items) => new Set(items.map((i) => i.id)).size === items.length, {
+    message: "A review is listed twice"
+  }).optional()
+}).refine((r) => r.enabled !== void 0 || r.google !== void 0 || r.items !== void 0, {
+  message: "Nothing to save"
+});
 var overviewStatSchema = external_exports.object({ value: external_exports.int(), compare: external_exports.int().nullable() });
 var activityKindSchema = external_exports.enum(["booked", "canceled", "rescheduled", "noShow", "walkIn"]);
 var activityEntrySchema = external_exports.object({
@@ -34169,7 +34512,13 @@ async function alternativesAfter(input2, now2) {
     now: now2
   });
   const ctx = input2.override ? { ...loaded, settings: relaxed(loaded.settings) } : loaded;
-  const request = input2.excludeBookingId ? { fromDate, toDate, staff: input2.staff, excludeBookingId: input2.excludeBookingId } : { fromDate, toDate, staff: input2.staff };
+  const request = {
+    fromDate,
+    toDate,
+    staff: input2.staff,
+    ...input2.excludeBookingId ? { excludeBookingId: input2.excludeBookingId } : {},
+    ...input2.keep ? { keep: input2.keep } : {}
+  };
   const result = computeAvailability(request, ctx);
   return nextOpenSlots(result, input2.startAt, ALTERNATIVE_LIMIT).map(toApiSlot);
 }
@@ -34264,15 +34613,18 @@ var ONLINE_POLICY = {
   audience: { customer: true, owner: true },
   ownerSeenAt: null
 };
-function serviceSnapshots(ctx) {
-  return ctx.services.map((s2) => ({
-    serviceId: s2._id,
-    name: s2.name,
-    group: s2.group,
-    priceCents: s2.priceCents,
-    priceFrom: s2.priceFrom,
-    durationMinutes: s2.durationMinutes
-  }));
+function serviceSnapshots(services, quote) {
+  return services.map((s2) => {
+    const line = quote.lines.find((l2) => l2.serviceId === s2._id);
+    return {
+      serviceId: s2._id,
+      name: s2.name,
+      group: s2.group,
+      priceCents: line?.priceCents ?? s2.priceCents,
+      priceFrom: false,
+      durationMinutes: line?.durationMinutes ?? s2.durationMinutes
+    };
+  });
 }
 function cleanNotes(notes) {
   return notes?.trim() ? notes.trim() : null;
@@ -34291,7 +34643,8 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
   const staffId = slot.candidates.find((id) => !tried.has(id));
   if (!staffId) throw new AppError("SLOT_TAKEN", "That time is no longer available");
   const staff = result.staff.find((s2) => s2._id === staffId);
-  if (!staff) throw new AppError("SLOT_TAKEN", "That time is no longer available");
+  const quote = staff ? result.quotes.get(staff._id) : void 0;
+  if (!staff || !quote) throw new AppError("SLOT_TAKEN", "That time is no longer available");
   const overrideUsed = policy.override && findSlot(
     computeAvailability({ fromDate: date5, toDate: date5, staff: input2.staff }, strict),
     startAt
@@ -34308,18 +34661,18 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
       );
     }
   }
-  const endAt = addMinutes(startAt, result.serviceMinutes);
+  const endAt = addMinutes(startAt, quote.serviceMinutes);
   const booking = await bookingsRepo_exports.insertBooking(
     {
       referenceCode,
       staffId: staff._id,
       staffRequested: input2.staff !== "any",
-      services: serviceSnapshots(ctx),
+      services: serviceSnapshots(ctx.services, quote.price),
       startAt,
       endAt,
-      durationMinutes: result.serviceMinutes,
-      bufferMinutes: result.bufferMinutes,
-      totalPriceCents: ctx.services.reduce((sum, s2) => sum + s2.priceCents, 0),
+      durationMinutes: quote.serviceMinutes,
+      bufferMinutes: quote.bufferMinutes,
+      totalPriceCents: quote.price.totalCents,
       customer: input2.customer,
       status: "confirmed",
       source: policy.source,
@@ -34334,7 +34687,7 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
   );
   await slotLocksRepo_exports.acquireSlotLocks(
     staff._id,
-    { start: startAt, end: addMinutes(endAt, result.bufferMinutes) },
+    { start: startAt, end: addMinutes(endAt, quote.bufferMinutes) },
     { holderType: "booking", holderId: booking._id },
     meta3.now,
     { session }
@@ -34454,12 +34807,12 @@ async function placeWalkIn(input2, startAt, referenceCode, meta3, actor, idempot
   const staff = resolveStaffSelector(ctx.staff, input2.staff);
   if (staff?.deletedAt !== null)
     throw new AppError("STAFF_UNAVAILABLE", "That chair was not found");
-  if (!ctx.services.every((s2) => staff.serviceIds.includes(s2._id))) {
+  const quote = quoteStaff(staff, ctx.services, ctx.settings);
+  if (!quote) {
     throw new AppError("STAFF_UNAVAILABLE", `${staff.name} does not offer every chosen service`);
   }
   await scheduleGuardsRepo_exports.bumpScheduleGuards([staff._id], meta3.now, { session });
-  const serviceMinutes = serviceMinutesOf(ctx.services);
-  const bufferMinutes = effectiveBufferMinutes(ctx.services, ctx.settings);
+  const { serviceMinutes, bufferMinutes } = quote;
   const endAt = addMinutes(startAt, serviceMinutes);
   const outsideWorkingTime = !isWithinWorkingTime(
     { staffId: staff._id, startAt, endAt },
@@ -34471,12 +34824,12 @@ async function placeWalkIn(input2, startAt, referenceCode, meta3, actor, idempot
       referenceCode,
       staffId: staff._id,
       staffRequested: true,
-      services: serviceSnapshots(ctx),
+      services: serviceSnapshots(ctx.services, quote.price),
       startAt,
       endAt,
       durationMinutes: serviceMinutes,
       bufferMinutes,
-      totalPriceCents: ctx.services.reduce((sum, s2) => sum + s2.priceCents, 0),
+      totalPriceCents: quote.price.totalCents,
       customer: input2.customer,
       status: "confirmed",
       source: "walkIn",
@@ -34664,6 +35017,7 @@ async function cancelInTransaction(booking, staff, settings, policy, now2, sessi
 async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
   const { startAt, selector } = input2;
   const serviceIds = booking.services.map((s2) => s2.serviceId);
+  const keep = { staffId: booking.staffId, serviceMinutes: booking.durationMinutes };
   const tried = /* @__PURE__ */ new Set();
   let lastConflict = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -34676,21 +35030,29 @@ async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
         );
         const ctx = policy.override ? { ...strict, settings: relaxed(strict.settings) } : strict;
         const result = computeAvailability(
-          { fromDate: date5, toDate: date5, staff: selector, excludeBookingId: booking._id },
+          {
+            fromDate: date5,
+            toDate: date5,
+            staff: selector,
+            excludeBookingId: booking._id,
+            keep
+          },
           ctx
         );
         const slot = findSlot(result, startAt);
         if (!slot) throw reasonError(result, startAt, ctx);
         const staffId = slot.candidates.find((id) => !tried.has(id));
         const staff = staffId ? result.staff.find((s2) => s2._id === staffId) : void 0;
-        if (!staffId || !staff)
+        const quote = staffId ? result.quotes.get(staffId) : void 0;
+        if (!staffId || !staff || !quote)
           throw new AppError("SLOT_TAKEN", "That time is no longer available");
         await scheduleGuardsRepo_exports.bumpScheduleGuards([staff._id], now2, { session });
-        const endAt = addMinutes(startAt, result.serviceMinutes);
+        const sameChair = staff._id === booking.staffId;
+        const endAt = addMinutes(startAt, quote.serviceMinutes);
         await slotLocksRepo_exports.releaseSlotLocks(booking._id, { session });
         await slotLocksRepo_exports.acquireSlotLocks(
           staff._id,
-          { start: startAt, end: addMinutes(endAt, result.bufferMinutes) },
+          { start: startAt, end: addMinutes(endAt, quote.bufferMinutes) },
           { holderType: "booking", holderId: booking._id },
           now2,
           { session }
@@ -34708,7 +35070,12 @@ async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
             staffRequested: selector !== "any",
             startAt,
             endAt,
-            bufferMinutes: result.bufferMinutes
+            bufferMinutes: quote.bufferMinutes,
+            ...sameChair ? {} : {
+              services: serviceSnapshots(ctx.services, quote.price),
+              durationMinutes: quote.serviceMinutes,
+              totalPriceCents: quote.price.totalCents
+            }
           },
           now2,
           { session }
@@ -34763,6 +35130,7 @@ async function rescheduleBookingAs(booking, settings, input2, policy, now2) {
       staff: selector,
       startAt,
       excludeBookingId: booking._id,
+      keep,
       override: policy.override
     },
     now2,
@@ -34919,17 +35287,17 @@ var SAMPLE_CUSTOMERS = [
   { name: "Quinn Notreal", phone: "+12155550109" }
 ];
 var PLAN = [
-  { chair: "marcus", service: "skin-fade", day: 0, hour: 15, source: "online", customer: 0 },
-  { chair: "dee", service: "classic-cut", day: 0, hour: 16, source: "online", customer: 1 },
-  { chair: "dontrise", service: "cut-and-beard", day: 0, hour: 14, source: "phone", customer: 2 },
-  { chair: "tre", service: "cut-and-beard", day: 1, hour: 10, source: "online", customer: 3 },
-  { chair: "marcus", service: "classic-cut", day: 1, hour: 13, source: "online", customer: 4 },
-  { chair: "jay", service: "kids-cut", day: 1, hour: 15, source: "phone", customer: 5 },
-  { chair: "kris", service: "skin-fade", day: 2, hour: 14, source: "online", customer: 6 },
-  { chair: "dee", service: "hot-towel-shave", day: 2, hour: 11, source: "online", customer: 7 },
-  { chair: "dontrise", service: "skin-fade", day: 3, hour: 12, source: "online", customer: 8 },
-  { chair: "tre", service: "classic-cut", day: 0, hour: 0, source: "walkIn", customer: 3 },
-  { chair: "jay", service: "lineup", day: 0, hour: 0, source: "walkIn", customer: 5 }
+  { chair: "lee", service: "haircut", day: 0, hour: 15, source: "online", customer: 0 },
+  { chair: "drew", service: "cut-beard", day: 0, hour: 16, source: "online", customer: 1 },
+  { chair: "dontrise", service: "cut-design", day: 0, hour: 14, source: "phone", customer: 2 },
+  { chair: "nelly", service: "steam-fade", day: 1, hour: 10, source: "online", customer: 3 },
+  { chair: "lee", service: "lineup", day: 1, hour: 13, source: "online", customer: 4 },
+  { chair: "dontrise", service: "kids-cut", day: 1, hour: 15, source: "phone", customer: 5 },
+  { chair: "drew", service: "haircut", day: 2, hour: 14, source: "online", customer: 6 },
+  { chair: "nelly", service: "haircut", day: 2, hour: 11, source: "online", customer: 7 },
+  { chair: "dontrise", service: "haircut", day: 3, hour: 12, source: "online", customer: 8 },
+  { chair: "nelly", service: "kids-cut", day: 0, hour: 0, source: "walkIn", customer: 3 },
+  { chair: "lee", service: "lineup", day: 0, hour: 0, source: "walkIn", customer: 5 }
 ];
 var LOOKAHEAD_DAYS = 14;
 async function openStart(plan, now2) {
@@ -34953,7 +35321,7 @@ async function workingNow(chair, now2) {
   const ctx = await loadAvailabilityContext({
     fromDate: today,
     toDate: today,
-    serviceIds: [serviceSeedId("classic-cut")],
+    serviceIds: [serviceSeedId("haircut")],
     now: now2
   });
   const { ranges } = workingRangesFor(staffSeedId(chair), today, ctx);
@@ -35066,7 +35434,7 @@ async function seedWithLock(setup, now2) {
     if (Date.now() > deadline) {
       throw new AppError("CONFIG_ERROR", "The demo is still setting itself up. Please retry.");
     }
-    await new Promise((resolve2) => setTimeout(resolve2, POLL_MS));
+    await new Promise((resolve3) => setTimeout(resolve3, POLL_MS));
   }
 }
 async function ensureDemoReady(setup, now2 = /* @__PURE__ */ new Date()) {
@@ -35098,6 +35466,194 @@ async function clearDemoData() {
   return { cleared: true };
 }
 
+// server/services/seedPhotos.ts
+import { readFile as readFile2 } from "node:fs/promises";
+import { join as join2, resolve as resolve2 } from "node:path";
+
+// server/lib/webpSize.ts
+function webpSize(bytes) {
+  const at = (i) => bytes[i] ?? 0;
+  const tag = (i) => String.fromCharCode(at(i), at(i + 1), at(i + 2), at(i + 3));
+  if (bytes.length < 30 || tag(0) !== "RIFF" || tag(8) !== "WEBP") return null;
+  let size = null;
+  const chunk = tag(12);
+  if (chunk === "VP8 ") {
+    if (at(23) === 157 && at(24) === 1 && at(25) === 42) {
+      size = {
+        width: (at(26) | at(27) << 8) & 16383,
+        height: (at(28) | at(29) << 8) & 16383
+      };
+    }
+  } else if (chunk === "VP8L") {
+    if (at(20) === 47) {
+      const bits = (at(21) | at(22) << 8 | at(23) << 16 | at(24) << 24) >>> 0;
+      size = { width: (bits & 16383) + 1, height: (bits >>> 14 & 16383) + 1 };
+    }
+  } else if (chunk === "VP8X") {
+    size = {
+      width: (at(24) | at(25) << 8 | at(26) << 16) + 1,
+      height: (at(27) | at(28) << 8 | at(29) << 16) + 1
+    };
+  }
+  return size && size.width > 0 && size.height > 0 ? size : null;
+}
+
+// server/storage/serverUpload.ts
+async function storePhotoBytes(storage, key, bytes, contentType) {
+  if (storage.name !== "cloudinary") {
+    await storage.put(key, bytes, contentType);
+    return;
+  }
+  const upload = await storage.presignUpload({
+    key,
+    contentType,
+    size: bytes.length,
+    expiresInSeconds: 300
+  });
+  if (upload.method !== "POST") throw new Error("Unexpected upload method");
+  const form = new FormData();
+  for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
+  form.append("file", new Blob([bytes], { type: contentType }), "photo.webp");
+  const res = await fetch(upload.url, { method: "POST", body: form });
+  if (!res.ok) throw new Error(`Cloudinary answered ${String(res.status)}`);
+}
+
+// server/services/seedPhotos.ts
+var SYSTEM4 = { type: "system", userId: null, staffId: null };
+var seedPhotoEntrySchema = external_exports.object({
+  file: external_exports.string().regex(/^[a-z0-9][a-z0-9-]*\.webp$/, "A lowercase .webp file name"),
+  kind: external_exports.enum(["hero", "gallery"]),
+  alt: external_exports.string().trim().min(1).max(200),
+  home: external_exports.boolean().optional(),
+  sortOrder: external_exports.int().min(0)
+});
+var seedPhotoManifestSchema = external_exports.object({
+  photos: external_exports.array(seedPhotoEntrySchema).max(200)
+});
+function seedPhotosDir() {
+  return resolve2(process.cwd(), process.env.SEED_PHOTOS_DIR ?? "seed/photos");
+}
+function seedPhotoId(file2) {
+  return seedId("photo", file2);
+}
+function seedPhotoUuid(file2, bytes) {
+  const h = sha256Hex(`seed-photo:${getEnv2().MONGODB_DB_NAME}:${file2}:${sha256Hex(bytes)}`);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+async function readManifest(dir) {
+  let text;
+  try {
+    text = await readFile2(join2(dir, "manifest.json"), "utf8");
+  } catch {
+    return "no-manifest";
+  }
+  try {
+    const parsed = seedPhotoManifestSchema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data.photos : "bad-manifest";
+  } catch {
+    return "bad-manifest";
+  }
+}
+async function readOptional(path) {
+  try {
+    return await readFile2(path);
+  } catch {
+    return null;
+  }
+}
+async function loadSeedPhotos(now2, options = {}) {
+  const dir = options.dir ?? seedPhotosDir();
+  const summary = {
+    dir,
+    added: [],
+    existing: [],
+    missing: [],
+    failed: [],
+    skipped: null
+  };
+  if (!storageEnabled()) {
+    summary.skipped = "storage-off";
+    return summary;
+  }
+  const manifest = await readManifest(dir);
+  if (typeof manifest === "string") {
+    summary.skipped = manifest;
+    logger.warn(
+      manifest === "no-manifest" ? "seed photos: no manifest.json, nothing loaded" : "seed photos: manifest.json is not valid, nothing loaded",
+      { dir }
+    );
+    return summary;
+  }
+  const storage = getStorage();
+  for (const entry of manifest) {
+    const id = seedPhotoId(entry.file);
+    const heroTaken = entry.kind === "hero" && (await photosRepo_exports.listPhotos({ kind: "hero" })).length > 0;
+    if (heroTaken || await photosRepo_exports.findPhotoById(id)) {
+      summary.existing.push(entry.file);
+      continue;
+    }
+    const bytes = await readOptional(join2(dir, entry.file));
+    if (!bytes) {
+      summary.missing.push(entry.file);
+      continue;
+    }
+    const size = webpSize(bytes);
+    if (!size) {
+      summary.failed.push(entry.file);
+      logger.warn("seed photos: not a WebP file, skipped", { file: entry.file });
+      continue;
+    }
+    try {
+      const key = newPhotoKey(entry.kind, null, seedPhotoUuid(entry.file, bytes));
+      await storePhotoBytes(storage, key, bytes, "image/webp");
+      await photosRepo_exports.insertPhoto(
+        {
+          kind: entry.kind,
+          staffId: null,
+          key,
+          width: size.width,
+          height: size.height,
+          alt: entry.alt,
+          sortOrder: entry.sortOrder,
+          ...entry.home ? { home: true } : {},
+          createdBy: SYSTEM4
+        },
+        now2,
+        { id }
+      );
+      summary.added.push(entry.file);
+    } catch (error62) {
+      summary.failed.push(entry.file);
+      logger.warn("seed photos: could not store a photo", {
+        file: entry.file,
+        reason: error62 instanceof Error ? error62.message : "unknown"
+      });
+    }
+  }
+  if (summary.missing.length > 0) {
+    logger.warn(
+      `seed photos: ${String(summary.missing.length)} of ${String(manifest.length)} files are not in the folder yet, skipped`,
+      { dir, missing: summary.missing }
+    );
+  }
+  if (summary.added.length > 0) {
+    await auditLogRepo_exports.appendAuditEntry(
+      {
+        actor: SYSTEM4,
+        action: "photo.seed",
+        entityType: "photo",
+        entityId: "seed",
+        before: null,
+        after: { added: summary.added },
+        meta: { missing: summary.missing.length, failed: summary.failed.length },
+        requestId: options.requestId ?? null
+      },
+      now2
+    );
+  }
+  return summary;
+}
+
 // server/services/seedService.ts
 async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
   await ensureIndexes(db);
@@ -35114,10 +35670,10 @@ async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
     await weeklyHoursRepo_exports.setShopHours(shopHoursSeed, now2);
     summary.shopHoursCreated = true;
   }
-  for (const service of servicesSeed) {
-    const id = serviceSeedId(service.key);
+  for (const service2 of servicesSeed) {
+    const id = serviceSeedId(service2.key);
     if (await servicesRepo_exports.findServiceById(id)) continue;
-    await servicesRepo_exports.insertService(service.input, now2, { id });
+    await servicesRepo_exports.insertService(service2.input, now2, { id });
     summary.servicesCreated += 1;
   }
   for (const member of staffSeed) {
@@ -35146,7 +35702,7 @@ async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
 }
 
 // server/services/bootstrap.ts
-var SYSTEM4 = { type: "system", userId: null, staffId: null };
+var SYSTEM5 = { type: "system", userId: null, staffId: null };
 async function bootstrap(input2, now2) {
   const env = getEnv2();
   const demo = env.DEMO_MODE === "true";
@@ -35177,6 +35733,7 @@ async function bootstrap(input2, now2) {
   }
   const created = { ...summary, indexes: true };
   if (demo && !demoRecord) {
+    created.seedPhotos = (await loadSeedPhotos(now2, { requestId: input2.requestId })).added.length;
     created.sampleBookings = await seedSampleBookings(now2);
     created.demoPins = await seedDemoPins(now2);
     await systemStateRepo_exports.recordDemoSeed(now2);
@@ -35185,7 +35742,7 @@ async function bootstrap(input2, now2) {
   const record2 = await systemStateRepo_exports.recordBootstrap(created, now2);
   await auditLogRepo_exports.appendAuditEntry(
     {
-      actor: SYSTEM4,
+      actor: SYSTEM5,
       action: "system.bootstrap",
       entityType: "system",
       entityId: "bootstrap",
@@ -35738,6 +36295,14 @@ function getChannel(name) {
   return channel;
 }
 
+// server/lib/publicEmail.ts
+function isPlaceholderEmail(email3) {
+  return !email3 || email3.trim().toLowerCase() === PLACEHOLDER_SHOP_EMAIL.toLowerCase();
+}
+function publicEmail(email3) {
+  return isPlaceholderEmail(email3) ? "" : (email3 ?? "").trim();
+}
+
 // shared/lib/ics.ts
 function pad(n2) {
   return n2.toString().padStart(2, "0");
@@ -35810,7 +36375,7 @@ function buildIcs(input2) {
     `SUMMARY:${escapeIcsText(input2.summary)}`,
     `DESCRIPTION:${escapeIcsText(input2.description)}`,
     `LOCATION:${escapeIcsText(input2.location)}`,
-    `ORGANIZER;CN=${escapeIcsText(input2.organizerName)}:mailto:${input2.organizerEmail}`,
+    ...input2.organizerEmail ? [`ORGANIZER;CN=${escapeIcsText(input2.organizerName)}:mailto:${input2.organizerEmail}`] : [],
     `STATUS:${input2.method === "CANCEL" ? "CANCELLED" : "CONFIRMED"}`,
     ...input2.url ? [`URL:${input2.url}`] : [],
     "END:VEVENT",
@@ -35864,7 +36429,7 @@ function esc2(value) {
 }
 function serviceLines(p) {
   return p.booking.services.map(
-    (s2) => `${s2.name}: ${s2.priceFrom ? "from " : ""}${formatCents(s2.priceCents)} (${s2.durationMinutes} min)`
+    (s2) => `${s2.name}: ${formatCents(s2.priceCents)} (${s2.durationMinutes} min)`
   );
 }
 function whenLine(p) {
@@ -35907,7 +36472,7 @@ function icsAttachment(p, method, env) {
     ].join(" "),
     location: p.shop.addressLines.join(", "),
     organizerName: p.shop.name,
-    organizerEmail: p.shop.email,
+    organizerEmail: publicEmail(p.shop.email),
     stamp: env.now,
     ...url2 ? { url: url2 } : {}
   });
@@ -35927,7 +36492,7 @@ function customerConfirmed(p, env, rescheduled) {
     `Reference code: ${p.booking.referenceCode}`,
     "Services:",
     ...serviceLines(p).map((l2) => `  ${l2}`),
-    `Total: ${formatCents(p.booking.totalPriceCents)}${p.booking.services.some((s2) => s2.priceFrom) ? " (starting price, final price depends on the service)" : ""}`,
+    `Total: ${formatCents(p.booking.totalPriceCents)}`,
     ...url2 ? [`Need to change it? Cancel or reschedule here: ${url2}`] : [],
     "A calendar file is attached.",
     "",
@@ -36738,26 +37303,53 @@ function summarize(booking, staffById) {
     endAt: booking.endAt.toISOString(),
     customerName: booking.customer.name,
     services: booking.services.map((s2) => s2.name),
-    hasEmail: booking.customer.email !== null
+    hasEmail: booking.customer.email !== null,
+    totalPriceCents: booking.totalPriceCents,
+    durationMinutes: booking.durationMinutes
   };
 }
 function heldSpan(booking) {
   return { start: booking.startAt, end: addMinutes(booking.endAt, booking.bufferMinutes) };
 }
-function canTake(snapshot, booking, staff) {
-  if (staff.deletedAt !== null) return false;
-  if (!booking.services.every((s2) => staff.serviceIds.includes(s2.serviceId))) return false;
-  return isWithinWorkingTime({ ...booking, staffId: staff._id }, staff, snapshot.source);
+function repriceFor(booking, staff, servicesById) {
+  const quote = quoteMove(booking.services, (id) => servicesById.get(id), pricedStaff(staff));
+  if (!quote) return null;
+  return {
+    services: booking.services.map((line, index) => ({
+      ...line,
+      priceCents: quote.lines[index]?.priceCents ?? line.priceCents,
+      priceFrom: false,
+      durationMinutes: quote.lines[index]?.durationMinutes ?? line.durationMinutes
+    })),
+    durationMinutes: quote.totalMinutes,
+    totalPriceCents: quote.totalCents,
+    endAt: addMinutes(booking.startAt, quote.totalMinutes)
+  };
 }
-async function moveOptionsFor(snapshot, booking, session) {
+function moveTo(snapshot, booking, staff, servicesById) {
+  if (staff.deletedAt !== null) return null;
+  const moved = repriceFor(booking, staff, servicesById);
+  if (!moved) return null;
+  const span = { staffId: staff._id, startAt: booking.startAt, endAt: moved.endAt };
+  return isWithinWorkingTime(span, staff, snapshot.source) ? moved : null;
+}
+async function moveOptionsFor(snapshot, booking, servicesById, session) {
   const options = [];
   const sorted = [...snapshot.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const staff of sorted) {
-    if (staff._id === booking.staffId || !canTake(snapshot, booking, staff)) continue;
-    const locks = await slotLocksRepo_exports.listSlotLocksForStaff(staff._id, heldSpan(booking), {
-      session
-    });
-    if (locks.length === 0) options.push({ staffId: staff._id, staffName: staff.name });
+    if (staff._id === booking.staffId) continue;
+    const moved = moveTo(snapshot, booking, staff, servicesById);
+    if (!moved) continue;
+    const span = heldSpan({ ...booking, endAt: moved.endAt });
+    const locks = await slotLocksRepo_exports.listSlotLocksForStaff(staff._id, span, { session });
+    if (locks.length === 0) {
+      options.push({
+        staffId: staff._id,
+        staffName: staff.name,
+        totalPriceCents: moved.totalPriceCents,
+        durationMinutes: moved.durationMinutes
+      });
+    }
   }
   return options;
 }
@@ -36780,6 +37372,11 @@ async function applyScheduleChange(change) {
     }
     for (const booking of change.alsoAffected?.(after.upcoming) ?? [])
       affected.set(booking._id, booking);
+    const serviceIds = new Set(
+      [...affected.values()].flatMap((b) => b.services.map((s2) => s2.serviceId))
+    );
+    const services = await servicesRepo_exports.findServicesByIds([...serviceIds], { session });
+    const servicesById = new Map(services.map((s2) => [s2._id, s2]));
     const unresolved = [...affected.values()].filter((b) => !choices.has(b._id));
     if (unresolved.length > 0) {
       throw new AppError(
@@ -36790,7 +37387,7 @@ async function applyScheduleChange(change) {
             affected: await Promise.all(
               [...affected.values()].map(async (b) => ({
                 ...summarize(b, after.staffById),
-                moveOptions: await moveOptionsFor(after, b, session)
+                moveOptions: await moveOptionsFor(after, b, servicesById, session)
               }))
             )
           }
@@ -36807,7 +37404,8 @@ async function applyScheduleChange(change) {
       const action = choice?.action;
       if (choice?.action === "move" && choice.toStaffId) {
         const target = after.staffById.get(choice.toStaffId);
-        if (!target || !canTake(after, booking, target)) {
+        const priced = target ? moveTo(after, booking, target, servicesById) : null;
+        if (!target || !priced) {
           throw new AppError(
             "SLOT_TAKEN",
             `${target?.name ?? "That chair"} can not take this booking`
@@ -36817,27 +37415,65 @@ async function applyScheduleChange(change) {
         await slotLocksRepo_exports.releaseSlotLocks(booking._id, { session });
         await slotLocksRepo_exports.acquireSlotLocks(
           target._id,
-          heldSpan(booking),
+          heldSpan({ ...booking, endAt: priced.endAt }),
           { holderType: "booking", holderId: booking._id },
           change.now,
           { session }
         );
         await relockBlocks(booking.staffId, heldSpan(booking), change.now, session);
-        await bookingsRepo_exports.moveBookingToStaff(booking._id, target._id, change.now, { session });
+        const movedBooking = await bookingsRepo_exports.moveBookingToStaff(
+          booking._id,
+          {
+            staffId: target._id,
+            endAt: priced.endAt,
+            services: priced.services,
+            durationMinutes: priced.durationMinutes,
+            totalPriceCents: priced.totalPriceCents
+          },
+          change.now,
+          { session }
+        );
         await auditLogRepo_exports.appendAuditEntry(
           {
             actor: change.actor,
             action: "booking.move",
             entityType: "booking",
             entityId: booking._id,
-            before: { staffId: booking.staffId },
-            after: { staffId: target._id },
+            before: {
+              staffId: booking.staffId,
+              endAt: booking.endAt,
+              durationMinutes: booking.durationMinutes,
+              totalPriceCents: booking.totalPriceCents
+            },
+            after: {
+              staffId: target._id,
+              endAt: movedBooking.endAt,
+              durationMinutes: movedBooking.durationMinutes,
+              totalPriceCents: movedBooking.totalPriceCents
+            },
             meta: { change: change.audit.action },
             requestId: change.requestId
           },
           change.now,
           { session }
         );
+        if (settings) {
+          outboxIds.push(
+            ...await enqueueBookingNotifications(
+              {
+                event: "rescheduled",
+                view: toBookingView(movedBooking, target),
+                settings,
+                managePath: manageLinkFor(movedBooking),
+                previousStartAt: null,
+                cancelReason: null,
+                audience: { customer: true, owner: false }
+              },
+              change.now,
+              session
+            )
+          );
+        }
         moved.push(booking._id);
         continue;
       }
@@ -36930,18 +37566,18 @@ async function listServices2() {
   return { services: (await servicesRepo_exports.listServices()).map(toServiceView) };
 }
 async function createService(principal, input2, meta3) {
-  const service = await servicesRepo_exports.insertService(input2, meta3.now);
+  const service2 = await servicesRepo_exports.insertService(input2, meta3.now);
   await audit2(
     principal,
-    { action: "service.create", entityType: "service", entityId: service._id, after: input2 },
+    { action: "service.create", entityType: "service", entityId: service2._id, after: input2 },
     meta3
   );
-  return { service: toServiceView(service) };
+  return { service: toServiceView(service2) };
 }
 async function updateService2(principal, id, patch, meta3) {
   const before = await servicesRepo_exports.findServiceById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
-  const service = await servicesRepo_exports.updateService(id, patch, meta3.now);
+  const service2 = await servicesRepo_exports.updateService(id, patch, meta3.now);
   await audit2(
     principal,
     {
@@ -36953,11 +37589,11 @@ async function updateService2(principal, id, patch, meta3) {
     },
     meta3
   );
-  return { service: toServiceView(service) };
+  return { service: toServiceView(service2) };
 }
 async function deleteService(principal, id, resolutions, meta3) {
-  const service = await servicesRepo_exports.findServiceById(id);
-  if (!service || service.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
+  const service2 = await servicesRepo_exports.findServiceById(id);
+  if (!service2 || service2.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
   const change = await applyScheduleChange({
     actor: actorOf2(principal),
     requestId: meta3.requestId,
@@ -36988,6 +37624,8 @@ function toStaffView(s2) {
     bio: s2.bio,
     chairNumber: s2.chairNumber,
     serviceIds: s2.serviceIds,
+    // Read with a default: staff documents written before per person prices have no field.
+    servicePrices: s2.servicePrices ?? [],
     photoUrl: s2.photoUrl,
     instagramHandle: s2.instagramHandle,
     sortOrder: s2.sortOrder,
@@ -37009,9 +37647,17 @@ async function createStaff(principal, input2, meta3) {
   return { staff: toStaffView(staff) };
 }
 async function updateStaff2(principal, id, input2, meta3) {
-  const { resolutions, ...patch } = input2;
+  const { resolutions, ...requested } = input2;
   const before = await staffRepo_exports.findStaffById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
+  const patch = { ...requested };
+  const beforePrices = before.servicePrices ?? [];
+  if (patch.servicePrices !== void 0) {
+    staffRepo_exports.assertPricesMatchMenu(patch.serviceIds ?? before.serviceIds, patch.servicePrices);
+  } else if (patch.serviceIds) {
+    const kept = pruneServicePrices(patch.serviceIds, beforePrices);
+    if (kept.length !== beforePrices.length) patch.servicePrices = kept;
+  }
   const removed = patch.serviceIds ? before.serviceIds.filter((s2) => !patch.serviceIds?.includes(s2)) : [];
   const change = await applyScheduleChange({
     actor: actorOf2(principal),
@@ -37031,6 +37677,20 @@ async function updateStaff2(principal, id, input2, meta3) {
       (b) => b.staffId === id && b.services.some((s2) => removed.includes(s2.serviceId))
     )
   });
+  const afterPrices = change.result.servicePrices ?? [];
+  if (JSON.stringify(afterPrices) !== JSON.stringify(beforePrices)) {
+    await audit2(
+      principal,
+      {
+        action: "staff.prices.update",
+        entityType: "staff",
+        entityId: id,
+        before: { servicePrices: beforePrices },
+        after: { servicePrices: afterPrices }
+      },
+      meta3
+    );
+  }
   return {
     body: {
       staff: toStaffView(change.result),
@@ -37099,6 +37759,7 @@ async function putSettings(principal, input2, meta3) {
   await withTransaction(async (session) => {
     await shopSettingsRepo_exports.updateShopSettings(input2, meta3.now, { session });
   });
+  const after = await getSettings();
   await audit2(
     principal,
     {
@@ -37106,7 +37767,64 @@ async function putSettings(principal, input2, meta3) {
       entityType: "shopSettings",
       entityId: "shop",
       before: before.settings,
-      after: input2
+      after: after.settings
+    },
+    meta3
+  );
+  return after;
+}
+function reviewsAuditView(reviews, google) {
+  return {
+    enabled: reviews.enabled,
+    google: {
+      rating: google.rating,
+      reviewCount: google.reviewCount,
+      ratingCheckedOn: google.ratingCheckedOn
+    },
+    items: reviews.items.map((r) => ({
+      id: r.id,
+      name: r.name,
+      show: r.show,
+      sortOrder: r.sortOrder
+    }))
+  };
+}
+async function putReviews(principal, input2, meta3) {
+  const { before, after } = await withTransaction(async (session) => {
+    const stored = await shopSettingsRepo_exports.requireShopSettings({ session });
+    let items = stored.reviews.items;
+    if (input2.items) {
+      const byId = new Map(items.map((r) => [r.id, r]));
+      const sameSet = input2.items.length === items.length && input2.items.every((i) => byId.has(i.id));
+      if (!sameSet) {
+        throw new AppError(
+          "CONFLICT",
+          "The reviews changed since this page was opened. Reload the page and try again."
+        );
+      }
+      items = input2.items.flatMap((entry, index) => {
+        const review = byId.get(entry.id);
+        return review ? [{ ...review, show: entry.show, sortOrder: index * 10 }] : [];
+      });
+    }
+    const updated = await shopSettingsRepo_exports.updateReviewSettings(
+      {
+        reviews: { enabled: input2.enabled ?? stored.reviews.enabled, items },
+        google: input2.google ? { ...stored.google, ...input2.google } : stored.google
+      },
+      meta3.now,
+      { session }
+    );
+    return { before: stored, after: updated };
+  });
+  await audit2(
+    principal,
+    {
+      action: "settings.reviews.update",
+      entityType: "shopSettings",
+      entityId: "shop",
+      before: reviewsAuditView(before.reviews, before.google),
+      after: reviewsAuditView(after.reviews, after.google)
     },
     meta3
   );
@@ -37730,7 +38448,8 @@ async function galleryPage(query) {
   ) : [];
   const counts = /* @__PURE__ */ new Map();
   for (const p of all) if (p.staffId) counts.set(p.staffId, (counts.get(p.staffId) ?? 0) + 1);
-  const filtered = only ? all.filter((p) => p.staffId === only) : all;
+  const chosen = only ? all.filter((p) => p.staffId === only) : all;
+  const filtered = query.home ? [...chosen.filter((p) => p.home === true), ...chosen.filter((p) => p.home !== true)] : chosen;
   const after = cursors.decode(query.cursor, isOrderCursor);
   const start = after ? filtered.findIndex((p) => p._id === after.i) + 1 : 0;
   const page = filtered.slice(start, start + query.limit);
@@ -38416,6 +39135,11 @@ var adminRoutes = [
     const input2 = await parseBody(ctx, settingsRequestSchema);
     return { body: settingsResponseSchema.parse(await putSettings(principal, input2, metaOf(ctx))) };
   }),
+  owner("PUT", "/api/admin/reviews", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, reviewsRequestSchema);
+    return { body: settingsResponseSchema.parse(await putReviews(principal, input2, metaOf(ctx))) };
+  }),
   // A barber's PIN access ---------------------------------------------------
   owner("GET", "/api/admin/staff/:id/access", async (ctx) => {
     ctxScope(ctx);
@@ -38472,11 +39196,23 @@ var adminRoutes = [
 ];
 
 // shared/api/public.ts
+var publicReviewSchema = external_exports.object({
+  id: idSchema,
+  name: external_exports.string(),
+  text: external_exports.string(),
+  stars: external_exports.int(),
+  source: reviewSourceSchema,
+  /** YYYY-MM-DD, or null when the source shows no exact date (theCut). */
+  date: external_exports.string().nullable(),
+  /** The chair the review is about, or null for the shop as a whole. */
+  staffId: idSchema.nullable()
+});
 var publicShopSchema = external_exports.object({
   name: external_exports.string(),
   tagline: external_exports.string(),
   address: addressSchema,
   phone: external_exports.string(),
+  /** Empty while the stored address is still the stand-in, so no public page prints it. */
   email: external_exports.string(),
   instagramHandle: external_exports.string(),
   timezone: external_exports.string(),
@@ -38494,6 +39230,10 @@ var publicShopSchema = external_exports.object({
   /** The line in the strip above the header. Absent from older responses; the client then shows none. */
   announcement: announcementSchema.optional(),
   social: socialLinksSchema.optional(),
+  /** The Google Business Profile: place id for the Maps and review links, plus the rating shown. */
+  google: googleSettingsSchema.optional(),
+  /** The reviews to show, in order. Empty while the section is off or every review is hidden. */
+  reviews: external_exports.array(publicReviewSchema).max(30).optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
@@ -38522,6 +39262,8 @@ var publicStaffSchema = external_exports.object({
   bio: external_exports.string(),
   chairNumber: external_exports.int().nullable(),
   serviceIds: external_exports.array(idSchema),
+  /** This person's own prices and times, where they differ from the shop's. Public on the menu. */
+  servicePrices: external_exports.array(servicePriceSchema).default([]),
   photoUrl: external_exports.string().nullable(),
   instagramHandle: external_exports.string().nullable(),
   acceptsOnlineBooking: external_exports.boolean(),
@@ -38577,6 +39319,12 @@ var changeEmailRequestSchema = external_exports.object({
 var okResponseSchema = external_exports.object({ ok: external_exports.literal(true) });
 var logoutAllResponseSchema = external_exports.object({ ok: external_exports.literal(true), sessionsEnded: external_exports.int() });
 
+// shared/lib/reviews.ts
+function shownReviews(reviews) {
+  if (!reviews.enabled) return [];
+  return reviews.items.map((item, index) => ({ item, index })).filter(({ item }) => item.show).sort((a, b) => a.item.sortOrder - b.item.sortOrder || a.index - b.index).map(({ item }) => item);
+}
+
 // server/services/nextOpening.ts
 var LOOKAHEAD_DAYS2 = 14;
 function openingLabel(startAt, now2) {
@@ -38588,12 +39336,15 @@ function openingLabel(startAt, now2) {
   if (day === tomorrow) return `Tomorrow ${time3}`;
   return `${toShopTime(startAt).toFormat("ccc")} ${time3}`;
 }
+function minutesOnChair(staff, service2) {
+  return resolveServiceForStaff(pricedService(service2), pricedStaff(staff)).durationMinutes;
+}
 function serviceForChair(staff, services, preferredId) {
   const offered = services.filter((s2) => staff.serviceIds.includes(s2._id));
   const preferred = preferredId ? offered.find((s2) => s2._id === preferredId) : void 0;
   if (preferred) return preferred;
   return [...offered].sort(
-    (a, b) => a.durationMinutes - b.durationMinutes || a.sortOrder - b.sortOrder
+    (a, b) => minutesOnChair(staff, a) - minutesOnChair(staff, b) || a.sortOrder - b.sortOrder
   )[0] ?? null;
 }
 async function loadShared(now2) {
@@ -38612,11 +39363,11 @@ async function loadShared(now2) {
   const toDate = shopDayStart(today).plus({ days: windowDays }).toISODate() ?? today;
   return { ctx, services, today, toDate, preferred: settings.nextOpenServiceId };
 }
-function slotsFor(shared, staff, service, limit, now2) {
-  if (!service) return [];
+function slotsFor(shared, staff, service2, limit, now2) {
+  if (!service2) return [];
   const result = computeAvailability(
     { fromDate: shared.today, toDate: shared.toDate, staff: staff._id },
-    { ...shared.ctx, services: [service] }
+    { ...shared.ctx, services: [service2] }
   );
   return nextOpenSlots(result, now2, limit);
 }
@@ -38626,14 +39377,14 @@ async function nextOpenings(now2) {
   const chairs = staff.map((s2) => {
     const working = workingRangesFor(s2._id, shared.today, shared.ctx);
     const status = working.ranges.length > 0 ? "in" : working.reason === "closed" ? "closed" : "off";
-    const service = serviceForChair(s2, shared.services, shared.preferred);
-    const [slot] = slotsFor(shared, s2, service, 1, now2);
+    const service2 = serviceForChair(s2, shared.services, shared.preferred);
+    const [slot] = slotsFor(shared, s2, service2, 1, now2);
     return {
       staff: { id: s2._id, slug: s2.slug, name: s2.name },
       status,
       nextOpen: slot ? slot.startAt.toISOString() : null,
       nextOpenLabel: slot ? openingLabel(slot.startAt, now2) : null,
-      serviceId: service?._id ?? null
+      serviceId: service2?._id ?? null
     };
   });
   return { date: shared.today, chairs };
@@ -38644,8 +39395,8 @@ async function staffOpenings(slug, count, now2) {
     throw new AppError("NOT_FOUND", "That chair is no longer listed");
   }
   const shared = await loadShared(now2);
-  const service = serviceForChair(staff, shared.services, shared.preferred);
-  const openings = slotsFor(shared, staff, service, count, now2).map((slot) => ({
+  const service2 = serviceForChair(staff, shared.services, shared.preferred);
+  const openings = slotsFor(shared, staff, service2, count, now2).map((slot) => ({
     startAt: slot.startAt.toISOString(),
     endAt: slot.endAt.toISOString(),
     date: shopDateOf(slot.startAt),
@@ -38653,7 +39404,7 @@ async function staffOpenings(slug, count, now2) {
   }));
   return {
     staff: { id: staff._id, slug: staff.slug, name: staff.name },
-    service: service ? { id: service._id, name: service.name, durationMinutes: service.durationMinutes } : null,
+    service: service2 ? { id: service2._id, name: service2.name, durationMinutes: minutesOnChair(staff, service2) } : null,
     openings
   };
 }
@@ -38686,10 +39437,23 @@ function toPublicStaff(doc) {
     bio: doc.bio,
     chairNumber: doc.chairNumber,
     serviceIds: doc.serviceIds,
+    // Prices are the public menu, so they travel with the person. Old documents have none.
+    servicePrices: doc.servicePrices ?? [],
     photoUrl: doc.photoUrl,
     instagramHandle: doc.instagramHandle,
     acceptsOnlineBooking: doc.acceptsOnlineBooking,
     sortOrder: doc.sortOrder
+  };
+}
+function toPublicReview(item) {
+  return {
+    id: item.id,
+    name: item.name,
+    text: item.text,
+    stars: item.stars,
+    source: item.source,
+    date: item.date ?? null,
+    staffId: item.staffId
   };
 }
 var EMPTY_WEEK = { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] };
@@ -38709,7 +39473,7 @@ var publicRoutes = [
         tagline: settings.tagline,
         address: settings.address,
         phone: settings.phone,
-        email: settings.email,
+        email: publicEmail(settings.email),
         instagramHandle: settings.instagramHandle,
         timezone: settings.timezone,
         hours: hours?.days ?? EMPTY_WEEK,
@@ -38728,6 +39492,9 @@ var publicRoutes = [
           enabled: announcementIsLive(settings.announcement, shopDateOf(ctx.now))
         },
         social: settings.social,
+        google: settings.google,
+        // Hidden reviews, and every review while the section is off, never leave the server.
+        reviews: shownReviews(settings.reviews).map(toPublicReview),
         heroPhoto: hero,
         maintenance: getEnv2().MAINTENANCE_MODE === "true",
         demo: demoEnabled()
@@ -38753,7 +39520,8 @@ var publicRoutes = [
     handler: async () => {
       const staff = await staffRepo_exports.listPublicStaff();
       const base = getEnv2().APP_BASE_URL.replace(/\/$/, "");
-      const paths = [...SITEMAP_PATHS, ...staff.map((s2) => `/chairs/${s2.slug}`)];
+      const bookable = staff.filter((s2) => s2.acceptsOnlineBooking);
+      const paths = [...SITEMAP_PATHS, ...bookable.map((s2) => `/chairs/${s2.slug}`)];
       const urls = paths.map((p) => `  <url><loc>${escapeXml(`${base}${p}`)}</loc></url>`);
       const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -38930,6 +39698,10 @@ var authRoutes = [
 
 // server/http/routes/availability.ts
 var MAX_DAYS = 62;
+function shortestTotalMinutes(result, ctx) {
+  const totals = [...result.quotes.values()].map((q) => q.totalMinutes);
+  return totals.length > 0 ? Math.min(...totals) : serviceMinutesOf(ctx.services) + effectiveBufferMinutes(ctx.services, ctx.settings);
+}
 var availabilityRoutes = [
   {
     method: "GET",
@@ -38962,7 +39734,7 @@ var availabilityRoutes = [
       const day = result.days[0];
       const body = availabilityResponseSchema.parse({
         date: query.date,
-        durationMinutes: result.totalMinutes,
+        durationMinutes: shortestTotalMinutes(result, data),
         slots: (day?.slots ?? []).map((s2) => ({
           startAt: s2.startAt.toISOString(),
           endAt: s2.endAt.toISOString(),
