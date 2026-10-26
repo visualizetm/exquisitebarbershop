@@ -1229,3 +1229,15 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   next working day (from the stored shop and staff hours) at a fixed time no other test in the file uses
   (Lee 12:00, 15:00 and 17:00; Dontrise 10:00 and 11:00). Before this the file failed every evening from
   20:00 shop time, when a booking a few hours out spilled past midnight.
+- D13a-01 Today's chairs is a carousel under 1024px with native scroll and CSS scroll snap, no library:
+  `scroll-snap-type: x mandatory`, cards at 82% of the width under 768px and 44% from 768px (two in
+  view on a tablet, the next peeking in), `overscroll-behavior-x: contain`, `overflow-y: hidden`. From
+  1024px the grid is unchanged. Rejected a JavaScript slider: more code, worse scrolling on phones.
+- D13a-02 The autoplay timer is a small controller apart from the DOM (`carouselAutoplay.ts`), tested
+  with fake timers. Holds (finger down, hover, focus inside, off screen, hidden tab) restart the full
+  interval when released; a stop is for good. A `pointercancel` on the strip means the browser took
+  the gesture for scrolling, so it counts as the user's swipe, as does a lift with the strip moved.
+- D13a-03 The carousel region is named "Today's chairs carousel": the section around it is already a
+  region named "Today's chairs" by its heading, and two regions with one name confuse a screen reader.
+- D13a-04 Dots are 44px buttons labeled "Show [name]", the current one `aria-current="true"` and
+  drawn longer in the accent color. No live region: auto-advance announces nothing.

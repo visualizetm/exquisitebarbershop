@@ -225,14 +225,21 @@ h2[tabindex='-1']:focus,
 }
 
 /* A sideways strip on phones that becomes a grid from 768px. */
+/*
+ * The sideways strip (Today's chairs). Under 1024px it is a carousel: native scroll with mandatory
+ * snap, one card at 82% so the next peeks in, a sideways swipe never drags the page
+ * (overscroll-behavior-x) and nothing wobbles up and down inside it (overflow-y hidden). From
+ * 1024px it is the grid; data-lg sets the columns.
+ */
 .exq-strip {
   display: flex;
   gap: var(--s4);
   margin-inline: calc(var(--s4) * -1);
   padding-inline: var(--s4);
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
+  overflow: auto hidden;
+  scroll-snap-type: x mandatory;
   scroll-padding-inline: var(--s4);
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   padding-bottom: var(--s2);
 }
@@ -240,11 +247,15 @@ h2[tabindex='-1']:focus,
   display: none;
 }
 .exq-strip > * {
-  flex: 0 0 68%;
-  max-width: 280px;
+  flex: 0 0 82%;
   scroll-snap-align: start;
 }
 @media (min-width: 768px) {
+  .exq-strip > * {
+    flex-basis: 44%;
+  }
+}
+@media (min-width: 1024px) {
   .exq-strip {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -255,12 +266,6 @@ h2[tabindex='-1']:focus,
   }
   .exq-strip > * {
     flex: none;
-    max-width: none;
-  }
-}
-@media (min-width: 1024px) {
-  .exq-strip[data-lg='3'] {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .exq-strip[data-lg='6'] {
     grid-template-columns: repeat(6, minmax(0, 1fr));

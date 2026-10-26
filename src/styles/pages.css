@@ -190,6 +190,42 @@
 }
 
 /* Chairs --------------------------------------------------------------------------------- */
+/* The carousel dots: one per chair, 44px targets, the current one long and red. Grid from 1024px. */
+.exq-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--s1);
+  margin-top: var(--s2);
+}
+.exq-carousel__dot {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.exq-carousel__dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: currentColor;
+}
+.exq-carousel__dot[aria-current='true'] {
+  color: var(--accent-text);
+}
+.exq-carousel__dot[aria-current='true']::before {
+  width: 24px;
+}
+@media (min-width: 1024px) {
+  .exq-carousel__dots {
+    display: none;
+  }
+}
 .exq-chairs__fallback {
   margin-top: var(--s4);
 }

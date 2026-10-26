@@ -622,3 +622,13 @@ commit, and what is still open.
   a longer length that does not fit); the two tab Google test; the sitemap and email location tests. E2e
   expectations updated for exact chair prices, the move option prices and the sitemap (not run here; the final
   gate runs them).
+
+## Prompt 13a
+
+### M1: Today's chairs carousel
+
+- Shipped: `src/components/site/carouselAutoplay.ts`, `useCarousel.ts`, dots in `TodaysChairs.tsx`,
+  the strip rules in `base.css` (carousel to 1024px) and the dots in `pages.css`.
+- Tests: `tests/unit/carouselAutoplay.test.ts` (6), `tests/e2e/carousel.spec.ts` (snap, dots, page
+  scroll over the strip, auto-advance and its stop, reduced motion).
+- Heartbeat: 01:29 UTC, next is M2 (scroll spec, overflow fixes, lighter reveals).
