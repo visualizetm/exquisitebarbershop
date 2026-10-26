@@ -646,3 +646,5 @@ commit, and what is still open.
   no-photo panel in `PhotoFrame`, the Instagram phone bar on chair pages, and the narrowed
   site.spec check. Tests: `tests/e2e/p13a.spec.ts`, `heroScrim.test.ts`, `csp.test.ts`.
 - Heartbeat: 01:41 UTC, next is SHIP (gate, screenshots, Lighthouse, report, PR, merge).
+- SHIP: 02:01 UTC, gate green after two narrowed Iniya checks, screens and Lighthouse captured
+  (Home 88, Visit 95), report written; next is the PR and the merge.
