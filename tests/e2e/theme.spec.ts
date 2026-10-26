@@ -141,7 +141,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('.exq-floorcard').first()).toBeVisible();
     await expectNoAxeViolations(page, `admin overview ${theme}`);
     await page.goto('/admin/settings?tab=account');
-    await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Password' })).toBeVisible();
     await expectNoAxeViolations(page, `admin account ${theme}`);
   });
 }

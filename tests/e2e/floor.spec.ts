@@ -81,6 +81,26 @@ test('Arrived, Start and Done work from Today', async ({ page }) => {
     'href',
     '/admin/shop/bookings?range=today&status=completed',
   );
+  // Lee's chair is handed back (undo, then cancel) so the barber portal tests that follow can
+  // start a walk-in with Lee right away.
+  const id = (JSON.parse(created.text) as { booking: { id: string } }).booking.id;
+  for (const [path, body] of [
+    ['status', { status: 'confirmed', notify: false }],
+    ['cancel', { notify: false }],
+  ] as const) {
+    const res = await page.evaluate(
+      async ([p, b]) =>
+        (
+          await fetch(`/api/admin/bookings/${p}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(b),
+          })
+        ).ok,
+      [`${id}/${path}`, body] as const,
+    );
+    expect(res, path).toBe(true);
+  }
   // Tap targets on the tablet are at least 44px.
   for (const b of await page
     .locator('.exq-coming__actions .exq-btn, .exq-floorcard__actions .exq-btn')

@@ -201,7 +201,7 @@ test.describe('team and the resolver', () => {
     const slug = unique.toLowerCase().replace(/\s+/g, '-');
     await expect(panel.getByLabel('Web address name')).toHaveValue(slug);
     await panel.getByRole('button', { name: 'Add barber' }).click();
-    await expect(page).toHaveURL(/\/admin\/team\/[0-9a-f]{24}/);
+    await expect(page).toHaveURL(/\/admin\/shop\/team\/[0-9a-f]{24}/);
     await expect(page.getByRole('heading', { name: unique, level: 1 })).toBeVisible();
 
     // Tabs: profile, services, hours, time off. Show on site puts them on the public page.
@@ -221,7 +221,7 @@ test.describe('team and the resolver', () => {
       .getByRole('dialog', { name: `Remove ${unique}?` })
       .getByRole('button', { name: `Remove ${unique}` })
       .click();
-    await expect(page).toHaveURL(/\/admin\/team$/);
+    await expect(page).toHaveURL(/\/admin\/shop\/team$/);
     await visitor.goto(`/chairs/${slug}`);
     await expect(visitor).toHaveURL(/\/book\?barber=any/);
     await visitor.close();
