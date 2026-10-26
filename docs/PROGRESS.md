@@ -681,3 +681,6 @@ commit, and what is still open.
   integration test in adminApi.test.ts, `tests/e2e/floor.spec.ts` at 1180 (Arrived, Start, Done on
   a walk-in seeded for later today).
 - Heartbeat: 23:05 UTC, commit follows, next is SHIP (gate, screenshots, Lighthouse, report, PR).
+- SHIP: 23:36 UTC, gate green after five spec fixes for the new paths and one weekday de-flake,
+  screens and Lighthouse captured (Home 79 then 84, 13a was 88; the 91 KB font is the cause),
+  report written; next is the PR, the merge and the production check.

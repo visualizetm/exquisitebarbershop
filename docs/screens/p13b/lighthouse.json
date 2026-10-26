@@ -1,0 +1,29 @@
+{
+  "note": "Lighthouse 13.5.0 mobile, simulated throttling, on the demo build, prompt 13b, 2026-10-26. Run 1 right after the gate, run 2 on a quiet machine.",
+  "pages": [
+    {
+      "url": "/",
+      "run": 1,
+      "performance": 79,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "seo": 63,
+      "fcp": "2.1\u00a0s",
+      "lcp": "3.9\u00a0s",
+      "tbt": "320\u00a0ms",
+      "cls": "0.002"
+    },
+    {
+      "url": "/",
+      "run": 2,
+      "performance": 84,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "seo": 63,
+      "fcp": "2.0\u00a0s",
+      "lcp": "4.1\u00a0s",
+      "tbt": "140\u00a0ms",
+      "cls": "0.002"
+    }
+  ]
+}
