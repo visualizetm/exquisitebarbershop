@@ -174,7 +174,8 @@ test.describe('Iniya takes bookings on Instagram', () => {
     // No portrait yet: the frame shows its no-photo state on purpose, with her name.
     const photo = page.locator('.exq-chair__photo .exq-photoframe');
     await expect(photo).toHaveAttribute('data-state', 'placeholder');
-    await expect(page.locator('.exq-chair__photo img')).toHaveCount(0);
+    // The panel's small Q mark is the only image: no portrait.
+    await expect(page.locator('.exq-chair__photo img.exq-photoframe__img')).toHaveCount(0);
   });
 
   test('/book?barber=iniya falls back to anyone available', async ({ page }) => {
@@ -194,7 +195,10 @@ test.describe('Iniya takes bookings on Instagram', () => {
     await expect(picker).toBeVisible();
     await expect(picker.getByText('Anyone available')).toBeVisible();
     for (const name of ['Dontrise', 'Lee', 'Drew', 'Nelly Cutz']) {
-      await expect(picker.getByText(name, { exact: true }), name).toBeVisible();
+      await expect(
+        picker.locator('.exq-option__title', { hasText: name }).first(),
+        name,
+      ).toBeVisible();
     }
     await expect(picker.getByText('Iniya')).toHaveCount(0);
   });

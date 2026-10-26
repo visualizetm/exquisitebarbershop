@@ -20,7 +20,8 @@ function shared(): IntersectionObserver {
         observer?.unobserve(el);
       });
     },
-    { rootMargin: '0px 0px -6% 0px', threshold: 0.01 },
+    // Starts 15% of the viewport early, so a card is already rising when it comes into view.
+    { rootMargin: '0px 0px 15% 0px', threshold: 0.01 },
   );
   return observer;
 }

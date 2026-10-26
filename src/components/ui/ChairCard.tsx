@@ -47,7 +47,7 @@ export function ChairCard(props: ChairCardProps) {
   const body = (
     <>
       <span className="exq-chaircard__frame">
-        <PhotoFrame photo={photo} name={name} priority={priority} />
+        <PhotoFrame photo={photo} name={name} priority={priority} chairNumber={chairNumber} />
         {badge ? <span className="exq-chaircard__badge">{badge}</span> : null}
       </span>
       <span className="exq-chaircard__body">

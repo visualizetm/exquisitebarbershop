@@ -1,0 +1,27 @@
+{
+  "note": "Lighthouse 13.5.0 mobile, simulated throttling, on the demo build (the built bundle over https with the seed photos in GridFS), one run per page on 2026-10-26, prompt 13a.",
+  "pages": [
+    {
+      "url": "/",
+      "performance": 88,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "seo": 63,
+      "fcp": "2.0 s",
+      "lcp": "3.5 s",
+      "tbt": "150 ms",
+      "cls": "0"
+    },
+    {
+      "url": "/visit",
+      "performance": 95,
+      "accessibility": 100,
+      "bestPractices": 96,
+      "seo": 69,
+      "fcp": "2.0 s",
+      "lcp": "2.7 s",
+      "tbt": "60 ms",
+      "cls": "0"
+    }
+  ]
+}

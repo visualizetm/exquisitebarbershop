@@ -547,23 +547,36 @@ a.exq-pricerow:focus-visible {
 .exq-photoframe[data-state='placeholder'] {
   background: var(--ink);
 }
-.exq-photoframe__placeholder {
+/* No photo: a compact ink panel, the chair number large, the name, the small Q mark top right. */
+.exq-photoframe__panel {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
-  color: var(--mute-on-dark);
-  background: linear-gradient(
-    135deg,
-    transparent 44%,
-    var(--ink-2) 44%,
-    var(--ink-2) 56%,
-    transparent 56%
-  );
+  align-content: end;
+  gap: var(--s1);
+  padding: var(--s4);
+  color: var(--fg);
+  background: var(--bg);
 }
-.exq-photoframe__placeholder svg {
-  width: 40px;
-  height: 40px;
+.exq-photoframe__number {
+  font-size: var(--t-display);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.exq-photoframe__name {
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mute-on-dark);
+}
+.exq-photoframe__mark {
+  position: absolute;
+  top: var(--s4);
+  right: var(--s4);
+  width: 28px;
+  height: 28px;
 }
 
 /* Chair cards -------------------------------------------------------------- */

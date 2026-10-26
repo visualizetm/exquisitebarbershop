@@ -223,6 +223,14 @@ None. Directions use the shop's own Google Maps page, built from the place id in
   launch), `BARBER-GUIDE.md`, `DESIGN-SYSTEM.md` (reviews, prices, photo rules), `ARCHITECTURE.md`,
   `DEPLOY.md` section 11. The live showcase shows all of it only after Settings, Demo data, Reset.
 
+## Prompt 13a additions
+
+- Today's chairs is a snapping carousel under 1024px with dots and a cautious auto-advance; reveals
+  are lighter (8px, 280ms); a scroll spec proves no sideways overflow on any public page; Visit has a
+  lazy Google map (CSP `frame-src`); the hero scrim is a measured gradient; a chair without a portrait
+  shows a compact numbered panel; a chair that books on Instagram gets MESSAGE ON INSTAGRAM in the
+  phone bar.
+
 ## Last commit
 
 Prompt 12, 2026-10-25: the shop's real content (facts, team, services and per barber prices, photos, reviews)

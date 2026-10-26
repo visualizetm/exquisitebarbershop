@@ -1229,3 +1229,51 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   next working day (from the stored shop and staff hours) at a fixed time no other test in the file uses
   (Lee 12:00, 15:00 and 17:00; Dontrise 10:00 and 11:00). Before this the file failed every evening from
   20:00 shop time, when a booking a few hours out spilled past midnight.
+- D13a-01 Today's chairs is a carousel under 1024px with native scroll and CSS scroll snap, no library:
+  `scroll-snap-type: x mandatory`, cards at 82% of the width under 768px and 44% from 768px (two in
+  view on a tablet, the next peeking in), `overscroll-behavior-x: contain`, `overflow-y: hidden`. From
+  1024px the grid is unchanged. Rejected a JavaScript slider: more code, worse scrolling on phones.
+- D13a-02 The autoplay timer is a small controller apart from the DOM (`carouselAutoplay.ts`), tested
+  with fake timers. Holds (finger down, hover, focus inside, off screen, hidden tab) restart the full
+  interval when released; a stop is for good. A `pointercancel` on the strip means the browser took
+  the gesture for scrolling, so it counts as the user's swipe, as does a lift with the strip moved.
+- D13a-03 The carousel region is named "Today's chairs carousel": the section around it is already a
+  region named "Today's chairs" by its heading, and two regions with one name confuse a screen reader.
+- D13a-04 Dots are 44px buttons labeled "Show [name]", the current one `aria-current="true"` and
+  drawn longer in the accent color. No live region: auto-advance announces nothing.
+- D13a-05 `tests/e2e/scroll.spec.ts` checks every public page at 360, 390 and 414 for sideways
+  overflow and names the elements past the edge. None were found, so nothing was clipped: no
+  `overflow-x: hidden` on body or html.
+- D13a-06 Reveals keep their shape but get lighter: 8px of travel, `--d-reveal` 280ms,
+  `--stagger-reveal` 40ms, and the observer starts them 15% of the viewport early
+  (`rootMargin: 0px 0px 15% 0px`), so a card is already rising when it comes into view. The clip-path
+  photo wipes and the hero line rises are unchanged. Rejected removing reveals: they cost nothing on
+  a phone at this size.
+- D13a-07 Scroll listeners: the carousel's is passive and reads once per frame; the keyboard
+  detector's visualViewport resize is passive; the lightbox's onScroll is React's own listener on
+  a scroll event, which cannot block scrolling, so it stays. No `scroll-behavior: smooth` on html;
+  body and the main area use dvh and svh behind a vh fallback. The only nested scroll areas are the
+  carousel, the booking day chips and the lightbox track, all meant to scroll. The carousel works
+  without IntersectionObserver (it then runs whenever the tab is visible).
+- D13a-08 The Visit map is Google's keyless embed (`/maps?q=<name, address>&output=embed`) in a fixed
+  4:3 frame (16:9 from 768px), lazy, titled, `referrerpolicy="no-referrer-when-downgrade"`. On a
+  touch screen a "Tap to move the map" layer covers it until tapped, so a finger over the map scrolls
+  the page; with a mouse (`hover: hover`) the layer is not shown. Directions sits right under the map
+  and works without the frame. `frame-src https://www.google.com https://maps.google.com` is added to
+  the CSP and its test.
+- D13a-09 The hero scrim is one gradient, `to top`: `--scrim-photo-strong` (90% ink) over the lower
+  78% of the hero, where every text line sits, fading to `--scrim-photo-light` (62%) at the top band
+  where the faces are. On a phone the text spans the full width, so "lighter on the right" would put
+  a bright photo behind the end of every line: a right-to-left gradient measured 3.57:1 for the red
+  line at 390. Measured over every text box on the real photo: red 5.08:1 at 390 and 4.90:1 at 768,
+  white 10.6:1 and 8.92:1; at 1280 the text is on plain ink (6.07:1 and 18.88:1). The one gradient
+  allowed by the copy rules moves from the old placeholder stripe (removed) to this scrim.
+- D13a-10 No photo: `PhotoFrame` shows a compact ink panel with the chair number in Jost 900, the
+  name and the small Q mark, in cards and on the chair page. On phones the chair page panel is 40svh
+  (at most 280px) and the Book action is ordered before the bio and the handle, so the name,
+  specialty and Book are in the first screen.
+- D13a-11 A chair with `acceptsOnlineBooking: false` and an Instagram handle gets a phone bar of
+  CALL plus MESSAGE ON INSTAGRAM (a new-tab link); any such chair, not only Iniya. A chair without
+  online booking and without a handle gets no bar.
+- D13a-12 site.spec's uncredited lightbox check looks only for barber book links (`/book?barber=`),
+  so the shop-wide "Book a chair" link is allowed.

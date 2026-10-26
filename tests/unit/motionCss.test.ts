@@ -79,6 +79,20 @@ describe('motion.css rules', () => {
     expect([...found].filter((p) => !allowed.has(p))).toEqual([]);
   });
 
+  it('keeps scroll reveals light: 8px of travel on the reveal tokens, and no smooth scrolling on html', () => {
+    const hidden = /\.motion-ready \[data-reveal-kind\]\[data-reveal='hidden'\] \{([^}]*)\}/.exec(
+      motion,
+    );
+    expect(hidden?.[1]).toContain('translateY(8px)');
+    const rule = /\.motion-ready \[data-reveal-kind\] \{([^}]*)\}/.exec(motion);
+    expect(rule?.[1]).toContain('opacity var(--d-reveal)');
+    expect(rule?.[1]).toContain('transform var(--d-reveal)');
+    expect(rule?.[1]).toContain('var(--stagger-reveal)');
+    for (const file of ['reset', 'base', 'kit', 'frame', 'pages']) {
+      expect(read(file), `${file}.css`).not.toMatch(/scroll-behavior:\s*smooth/);
+    }
+  });
+
   it('loops nothing but the button spinner', () => {
     const loops = [...motion.matchAll(/animation:[^;]*\binfinite\b[^;]*;/g)].map((m) => m[0]);
     expect(loops).toHaveLength(1);
@@ -130,6 +144,8 @@ describe('tokens', () => {
       ['d-base', '250ms'],
       ['d-slow', '400ms'],
       ['stagger', '60ms'],
+      ['d-reveal', '280ms'],
+      ['stagger-reveal', '40ms'],
     ] as const) {
       expect(tokens).toContain(`--${name}: ${value};`);
     }

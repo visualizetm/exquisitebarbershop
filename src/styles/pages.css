@@ -106,7 +106,14 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--scrim-photo);
+  /* Directional: strong behind the text block (the lower 78%, where every line sits full width on
+     a phone), lighter over the top band so the faces in the photo read. The one gradient in the
+     styles; measured in tests/unit/heroScrim.test.ts (D13a-09). */
+  background: linear-gradient(
+    to top,
+    var(--scrim-photo-strong) 0% 78%,
+    var(--scrim-photo-light) 100%
+  );
 }
 .exq-hero[data-state='photo'] .exq-photoframe {
   height: 100%;
@@ -190,6 +197,42 @@
 }
 
 /* Chairs --------------------------------------------------------------------------------- */
+/* The carousel dots: one per chair, 44px targets, the current one long and red. Grid from 1024px. */
+.exq-carousel__dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--s1);
+  margin-top: var(--s2);
+}
+.exq-carousel__dot {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.exq-carousel__dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: currentColor;
+}
+.exq-carousel__dot[aria-current='true'] {
+  color: var(--accent-text);
+}
+.exq-carousel__dot[aria-current='true']::before {
+  width: 24px;
+}
+@media (min-width: 1024px) {
+  .exq-carousel__dots {
+    display: none;
+  }
+}
 .exq-chairs__fallback {
   margin-top: var(--s4);
 }
@@ -202,6 +245,19 @@
 .exq-chair__photo {
   width: 100%;
   max-width: 480px;
+}
+/* Without a portrait, the panel is short on phones so the name and Book stay in the first screen. */
+@media (max-width: 1023px) {
+  .exq-chair__photo .exq-photoframe[data-state='placeholder'] {
+    aspect-ratio: auto;
+    height: 40svh;
+    max-height: 280px;
+  }
+  /* The Book action comes before the bio and the handle, so it is in the first screen. */
+  .exq-chair__bio,
+  .exq-chair__social {
+    order: 1;
+  }
 }
 .exq-chair__intro {
   display: grid;
@@ -380,6 +436,54 @@
   font-style: normal;
   font-weight: 700;
   line-height: 1.25;
+}
+/* The map: a fixed 4:3 frame (16:9 from 768px) so nothing shifts; on a phone a tap-to-move layer
+   keeps a finger scrolling the page until the visitor asks for the map. */
+.exq-visit__map {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  margin-bottom: var(--s4);
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--card-2);
+}
+.exq-visit__map-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.exq-visit__map-cover {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: end;
+  justify-items: start;
+  padding: var(--s3);
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.exq-visit__map-hint {
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+@media (hover: hover) {
+  .exq-visit__map-cover {
+    display: none;
+  }
+}
+@media (min-width: 768px) {
+  .exq-visit__map {
+    aspect-ratio: 16 / 9;
+  }
 }
 .exq-visit__actions {
   display: flex;

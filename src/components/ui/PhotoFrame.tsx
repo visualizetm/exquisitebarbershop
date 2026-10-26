@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import Scissors01 from '@untitled-ui/icons-react/build/esm/Scissors01';
 import type { CloudinaryAsset } from '@shared/lib/cloudinary';
 import { photoSources } from '@/lib/photoSources';
+import { Mark } from './Mark';
 
 export interface Photo {
   url: string;
@@ -16,8 +16,9 @@ export type FrameRatio = '4:5' | '1:1' | '16:9';
 
 /**
  * The photo frame, 4:5, 1:1 or 16:9, with a 4px radius. States: loading (the image is on its
- * way, a still block shows), loaded, and placeholder (no photo: an ink panel with a faint
- * diagonal stripe and the shears, never a blank box). The ratio is fixed, so layout never shifts.
+ * way, a still block shows), loaded, and placeholder (no photo: a compact ink panel with the chair
+ * number large, the name and the small Q mark, never a blank box). The ratio is fixed, so layout
+ * never shifts.
  */
 export function PhotoFrame({
   photo,
@@ -25,6 +26,7 @@ export function PhotoFrame({
   ratio = '4:5',
   sizes = '(min-width: 1024px) 380px, 72vw',
   priority = false,
+  chairNumber = null,
 }: {
   photo: Photo | null;
   /** Used as a fallback alt. */
@@ -33,6 +35,8 @@ export function PhotoFrame({
   sizes?: string;
   /** True for the one image above the fold; everything else lazy loads. */
   priority?: boolean;
+  /** Shown large on the panel when there is no photo. */
+  chairNumber?: number | null | undefined;
 }) {
   const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLImageElement>(null);
@@ -62,8 +66,12 @@ export function PhotoFrame({
           }}
         />
       ) : (
-        <span className="exq-photoframe__placeholder" aria-hidden="true">
-          <Scissors01 />
+        <span className="exq-photoframe__panel exq-dark" aria-hidden="true">
+          {chairNumber !== null ? (
+            <span className="exq-photoframe__number">{String(chairNumber).padStart(2, '0')}</span>
+          ) : null}
+          <span className="exq-photoframe__name">{name}</span>
+          <Mark name="disc" width={28} height={28} className="exq-photoframe__mark" />
         </span>
       )}
     </span>

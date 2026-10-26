@@ -59,7 +59,9 @@ export function ChairPage() {
   const profile = result.status === 'ready' ? result.data.staff : null;
   const shop = useShop();
   const phone = (shop.status === 'ready' ? shop.data.phone : __SHOP_PHONE__).replace(/[^\d+]/g, '');
-  // On a profile the phone bar books this barber, and the booking opens with them chosen.
+  // On a profile the phone bar books this barber, and the booking opens with them chosen. A chair
+  // without online booking that books on Instagram gets that instead of BOOK NOW.
+  const profileAway = profile ? offlineBooking(profile) : null;
   useBar(
     profile?.acceptsOnlineBooking
       ? {
@@ -70,7 +72,17 @@ export function ChairPage() {
             tone: 'paper',
           },
         }
-      : null,
+      : profileAway?.href
+        ? {
+            left: { label: 'Call', href: `tel:${phone}`, tone: 'ink', icon: 'phone' },
+            right: {
+              label: 'Message on Instagram',
+              href: profileAway.href,
+              external: true,
+              tone: 'paper',
+            },
+          }
+        : null,
   );
   usePageMeta({
     title: profile?.name ?? 'The chairs',
@@ -125,6 +137,7 @@ export function ChairPage() {
             name={staff.name}
             priority
             sizes="(min-width: 1024px) 480px, 100vw"
+            chairNumber={staff.chairNumber}
           />
         </Reveal>
         <div className="exq-chair__intro">

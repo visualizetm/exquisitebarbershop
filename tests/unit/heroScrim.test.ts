@@ -11,9 +11,17 @@ import { describe, expect, it } from 'vitest';
 const tokens = readFileSync('src/styles/tokens.css', 'utf8');
 const pages = readFileSync('src/styles/pages.css', 'utf8');
 
-const PHOTO_UNDER_LINE: Record<string, [number, number, number]> = {
-  '390': [222, 187, 162],
-  '768': [242, 217, 192],
+/**
+ * Worst (brightest) pixel of the shop's hero photo under each text box (label, every title line,
+ * the sub line and the info row), measured on the demo build with the text hidden (scratchpad
+ * hero-contrast-13a.mjs) as it shows through the gradient scrim (strong 90% to 78% of the height,
+ * light 62% at the top). A new photo, crop or gradient needs a new measurement.
+ */
+const MEASURED: Record<string, { red: number; white: number }> = {
+  '390': { red: 5.08, white: 10.6 },
+  '768': { red: 4.9, white: 8.92 },
+  // At 1280 the photo stands in its own column: the text is on plain ink.
+  '1280': { red: 6.07, white: 18.88 },
 };
 
 function hex(name: string): [number, number, number] {
@@ -36,11 +44,11 @@ function contrast(a: readonly number[], b: readonly number[]): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-function scrimAlpha(): number {
-  const match = /--scrim-photo:\s*color-mix\(in srgb, var\(--ink\) (\d+)%, transparent\);/.exec(
-    tokens,
-  );
-  if (!match?.[1]) throw new Error('no --scrim-photo');
+function scrimAlpha(name: 'strong' | 'light'): number {
+  const match = new RegExp(
+    `--scrim-photo-${name}:\\s*color-mix\\(in srgb, var\\(--ink\\) (\\d+)%, transparent\\);`,
+  ).exec(tokens);
+  if (!match?.[1]) throw new Error(`no --scrim-photo-${name}`);
   return Number(match[1]) / 100;
 }
 
@@ -63,22 +71,34 @@ describe('the hero red line on the photo', () => {
     expect(hero).not.toMatch(/var\(--red\)/);
   });
 
-  it('keeps 4.5:1 over the brightest photo pixel under the line at 390 and 768', () => {
-    const alpha = scrimAlpha();
-    const ink = hex('ink');
-    const red = hex('red-on-dark');
-    for (const [width, photo] of Object.entries(PHOTO_UNDER_LINE)) {
-      const ground = photo.map((c, i) => Math.round(alpha * (ink[i] ?? 0) + (1 - alpha) * c));
-      expect(contrast(red, ground), width).toBeGreaterThanOrEqual(4.5);
-    }
+  it('is a directional gradient: strong behind the text, lighter over the rest', () => {
+    const strong = scrimAlpha('strong');
+    const light = scrimAlpha('light');
+    expect(strong).toBeGreaterThan(light);
+    // The strong stop is at least the 87% that kept the red line at 4.5:1 as a flat scrim (D12-80).
+    expect(strong).toBeGreaterThanOrEqual(0.87);
+    const after = /\.exq-hero\[data-state='photo'\] \.exq-hero__photo::after \{([^}]*)\}/.exec(
+      pages,
+    );
+    expect(after?.[1]).toMatch(
+      /linear-gradient\([\s\S]*?--scrim-photo-strong[\s\S]*?--scrim-photo-light/,
+    );
   });
 
-  it('is no darker than it needs to be: one point less fails at 768', () => {
-    const alpha = scrimAlpha() - 0.01;
+  it('over a white photo the strong zone keeps white text at 7:1 and the red line at 4.5:1', () => {
+    const alpha = scrimAlpha('strong');
     const ink = hex('ink');
-    const ground = (PHOTO_UNDER_LINE['768'] ?? [0, 0, 0]).map((c, i) =>
+    const ground = [255, 255, 255].map((c, i) =>
       Math.round(alpha * (ink[i] ?? 0) + (1 - alpha) * c),
     );
-    expect(contrast(hex('red-on-dark'), ground)).toBeLessThan(4.5);
+    expect(contrast([255, 255, 255], ground)).toBeGreaterThanOrEqual(7);
+    expect(contrast(hex('red-on-dark'), ground)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps the measured contrast on the real photo at 390 and 768', () => {
+    for (const [width, m] of Object.entries(MEASURED)) {
+      expect(m.red, `${width} red`).toBeGreaterThanOrEqual(4.5);
+      expect(m.white, `${width} white`).toBeGreaterThanOrEqual(7);
+    }
   });
 });

@@ -36,7 +36,7 @@ function useKeyboardOpen(): boolean {
     };
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', update);
-    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('resize', update, { passive: true });
     return () => {
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);
@@ -68,7 +68,11 @@ function Half({ action }: { action: BarAction }) {
   }
   if (action.href && !action.disabled) {
     return (
-      <a href={action.href} {...props}>
+      <a
+        href={action.href}
+        {...props}
+        {...(action.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      >
         {label}
       </a>
     );

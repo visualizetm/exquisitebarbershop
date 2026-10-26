@@ -4,6 +4,7 @@ import { ChairCard, ChairCardSkeleton, Link, Reveal } from '@/components/ui';
 import { chairStatusOf, inChairOrder } from '@/lib/chairStatus';
 import { offlineBooking } from '@/lib/offlineBooking';
 import { useApi } from '@/lib/useApi';
+import { useCarousel } from './useCarousel';
 
 /**
  * The signature strip: one ChairCard per chair with today's status and next open time. Sideways on
@@ -21,6 +22,8 @@ export function TodaysChairs({
   columns?: 3 | 6;
 }) {
   const next = useApi('/api/availability/next', nextOpeningsResponseSchema);
+  const ordered = staff ? inChairOrder(staff) : [];
+  const carousel = useCarousel(ordered.length, Boolean(staff) && next.status !== 'loading');
   if (!staff || next.status === 'loading') {
     return (
       <ul
@@ -39,9 +42,14 @@ export function TodaysChairs({
   }
   const rows = next.status === 'ready' ? next.data.chairs : [];
   return (
-    <>
-      <ul className="exq-strip exq-bare exq-chairs__list" data-state="ready" data-lg={columns}>
-        {inChairOrder(staff).map((member, i) => {
+    <div className="exq-carousel" role="region" aria-label="Today's chairs carousel">
+      <ul
+        ref={carousel.ref}
+        className="exq-strip exq-bare exq-chairs__list"
+        data-state="ready"
+        data-lg={columns}
+      >
+        {ordered.map((member, i) => {
           // A chair without online booking shows where to book instead of an open time.
           const away = offlineBooking(member);
           const { status, label } = away
@@ -78,11 +86,27 @@ export function TodaysChairs({
           );
         })}
       </ul>
+      {ordered.length > 1 ? (
+        <div className="exq-carousel__dots" role="group" aria-label="Choose a chair to show">
+          {ordered.map((member, i) => (
+            <button
+              key={member.id}
+              type="button"
+              className="exq-carousel__dot"
+              aria-label={`Show ${member.name}`}
+              aria-current={i === carousel.index ? 'true' : undefined}
+              onClick={() => {
+                carousel.goTo(i);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
       {next.status === 'error' ? (
         <p className="exq-chairs__fallback" data-state="error">
           <Link to="/chairs">See all chairs</Link>
         </p>
       ) : null}
-    </>
+    </div>
   );
 }

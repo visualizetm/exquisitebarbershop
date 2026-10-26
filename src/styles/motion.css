@@ -97,17 +97,18 @@
     transition: transform var(--d-base) var(--ease-out);
   }
 
-  /* Scroll reveals: once each. Only below-the-fold elements are ever hidden. */
+  /* Scroll reveals: once each, 8px in 280ms with a 40ms stagger, started a little before the element
+     enters (useReveal's rootMargin). Only below-the-fold elements are ever hidden. */
   .motion-ready [data-reveal-kind] {
     transition:
-      opacity var(--d-base) var(--ease-out),
-      transform var(--d-base) var(--ease-out),
+      opacity var(--d-reveal) var(--ease-out),
+      transform var(--d-reveal) var(--ease-out),
       clip-path var(--d-slow) var(--ease-out);
-    transition-delay: calc(var(--reveal-i, 0) * var(--stagger));
+    transition-delay: calc(var(--reveal-i, 0) * var(--stagger-reveal));
   }
   .motion-ready [data-reveal-kind][data-reveal='hidden'] {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(8px);
   }
   /* A photo wipes up from the bottom. The wrapper is what the observer watches; its child is what
      is clipped (an element clipped away entirely would never count as on screen). */
@@ -117,7 +118,7 @@
   }
   .motion-ready [data-reveal-kind='wipe'] > * {
     transition: clip-path var(--d-slow) var(--ease-out);
-    transition-delay: calc(var(--reveal-i, 0) * var(--stagger));
+    transition-delay: calc(var(--reveal-i, 0) * var(--stagger-reveal));
   }
   .motion-ready [data-reveal-kind='wipe'][data-reveal='hidden'] > * {
     clip-path: inset(100% 0 0 0);
