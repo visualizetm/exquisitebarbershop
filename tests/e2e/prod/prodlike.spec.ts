@@ -252,8 +252,9 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   };
   expect(status).toEqual({ status: 503, code: 'STORAGE_DISABLED' });
 
-  // Signing in left no 401 behind, and the day loaded.
-  await page.goto('/admin');
+  // Signing in left no 401 behind, and the day loaded. (/admin itself now lands on the side this
+  // device used last, which was Website above.)
+  await page.goto('/admin/shop/today');
   await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
   expect(errors).toEqual([]);
 });

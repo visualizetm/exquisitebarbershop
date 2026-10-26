@@ -472,7 +472,7 @@ test('Reset demo data wipes the changes and loads the sample shop again', async 
   await sheet.getByRole('button', { name: 'Reset it' }).click();
 
   // Back on a fresh Today, still signed in.
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/shop\/today$/);
   await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
 
   // The photos and the visitor's booking are gone; the sample shop is back.
