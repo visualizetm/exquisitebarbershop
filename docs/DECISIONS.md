@@ -887,9 +887,9 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   service (the owner edits one person at a time). The field is optional so documents written before it read
   as none: `toStaffView`, `toPublicStaff` and the engine default it to an empty list, and no migration runs.
 - D12-27 The pricing rule is one pure helper, `shared/lib/servicePricing.ts`. A chosen or assigned person
-  gets their own entry, else the shop's price and time. The "from" flag stays the service's own flag, so the
-  owner still decides what "from" means (a price that depends on the head of hair is true whatever the
-  barber); it is also switched on when first available could land on a different price. An entry that cannot
+  gets their own entry, else the shop's price and time. The "from" flag first stayed the service's own flag for one
+  person too; replaced by D12-82: one person's price is exact, and "from" is only for the shop-wide list and
+  first available, where it is switched on by the service flag or when the people differ. An entry that cannot
   be a price (negative, a fraction of a cent, not a number) is ignored and the shop price applies, so a
   damaged record never charges nonsense; writes are validated, so this only guards against hand edits.
 - D12-28 First available, or no one chosen yet: the lowest total among the people who do every chosen
@@ -922,8 +922,8 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   with a chair, or anyone available) re-resolves with the new chair's own price and time and writes the
   service lines, `durationMinutes` and `totalPriceCents`, because keeping the old chair's price on a booking
   now sitting with Nelly would be wrong. Rejected: always re-resolving (an edit to a price would silently
-  change an existing customer's price and length). The resolver Move (a schedule conflict) keeps price and
-  length: the owner is fixing a schedule, not repricing, and the conflict rule checked the same time span.
+  change an existing customer's price and length). The resolver Move (a schedule conflict) first kept price and
+  length; replaced by D12-81, which reprices it for the new chair like any other move.
 - D12-33 Validation. Cents are whole and not below zero, minutes use the service rule (multiple of 5, 5 to
   480; `serviceDurationSchema` is shared), at most 100 entries, one per service. Duplicates are an array
   level refinement, because Zod 4 refuses `.omit()` on an object with refinements and the staff schemas are
@@ -1159,9 +1159,73 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   resized copies at seed and upload time, or Cloudinary for the real launch (its `srcset` already asks for
   400px tiles). Rejected: a resize step on the server in a capture pass (a new image pipeline, not a visual
   fix).
-- D12-80 The red display line on the hero photo stays as designed (D12-52). Measured on the real photo with the
-  text hidden, the brightest pixel under each line gives white 11.9:1 or more, the grey sub line 8.3:1 and the
-  red "Exquisite" 3.99:1 at 390 and 3.67:1 at 768: WCAG AA for large text (3:1, the line is 52px bold), short
-  of the checklist's 4.5:1. The two ways to reach 4.5:1 change the look (the scrim at about 88% ink hides most
-  of the photo; a white accent line drops the red), so that is Rob's call. Rejected: changing the brand look in
-  a capture pass.
+- D12-80 The red display line on the hero photo (Rob's call after the milestone 5 captures). Red text on a
+  photo or on ink is always `--red-on-dark` (#FF5470), never `--red` (#C8102E): the hero with a photo is
+  `.exq-dark` in both themes, so "Exquisite" already rendered #FF5470 there, and that stays the brand rule.
+  The word stays red and the scrim keeps its design; only its strength changed. Measured on the real hero
+  photo on the demo build with the title text hidden, the brightest pixel under the line box (the milestone 5
+  method) gave 3.99:1 at 390 and 3.67:1 at 768 at the old 80% ink (glyph box only: 4.22 and 4.36), short of
+  4.5:1. `--scrim-photo` is now 87% ink, the lightest whole step that passes at both widths: 4.75:1 at 390 and
+  4.51:1 at 768 (glyph box 4.91 and 5.00), identical in light and dark; 86% gives 4.34:1 at 768. White text
+  on it is 13.2:1 or more over any photo. `tests/unit/heroScrim.test.ts` holds the measured pixels and fails
+  if the token gets lighter, and `tests/e2e/rules.spec.ts` checks the line's computed color in both themes.
+  Rejected: a white accent line (drops the red) and a darker band only behind the title (a second scrim
+  token for one line).
+- D12-81 A move to another barber reprices the booking (Rob, must fix). The resolver's Move now prices the
+  booking for the new chair with the shared helper (`quoteMove` in `shared/lib/servicePricing.ts`: the new
+  chair's own entry, else the service's current price and time, else the stored line when a service record is
+  gone) and writes the service lines, `durationMinutes`, `totalPriceCents` and the end time from the same
+  start, with the slot locks taken over the new length, all in the change's transaction. The cleanup gap is per
+  service, so it stays. A chair whose own length does not fit (past its hours, or into another booking) is not
+  offered, and asking for it anyway fails the lock insert and rolls the whole change back. `moveOptions` carry
+  each chair's `totalPriceCents` and `durationMinutes`, and each affected booking its current ones, so the
+  "Move to" list reads "Drew, $40" (plus the minutes when they change) with a line under it ("With Drew: $40,
+  45 min (now $50, 75 min)") before the owner applies anything. The owner's Reschedule with another barber
+  already repriced (D12-32); its Barber list now shows the same per barber price, and a barber who does not do
+  the services is listed but disabled. The customer is emailed the move ("Your appointment has been moved",
+  the new barber, the lines and the total at the new price), so D11-08 no longer holds: the link version moves
+  up like a reschedule, which keeps the outbox dedupe key unique per move and raises the calendar SEQUENCE so a
+  calendar app replaces the event. Rejected: keeping the old price (the spec prices a booking by the barber
+  actually assigned) and a silent move (the customer would arrive expecting another barber and price).
+- D12-82 One person's price is exact, never "From" (Rob, must fix). `resolveServiceForStaff` and
+  `quoteForStaff` return `priceFrom: false`, so a chair page, a barber chosen in booking (the service step, the
+  barber step, the bar and the summary card), the owner's New booking panel with a barber, and the barber's
+  own walk-in list print the barber's exact price whatever the service's flag says (Drew's page reads $40, $25
+  and $65, as his theCut menu does). "From" stays where no one person is meant: `/services`, the Home menu and
+  first available, from the service flag or when the people differ. Bookings store `priceFrom: false` on every
+  line, and the emails and the booked summaries ignore a stored flag, so a booking made before this change no
+  longer prints "from" or the "(starting price...)" note either. Team, Services shows each service at that
+  barber's own price. Rejected: keeping the service flag for one person (D12-27; the spec says a chosen
+  barber's page shows that barber's prices, and those menus list flat prices).
+- D12-83 Lighthouse under 85 (Home 81, Gallery 74, D12-79) stays an open item in this PR (Rob's call): no
+  smaller photo copies here. The photos move to Cloudinary before the real launch, which already serves 400px
+  tiles; if Cloudinary is delayed, smaller copies for the GridFS and local drivers go in the next prompt.
+- D12-84 A settings save no longer writes the Google block. Every settings panel sends back the whole document
+  it loaded, so a tab opened before a Website, Reviews save put the old rating and count back (tab A loads
+  4.7 from 15, tab B saves 4.8 from 16, tab A saves Shop info: 4.7 again). `shopSettingsUpdateSchema` strips
+  `google` like `reviews`, and `PUT /api/admin/reviews` is the one writer of the rating, count and checked
+  date; the place id comes from the seed and has no editor. `tests/integration/realShop.test.ts` replays the
+  two tabs. Rejected: merging only the place id from the settings route (nothing in the UI edits it).
+- D12-85 The sitemap skips a chair that takes no online bookings, so Iniya's page is not listed (the prompt:
+  "first available, the booking staff picker and the sitemap skip her cleanly"; this replaces D12-11 and
+  part (a) of D12-25). Her page still answers and is linked from The Chairs. Rejected: listing her (the
+  literal instruction says skip, and the cost is one filter).
+- D12-86 The stand-in shop email now lives in `seed/shop.ts` (`PLACEHOLDER_SHOP_EMAIL`, marked PLACEHOLDER) as
+  hard rule 9 asks; the comparison moved from `shared/lib/email.ts` to `server/lib/publicEmail.ts`, because
+  only the server hides it (`/api/shop`, the calendar file) and the client must not bundle the seed. A unit
+  test checks that the literal sits on a PLACEHOLDER line in the seed and nowhere in the server code.
+- D12-87 Review claims not fixed here. (a) The barber walk-in form for a barber hidden from the website:
+  rejected, it cannot happen. `authenticateTeam` refuses the session of a barber with `showOnWebsite` off
+  (`usableStaff` in `server/auth/teamAuth.ts`), so the portal goes back to sign in and the form never shows
+  for them; a trial test got 401 for Nelly's session once she was hidden, and the PIN sign in already answers a
+  hidden barber like a wrong PIN (`tests/integration/teamAuth.test.ts`). The public staff list and the
+  portal therefore always agree. (b) The owner guide pictures still show the prompt 11 sample barbers: per
+  Rob, the final step recaptures them with the guide mode of `tests/e2e/p11-capture.ts` on the demo build and
+  reruns `scripts/guide-pdf.ts`; this step ran no Playwright beyond the hero measurement. (c) The prompt 12
+  report is written in the final step too, because it must carry the final gate's results and the commits.
+- D12-88 tests/integration/manualBookings.test.ts no longer depends on the time of day. Its clock is
+  frozen (only Date, timers stay real) at 13:00 shop time on the next Tuesday and runs on from there,
+  because walk-ins and the lead time are about "now". Every date-based booking in it uses the barber's
+  next working day (from the stored shop and staff hours) at a fixed time no other test in the file uses
+  (Lee 12:00, 15:00 and 17:00; Dontrise 10:00 and 11:00). Before this the file failed every evening from
+  20:00 shop time, when a booking a few hours out spilled past midnight.

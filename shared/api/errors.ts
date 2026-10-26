@@ -83,8 +83,24 @@ export const apiErrorSchema = z.object({
           customerName: z.string(),
           services: z.array(z.string()),
           hasEmail: z.boolean(),
-          /** Chairs that do every service of this booking and are free for all of it: where it can move. */
-          moveOptions: z.array(z.object({ staffId: z.string(), staffName: z.string() })).optional(),
+          /** What the booking costs and how long it takes now, on its own chair. */
+          totalPriceCents: z.int().optional(),
+          durationMinutes: z.int().optional(),
+          /**
+           * Chairs that do every service of this booking and are free for all of their own length:
+           * where it can move. Each carries what the booking costs and takes with that chair, so the
+           * owner sees the new price before confirming.
+           */
+          moveOptions: z
+            .array(
+              z.object({
+                staffId: z.string(),
+                staffName: z.string(),
+                totalPriceCents: z.int(),
+                durationMinutes: z.int(),
+              }),
+            )
+            .optional(),
         }),
       )
       .optional(),

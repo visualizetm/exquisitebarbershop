@@ -80,19 +80,19 @@ export async function createShopSettingsIfMissing(
 }
 
 /**
- * Replaces the settings the save carries. A group the save leaves out (google) keeps its stored
- * value, and the reviews are never written here (see updateReviewSettings).
+ * Replaces the settings the save carries. The reviews and the Google block are never written here
+ * (see updateReviewSettings), so a save from a tab opened earlier cannot undo a newer rating.
  */
 export async function updateShopSettings(
   input: ShopSettingsUpdate,
   now: Date,
   options?: RepoOptions,
 ): Promise<ShopSettingsDocument> {
-  const { google, ...parsed } = shopSettingsUpdateSchema.parse(input);
+  const parsed = shopSettingsUpdateSchema.parse(input);
   const col = await collection('shopSettings');
   const updated = await col.findOneAndUpdate(
     { _id: SHOP_SETTINGS_ID },
-    { $set: { ...parsed, ...(google ? { google } : {}), updatedAt: now } },
+    { $set: { ...parsed, updatedAt: now } },
     { returnDocument: 'after', ...sessionOf(options) },
   );
   if (!updated) throw new AppError('NOT_FOUND', 'Shop settings were not found');

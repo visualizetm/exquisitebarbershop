@@ -28,11 +28,14 @@ Semantic surfaces (also in tokens.css) derive from the palette: `--bg`, `--card`
 (red text: #C8102E on paper, #FF5470 on ink), `--accent-soft`, `--on-accent`, `--solid-bg` and
 `--solid-fg` (the "ink" button and the selected card: ink in light, paper in dark), `--solid-fg-2`,
 `--band-line`, `--scrim`. `.exq-dark` scopes an ink band inside any page; it stays ink in both
-themes. `--scrim-photo` (ink at 80%) sits between a photo and the text on it, the Home hero on
-phones and tablets: even over a pure white photo, white text keeps 10.2:1, `--line` 7.2:1 and the
-red display line 3.3:1 (large text); small red labels on a photo turn white. The hero sets its own text
-color (`color: var(--fg)`), so the title and facts follow the band, never the page around it. Measured on the
-shop's real hero photo, the red line is 3.99:1 at 390 (D12-80).
+themes. `--scrim-photo` (ink at 87%) sits between a photo and the text on it, the Home hero on
+phones and tablets. Red text on a photo or on ink is always `--red-on-dark` (#FF5470), never `--red`:
+the hero with a photo is `.exq-dark` in both themes, so "Exquisite" takes #FF5470 there. 87% is the
+lightest scrim that keeps that line at 4.5:1 on the shop's real hero photo (brightest pixel under the
+line: 4.75:1 at 390, 4.51:1 at 768; 86% gives 4.34:1 at 768, D12-80). Even over a pure white photo,
+white text keeps 13.2:1, `--line` 9.4:1 and the red line 4.2:1 (large text); small red labels on a
+photo turn white. The hero sets its own text color (`color: var(--fg)`), so the title and facts follow
+the band, never the page around it.
 
 The Home hero has two states. `data-state="text"`: no photo, the text stands alone on the page.
 `data-state="photo"`: an ink band (`.exq-dark`); below 1024px the photo fills the hero behind the

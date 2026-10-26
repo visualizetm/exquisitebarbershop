@@ -344,6 +344,7 @@ interface PlacedBooking {
 /**
  * The services as the booking will keep them: the name and group of the service, and the price and
  * time of the chair it was booked on. They are copied, so later price edits never touch a booking.
+ * A booking always has one chair, so its prices are exact, never "from".
  */
 function serviceSnapshots(
   services: readonly ServiceDocument[],
@@ -356,7 +357,7 @@ function serviceSnapshots(
       name: s.name,
       group: s.group,
       priceCents: line?.priceCents ?? s.priceCents,
-      priceFrom: line?.priceFrom ?? s.priceFrom,
+      priceFrom: false,
       durationMinutes: line?.durationMinutes ?? s.durationMinutes,
     };
   });

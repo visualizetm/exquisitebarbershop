@@ -194,11 +194,13 @@ describe('a booking with a chosen barber', () => {
     await deliverOutboxIds(rows.map((r) => r._id));
     const customerMail = log.sent.find((m) => m.to === 'sam@example.com');
     const ownerMail = log.sent.find((m) => m.to !== 'sam@example.com');
-    expect(customerMail?.text).toContain('Kids Cut: from $25');
+    expect(customerMail?.text).toContain('Kids Cut: $25 (30 min)');
     expect(customerMail?.text).toContain('Total: $45');
+    // A chosen barber's price is exact: no "from" anywhere in the email.
+    expect(customerMail?.text).not.toMatch(/from \$|starting price/i);
     expect(customerMail?.html).toContain('$45');
     expect(ownerMail?.text).toContain('Total: $45');
-    expect(ownerMail?.text).toContain('Kids Cut: from $25');
+    expect(ownerMail?.text).toContain('Kids Cut: $25 (30 min)');
 
     const detail = bookingDetailResponseSchema.parse(
       (await owner('GET', `/api/admin/bookings/${made.booking.id}`)).body,

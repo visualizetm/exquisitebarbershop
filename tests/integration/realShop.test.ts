@@ -378,9 +378,10 @@ describe('Iniya takes bookings on Instagram', () => {
     expect(openings.openings).toEqual([]);
   });
 
-  it('keeps her page in the sitemap: it is a real page that sends visitors to her Instagram', async () => {
+  it('the sitemap skips her, like first available and the staff picker; her page still answers', async () => {
     const xml = String((await get('/api/sitemap.xml')).body.text);
-    expect(xml).toContain('<loc>http://localhost:5173/chairs/iniya</loc>');
+    expect(xml).not.toContain('/chairs/iniya');
+    expect((await get('/api/staff/iniya')).status).toBe(200);
     for (const slug of ['dontrise', 'lee', 'drew', 'nelly']) {
       expect(xml).toContain(`<loc>http://localhost:5173/chairs/${slug}</loc>`);
     }
@@ -404,53 +405,52 @@ describe('the Google block in the owner settings', () => {
       ).body,
     ).settings;
 
-  it('round trips, and a change reaches the public shop answer', async () => {
+  it('a settings save never writes the Google block, whatever it carries', async () => {
     const settings = await current();
     expect(settings.google).toEqual(shopSettingsSeed.google);
-    const res = await put({
-      ...settings,
-      google: { ...settings.google, rating: 4.8, reviewCount: 16, ratingCheckedOn: '2026-11-02' },
+    for (const carried of [
+      { ...settings.google, rating: 4.8, reviewCount: 16, ratingCheckedOn: '2026-11-02' },
+      { ...settings.google, rating: 6 },
+      { ...settings.google, placeId: 'bad id with spaces' },
+    ]) {
+      const res = await put({ ...settings, google: carried });
+      expect(res.status, JSON.stringify(carried)).toBe(200);
+      expect((await current()).google).toEqual(shopSettingsSeed.google);
+    }
+    // A save that leaves it out (an older tab) keeps it too.
+    const { google: _google, ...withoutGoogle } = await current();
+    expect((await put(withoutGoogle)).status).toBe(200);
+    expect((await current()).google).toEqual(shopSettingsSeed.google);
+  });
+
+  it('a tab opened earlier cannot undo a newer rating saved in Website, Reviews', async () => {
+    // Tab A loads the settings (rating 4.7 from 15).
+    const tabA = await current();
+    // Tab B saves 4.8 from 16 in Website, Reviews.
+    const reviews = await call(server.baseUrl, 'PUT', '/api/admin/reviews', {
+      headers: { cookie: ownerCookie },
+      body: { google: { rating: 4.8, reviewCount: 16, ratingCheckedOn: '2026-11-02' } },
     });
-    expect(res.status).toBe(200);
+    expect(reviews.status, JSON.stringify(reviews.body)).toBe(200);
+    // Tab A saves Shop info with everything it loaded, the old rating included.
+    expect((await put(tabA)).status).toBe(200);
+    expect((await current()).google).toMatchObject({ rating: 4.8, reviewCount: 16 });
     expect(publicShopSchema.parse((await get('/api/shop')).body).google).toMatchObject({
       rating: 4.8,
       reviewCount: 16,
-      ratingCheckedOn: '2026-11-02',
+      placeId: shopSettingsSeed.google?.placeId,
     });
-    await put(settings);
-  });
-
-  it('rejects a bad rating, count, date or place id, and changes nothing', async () => {
-    const settings = await current();
-    const google = settings.google;
-    for (const bad of [
-      { ...google, rating: 6 },
-      { ...google, rating: 4.75 },
-      { ...google, reviewCount: -1 },
-      { ...google, reviewCount: 2.5 },
-      { ...google, ratingCheckedOn: 'yesterday' },
-      { ...google, placeId: 'bad id with spaces' },
-    ]) {
-      const res = await put({ ...settings, google: bad });
-      expect(res.status, JSON.stringify(bad)).toBe(400);
-    }
-    expect((await current()).google).toEqual(settings.google);
-  });
-
-  it('a save that leaves google out keeps the stored place id and rating', async () => {
-    // An older dashboard tab does not know the group, so its save does not carry it.
-    const { google: _google, ...withoutGoogle } = await current();
-    const res = await put(withoutGoogle);
-    expect(res.status).toBe(200);
-    expect((await current()).google).toEqual(shopSettingsSeed.google);
-    expect(publicShopSchema.parse((await get('/api/shop')).body).google).toEqual(
-      shopSettingsSeed.google,
-    );
-    // A save that does carry it still replaces it.
-    const settings = await current();
-    await put({ ...settings, google: { ...settings.google, reviewCount: 16 } });
-    expect((await current()).google.reviewCount).toBe(16);
-    await put(settings);
+    // Back to the seed for the other tests.
+    await call(server.baseUrl, 'PUT', '/api/admin/reviews', {
+      headers: { cookie: ownerCookie },
+      body: {
+        google: {
+          rating: shopSettingsSeed.google?.rating,
+          reviewCount: shopSettingsSeed.google?.reviewCount,
+          ratingCheckedOn: shopSettingsSeed.google?.ratingCheckedOn,
+        },
+      },
+    });
     expect((await current()).google).toEqual(shopSettingsSeed.google);
   });
 

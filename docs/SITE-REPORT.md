@@ -45,14 +45,14 @@ Last commit: see the bottom of this file.
 | /             | hero (the real photo behind a scrim on phones, its own column from 1024px), today's chairs, the menu (ink, "From" prices), the work (six Home photos), "What clients say" (rating line and three reviews), visit, ink CTA band, footer | prompt 10; real content prompt 12                           |
 | /services     | ink page: label, heading, group chips with counts, price rows ("From $x" where barbers differ) with Book links                                                                                                                         | prompt 10; prices prompt 12                                 |
 | /chairs       | "Pick your chair": chair cards with CHAIR number, name, specialty, next open; Iniya's says "Book through Instagram"                                                                                                                    | prompt 10; real team prompt 12                              |
-| /chairs/:slug | portrait (placeholder for now), name, title, specialty, bio, next 3 openings, that barber's own prices and minutes, up to three reviews about them, their work (or "From the shop"), Instagram, BOOK [NAME] in the phone bar           | prompt 10; prompt 12                                        |
+| /chairs/:slug | portrait (placeholder for now), name, title, specialty, bio, next 3 openings, that barber's own exact prices and minutes, up to three reviews about them, their work (or "From the shop"), Instagram, BOOK [NAME] in the phone bar     | prompt 10; prompt 12                                        |
 | /gallery      | heading, barber filter chips (only once a photo is credited), 2 and 3 column grid, swipeable lightbox                                                                                                                                  | prompt 10; real photos prompt 12                            |
 | /visit        | hours with today marked, address with Suite F, Directions (Google Maps place link), Call (610) 609-0786, policies, good to know, parking                                                                                               | prompt 10; real facts prompt 12                             |
 | /book         | four part step bar, numbered steps, option cards, day strip, times by part of day, details, confirm, ticket                                                                                                                            | prompt 10                                                   |
 | /manage       | ticket, reschedule, cancel sheet                                                                                                                                                                                                       | prompt 10                                                   |
 | /admin/\*     | Overview, Bookings, Schedule, Customers, Team (with Prices), Website (with Reviews), Settings, search, quick actions                                                                                                                   | prompt 3; prompt 11 dashboard; prompt 12 Prices and Reviews |
 | /kit          | every kit component in every state                                                                                                                                                                                                     | development builds only                                     |
-| /sitemap.xml  | public routes plus one entry per listed chair, from the API                                                                                                                                                                            | milestone 5                                                 |
+| /sitemap.xml  | public routes plus one entry per bookable chair, from the API                                                                                                                                                                          | milestone 5                                                 |
 | /setup        | setup secret field, Run doctor, Run setup, checklist; exists only while BOOTSTRAP_SECRET is set; noindex                                                                                                                               | prompt 5                                                    |
 
 ## Component inventory
@@ -159,6 +159,10 @@ None. Directions use the shop's own Google Maps page, built from the place id in
   when nobody can sign in; see docs/OPERATIONS.md.
 - Responsive photo sizes exist only on Cloudinary (four widths per frame); photos on the local, R2 or
   GridFS drivers are one size up to 2000px.
+- Lighthouse mobile misses the 85 target on the showcase build with the GridFS photos: Home 81, Gallery 74
+  (Gallery's tiles get the full 1600px files, about 781 KiB too much; D12-79). Rob's call: no smaller copies
+  in prompt 12. The photos move to Cloudinary before the real launch, which already serves 400px tiles; if
+  Cloudinary is delayed, smaller copies for the GridFS and local drivers go in the next prompt.
 - Cloudinary keeps no data backup: with it on, turn on MongoDB Atlas snapshots (the daily job writes no
   export for this driver).
 - The phone bar hides while a text field has focus, so the last field of a form is finished with the
@@ -205,8 +209,10 @@ None. Directions use the shop's own Google Maps page, built from the place id in
   Sunday), the announcement "Walk-ins welcome", the five real people (Iniya shown, booked through Instagram,
   never bookable online), 15 real services. The placeholder email never reaches a public page.
 - Per barber prices and times (`staff.servicePrices`, `shared/lib/servicePricing.ts`): "From" prices on the
-  menu, each chair's own prices on its page, bookings, emails and admin views at the assigned chair's price;
-  Team, Prices to edit them.
+  shop-wide menu and for first available only; each chair's own exact prices on its page (never "From"), and
+  bookings, emails and admin views at the assigned chair's exact price, also after the owner moves a booking
+  to another barber (reschedule with a chair, or the resolver's Move, which shows each chair's price before
+  the owner confirms and emails the customer the new barber and price); Team, Prices to edit them.
 - The 15 real photos (`seed/photos`, loaded by `server/services/seedPhotos.ts` on demo setup and Reset, or
   `npm run photos:seed`): the hero, Home's six, the gallery, chair pages with "From the shop".
 - 18 real reviews (`settings.reviews`), word for word: Home "What clients say" with the Google rating line, up to

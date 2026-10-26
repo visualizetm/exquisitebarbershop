@@ -1,8 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { PLACEHOLDER_SHOP_EMAIL, isPlaceholderEmail, publicEmail } from '../../shared/lib/email';
+import { isPlaceholderEmail, publicEmail } from '../../server/lib/publicEmail';
 import { googleMapsUrl, googleReviewUrl } from '../../shared/lib/google';
 import { DEFAULT_GOOGLE, googleSettingsSchema } from '../../shared/schemas/shopSettings';
-import { shopSettingsSeed } from '../../seed/shop';
+import { PLACEHOLDER_SHOP_EMAIL, shopSettingsSeed } from '../../seed/shop';
 import { addressLine, directionsUrl } from '../../src/lib/shop';
 
 const PLACE_ID = 'ChIJISdW6zTpxokRzSBEJjMQU4M';
@@ -118,5 +119,14 @@ describe('the stand-in shop email', () => {
 
   it('the seed email is the placeholder, so a fresh install shows none', () => {
     expect(isPlaceholderEmail(shopSettingsSeed.email)).toBe(true);
+  });
+
+  it('the stand-in value lives in seed/shop.ts, marked PLACEHOLDER (hard rule 9), and nowhere else', () => {
+    const seed = readFileSync('seed/shop.ts', 'utf8');
+    const line = seed.split('\n').find((l) => l.includes(`'${PLACEHOLDER_SHOP_EMAIL}'`));
+    expect(line).toMatch(/\/\/ PLACEHOLDER/);
+    for (const file of ['server/lib/publicEmail.ts', 'server/http/routes/public.ts']) {
+      expect(readFileSync(file, 'utf8')).not.toContain(PLACEHOLDER_SHOP_EMAIL);
+    }
   });
 });

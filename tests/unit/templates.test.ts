@@ -58,8 +58,12 @@ describe('email templates', () => {
     expect(m.subject).toContain('Wed, Jul 15 at 9:00 AM');
     expect(m.subject).toContain('KZT-7MQ4');
     expect(m.text).toContain('https://example.com/manage?token=v1.abc.def');
-    expect(m.text).toContain('from $10');
-    expect(m.text).toContain('Total: $40 (starting price');
+    // The booking has one barber, so the price is exact even for a line stored with the old
+    // "from" flag: no "from", no starting price note.
+    expect(m.text).toContain(': $10 (');
+    expect(m.text).not.toMatch(/from \$/i);
+    expect(m.text).not.toContain('starting price');
+    expect(m.text).toContain('Total: $40\n');
     expect(m.html).toContain('&lt;Customer&gt;');
     expect(m.html).toContain('href="https://example.com/manage?token=v1.abc.def"');
     expect(m.attachments).toHaveLength(1);

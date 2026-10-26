@@ -297,16 +297,15 @@ export const shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
 export type ShopSettingsInput = z.input<typeof shopSettingsInputSchema>;
 
 /**
- * What a settings save may carry. A group added after launch is optional here: a dashboard tab
- * opened before a deploy does not know it, and its save must leave the stored value alone instead
- * of resetting it to the empty default (which would wipe the place id and the rating).
- *
- * The reviews are not part of it at all: Website, Reviews saves them through its own route, which
- * can only show, hide and order them. A settings save that carries them (every panel sends back
- * the settings it loaded) has them stripped, so it can neither change a quote nor undo a Reviews
- * save made in another tab.
+ * What a settings save may carry. The reviews and the Google block are not part of it at all:
+ * Website, Reviews saves both through its own route (`PUT /api/admin/reviews`), which can only show,
+ * hide and order the reviews and set the rating, count and checked date; the place id is fixed by
+ * the seed. A settings save that carries them (every panel sends back the settings it loaded) has
+ * them stripped, so a tab opened earlier can neither change a quote nor undo a newer rating saved
+ * in another tab.
  */
-export const shopSettingsUpdateSchema = shopSettingsInputSchema.omit({ reviews: true }).extend({
-  google: googleSettingsSchema.optional(),
+export const shopSettingsUpdateSchema = shopSettingsInputSchema.omit({
+  reviews: true,
+  google: true,
 });
 export type ShopSettingsUpdate = z.input<typeof shopSettingsUpdateSchema>;

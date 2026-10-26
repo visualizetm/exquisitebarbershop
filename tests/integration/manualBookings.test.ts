@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { bookingsRepo, emailOutboxRepo, slotLocksRepo, weeklyHoursRepo } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
 import { serviceSeedId, staffSeedId } from '../../seed/shop';
@@ -17,6 +17,7 @@ import {
   bookPublic,
   call,
   idemKey,
+  nextDate,
   phone,
   slotAt,
   startTestServer,
@@ -42,6 +43,15 @@ const ALWAYS: WeekHours = {
   sat: [allDay],
   sun: [allDay],
 };
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+
+/*
+ * The clock is frozen for this file at 13:00 shop time on the next Tuesday and runs on from there
+ * (only Date is faked; timers stay real). Walk-ins and the lead time are about "now", so without it
+ * they failed late in the evening, when a booking spilled past midnight, and could fall on a day the
+ * shop is closed.
+ */
+const FROZEN_NOW = new Date(slotAt(nextDate(2, 1), '13:00'));
 
 const asOwner = (
   method: string,
@@ -72,7 +82,21 @@ function startIn(minutes: number): string {
   return ceilToStep(addMinutes(new Date(), minutes), 15).toISOString();
 }
 
+/** The first day after today on which both the shop and this barber have hours. */
+async function nextWorkingDay(staffKey: string): Promise<string> {
+  const shop = (await weeklyHoursRepo.getShopHours())?.days;
+  const own = (await weeklyHoursRepo.getStaffHours(staffSeedId(staffKey)))?.days ?? shop;
+  let day = shopDayStart(shopDateOf(new Date())).plus({ days: 1 });
+  for (let i = 0; i < 14; i += 1, day = day.plus({ days: 1 })) {
+    const key = WEEKDAYS[day.weekday - 1];
+    if (key && (shop?.[key].length ?? 0) > 0 && (own?.[key].length ?? 0) > 0)
+      return day.toISODate() ?? '';
+  }
+  throw new Error(`${staffKey} has no working day in the next two weeks`);
+}
+
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: FROZEN_NOW, shouldAdvanceTime: true });
   await runSeed(db(), NOW);
   await weeklyHoursRepo.setShopHours(ALWAYS, new Date());
   for (const key of ['lee', 'nelly', 'drew', 'dontrise'])
@@ -83,11 +107,16 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await server.close();
+  vi.useRealTimers();
 });
 
 describe('phone bookings', () => {
   it('follow normal availability, are already seen, and email the customer but not the owner', async () => {
-    const res = await manual({ source: 'phone', staff: 'lee', startAt: startIn(180) });
+    const res = await manual({
+      source: 'phone',
+      staff: 'lee',
+      startAt: slotAt(await nextWorkingDay('lee'), '17:00'),
+    });
     expect(res.status).toBe(201);
     const body = manualBookingResponseSchema.parse(res.body);
     expect(body.booking).toMatchObject({ source: 'phone', isNew: false, staffRequested: true });
@@ -136,8 +165,7 @@ describe('phone bookings', () => {
   });
 
   it('the override never takes a slot someone already holds', async () => {
-    // A fixed open slot tomorrow: five hours from now can cross midnight late in the day.
-    const at = slotAt(shopDateOf(new Date(Date.now() + 24 * 60 * 60_000)), '15:00');
+    const at = slotAt(await nextWorkingDay('lee'), '15:00');
     await bookPublic(server.baseUrl, { staff: 'lee', serviceIds: [cut], startAt: at });
     const res = await manual({ source: 'phone', staff: 'lee', startAt: at, override: true });
     expect(res.status).toBe(409);
@@ -147,11 +175,10 @@ describe('phone bookings', () => {
   it('is idempotent and validates its input', async () => {
     const key = idemKey();
     // The same customer both times: a different body under the same key is a 422.
-    // A fixed open slot tomorrow: seven hours from now can land after closing late in the day.
     const payload = {
       source: 'phone',
       staff: 'lee',
-      startAt: slotAt(shopDateOf(new Date(Date.now() + 24 * 60 * 60_000)), '12:00'),
+      startAt: slotAt(await nextWorkingDay('lee'), '12:00'),
       customer: { name: 'Same Caller', phone: phone(), email: null },
     };
     const first = await manual(payload, key);
@@ -187,7 +214,6 @@ describe('walk-ins', () => {
 
   it('can email the customer when asked, and starts at a given time today', async () => {
     const later = startIn(240);
-    if (shopDateOf(new Date(later)) !== shopDateOf(new Date())) return; // too close to midnight to test today
     const res = await manual({
       source: 'walkIn',
       staff: 'nelly',
@@ -235,12 +261,8 @@ describe('walk-ins', () => {
 
 describe('owner reschedule', () => {
   it('moves a booking, can override lead time, and notifies only when asked', async () => {
-    // Dontrise has no walk-ins from the tests above, so the early slot is free. Tomorrow
-    // at ten, rather than hours from now, so the booking never spills past midnight. The shop
-    // is closed on Mondays, so a Monday tomorrow moves to Tuesday.
-    let day = shopDayStart(shopDateOf(new Date())).plus({ days: 1 });
-    if (day.weekday === 1) day = day.plus({ days: 1 });
-    const tomorrow = day.toISODate() ?? '';
+    // Dontrise has no walk-ins from the tests above, so ten on his next working day is free.
+    const tomorrow = await nextWorkingDay('dontrise');
     const created = await bookPublic(server.baseUrl, {
       staff: 'dontrise',
       serviceIds: [cut],

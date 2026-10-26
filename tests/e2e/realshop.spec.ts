@@ -199,9 +199,10 @@ test.describe('Iniya takes bookings on Instagram', () => {
     await expect(picker.getByText('Iniya')).toHaveCount(0);
   });
 
-  test('her page is in the sitemap', async ({ page }) => {
+  test('the sitemap skips her, like the staff picker', async ({ page }) => {
     const sitemap = await (await page.request.get('/sitemap.xml')).text();
-    expect(sitemap).toContain('/chairs/iniya</loc>');
+    expect(sitemap).not.toContain('/chairs/iniya</loc>');
+    expect(sitemap).toContain('/chairs/drew</loc>');
   });
 });
 

@@ -27917,8 +27917,9 @@ var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   createdAt: true,
   updatedAt: true
 });
-var shopSettingsUpdateSchema = shopSettingsInputSchema.omit({ reviews: true }).extend({
-  google: googleSettingsSchema.optional()
+var shopSettingsUpdateSchema = shopSettingsInputSchema.omit({
+  reviews: true,
+  google: true
 });
 
 // server/db/client.ts
@@ -28750,8 +28751,22 @@ var apiErrorSchema = external_exports.object({
         customerName: external_exports.string(),
         services: external_exports.array(external_exports.string()),
         hasEmail: external_exports.boolean(),
-        /** Chairs that do every service of this booking and are free for all of it: where it can move. */
-        moveOptions: external_exports.array(external_exports.object({ staffId: external_exports.string(), staffName: external_exports.string() })).optional()
+        /** What the booking costs and how long it takes now, on its own chair. */
+        totalPriceCents: external_exports.int().optional(),
+        durationMinutes: external_exports.int().optional(),
+        /**
+         * Chairs that do every service of this booking and are free for all of their own length:
+         * where it can move. Each carries what the booking costs and takes with that chair, so the
+         * owner sees the new price before confirming.
+         */
+        moveOptions: external_exports.array(
+          external_exports.object({
+            staffId: external_exports.string(),
+            staffName: external_exports.string(),
+            totalPriceCents: external_exports.int(),
+            durationMinutes: external_exports.int()
+          })
+        ).optional()
       })
     ).optional(),
     /** For SLOT_TAKEN: the next open times so the UI can offer them right away. */
@@ -28847,11 +28862,11 @@ async function createShopSettingsIfMissing(input2, now2, options) {
   return { created: result.upsertedCount === 1 };
 }
 async function updateShopSettings(input2, now2, options) {
-  const { google, ...parsed } = shopSettingsUpdateSchema.parse(input2);
+  const parsed = shopSettingsUpdateSchema.parse(input2);
   const col = await collection("shopSettings");
   const updated = await col.findOneAndUpdate(
     { _id: SHOP_SETTINGS_ID },
-    { $set: { ...parsed, ...google ? { google } : {}, updatedAt: now2 } },
+    { $set: { ...parsed, updatedAt: now2 } },
     { returnDocument: "after", ...sessionOf(options) }
   );
   if (!updated) throw new AppError("NOT_FOUND", "Shop settings were not found");
@@ -28904,7 +28919,7 @@ function resolveServiceForStaff(service2, staff) {
     serviceId: service2.id,
     priceCents: own2 ? own2.priceCents : service2.priceCents,
     durationMinutes: isMinutes(own2?.durationMinutes) ? own2.durationMinutes : service2.durationMinutes,
-    priceFrom: service2.priceFrom,
+    priceFrom: false,
     overridden: own2 !== void 0
   };
 }
@@ -28916,8 +28931,22 @@ function quoteForStaff(services, staff) {
     lines,
     totalCents: lines.reduce((sum, l2) => sum + l2.priceCents, 0),
     totalMinutes: lines.reduce((sum, l2) => sum + l2.durationMinutes, 0),
-    from: lines.some((l2) => l2.priceFrom)
+    from: false
   };
+}
+function quoteMove(booked, shopService, staff) {
+  return quoteForStaff(
+    booked.map((line) => {
+      const service2 = shopService(line.serviceId);
+      return {
+        id: line.serviceId,
+        priceCents: service2?.priceCents ?? line.priceCents,
+        priceFrom: false,
+        durationMinutes: service2?.durationMinutes ?? line.durationMinutes
+      };
+    }),
+    staff
+  );
 }
 function servicePriceIssues(serviceIds, prices) {
   const issues = [];
@@ -29792,11 +29821,14 @@ async function listBookingsStartingBetween(range, options) {
   const col = await collection("bookings");
   return col.find({ startAt: { $gte: range.start, $lt: range.end } }, sessionOf(options)).sort({ startAt: 1 }).toArray();
 }
-async function moveBookingToStaff(id, staffId, now2, options) {
+async function moveBookingToStaff(id, change, now2, options) {
   const col = await collection("bookings");
   const updated = await col.findOneAndUpdate(
     { _id: id, status: "confirmed" },
-    { $set: { staffId, staffRequested: true, updatedAt: now2 } },
+    {
+      $set: { ...change, staffRequested: true, updatedAt: now2 },
+      $inc: { manageTokenVersion: 1 }
+    },
     { returnDocument: "after", ...sessionOf(options) }
   );
   if (!updated)
@@ -31892,16 +31924,8 @@ import { timingSafeEqual as timingSafeEqual3 } from "node:crypto";
 // server/services/demo.ts
 import { randomUUID } from "node:crypto";
 
-// shared/lib/email.ts
-var PLACEHOLDER_SHOP_EMAIL = "hello@exquisitebarberbeauty.com";
-function isPlaceholderEmail(email3) {
-  return !email3 || email3.trim().toLowerCase() === PLACEHOLDER_SHOP_EMAIL;
-}
-function publicEmail(email3) {
-  return isPlaceholderEmail(email3) ? "" : (email3 ?? "").trim();
-}
-
 // seed/shop.ts
+var PLACEHOLDER_SHOP_EMAIL = "hello@exquisitebarberbeauty.com";
 var reviewsSeed = [
   {
     name: "Unique D.",
@@ -34597,7 +34621,7 @@ function serviceSnapshots(services, quote) {
       name: s2.name,
       group: s2.group,
       priceCents: line?.priceCents ?? s2.priceCents,
-      priceFrom: line?.priceFrom ?? s2.priceFrom,
+      priceFrom: false,
       durationMinutes: line?.durationMinutes ?? s2.durationMinutes
     };
   });
@@ -36271,6 +36295,14 @@ function getChannel(name) {
   return channel;
 }
 
+// server/lib/publicEmail.ts
+function isPlaceholderEmail(email3) {
+  return !email3 || email3.trim().toLowerCase() === PLACEHOLDER_SHOP_EMAIL.toLowerCase();
+}
+function publicEmail(email3) {
+  return isPlaceholderEmail(email3) ? "" : (email3 ?? "").trim();
+}
+
 // shared/lib/ics.ts
 function pad(n2) {
   return n2.toString().padStart(2, "0");
@@ -36397,7 +36429,7 @@ function esc2(value) {
 }
 function serviceLines(p) {
   return p.booking.services.map(
-    (s2) => `${s2.name}: ${s2.priceFrom ? "from " : ""}${formatCents(s2.priceCents)} (${s2.durationMinutes} min)`
+    (s2) => `${s2.name}: ${formatCents(s2.priceCents)} (${s2.durationMinutes} min)`
   );
 }
 function whenLine(p) {
@@ -36460,7 +36492,7 @@ function customerConfirmed(p, env, rescheduled) {
     `Reference code: ${p.booking.referenceCode}`,
     "Services:",
     ...serviceLines(p).map((l2) => `  ${l2}`),
-    `Total: ${formatCents(p.booking.totalPriceCents)}${p.booking.services.some((s2) => s2.priceFrom) ? " (starting price, final price depends on the service)" : ""}`,
+    `Total: ${formatCents(p.booking.totalPriceCents)}`,
     ...url2 ? [`Need to change it? Cancel or reschedule here: ${url2}`] : [],
     "A calendar file is attached.",
     "",
@@ -37271,26 +37303,53 @@ function summarize(booking, staffById) {
     endAt: booking.endAt.toISOString(),
     customerName: booking.customer.name,
     services: booking.services.map((s2) => s2.name),
-    hasEmail: booking.customer.email !== null
+    hasEmail: booking.customer.email !== null,
+    totalPriceCents: booking.totalPriceCents,
+    durationMinutes: booking.durationMinutes
   };
 }
 function heldSpan(booking) {
   return { start: booking.startAt, end: addMinutes(booking.endAt, booking.bufferMinutes) };
 }
-function canTake(snapshot, booking, staff) {
-  if (staff.deletedAt !== null) return false;
-  if (!booking.services.every((s2) => staff.serviceIds.includes(s2.serviceId))) return false;
-  return isWithinWorkingTime({ ...booking, staffId: staff._id }, staff, snapshot.source);
+function repriceFor(booking, staff, servicesById) {
+  const quote = quoteMove(booking.services, (id) => servicesById.get(id), pricedStaff(staff));
+  if (!quote) return null;
+  return {
+    services: booking.services.map((line, index) => ({
+      ...line,
+      priceCents: quote.lines[index]?.priceCents ?? line.priceCents,
+      priceFrom: false,
+      durationMinutes: quote.lines[index]?.durationMinutes ?? line.durationMinutes
+    })),
+    durationMinutes: quote.totalMinutes,
+    totalPriceCents: quote.totalCents,
+    endAt: addMinutes(booking.startAt, quote.totalMinutes)
+  };
 }
-async function moveOptionsFor(snapshot, booking, session) {
+function moveTo(snapshot, booking, staff, servicesById) {
+  if (staff.deletedAt !== null) return null;
+  const moved = repriceFor(booking, staff, servicesById);
+  if (!moved) return null;
+  const span = { staffId: staff._id, startAt: booking.startAt, endAt: moved.endAt };
+  return isWithinWorkingTime(span, staff, snapshot.source) ? moved : null;
+}
+async function moveOptionsFor(snapshot, booking, servicesById, session) {
   const options = [];
   const sorted = [...snapshot.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const staff of sorted) {
-    if (staff._id === booking.staffId || !canTake(snapshot, booking, staff)) continue;
-    const locks = await slotLocksRepo_exports.listSlotLocksForStaff(staff._id, heldSpan(booking), {
-      session
-    });
-    if (locks.length === 0) options.push({ staffId: staff._id, staffName: staff.name });
+    if (staff._id === booking.staffId) continue;
+    const moved = moveTo(snapshot, booking, staff, servicesById);
+    if (!moved) continue;
+    const span = heldSpan({ ...booking, endAt: moved.endAt });
+    const locks = await slotLocksRepo_exports.listSlotLocksForStaff(staff._id, span, { session });
+    if (locks.length === 0) {
+      options.push({
+        staffId: staff._id,
+        staffName: staff.name,
+        totalPriceCents: moved.totalPriceCents,
+        durationMinutes: moved.durationMinutes
+      });
+    }
   }
   return options;
 }
@@ -37313,6 +37372,11 @@ async function applyScheduleChange(change) {
     }
     for (const booking of change.alsoAffected?.(after.upcoming) ?? [])
       affected.set(booking._id, booking);
+    const serviceIds = new Set(
+      [...affected.values()].flatMap((b) => b.services.map((s2) => s2.serviceId))
+    );
+    const services = await servicesRepo_exports.findServicesByIds([...serviceIds], { session });
+    const servicesById = new Map(services.map((s2) => [s2._id, s2]));
     const unresolved = [...affected.values()].filter((b) => !choices.has(b._id));
     if (unresolved.length > 0) {
       throw new AppError(
@@ -37323,7 +37387,7 @@ async function applyScheduleChange(change) {
             affected: await Promise.all(
               [...affected.values()].map(async (b) => ({
                 ...summarize(b, after.staffById),
-                moveOptions: await moveOptionsFor(after, b, session)
+                moveOptions: await moveOptionsFor(after, b, servicesById, session)
               }))
             )
           }
@@ -37340,7 +37404,8 @@ async function applyScheduleChange(change) {
       const action = choice?.action;
       if (choice?.action === "move" && choice.toStaffId) {
         const target = after.staffById.get(choice.toStaffId);
-        if (!target || !canTake(after, booking, target)) {
+        const priced = target ? moveTo(after, booking, target, servicesById) : null;
+        if (!target || !priced) {
           throw new AppError(
             "SLOT_TAKEN",
             `${target?.name ?? "That chair"} can not take this booking`
@@ -37350,27 +37415,65 @@ async function applyScheduleChange(change) {
         await slotLocksRepo_exports.releaseSlotLocks(booking._id, { session });
         await slotLocksRepo_exports.acquireSlotLocks(
           target._id,
-          heldSpan(booking),
+          heldSpan({ ...booking, endAt: priced.endAt }),
           { holderType: "booking", holderId: booking._id },
           change.now,
           { session }
         );
         await relockBlocks(booking.staffId, heldSpan(booking), change.now, session);
-        await bookingsRepo_exports.moveBookingToStaff(booking._id, target._id, change.now, { session });
+        const movedBooking = await bookingsRepo_exports.moveBookingToStaff(
+          booking._id,
+          {
+            staffId: target._id,
+            endAt: priced.endAt,
+            services: priced.services,
+            durationMinutes: priced.durationMinutes,
+            totalPriceCents: priced.totalPriceCents
+          },
+          change.now,
+          { session }
+        );
         await auditLogRepo_exports.appendAuditEntry(
           {
             actor: change.actor,
             action: "booking.move",
             entityType: "booking",
             entityId: booking._id,
-            before: { staffId: booking.staffId },
-            after: { staffId: target._id },
+            before: {
+              staffId: booking.staffId,
+              endAt: booking.endAt,
+              durationMinutes: booking.durationMinutes,
+              totalPriceCents: booking.totalPriceCents
+            },
+            after: {
+              staffId: target._id,
+              endAt: movedBooking.endAt,
+              durationMinutes: movedBooking.durationMinutes,
+              totalPriceCents: movedBooking.totalPriceCents
+            },
             meta: { change: change.audit.action },
             requestId: change.requestId
           },
           change.now,
           { session }
         );
+        if (settings) {
+          outboxIds.push(
+            ...await enqueueBookingNotifications(
+              {
+                event: "rescheduled",
+                view: toBookingView(movedBooking, target),
+                settings,
+                managePath: manageLinkFor(movedBooking),
+                previousStartAt: null,
+                cancelReason: null,
+                audience: { customer: true, owner: false }
+              },
+              change.now,
+              session
+            )
+          );
+        }
         moved.push(booking._id);
         continue;
       }
@@ -39417,7 +39520,8 @@ var publicRoutes = [
     handler: async () => {
       const staff = await staffRepo_exports.listPublicStaff();
       const base = getEnv2().APP_BASE_URL.replace(/\/$/, "");
-      const paths = [...SITEMAP_PATHS, ...staff.map((s2) => `/chairs/${s2.slug}`)];
+      const bookable = staff.filter((s2) => s2.acceptsOnlineBooking);
+      const paths = [...SITEMAP_PATHS, ...bookable.map((s2) => `/chairs/${s2.slug}`)];
       const urls = paths.map((p) => `  <url><loc>${escapeXml(`${base}${p}`)}</loc></url>`);
       const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

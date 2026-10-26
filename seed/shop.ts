@@ -8,11 +8,16 @@
  * Ids are deterministic (seedId) so running the seed twice never duplicates rows.
  */
 import { newId, seedId } from '../server/lib/ids';
-import { PLACEHOLDER_SHOP_EMAIL } from '../shared/lib/email';
 import type { WeekHours } from '../shared/schemas/common';
 import type { ServiceInput } from '../shared/schemas/service';
 import type { ReviewItem, ReviewSource, ShopSettingsInput } from '../shared/schemas/shopSettings';
 import type { ServicePrice, StaffInput } from '../shared/schemas/staff';
+
+/**
+ * The shop's public email until the client has a real mailbox. While the stored email is still this
+ * value, no public page and no calendar file shows it (server/lib/publicEmail.ts).
+ */
+export const PLACEHOLDER_SHOP_EMAIL = 'hello@exquisitebarberbeauty.com'; // PLACEHOLDER
 
 /** A review as the seed holds it: `staffKey` names the chair it is about and becomes its id. */
 export interface ReviewSeed {

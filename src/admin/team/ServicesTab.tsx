@@ -5,6 +5,7 @@ import {
   type AdminStaffView,
   type ConflictResolution,
 } from '@shared/api/admin';
+import { resolveServiceForStaff } from '@shared/lib/servicePricing';
 import { Button, Checkbox, useToast } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { ErrorNote } from '../components/ErrorNote';
@@ -55,19 +56,23 @@ export function ServicesTab({
       >
         <fieldset className="exq-fieldset">
           <legend>Services {member.name} does</legend>
-          {services.map((s) => (
-            <Checkbox
-              key={s.id}
-              label={s.name}
-              hint={`${s.durationMinutes} min, ${s.priceFrom ? 'from ' : ''}${money(s.priceCents)}${s.isActive ? '' : ', hidden'}`}
-              checked={chosen.includes(s.id)}
-              onChange={(e) => {
-                setChosen(
-                  e.target.checked ? [...chosen, s.id] : chosen.filter((id) => id !== s.id),
-                );
-              }}
-            />
-          ))}
+          {services.map((s) => {
+            // This barber's own price and time (exact, never "from"), as their page shows it.
+            const own = resolveServiceForStaff(s, member);
+            return (
+              <Checkbox
+                key={s.id}
+                label={s.name}
+                hint={`${own.durationMinutes} min, ${money(own.priceCents)}${own.overridden ? ' (own price)' : ''}${s.isActive ? '' : ', hidden'}`}
+                checked={chosen.includes(s.id)}
+                onChange={(e) => {
+                  setChosen(
+                    e.target.checked ? [...chosen, s.id] : chosen.filter((id) => id !== s.id),
+                  );
+                }}
+              />
+            );
+          })}
         </fieldset>
         {action.state.status === 'error' ? <ErrorNote error={action.state.error} /> : null}
         <div>

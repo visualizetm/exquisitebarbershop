@@ -652,16 +652,16 @@ environment (development, test, preview, production) needs.
 
 ### Prompt 4: photos, next opening, gallery
 
-| Method        | Path                         | Auth               | Notes                                                                                  |
-| ------------- | ---------------------------- | ------------------ | -------------------------------------------------------------------------------------- |
-| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId  |
-| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service                |
-| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`, `home`; photos with per chair counts |
-| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                  |
-| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket     |
-| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201            |
-| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal               |
-| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus `/chairs/:slug`         |
+| Method        | Path                         | Auth               | Notes                                                                                   |
+| ------------- | ---------------------------- | ------------------ | --------------------------------------------------------------------------------------- |
+| GET           | /api/availability/next       | public, cached 30s | every chair on the site: status in, off or closed, nextOpen, nextOpenLabel, serviceId   |
+| GET           | /api/staff/:slug/openings    | public, cached 30s | query `count` 1 to 10; the next starts for the chair's shortest service                 |
+| GET           | /api/gallery                 | public, cached 60s | query `staff` (slug or alias), `cursor`, `limit`, `home`; photos with per chair counts  |
+| GET           | /api/admin/photos            | barber             | the owner sees any kind; a barber only their own chair's staff photos                   |
+| POST          | /api/admin/photos/upload-url | barber             | `{ kind, staffId?, contentType, size }`; a presigned PUT URL, the key and a ticket      |
+| POST          | /api/admin/photos/confirm    | barber             | `{ ticket, width, height, alt }`; checks the object exists and matches; 201             |
+| PATCH, DELETE | /api/admin/photos/:id        | barber             | alt and sortOrder; DELETE soft deletes and queues the object for removal                |
+| GET           | /api/sitemap.xml             | public, cached 1h  | XML, served at `/sitemap.xml` by a rewrite; public routes plus bookable `/chairs/:slug` |
 
 `/api/staff` and `/api/staff/:slug` carry `photo` (the chair's portrait) and
 `/api/shop` carries `heroPhoto`. `/api/availability/days` rows carry `count`. `/api/shop` also carries
@@ -729,16 +729,22 @@ One pure helper, `shared/lib/servicePricing.ts`, decides every price and time a 
 sees, on the server and in the browser alike:
 
 - A chosen or assigned person: their `servicePrices` entry for a service (price, and minutes when set), else the
-  service's own price and time. Several services add up for that one person.
+  service's own price and time. Several services add up for that one person. That price is exact: never "From",
+  whatever the service's `priceFrom` flag says (a chair page, a chosen barber in booking, the ticket, the
+  confirmation, the emails and the admin views).
 - First available, or nobody chosen yet: the lowest total among the people who could be assigned (online
   bookable and doing every chosen service; ties by total minutes, then display order, then id), shown as "From
   $x" when the people differ or a service is flagged `priceFrom`. The minutes are that same person's.
 - The price list (`/services`, Home's menu): per service, the lowest price among the people who offer it, "from"
-  when they differ; a chair page shows only that person's prices and minutes.
-- The booking stores the resolved lines, total and minutes of the person it lands on, inside the same
-  transaction as its slot locks. Walk-ins and phone bookings do the same. A reschedule on the same chair keeps
-  the stored prices; a move to another chair re-resolves them for the new chair. Emails, the ticket, the manage
-  page and the admin views read the stored snapshot, so a later price edit never changes a booking.
+  when they differ or the service is flagged; a chair page shows only that person's exact prices and minutes.
+- The booking stores the resolved lines (with `priceFrom: false`), total and minutes of the person it lands on,
+  inside the same transaction as its slot locks. Walk-ins and phone bookings do the same. A reschedule on the
+  same chair keeps the stored prices. A move to another chair, the owner's reschedule with a chair or the
+  resolver's Move, re-resolves them for the new chair: lines, total, minutes, end time and locks, in the same
+  transaction, and refuses the move when the new length does not fit. The resolver lists each chair a booking
+  can move to with that chair's price and minutes, and a move emails the customer the new barber, price and
+  time. Emails, the ticket, the manage page and the admin views read the stored snapshot, so a later price edit
+  never changes a booking.
 - Writes: `servicePrices` is validated with zod on the staff create and update routes (whole cents, minutes a
   multiple of 5, one entry per service, only services in `serviceIds`) and audited as `staff.prices.update`.
 
@@ -977,10 +983,14 @@ else to `authenticateFromCookie`, which now rejects barber role users, so barber
   resolutions; Move, Cancel and Cancel and notify are owner only.
 - Search: `GET /api/admin/search` over `bookings.nameKey` (index `by_name_key`), phone digits and reference code.
 - Resolver Move: `applyScheduleChange` accepts `move` with `toStaffId`; options list only chairs that do the
-  service and are free for the whole booking plus buffer. The move updates the booking, re-points its
-  `slotLocks` and writes `booking.move` audit in one transaction; a concurrent change taking the same free
-  time loses at the unique `(staffId, slotStart)` index and rolls back whole. The customer link version does
-  not change because the time did not.
+  service and are free for their own length of the booking plus buffer, each with that chair's price and
+  minutes (`moveOptions[].totalPriceCents`, `durationMinutes`). The move reprices the booking for the new
+  chair (`quoteMove` in `shared/lib/servicePricing.ts`: services, `durationMinutes`, `totalPriceCents` and
+  the end time from the same start), re-points its `slotLocks` over the new length, writes `booking.move`
+  audit and queues the customer's "moved" email in one transaction; a concurrent change taking the same
+  free time, or a longer length running into another booking, loses at the unique `(staffId, slotStart)`
+  index and rolls back whole. The customer link version moves up like a reschedule (prompt 12; before it a
+  move was silent and kept the first chair's price).
 - Demo: seeded barbers get PIN 246810; the sign-in shows it only when `/api/shop` says `demo`.
 - Team routes (16) are under `/api/team/*`; owner access routes are `/api/admin/staff/:id/access`,
   `/setup-link` and `/unlock`.

@@ -6,9 +6,12 @@ import type { ServicePrice } from '../schemas/staff';
  * override either. Every number a customer, an email or the owner sees about a price comes from
  * here:
  *
- * - A chosen or assigned person: that person's override, else the shop's price and time.
- * - First available, or nobody chosen yet: the person with the lowest total among those who can
- *   do every chosen service, shown as a "from" price. The time is that same person's, so the price
+ * - A chosen or assigned person: that person's override, else the shop's price and time. That is
+ *   the exact price, never "from", whatever the service's own "from" flag says: a chair page, a
+ *   chosen barber in booking, the ticket, the emails and the admin views all print it as is.
+ * - First available, or nobody chosen yet (the price list): the person with the lowest total among
+ *   those who can do every chosen service, shown as a "from" price when the service is marked
+ *   "from" or the people charge different amounts. The time is that same person's, so the price
  *   and the minutes always describe one real person.
  * - Several services: the sum of each line for the one person who does them all.
  *
@@ -38,7 +41,10 @@ export interface ResolvedService {
   serviceId: string;
   priceCents: number;
   durationMinutes: number;
-  /** The shop's "from" flag, plus true when first available could land on a different price. */
+  /**
+   * Only for a price that is not one person's (first available, the price list): the service is
+   * marked "from" or the people who offer it charge different amounts. One person's price is exact.
+   */
   priceFrom: boolean;
   /** True when the person's own entry supplied the price. */
   overridden: boolean;
@@ -79,7 +85,10 @@ export function overrideFor(
   return staff.servicePrices?.find((p) => p.serviceId === serviceId && isCents(p.priceCents));
 }
 
-/** One service for one person: their price and time when they set them, else the shop's. */
+/**
+ * One service for one person: their price and time when they set them, else the shop's. Exact,
+ * so never "from".
+ */
 export function resolveServiceForStaff(
   service: PricedService,
   staff: Pick<PricedStaff, 'servicePrices'>,
@@ -91,7 +100,7 @@ export function resolveServiceForStaff(
     durationMinutes: isMinutes(own?.durationMinutes)
       ? own.durationMinutes
       : service.durationMinutes,
-    priceFrom: service.priceFrom,
+    priceFrom: false,
     overridden: own !== undefined,
   };
 }
@@ -111,8 +120,41 @@ export function quoteForStaff(
     lines,
     totalCents: lines.reduce((sum, l) => sum + l.priceCents, 0),
     totalMinutes: lines.reduce((sum, l) => sum + l.durationMinutes, 0),
-    from: lines.some((l) => l.priceFrom),
+    from: false,
   };
+}
+
+/** A service line as a booking keeps it. */
+export interface BookedLine {
+  serviceId: string;
+  priceCents: number;
+  durationMinutes: number;
+}
+
+/**
+ * A booking's services priced for another person, when the owner moves it to another chair: that
+ * person's own entry for each service, else the service's current price and time (`shopService`),
+ * else the line the booking holds (a service record that no longer loads). Exact, like any one
+ * person's price. Null when the person does not do every service. The server prices the move with
+ * this and the move step shows the same numbers before the owner confirms.
+ */
+export function quoteMove(
+  booked: readonly BookedLine[],
+  shopService: (serviceId: string) => { priceCents: number; durationMinutes: number } | undefined,
+  staff: PricedStaff,
+): PriceQuote | null {
+  return quoteForStaff(
+    booked.map((line) => {
+      const service = shopService(line.serviceId);
+      return {
+        id: line.serviceId,
+        priceCents: service?.priceCents ?? line.priceCents,
+        priceFrom: false,
+        durationMinutes: service?.durationMinutes ?? line.durationMinutes,
+      };
+    }),
+    staff,
+  );
 }
 
 interface Candidate {
@@ -132,8 +174,9 @@ function compareCandidates(a: Candidate, b: Candidate): number {
 /**
  * First available, or no one chosen yet: the lowest total among the people who offer every chosen
  * service. The caller passes the people who could be assigned (online bookable ones for a booking,
- * everyone on the menu for the price list). The result is flagged "from" when the people differ
- * on price, because the real total is whoever ends up assigned. Null when nobody offers them all.
+ * everyone on the menu for the price list). A line is flagged "from" when the service is marked
+ * "from" or the people differ on its price, and the total when any line is or the totals differ,
+ * because the real price is whoever ends up assigned. Null when nobody offers them all.
  */
 export function quoteFirstAvailable(
   services: readonly PricedService[],
@@ -150,7 +193,8 @@ export function quoteFirstAvailable(
   const lines = best.lines.map((line, index) => ({
     ...line,
     priceFrom:
-      line.priceFrom || priced.some((c) => c.quote.lines[index]?.priceCents !== line.priceCents),
+      services[index]?.priceFrom === true ||
+      priced.some((c) => c.quote.lines[index]?.priceCents !== line.priceCents),
   }));
   const totalsDiffer = priced.some((c) => c.quote.totalCents !== best.totalCents);
   return { ...best, lines, from: totalsDiffer || lines.some((l) => l.priceFrom) };

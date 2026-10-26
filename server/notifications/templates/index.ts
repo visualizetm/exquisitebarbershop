@@ -1,4 +1,4 @@
-import { publicEmail } from '../../../shared/lib/email';
+import { publicEmail } from '../../lib/publicEmail';
 import { buildIcs, bookingIcsUid } from '../../../shared/lib/ics';
 import { formatCents } from '../../../shared/lib/money';
 import { formatUsPhone } from '../../../shared/lib/phone';
@@ -27,10 +27,13 @@ function esc(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * A booking has one barber, so every price in an email is that barber's exact price, never "from"
+ * (also for a booking stored before snapshots dropped the flag).
+ */
 function serviceLines(p: BookingEmailPayload): string[] {
   return p.booking.services.map(
-    (s) =>
-      `${s.name}: ${s.priceFrom ? 'from ' : ''}${formatCents(s.priceCents)} (${s.durationMinutes} min)`,
+    (s) => `${s.name}: ${formatCents(s.priceCents)} (${s.durationMinutes} min)`,
   );
 }
 
@@ -107,7 +110,7 @@ function customerConfirmed(p: BookingEmailPayload, env: RenderEnv, rescheduled: 
     `Reference code: ${p.booking.referenceCode}`,
     'Services:',
     ...serviceLines(p).map((l) => `  ${l}`),
-    `Total: ${formatCents(p.booking.totalPriceCents)}${p.booking.services.some((s) => s.priceFrom) ? ' (starting price, final price depends on the service)' : ''}`,
+    `Total: ${formatCents(p.booking.totalPriceCents)}`,
     ...(url ? [`Need to change it? Cancel or reschedule here: ${url}`] : []),
     'A calendar file is attached.',
     '',

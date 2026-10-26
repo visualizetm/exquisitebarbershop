@@ -596,3 +596,29 @@ commit, and what is still open.
 - The red display line over the hero photo measures 3.99:1 at 390 (large text passes 3:1, the checklist asks
   4.5:1); left for Rob (D12-80).
 - Not done in this part: the owner guide screens (still the prompt 11 sample barbers) and the report.
+
+### M6: review fixes (moves reprice, exact chair prices, hero red, settings, sitemap)
+
+- Moves reprice (Rob, D12-81): the resolver's Move prices the booking for the new chair with the shared
+  `quoteMove` and stores its lines, minutes, total, end time and locks over the new length in the same
+  transaction; a length that does not fit is not offered and fails cleanly. `moveOptions` carry each chair's
+  price and minutes ("Drew, $40" in the Move to list, a "With Drew: $40, 45 min (now $50, 75 min)" line
+  under it), the owner's Reschedule shows the price per barber too, and the customer is emailed the new
+  barber and price (link version up, like a reschedule).
+- Exact chair prices (Rob, D12-82): one person's price is never "From" (chair pages, a chosen barber in
+  booking, the ticket, emails, admin, Team, Services); "From" only on `/services`, the Home menu and first
+  available.
+- Hero red (Rob, D12-80): "Exquisite" was already #FF5470 (`--red-on-dark`) on the photo in both themes but
+  measured 3.99:1 at 390 and 3.67:1 at 768 on the real photo; `--scrim-photo` went from 80% to 87% ink, the
+  lightest step that passes: 4.75:1 at 390 and 4.51:1 at 768 (86% gives 4.34:1). Measured once on the demo
+  build with the title hidden (the milestone 5 method); `tests/unit/heroScrim.test.ts` and the rules spec
+  hold it. The `docs/screens/p12/` hero shots still show the 80% scrim (no p12 recapture, per Rob).
+- Review findings: a settings save no longer writes the Google block (D12-84); the sitemap skips chairs that
+  take no online bookings, Iniya included (D12-85); the placeholder email literal moved into `seed/shop.ts`
+  (D12-86). Rejected: the hidden barber walk-in claim (a hidden barber has no portal session, D12-87).
+  Deferred to the final step: the owner guide screens and PDF (Rob), the report. Lighthouse stays open (D12-83).
+- Tests: new `tests/unit/heroScrim.test.ts`, `menuPrices.test.ts`, `moveOption.test.ts`; four new resolver move
+  tests (prices on the options, override to shop price and back with cents, minutes, end, locks and the email,
+  a longer length that does not fit); the two tab Google test; the sitemap and email location tests. E2e
+  expectations updated for exact chair prices, the move option prices and the sitemap (not run here; the final
+  gate runs them).

@@ -1,9 +1,11 @@
 import type { ClientSession } from 'mongodb';
 import type { ConflictOutcome, ConflictResolution } from '../../shared/api/admin';
+import { quoteMove } from '../../shared/lib/servicePricing';
 import { addMinutes } from '../../shared/lib/time';
 import { shopDateOf, shopDayStart } from '../../shared/lib/time';
 import type { BookingDocument } from '../../shared/schemas/booking';
 import type { WeekHours } from '../../shared/schemas/common';
+import type { ServiceDocument } from '../../shared/schemas/service';
 import type { StaffDocument } from '../../shared/schemas/staff';
 import type { Actor } from '../../shared/schemas/timeBlock';
 import { withTransaction } from '../db/transaction';
@@ -13,15 +15,17 @@ import {
   bookingsRepo,
   closuresRepo,
   scheduleGuardsRepo,
+  servicesRepo,
   shopSettingsRepo,
   slotLocksRepo,
   staffRepo,
   timeBlocksRepo,
   weeklyHoursRepo,
 } from '../repos';
-import { isWithinWorkingTime, type ScheduleSource } from './availability';
-import { cancelInTransaction } from './bookingService';
-import { unknownStaff } from './bookingView';
+import { isWithinWorkingTime, pricedStaff, type ScheduleSource } from './availability';
+import { enqueueBookingNotifications } from './bookingNotifications';
+import { cancelInTransaction, manageLinkFor } from './bookingService';
+import { toBookingView, unknownStaff } from './bookingView';
 import { relockBlocks } from './locks';
 
 /**
@@ -38,8 +42,10 @@ import { relockBlocks } from './locks';
  *     So is any booking the change names directly (a removed service);
  *  5. if any affected booking lacks an explicit choice, throws SCHEDULE_CONFLICT
  *     with the list, which aborts the transaction and undoes the change;
- *  6. otherwise keeps (audited as an exception) or cancels each one, with or
- *     without telling the customer, and commits everything together.
+ *  6. otherwise keeps (audited as an exception), moves (to another chair at the
+ *     same start, at that chair's price and time, emailing the customer) or
+ *     cancels each one, with or without telling the customer, and commits
+ *     everything together.
  *
  * Bookings that were already outside working time before the change (earlier
  * exceptions, walk-ins after hours) are not reported again.
@@ -126,39 +132,103 @@ function summarize(booking: BookingDocument, staffById: Map<string, StaffDocumen
     customerName: booking.customer.name,
     services: booking.services.map((s) => s.name),
     hasEmail: booking.customer.email !== null,
+    totalPriceCents: booking.totalPriceCents,
+    durationMinutes: booking.durationMinutes,
   };
 }
 
 /** The span a booking holds: its time plus the buffer after it. */
-function heldSpan(booking: BookingDocument) {
+function heldSpan(booking: Pick<BookingDocument, 'startAt' | 'endAt' | 'bufferMinutes'>) {
   return { start: booking.startAt, end: addMinutes(booking.endAt, booking.bufferMinutes) };
 }
 
-/** Whether a chair does every service of a booking and works all of its time. */
-function canTake(snapshot: Snapshot, booking: BookingDocument, staff: StaffDocument): boolean {
-  if (staff.deletedAt !== null) return false;
-  if (!booking.services.every((s) => staff.serviceIds.includes(s.serviceId))) return false;
-  return isWithinWorkingTime({ ...booking, staffId: staff._id }, staff, snapshot.source);
+/** A booking as it would be on another chair at the same start. */
+interface MovedBooking {
+  services: BookingDocument['services'];
+  durationMinutes: number;
+  totalPriceCents: number;
+  endAt: Date;
 }
 
 /**
- * Chairs a booking could move to at the same time: they do all its services, work the whole
- * duration, and hold no booking or block over it. Re-checked by the lock insert when the move
- * is applied, so a stale list can never double book.
+ * A booking priced and timed for another chair by the shared pricing helper (`quoteMove`: that
+ * chair's own entry, else the service's current price and time). The start stays and the end follows
+ * the new length. The cleanup gap is per service, not per chair, so it stays too. The lines keep the
+ * names the customer booked. Null when the chair does not do every service.
+ */
+function repriceFor(
+  booking: BookingDocument,
+  staff: StaffDocument,
+  servicesById: ReadonlyMap<string, ServiceDocument>,
+): MovedBooking | null {
+  const quote = quoteMove(booking.services, (id) => servicesById.get(id), pricedStaff(staff));
+  if (!quote) return null;
+  return {
+    services: booking.services.map((line, index) => ({
+      ...line,
+      priceCents: quote.lines[index]?.priceCents ?? line.priceCents,
+      priceFrom: false,
+      durationMinutes: quote.lines[index]?.durationMinutes ?? line.durationMinutes,
+    })),
+    durationMinutes: quote.totalMinutes,
+    totalPriceCents: quote.totalCents,
+    endAt: addMinutes(booking.startAt, quote.totalMinutes),
+  };
+}
+
+/**
+ * The booking on another chair at the same start, when that chair can take it: it does every
+ * service and works the whole of its own length for them (which may be longer or shorter).
+ */
+function moveTo(
+  snapshot: Snapshot,
+  booking: BookingDocument,
+  staff: StaffDocument,
+  servicesById: ReadonlyMap<string, ServiceDocument>,
+): MovedBooking | null {
+  if (staff.deletedAt !== null) return null;
+  const moved = repriceFor(booking, staff, servicesById);
+  if (!moved) return null;
+  const span = { staffId: staff._id, startAt: booking.startAt, endAt: moved.endAt };
+  return isWithinWorkingTime(span, staff, snapshot.source) ? moved : null;
+}
+
+export interface MoveOption {
+  staffId: string;
+  staffName: string;
+  /** What the booking costs and how long it takes with this chair, shown before the owner confirms. */
+  totalPriceCents: number;
+  durationMinutes: number;
+}
+
+/**
+ * Chairs a booking could move to at the same start: they do all its services, work the whole of
+ * their own length for them, and hold no booking or block over it (plus the cleanup gap). Each
+ * carries that chair's price and length. Re-checked by the lock insert when the move is applied,
+ * so a stale list can never double book.
  */
 async function moveOptionsFor(
   snapshot: Snapshot,
   booking: BookingDocument,
+  servicesById: ReadonlyMap<string, ServiceDocument>,
   session: ClientSession,
-): Promise<{ staffId: string; staffName: string }[]> {
-  const options: { staffId: string; staffName: string }[] = [];
+): Promise<MoveOption[]> {
+  const options: MoveOption[] = [];
   const sorted = [...snapshot.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const staff of sorted) {
-    if (staff._id === booking.staffId || !canTake(snapshot, booking, staff)) continue;
-    const locks = await slotLocksRepo.listSlotLocksForStaff(staff._id, heldSpan(booking), {
-      session,
-    });
-    if (locks.length === 0) options.push({ staffId: staff._id, staffName: staff.name });
+    if (staff._id === booking.staffId) continue;
+    const moved = moveTo(snapshot, booking, staff, servicesById);
+    if (!moved) continue;
+    const span = heldSpan({ ...booking, endAt: moved.endAt });
+    const locks = await slotLocksRepo.listSlotLocksForStaff(staff._id, span, { session });
+    if (locks.length === 0) {
+      options.push({
+        staffId: staff._id,
+        staffName: staff.name,
+        totalPriceCents: moved.totalPriceCents,
+        durationMinutes: moved.durationMinutes,
+      });
+    }
   }
   return options;
 }
@@ -188,6 +258,12 @@ export async function applyScheduleChange<T>(
     }
     for (const booking of change.alsoAffected?.(after.upcoming) ?? [])
       affected.set(booking._id, booking);
+    // The services of the affected bookings, deleted or hidden ones included: a move prices them.
+    const serviceIds = new Set(
+      [...affected.values()].flatMap((b) => b.services.map((s) => s.serviceId)),
+    );
+    const services = await servicesRepo.findServicesByIds([...serviceIds], { session });
+    const servicesById = new Map(services.map((s) => [s._id, s]));
 
     const unresolved = [...affected.values()].filter((b) => !choices.has(b._id));
     if (unresolved.length > 0) {
@@ -201,7 +277,7 @@ export async function applyScheduleChange<T>(
             affected: await Promise.all(
               [...affected.values()].map(async (b) => ({
                 ...summarize(b, after.staffById),
-                moveOptions: await moveOptionsFor(after, b, session),
+                moveOptions: await moveOptionsFor(after, b, servicesById, session),
               })),
             ),
           },
@@ -220,39 +296,80 @@ export async function applyScheduleChange<T>(
       const action = choice?.action;
       if (choice?.action === 'move' && choice.toStaffId) {
         const target = after.staffById.get(choice.toStaffId);
-        if (!target || !canTake(after, booking, target)) {
+        const priced = target ? moveTo(after, booking, target, servicesById) : null;
+        if (!target || !priced) {
           throw new AppError(
             'SLOT_TAKEN',
             `${target?.name ?? 'That chair'} can not take this booking`,
           );
         }
         await scheduleGuardsRepo.bumpScheduleGuards([target._id], change.now, { session });
-        // Release first, then take the same time on the new chair: a lock held by anyone else
-        // (a booking made a moment ago) fails the insert and undoes the whole change.
+        // Release first, then take the new chair's own length from the same start: a lock held by
+        // anyone else (a booking made a moment ago, or one that sits inside a longer length) fails
+        // the insert and undoes the whole change.
         await slotLocksRepo.releaseSlotLocks(booking._id, { session });
         await slotLocksRepo.acquireSlotLocks(
           target._id,
-          heldSpan(booking),
+          heldSpan({ ...booking, endAt: priced.endAt }),
           { holderType: 'booking', holderId: booking._id },
           change.now,
           { session },
         );
         await relockBlocks(booking.staffId, heldSpan(booking), change.now, session);
-        await bookingsRepo.moveBookingToStaff(booking._id, target._id, change.now, { session });
+        const movedBooking = await bookingsRepo.moveBookingToStaff(
+          booking._id,
+          {
+            staffId: target._id,
+            endAt: priced.endAt,
+            services: priced.services,
+            durationMinutes: priced.durationMinutes,
+            totalPriceCents: priced.totalPriceCents,
+          },
+          change.now,
+          { session },
+        );
         await auditLogRepo.appendAuditEntry(
           {
             actor: change.actor,
             action: 'booking.move',
             entityType: 'booking',
             entityId: booking._id,
-            before: { staffId: booking.staffId },
-            after: { staffId: target._id },
+            before: {
+              staffId: booking.staffId,
+              endAt: booking.endAt,
+              durationMinutes: booking.durationMinutes,
+              totalPriceCents: booking.totalPriceCents,
+            },
+            after: {
+              staffId: target._id,
+              endAt: movedBooking.endAt,
+              durationMinutes: movedBooking.durationMinutes,
+              totalPriceCents: movedBooking.totalPriceCents,
+            },
             meta: { change: change.audit.action },
             requestId: change.requestId,
           },
           change.now,
           { session },
         );
+        // The customer hears about the new barber, price and time; the owner made the change.
+        if (settings) {
+          outboxIds.push(
+            ...(await enqueueBookingNotifications(
+              {
+                event: 'rescheduled',
+                view: toBookingView(movedBooking, target),
+                settings,
+                managePath: manageLinkFor(movedBooking),
+                previousStartAt: null,
+                cancelReason: null,
+                audience: { customer: true, owner: false },
+              },
+              change.now,
+              session,
+            )),
+          );
+        }
         moved.push(booking._id);
         continue;
       }

@@ -90,7 +90,9 @@ Open a booking from the table, the search or the Overview.
 
 1. **Mark done** or **No show** when the visit is over. A small message offers
    **Undo** for a few seconds.
-2. **Reschedule** moves it to another time. The customer gets a new link.
+2. **Reschedule** moves it to another time, or to another barber. Each barber in
+   the list shows what the booking costs with them. A different barber means
+   their price and time. The customer gets a new link.
 3. **Cancel** cancels it. **Cancel and notify** also emails the customer; it is
    greyed out when there is no email on file.
 4. **Resend confirmation** and **Copy manage link** help a customer who lost
@@ -129,7 +131,10 @@ red strip appears on the Overview. Their clients stay booked until you decide.
 1. Tap **Decide**.
 2. For each client, choose one:
    - **Move** puts them with another barber at the same time. Only chairs that
-     do the service and are free the whole time are offered.
+     do the service and are free the whole time are offered, each with what the
+     booking costs with them (for example "Drew, $40, 45 min"). The booking takes
+     that barber's price and time, and the customer gets an email with the new
+     barber and price.
    - **Keep** leaves them where they are.
    - **Cancel** cancels without emailing.
    - **Cancel and notify** cancels and emails the customer.
@@ -178,10 +183,12 @@ cut):
 
 **Use shop price** empties a row; tap **Save prices** after it. A service missing from the list is not
 on their menu yet: tick it under **Services** first. The barber's page shows
-their own prices and times. The Services page and Home show the lowest price
-as **From $x** when barbers charge different amounts. A booking with this barber
-uses their price and time, in the total, the confirmation email, the ticket and
-your Bookings. Bookings already made keep the price they were booked at.
+their own exact prices and times, never "From". The Services page, Home and
+"first available" in booking show the lowest price as **From $x** when barbers
+charge different amounts. A booking with this barber uses their price and time,
+in the total, the confirmation email, the ticket and your Bookings. Bookings
+already made keep the price they were booked at, unless you move one to another
+barber: then it takes that barber's price and time (sections 7 and 9).
 
 To give a barber their login:
 

@@ -9,10 +9,13 @@ import XCircle from '@untitled-ui/icons-react/build/esm/XCircle';
 import {
   bookingDetailResponseSchema,
   bookingResponseSchema,
+  serviceListResponseSchema,
   staffListResponseSchema,
+  type AdminStaffView,
   type BookingDetailResponse,
 } from '@shared/api/admin';
 import { okResponseSchema } from '@shared/api/auth';
+import { quoteMove } from '@shared/lib/servicePricing';
 import type { BookingStatus } from '@shared/schemas/booking';
 import {
   Button,
@@ -30,6 +33,7 @@ import { ApiRequestError, apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { ErrorNote } from '../components/ErrorNote';
 import { SOURCE_LABEL, money, phoneLabel, shopDateTime, shopInstant, shopParts } from '../format';
+import { optionLabel } from '../panels/moveOption';
 import { useQuick } from '../shell/quick';
 import { useMe } from '../useSession';
 
@@ -450,11 +454,31 @@ function RescheduleForm({
   const b = detail.booking;
   const parts = shopParts(b.startAt);
   const staff = useApi('/api/admin/staff', staffListResponseSchema);
+  const services = useApi('/api/admin/services', serviceListResponseSchema);
   const [date, setDate] = useState(parts.date);
   const [time, setTime] = useState(parts.time);
   const [chair, setChair] = useState(b.staff.slug);
   const [notify, setNotify] = useState(b.customer.email !== null);
   const [override, setOverride] = useState(false);
+  // What the booking costs with each barber, shown before the owner moves it: the same barber keeps
+  // the booked price and time, another one has their own (as the server prices the move).
+  const shop = services.status === 'ready' ? services.data.services : null;
+  /** Undefined while the menu loads; null when the barber does not do these services. */
+  const priceWith = (
+    s: AdminStaffView,
+  ): { totalPriceCents: number; durationMinutes: number } | null | undefined => {
+    if (s.id === b.staff.id) {
+      return { totalPriceCents: b.totalPriceCents, durationMinutes: b.durationMinutes };
+    }
+    if (!shop) return undefined;
+    const quote = quoteMove(b.services, (id) => shop.find((x) => x.id === id), s);
+    return quote
+      ? { totalPriceCents: quote.totalCents, durationMinutes: quote.totalMinutes }
+      : null;
+  };
+  const chairs = staff.status === 'ready' ? staff.data.staff.filter((s) => !s.deletedAt) : [];
+  const target = chairs.find((s) => s.slug === chair && s.id !== b.staff.id);
+  const targetPrice = target ? priceWith(target) : undefined;
   return (
     <form
       className="exq-bsheet__panel"
@@ -498,17 +522,34 @@ function RescheduleForm({
         }}
       >
         {staff.status === 'ready' ? (
-          staff.data.staff
-            .filter((s) => !s.deletedAt)
-            .map((s) => (
-              <option key={s.id} value={s.slug}>
-                {s.name}
+          chairs.map((s) => {
+            const price = priceWith(s);
+            return (
+              <option key={s.id} value={s.slug} disabled={price === null}>
+                {price === undefined
+                  ? s.name
+                  : price === null
+                    ? `${s.name}, does not do these services`
+                    : optionLabel(b, {
+                        staffId: s.id,
+                        staffName: s.name,
+                        totalPriceCents: price.totalPriceCents,
+                        durationMinutes: price.durationMinutes,
+                      })}
               </option>
-            ))
+            );
+          })
         ) : (
           <option value={b.staff.slug}>{b.staff.name}</option>
         )}
       </Select>
+      {target && targetPrice ? (
+        <p className="exq-bsheet__move exq-muted" aria-live="polite">
+          With {target.name}: {money(targetPrice.totalPriceCents)},{' '}
+          {String(targetPrice.durationMinutes)} min (now {money(b.totalPriceCents)},{' '}
+          {String(b.durationMinutes)} min). The booking takes their price and time.
+        </p>
+      ) : null}
       <Checkbox
         label="Email the client the new time"
         checked={notify}

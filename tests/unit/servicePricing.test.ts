@@ -6,6 +6,7 @@ import {
   pruneServicePrices,
   quoteFirstAvailable,
   quoteForStaff,
+  quoteMove,
   resolveServiceForStaff,
   servicePriceIssues,
   type PricedService,
@@ -71,7 +72,7 @@ describe('resolveServiceForStaff', () => {
       serviceId: 'haircut',
       priceCents: 4000,
       durationMinutes: 45,
-      priceFrom: true,
+      priceFrom: false,
       overridden: false,
     });
   });
@@ -92,8 +93,11 @@ describe('resolveServiceForStaff', () => {
     expect(line).toMatchObject({ priceCents: 5000, durationMinutes: 75, overridden: true });
   });
 
-  it('keeps the service from flag, so the owner still decides what says "from"', () => {
-    expect(resolveServiceForStaff(haircut, dontrise).priceFrom).toBe(true);
+  it('one person\'s price is exact, never "from", even for a service the shop marks "from"', () => {
+    // Haircut and Kids Cut are marked "from" on the shop menu.
+    expect(resolveServiceForStaff(haircut, dontrise).priceFrom).toBe(false);
+    expect(resolveServiceForStaff(haircut, lee).priceFrom).toBe(false);
+    expect(resolveServiceForStaff(kids, drew).priceFrom).toBe(false);
     expect(resolveServiceForStaff(beard, lee).priceFrom).toBe(false);
   });
 
@@ -113,9 +117,10 @@ describe('quoteForStaff (an assigned or chosen person)', () => {
       staffId: 'dontrise',
       totalCents: 8000,
       totalMinutes: 115,
-      from: true,
+      from: false,
     });
     expect(quote?.lines.map((l) => l.serviceId)).toEqual(['haircut', 'lineup']);
+    expect(quote?.lines.every((l) => !l.priceFrom)).toBe(true);
   });
 
   it('mixed services: an overridden line next to a shop line', () => {
@@ -126,12 +131,13 @@ describe('quoteForStaff (an assigned or chosen person)', () => {
     ]);
     expect(quote?.totalCents).toBe(7000);
     expect(quote?.totalMinutes).toBe(75);
-    // Kids Cut is flagged "from", so the total is a starting price.
-    expect(quote?.from).toBe(true);
+    // Kids Cut is flagged "from" on the shop menu, but Drew's own price is exact.
+    expect(quote?.from).toBe(false);
   });
 
-  it('is not "from" when no line is flagged', () => {
+  it('is never "from" for one person, flagged services or not', () => {
     expect(quoteForStaff([beard], lee)?.from).toBe(false);
+    expect(quoteForStaff([haircut, kids], nelly)?.from).toBe(false);
   });
 
   it('is null when the person does not offer every service', () => {
@@ -159,6 +165,14 @@ describe('quoteFirstAvailable (no one chosen yet, or anyone available)', () => {
     expect(quote?.totalCents).toBe(2000);
     // One person only: nothing to differ from, so the price is plain.
     expect(quoteFirstAvailable([solo], [dontrise])?.from).toBe(false);
+  });
+
+  it('keeps the shop "from" flag for first available, even with one person and one price', () => {
+    const quote = quoteFirstAvailable([haircut], [lee]);
+    expect(quote?.from).toBe(true);
+    expect(quote?.lines[0]?.priceFrom).toBe(true);
+    // The same person chosen by name: the exact price.
+    expect(quoteForStaff([haircut], lee)?.from).toBe(false);
   });
 
   it('is a plain price when everyone offering it charges the same and the shop does not say from', () => {
@@ -190,6 +204,43 @@ describe('quoteFirstAvailable (no one chosen yet, or anyone available)', () => {
     expect(quoteFirstAvailable([haircut], [slow, quick])?.staffId).toBe('quick');
     const same: PricedStaff = { id: 'same', sortOrder: 1, serviceIds: ['haircut'] };
     expect(quoteFirstAvailable([haircut], [quick, same])?.staffId).toBe('same');
+  });
+});
+
+describe('quoteMove (the owner moves a booking to another chair)', () => {
+  // Dontrise's own haircut as a booking stores it.
+  const booked = [{ serviceId: 'haircut', priceCents: 5000, durationMinutes: 75 }];
+  const shop = (id: string) => [haircut, lineup, kids, beard].find((s) => s.id === id);
+
+  it("takes the new chair's own price and time, exact", () => {
+    expect(quoteMove(booked, shop, nelly)).toMatchObject({
+      staffId: 'nelly',
+      totalCents: 4500,
+      totalMinutes: 45,
+      from: false,
+    });
+  });
+
+  it("takes the shop's current price and time for a chair without its own", () => {
+    expect(quoteMove(booked, shop, lee)).toMatchObject({ totalCents: 4000, totalMinutes: 45 });
+  });
+
+  it('the reverse: a shop priced booking moved to the chair with an override', () => {
+    const atShop = [{ serviceId: 'haircut', priceCents: 4000, durationMinutes: 45 }];
+    expect(quoteMove(atShop, shop, dontrise)).toMatchObject({ totalCents: 5000, totalMinutes: 75 });
+  });
+
+  it('falls back to the booked line when the service record no longer loads', () => {
+    expect(quoteMove(booked, () => undefined, lee)).toMatchObject({
+      totalCents: 5000,
+      totalMinutes: 75,
+    });
+  });
+
+  it('is null when the chair does not do every service', () => {
+    expect(
+      quoteMove([{ serviceId: 'beard', priceCents: 4500, durationMinutes: 45 }], shop, nelly),
+    ).toBeNull();
   });
 });
 

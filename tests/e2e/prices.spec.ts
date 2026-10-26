@@ -46,20 +46,23 @@ test.describe('the price list', () => {
     await expect(rowLink(page, 'Book Kids Cut with Design, 90 minutes, $40')).toBeVisible();
   });
 
-  test("a chair page shows that barber's own prices and times", async ({ page }) => {
+  test('a chair page shows that barber\'s own exact prices and times, never "From"', async ({
+    page,
+  }) => {
     await page.goto('/chairs/dontrise');
-    await expect(rowLink(page, 'Book Haircut with Dontrise, 75 minutes, From $50')).toBeVisible();
-    await expect(rowLink(page, 'Book Lineup with Dontrise, 40 minutes, From $30')).toBeVisible();
+    await expect(rowLink(page, 'Book Haircut with Dontrise, 75 minutes, $50')).toBeVisible();
+    await expect(rowLink(page, 'Book Lineup with Dontrise, 40 minutes, $30')).toBeVisible();
     await expect(
-      rowLink(page, 'Book Color and Cut with Dontrise, 180 minutes, From $100'),
+      rowLink(page, 'Book Color and Cut with Dontrise, 180 minutes, $100'),
     ).toBeVisible();
     await page.goto('/chairs/nelly');
-    await expect(rowLink(page, 'Book Haircut with Nelly Cutz, 45 minutes, From $45')).toBeVisible();
+    await expect(rowLink(page, 'Book Haircut with Nelly Cutz, 45 minutes, $45')).toBeVisible();
     await page.goto('/chairs/drew');
-    await expect(rowLink(page, 'Book Kids Cut with Drew, 30 minutes, From $25')).toBeVisible();
-    await expect(rowLink(page, 'Book Haircut with Drew, 45 minutes, From $40')).toBeVisible();
+    await expect(rowLink(page, 'Book Kids Cut with Drew, 30 minutes, $25')).toBeVisible();
+    await expect(rowLink(page, 'Book Haircut with Drew, 45 minutes, $40')).toBeVisible();
+    await expect(page.locator('.exq-chair')).not.toContainText(/From \$/);
     await page.goto('/chairs/lee');
-    await expect(rowLink(page, 'Book Haircut with Lee, 45 minutes, From $40')).toBeVisible();
+    await expect(rowLink(page, 'Book Haircut with Lee, 45 minutes, $40')).toBeVisible();
   });
 });
 
@@ -69,11 +72,13 @@ test.describe('booking with a barber', () => {
   }) => {
     await resetRateLimits();
     await page.goto('/book?barber=dontrise');
-    await expect(serviceOption(page, HAIRCUT)).toContainText('From $50');
+    // A chosen barber's price is exact: no "From", even for a service the shop menu marks "from".
+    await expect(serviceOption(page, HAIRCUT)).toContainText('$50');
+    await expect(serviceOption(page, HAIRCUT)).not.toContainText('From');
     await expect(serviceOption(page, HAIRCUT)).toContainText('75 min');
     await page.getByLabel(HAIRCUT).click();
     await expect(page.locator('.exq-service-picker__total')).toContainText(
-      '1 selected: From $50, about 75 minutes.',
+      '1 selected: $50, about 75 minutes.',
     );
     await page.getByRole('button', { name: 'Continue' }).click();
     await page.locator('.exq-day-option[data-state="available"] button').nth(1).click();
@@ -81,7 +86,8 @@ test.describe('booking with a barber', () => {
     await page.getByLabel('Name').fill('Price Customer');
     await page.getByLabel('Mobile phone').fill(randomPhone());
     await page.getByRole('button', { name: 'Review booking' }).click();
-    await expect(page.locator('.exq-book-card__total')).toContainText('From $50');
+    await expect(page.locator('.exq-book-card__total')).toContainText('$50');
+    await expect(page.locator('.exq-book-card__total')).not.toContainText('From');
     await page.getByRole('button', { name: 'Confirm booking' }).click();
     await expect(page.getByRole('heading', { name: 'You are booked' })).toBeFocused();
     await expect(page.locator('.exq-ticket__total')).toContainText('$50');
@@ -168,7 +174,7 @@ test.describe('the Prices tab in Team', () => {
     await expect(save).toBeDisabled();
 
     await page.goto('/chairs/drew');
-    await expect(rowLink(page, 'Book Haircut with Drew, 50 minutes, From $42.50')).toBeVisible();
+    await expect(rowLink(page, 'Book Haircut with Drew, 50 minutes, $42.50')).toBeVisible();
     // The shop price on /services is the lowest among the barbers who do it, which is still Lee's $40.
     await page.goto('/services');
     await expect(rowLink(page, 'Book Haircut, 45 minutes, From $40')).toBeVisible();
@@ -182,7 +188,7 @@ test.describe('the Prices tab in Team', () => {
     await save.click();
     await expect(page.getByText(/Prices saved\./).first()).toBeVisible();
     await page.goto('/chairs/drew');
-    await expect(rowLink(page, 'Book Haircut with Drew, 45 minutes, From $40')).toBeVisible();
+    await expect(rowLink(page, 'Book Haircut with Drew, 45 minutes, $40')).toBeVisible();
   });
 
   test('a barber with no services has nothing to price and points to the Services tab', async ({

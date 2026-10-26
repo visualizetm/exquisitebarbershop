@@ -145,10 +145,15 @@ test.describe('team and the resolver', () => {
       else await items.nth(i).getByRole('radio', { name: /^Keep/ }).check({ force: true });
     }
     await expect(panel.getByText(`${String(count)} of ${String(count)} decided`)).toBeVisible();
-    // Only chairs that do the service and are free are offered, never Nelly himself.
+    // Only chairs that do the service and are free are offered, never Nelly himself, each with
+    // what the booking costs there ("Drew, $40") before anything is applied.
     const options = await panel.getByLabel('Move to').first().locator('option').allTextContents();
     expect(options.length).toBeGreaterThan(0);
-    expect(options).not.toContain('Nelly Cutz');
+    for (const label of options) {
+      expect(label).not.toMatch(/^Nelly Cutz/);
+      expect(label).toMatch(/^[A-Za-z ]+, \$\d+/);
+    }
+    await expect(panel.locator('.exq-resolver__move').first()).toContainText(/With .+: \$\d+/);
     await apply.click();
     await expect(page.getByText(/Time blocked\. .*moved/)).toBeVisible();
 

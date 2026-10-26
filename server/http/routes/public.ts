@@ -11,7 +11,7 @@ import {
   type PublicService,
   type PublicStaff,
 } from '../../../shared/api/public';
-import { publicEmail } from '../../../shared/lib/email';
+import { publicEmail } from '../../lib/publicEmail';
 import { shownReviews } from '../../../shared/lib/reviews';
 import { shopDateOf } from '../../../shared/lib/time';
 import { announcementIsLive, type ReviewItem } from '../../../shared/schemas/shopSettings';
@@ -144,7 +144,10 @@ export const publicRoutes: RouteDefinition[] = [
     handler: async () => {
       const staff = await staffRepo.listPublicStaff();
       const base = getEnv().APP_BASE_URL.replace(/\/$/, '');
-      const paths = [...SITEMAP_PATHS, ...staff.map((s) => `/chairs/${s.slug}`)];
+      // Like first available and the booking staff picker, the sitemap skips a chair that takes no
+      // online bookings (Iniya books on Instagram). Her page itself still works and is linked.
+      const bookable = staff.filter((s) => s.acceptsOnlineBooking);
+      const paths = [...SITEMAP_PATHS, ...bookable.map((s) => `/chairs/${s.slug}`)];
       const urls = paths.map((p) => `  <url><loc>${escapeXml(`${base}${p}`)}</loc></url>`);
       const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
       return {

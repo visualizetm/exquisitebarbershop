@@ -8,11 +8,12 @@ export function qualifiedStaff(staff: PublicStaff[], serviceIds: string[]): Publ
   );
 }
 
+/** A booked appointment has one barber, so its prices are exact, never "from". */
 export function viewToSummary(view: BookingView): SummaryItem[] {
   return view.services.map((s) => ({
     name: s.name,
     priceCents: s.priceCents,
-    priceFrom: s.priceFrom,
+    priceFrom: false,
     durationMinutes: s.durationMinutes,
   }));
 }

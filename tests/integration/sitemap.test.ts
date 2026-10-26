@@ -32,6 +32,15 @@ describe('GET /sitemap.xml', () => {
     expect(xml).not.toContain('/manage');
   });
 
+  it('skips a chair that takes no online bookings (Iniya books on Instagram)', async () => {
+    const xml = String((await call(server.baseUrl, 'GET', '/api/sitemap.xml')).body.text);
+    expect(xml).not.toContain('/chairs/iniya<');
+    await staffRepo.updateStaff(staffSeedId('drew'), { acceptsOnlineBooking: false }, NOW);
+    const without = String((await call(server.baseUrl, 'GET', '/api/sitemap.xml')).body.text);
+    expect(without).not.toContain('/chairs/drew<');
+    await staffRepo.updateStaff(staffSeedId('drew'), { acceptsOnlineBooking: true }, NOW);
+  });
+
   it('drops a chair that is removed or hidden from the website', async () => {
     await staffRepo.updateStaff(staffSeedId('lee'), { showOnWebsite: false }, NOW);
     await staffRepo.softDeleteStaff(staffSeedId('nelly'), NOW);

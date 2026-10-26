@@ -404,6 +404,12 @@ test.describe('with the shop photos', () => {
       expect(colors.length).toBeGreaterThan(5);
       for (const color of colors)
         expect(['rgb(255, 255, 255)', 'rgb(217, 217, 217)']).toContain(color);
+      // Red on the photo is the red for dark grounds (--red-on-dark, #FF5470) in both themes, never
+      // #C8102E; with the 87% scrim it measures 4.5:1 or more on the real photo (D12-80).
+      const accent = await page
+        .locator('.exq-hero__title .exq-lines__text[data-accent="true"]')
+        .evaluate((el) => getComputedStyle(el).color);
+      expect(accent).toBe('rgb(255, 84, 112)');
     });
   }
 });

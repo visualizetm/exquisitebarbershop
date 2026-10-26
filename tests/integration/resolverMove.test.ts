@@ -8,6 +8,7 @@ import {
   weeklyHoursRepo,
 } from '../../server/repos';
 import { newId } from '../../server/lib/ids';
+import { renderTemplate } from '../../server/notifications/templates';
 import { createTimeBlock } from '../../server/services/adminSchedule';
 import { runSeed } from '../../server/services/seedService';
 import { serviceSeedId, shopHoursSeed, staffSeed, staffSeedId } from '../../seed/shop';
@@ -33,6 +34,7 @@ const THU = nextDate(4, 3);
 const lee = staffSeedId('lee');
 const drew = staffSeedId('drew');
 const nelly = staffSeedId('nelly');
+const dontrise = staffSeedId('dontrise');
 const cut = serviceSeedId('haircut');
 
 const asOwner = (method: string, path: string, body?: unknown) =>
@@ -41,10 +43,20 @@ const asOwner = (method: string, path: string, body?: unknown) =>
     ...(body === undefined ? {} : { body }),
   });
 
-async function seedBooking(staffId: string, hhmm: string, serviceId = cut) {
+/**
+ * A confirmed booking with its locks. `own` is the chair's own price and minutes, as a booking on a
+ * chair with an override stores them; without it the shop's.
+ */
+async function seedBooking(
+  staffId: string,
+  hhmm: string,
+  serviceId = cut,
+  own?: { priceCents: number; durationMinutes: number },
+) {
   const startAt = new Date(slotAt(THU, hhmm));
-  const service = await servicesRepo.findServiceById(serviceId);
-  if (!service) throw new Error('missing service');
+  const found = await servicesRepo.findServiceById(serviceId);
+  if (!found) throw new Error('missing service');
+  const service = own ? { ...found, ...own } : found;
   const endAt = addMinutes(startAt, service.durationMinutes);
   return withTransaction(async (session) => {
     const booking = await bookingsRepo.insertBooking(
@@ -145,8 +157,10 @@ describe('the resolver: Move', () => {
     const after = await bookingsRepo.findBookingById(booking._id);
     expect(after?.staffId).toBe(nelly);
     expect(after?.status).toBe('confirmed');
-    // The time did not change, so the customer's link version did not either.
-    expect(after?.manageTokenVersion).toBe(1);
+    // The customer is emailed the move, so the link version moves up like a reschedule.
+    expect(after?.manageTokenVersion).toBe(2);
+    // Nelly's own haircut price, $45 instead of the $40 Lee charges.
+    expect(after?.totalPriceCents).toBe(4500);
     const locks = await slotLocksRepo.listSlotLocksForHolder(booking._id);
     expect(locks.length).toBeGreaterThan(0);
     expect(new Set(locks.map((l) => l.staffId))).toEqual(new Set([nelly]));
@@ -155,6 +169,146 @@ describe('the resolver: Move', () => {
         .collection('auditLog')
         .countDocuments({ action: 'booking.move', entityId: booking._id }),
     ).toBe(1);
+  });
+
+  /** The customer's move email, rendered as it is sent. */
+  async function moveEmail(bookingId: string) {
+    const rows = await db()
+      .collection<{ template: string; to: string; payload: Record<string, unknown> }>('emailOutbox')
+      .find({ bookingId })
+      .toArray();
+    expect(rows.map((r) => r.template)).toEqual(['bookingRescheduled']);
+    const row = rows[0];
+    if (!row) throw new Error('no email');
+    expect(row.to).toBe('c@example.com');
+    return renderTemplate(row.template as 'bookingRescheduled', row.payload, row.to, 'k', {
+      appBaseUrl: 'https://example.com',
+      now: new Date(),
+    });
+  }
+
+  it("lists each chair it can move to with that chair's price and time for the booking", async () => {
+    // Dontrise's own haircut: $50 and 75 minutes.
+    const booking = await seedBooking(dontrise, '12:00', cut, {
+      priceCents: 5000,
+      durationMinutes: 75,
+    });
+    const conflict = await timeOff(dontrise);
+    expect(conflict.status).toBe(409);
+    const [affected] = apiErrorSchema.parse(conflict.body).error.affected ?? [];
+    expect(affected).toMatchObject({
+      bookingId: booking._id,
+      totalPriceCents: 5000,
+      durationMinutes: 75,
+    });
+    const options = new Map((affected?.moveOptions ?? []).map((o) => [o.staffId, o]));
+    // No override: the shop's $40 and 45 minutes. Nelly's own: $45.
+    expect(options.get(drew)).toMatchObject({
+      staffName: 'Drew',
+      totalPriceCents: 4000,
+      durationMinutes: 45,
+    });
+    expect(options.get(lee)).toMatchObject({ totalPriceCents: 4000, durationMinutes: 45 });
+    expect(options.get(nelly)).toMatchObject({ totalPriceCents: 4500, durationMinutes: 45 });
+  });
+
+  it("a move from a barber with his own price to one without takes the new barber's price, time, end, locks and email", async () => {
+    const booking = await seedBooking(dontrise, '12:00', cut, {
+      priceCents: 5000,
+      durationMinutes: 75,
+    });
+    const done = await timeOff(dontrise, [
+      { bookingId: booking._id, action: 'move', toStaffId: drew },
+    ]);
+    expect(done.status, JSON.stringify(done.body)).toBe(201);
+    const after = await bookingsRepo.findBookingById(booking._id);
+    expect(after).toMatchObject({
+      staffId: drew,
+      totalPriceCents: 4000,
+      durationMinutes: 45,
+      bufferMinutes: 10,
+      startAt: booking.startAt,
+      endAt: new Date(slotAt(THU, '12:45')),
+    });
+    expect(after?.services).toEqual([
+      expect.objectContaining({
+        serviceId: cut,
+        priceCents: 4000,
+        durationMinutes: 45,
+        priceFrom: false,
+      }),
+    ]);
+    // Drew holds 12:00 to 12:55 (45 minutes and the 10 minute gap): four blocks, Dontrise none.
+    const locks = await slotLocksRepo.listSlotLocksForHolder(booking._id);
+    expect(locks.map((l) => [l.staffId, l.slotStart.toISOString()])).toEqual(
+      ['12:00', '12:15', '12:30', '12:45'].map((t) => [drew, slotAt(THU, t)]),
+    );
+    const audit = await db()
+      .collection('auditLog')
+      .findOne({ action: 'booking.move', entityId: booking._id });
+    expect(audit?.before).toMatchObject({ staffId: dontrise, totalPriceCents: 5000 });
+    expect(audit?.after).toMatchObject({
+      staffId: drew,
+      totalPriceCents: 4000,
+      durationMinutes: 45,
+    });
+    const mail = await moveEmail(booking._id);
+    expect(mail.text).toContain('with Drew');
+    expect(mail.text).toContain('Haircut: $40 (45 min)');
+    expect(mail.text).toContain('Total: $40');
+    expect(mail.text).not.toContain('$50');
+    expect(mail.text).not.toMatch(/from \$/i);
+  });
+
+  it('the reverse: a move to the barber with his own price takes his $50 and 75 minutes', async () => {
+    const booking = await seedBooking(drew, '12:00');
+    expect(booking.totalPriceCents).toBe(4000);
+    const done = await timeOff(drew, [
+      { bookingId: booking._id, action: 'move', toStaffId: dontrise },
+    ]);
+    expect(done.status, JSON.stringify(done.body)).toBe(201);
+    const after = await bookingsRepo.findBookingById(booking._id);
+    expect(after).toMatchObject({
+      staffId: dontrise,
+      totalPriceCents: 5000,
+      durationMinutes: 75,
+      endAt: new Date(slotAt(THU, '13:15')),
+    });
+    expect(after?.services[0]).toMatchObject({ priceCents: 5000, durationMinutes: 75 });
+    // 12:00 to 13:25 on Dontrise: six blocks.
+    const locks = await slotLocksRepo.listSlotLocksForHolder(booking._id);
+    expect(locks.map((l) => l.slotStart.toISOString())).toEqual(
+      ['12:00', '12:15', '12:30', '12:45', '13:00', '13:15'].map((t) => slotAt(THU, t)),
+    );
+    expect(new Set(locks.map((l) => l.staffId))).toEqual(new Set([dontrise]));
+    const mail = await moveEmail(booking._id);
+    expect(mail.text).toContain('with Dontrise');
+    expect(mail.text).toContain('Haircut: $50 (75 min)');
+    expect(mail.text).toContain('Total: $50');
+    expect(mail.subject).toContain('Moved');
+  });
+
+  it('a longer length that does not fit is not offered, and asking for it changes nothing', async () => {
+    // Drew's 45 minutes would end before Dontrise's 13:00 client; Dontrise's own 75 would not.
+    const booking = await seedBooking(drew, '12:00');
+    await seedBooking(dontrise, '13:00');
+    const conflict = await timeOff(drew);
+    expect(conflict.status).toBe(409);
+    const [affected] = apiErrorSchema.parse(conflict.body).error.affected ?? [];
+    const ids = (affected?.moveOptions ?? []).map((o) => o.staffId);
+    expect(ids).not.toContain(dontrise);
+    expect(ids).toContain(lee);
+    const refused = await timeOff(drew, [
+      { bookingId: booking._id, action: 'move', toStaffId: dontrise },
+    ]);
+    expect(refused.status).toBe(409);
+    const after = await bookingsRepo.findBookingById(booking._id);
+    expect(after).toMatchObject({ staffId: drew, totalPriceCents: 4000, durationMinutes: 45 });
+    expect(
+      new Set((await slotLocksRepo.listSlotLocksForHolder(booking._id)).map((l) => l.staffId)),
+    ).toEqual(new Set([drew]));
+    expect(await db().collection('timeBlocks').countDocuments({})).toBe(0);
+    expect(await db().collection('emailOutbox').countDocuments({ bookingId: booking._id })).toBe(0);
   });
 
   it('refuses a chair that does not do the service, and changes nothing', async () => {
