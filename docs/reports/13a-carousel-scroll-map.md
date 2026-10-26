@@ -43,7 +43,7 @@ Checklist:
 - PASS tap targets 44px; axe clean at 390 and 1280 in light and dark on Home, Drew, Iniya and Visit (rules.spec and chrome.spec in the gate)
 - PASS Lighthouse mobile: Home 88 (report 12: 81), Visit 95, CLS 0 on both, accessibility 100 (docs/screens/p13a/lighthouse.json)
 
-Commits: f3b4252 M1 carousel; d7784bb M2 scrolling and reveals; fe91853 M3 map, scrim, panel, bar; the SHIP commit (tests, screens, report) follows.
+Commits: f3b4252 M1 carousel; d7784bb M2 scrolling and reveals; fe91853 M3 map, scrim, panel, bar; 4cf3299 SHIP (tests, screens, report); merged into main as 648d6b2 (PR 9).
 
 Env vars: none new.
 
@@ -57,3 +57,7 @@ Known gaps and risks:
 Needs Rob's phone: swipe the carousel on Home, scroll past the map on Visit, and check the hero photo on a real iPhone.
 
 Ready for next step: the single next step is Cloudinary for the photos (the report 12 Gallery score). Do not change the carousel's snap rules, the reveal tokens or the measured hero gradient without a new measurement.
+
+Production: PR 9 merged into main as 648d6b2 at 02:05 UTC with both CI runs and the Vercel preview green. Vercel's status on the merge commit reads "Deployment has completed" (success). The health URL exquisitebarbershop.visualizeclients.com/api/health is not reachable from this sandbox, so Rob checks it once.
+
+648d6b2, production: ready
