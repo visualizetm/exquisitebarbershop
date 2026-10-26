@@ -50,4 +50,6 @@ Needs Rob's phone and tablet: the dashboard at 390 (switch and tabs scrolling si
 
 Ready for next step: 13c (full-screen New booking, the walk-in line panel in the right column, tablet check-in in the top bar slot) starts from AdminShell.tsx and TodayPage.tsx. Do not touch the pricing rule, the reviews writer, the seed photo ids, the carousel snap rules, the reveal tokens or the slot locks; do not change the floor rules without a frozen-clock test.
 
-Production: pending, the PR follows this commit.
+Production: PR 11 merged into main as b5769d2 at 23:41 UTC with both CI runs and the Vercel preview green. Vercel's status on the merge commit reads "Deployment has completed" (success) at 23:42 UTC. The health URL is not reachable from this sandbox, so Rob checks /api/health once for buildSha b5769d2.
+
+b5769d2, production: ready
