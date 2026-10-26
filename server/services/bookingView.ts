@@ -51,6 +51,8 @@ export function toAdminBookingView(
       : null,
     rescheduledFromId: booking.rescheduledFromId,
     ownerSeenAt: booking.ownerSeenAt?.toISOString() ?? null,
+    arrivedAt: booking.arrivedAt?.toISOString() ?? null,
+    startedAt: booking.startedAt?.toISOString() ?? null,
     updatedAt: booking.updatedAt.toISOString(),
   });
 }

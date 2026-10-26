@@ -2040,3 +2040,320 @@
 .exq-settings__facts dd {
   margin: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Shop, Today: the floor
+   --------------------------------------------------------------------------- */
+.exq-today__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.exq-today__pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  font-size: var(--t-label);
+  font-weight: 700;
+  font-stretch: var(--w-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.exq-today__pill[data-tone='accent'] {
+  border-color: var(--red);
+  background: var(--red);
+  color: var(--paper);
+}
+.exq-today__grid {
+  display: grid;
+  gap: var(--s4);
+  margin-bottom: var(--s4);
+}
+@media (min-width: 1024px) {
+  .exq-today__grid {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    align-items: start;
+  }
+}
+.exq-today__main,
+.exq-today__aside {
+  min-width: 0;
+}
+.exq-today__h2 {
+  margin: 0 0 var(--s3);
+  color: var(--fg-3);
+}
+.exq-today__all {
+  color: var(--accent-text);
+}
+
+/* Chair cards */
+.exq-floor {
+  display: grid;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+}
+.exq-floorcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.exq-floorcard[data-kind='inChair'] {
+  border-color: var(--band-line);
+}
+.exq-floorcard[data-kind='off'],
+.exq-floorcard[data-kind='instagram'] {
+  color: var(--fg-3);
+}
+.exq-floorcard__chair {
+  margin: 0;
+  color: var(--fg-3);
+}
+.exq-floorcard__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+.exq-floorcard__name {
+  margin: 0;
+  font-size: var(--t-h3);
+}
+.exq-floorcard__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--fg-3);
+}
+.exq-floorcard[data-kind='inChair'] .exq-floorcard__state {
+  color: var(--accent-text);
+}
+.exq-floorcard[data-kind='inChair'] .exq-floorcard__state::before,
+.exq-floorcard[data-kind='free'] .exq-floorcard__state::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.exq-floorcard[data-kind='free'] .exq-floorcard__state {
+  color: var(--ok);
+}
+.exq-floorcard__client {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-floorcard__client:hover .exq-floorcard__who {
+  color: var(--accent-text);
+}
+.exq-floorcard__who {
+  display: block;
+  margin: 0;
+  font-weight: 700;
+}
+.exq-floorcard__service {
+  display: block;
+  margin: 0;
+  color: var(--fg-2);
+}
+.exq-floorcard__bar {
+  height: 8px;
+  margin-top: var(--s1);
+  border-radius: var(--r-pill);
+  background: var(--card-2);
+  overflow: hidden;
+}
+.exq-floorcard__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--red);
+}
+.exq-floorcard__times {
+  margin: 0;
+  color: var(--fg-3);
+}
+.exq-floorcard__next {
+  margin: 0;
+  color: var(--fg-2);
+}
+.exq-floorcard__actions {
+  display: flex;
+  gap: var(--s2);
+  margin-top: auto;
+  padding-top: var(--s2);
+}
+.exq-floorcard__more {
+  position: relative;
+}
+.exq-floorcard__menu {
+  position: absolute;
+  top: calc(100% + var(--s1));
+  left: 0;
+  z-index: 10;
+  min-width: 160px;
+  padding: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-tile);
+  background: var(--card-2);
+  box-shadow: var(--shadow-pop);
+}
+.exq-floorcard__item {
+  display: block;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-floorcard__item:hover {
+  background: var(--border);
+}
+
+/* Coming up */
+.exq-coming__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--border);
+}
+.exq-coming__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.exq-coming__time {
+  font-weight: 800;
+  white-space: nowrap;
+}
+.exq-coming__who {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-coming__who:hover .exq-coming__name {
+  color: var(--accent-text);
+}
+.exq-coming__name {
+  font-weight: 700;
+}
+.exq-coming__sub {
+  color: var(--fg-2);
+}
+.exq-coming__source {
+  margin-top: var(--s1);
+  color: var(--fg-3);
+}
+.exq-coming__row[data-state='arrived'] .exq-coming__source {
+  color: var(--ok);
+}
+.exq-coming__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+@media (min-width: 768px) {
+  .exq-coming__row {
+    grid-template-columns: 80px minmax(0, 1fr) auto;
+    align-items: center;
+  }
+  .exq-coming__actions {
+    grid-column: auto;
+    justify-content: flex-end;
+  }
+}
+
+/* Today so far */
+.exq-sofar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+.exq-sofar__tile {
+  padding: var(--s3);
+  border-radius: var(--r-tile);
+  background: var(--card-2);
+}
+.exq-sofar__tile dt {
+  margin: 0 0 var(--s1);
+  color: var(--fg-3);
+}
+.exq-sofar__tile dd {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Done today */
+.exq-donelist__row {
+  border-top: 1px solid var(--border);
+}
+.exq-donelist__row:first-child {
+  border-top: 0;
+}
+.exq-donelist__btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  width: 100%;
+  min-height: var(--hit);
+  padding: var(--s2) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-donelist__btn:hover .exq-donelist__who {
+  color: var(--accent-text);
+}
+.exq-donelist__who {
+  display: grid;
+  min-width: 0;
+  font-weight: 700;
+}
+.exq-donelist__sub {
+  color: var(--fg-3);
+  font-weight: 400;
+}
+.exq-donelist__price {
+  font-weight: 800;
+  white-space: nowrap;
+}

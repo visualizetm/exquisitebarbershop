@@ -12,7 +12,7 @@ import { SchedulePage } from './schedule/SchedulePage';
 import { SettingsPage } from './settings/SettingsPage';
 import { WebsitePage } from './website/WebsitePage';
 import { BookingsPage } from './bookings/BookingsPage';
-import { OverviewPage } from './overview/OverviewPage';
+import { TodayPage } from './today/TodayPage';
 import { TeamDetailPage } from './team/TeamDetailPage';
 import { TeamPage } from './team/TeamPage';
 import { AdminShell } from './shell/AdminShell';
@@ -118,7 +118,7 @@ function OwnerRoutes() {
       <Route index element={<Home />} />
       <Route path="shop">
         <Route index element={<Navigate to="/admin/shop/today" replace />} />
-        <Route path="today" element={<OverviewPage />} />
+        <Route path="today" element={<TodayPage />} />
         <Route path="bookings" element={<BookingsPage />} />
         <Route path="bookings/:id" element={<BookingsPage />} />
         <Route path="schedule" element={<SchedulePage />} />

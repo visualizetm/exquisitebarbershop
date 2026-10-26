@@ -8,6 +8,7 @@ import {
   bookingListResponseSchema,
   bookingResponseSchema,
   customerResponseSchema,
+  floorResponseSchema,
   outboxListResponseSchema,
   scheduleResponseSchema,
   serviceListResponseSchema,
@@ -171,6 +172,61 @@ describe('status changes', () => {
     );
     expect(detail.booking.status).toBe('confirmed');
     expect(detail.audit.map((a) => a.action)).toContain('booking.status');
+  });
+});
+
+describe('the floor: arrived and start', () => {
+  it('stamps once, answers the same way twice, audits once, and refuses a finished booking', async () => {
+    const b = await bookPublic(server.baseUrl, {
+      staff: 'lee',
+      serviceIds: [cut],
+      startAt: slotAt(nextDate(2, 3), '14:00'),
+    });
+    const view = (body: unknown) => bookingResponseSchema.parse(body).booking;
+    const fresh = view((await owner('GET', `/api/admin/bookings/${b.id}`)).body);
+    expect(fresh).toMatchObject({ arrivedAt: null, startedAt: null });
+
+    const arrived = view((await owner('POST', `/api/admin/bookings/${b.id}/arrived`, {})).body);
+    expect(arrived.arrivedAt).not.toBeNull();
+    expect(arrived.startedAt).toBeNull();
+    const again = view((await owner('POST', `/api/admin/bookings/${b.id}/arrived`, {})).body);
+    expect(again.arrivedAt).toBe(arrived.arrivedAt);
+
+    const started = view((await owner('POST', `/api/admin/bookings/${b.id}/start`, {})).body);
+    expect(started.startedAt).not.toBeNull();
+    expect(started.arrivedAt).toBe(arrived.arrivedAt);
+    const stillStarted = view((await owner('POST', `/api/admin/bookings/${b.id}/start`, {})).body);
+    expect(stillStarted.startedAt).toBe(started.startedAt);
+
+    const audit = await db()
+      .collection<{ action: string }>('auditLog')
+      .find({ entityId: b.id, action: { $in: ['booking.arrived', 'booking.start'] } })
+      .toArray();
+    expect(audit.map((a) => a.action).sort()).toEqual(['booking.arrived', 'booking.start']);
+
+    // Only the owner marks the floor.
+    const asBarber = await barber('POST', `/api/admin/bookings/${b.id}/arrived`, {});
+    expect([401, 403]).toContain(asBarber.status);
+
+    // Done, no show or cancelled: nothing more to stamp.
+    await owner('POST', `/api/admin/bookings/${b.id}/status`, { status: 'completed' });
+    for (const moment of ['arrived', 'start'] as const) {
+      const refused = await owner('POST', `/api/admin/bookings/${b.id}/${moment}`, {});
+      expect(refused.status).toBe(409);
+      expect(codeOf(refused.body)).toBe('INVALID_TRANSITION');
+    }
+    await owner('POST', `/api/admin/bookings/${b.id}/status`, { status: 'confirmed' });
+    await owner('POST', `/api/admin/bookings/${b.id}/cancel`, { notify: false });
+    const cancelled = await owner('POST', `/api/admin/bookings/${b.id}/start`, {});
+    expect(cancelled.status).toBe(409);
+
+    // The floor answers with every chair and today's numbers.
+    const floor = floorResponseSchema.parse((await owner('GET', '/api/admin/floor')).body);
+    expect(floor.chairs.map((c) => c.staff.slug)).toContain('lee');
+    expect(
+      floor.chairs.every((c) => ['inChair', 'free', 'off', 'instagram'].includes(c.kind)),
+    ).toBe(true);
+    expect(floor.counts.done).toBeGreaterThanOrEqual(0);
   });
 });
 

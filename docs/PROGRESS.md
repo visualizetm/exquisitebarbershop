@@ -670,3 +670,14 @@ commit, and what is still open.
   (23 of 23); axe clean in the shell, on Overview, Bookings, the booking panel, the website and
   settings sections at 1280 and 390.
 - Heartbeat: 22:52 UTC, commit follows, next is M3 (the floor on Shop, Today).
+
+### M3: the floor
+
+- Shipped: `arrivedAt` and `startedAt` on bookings, `GET /api/admin/floor`, `POST .../arrived` and
+  `.../start` (idempotent, audited, owner only), pure floor rules in `shared/lib/floor.ts`, the
+  Today page (chair cards, Coming up with Arrived, Start, Move and No show, Today so far, Done today
+  with All n, 30 second refresh) replacing Overview with its alerts, quick actions, chart and
+  activity kept. Tests: `tests/unit/floor.test.ts` (6, frozen clock), the arrived and start
+  integration test in adminApi.test.ts, `tests/e2e/floor.spec.ts` at 1180 (Arrived, Start, Done on
+  a walk-in seeded for later today).
+- Heartbeat: 23:05 UTC, commit follows, next is SHIP (gate, screenshots, Lighthouse, report, PR).

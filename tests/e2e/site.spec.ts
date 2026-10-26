@@ -7,7 +7,7 @@ async function signInAsOwner(page: Page) {
   await page.getByLabel('Email').fill(E2E_OWNER.email);
   await page.getByLabel('Password').fill(E2E_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
 }
 
 test("the home strip shows today's chairs and each card books that chair", async ({ page }) => {

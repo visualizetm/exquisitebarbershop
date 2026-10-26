@@ -66,6 +66,9 @@ export const bookingDocumentSchema = z
     manageTokenVersion: z.int().min(1),
     /** When the owner first opened it. Online bookings without it show as new. */
     ownerSeenAt: z.date().nullable().optional(),
+    /** The floor: when the client checked in at the shop, and when the cut started. */
+    arrivedAt: z.date().nullable().optional(),
+    startedAt: z.date().nullable().optional(),
     /** The customer name without accents or case, for the owner's search. Set on insert. */
     nameKey: z.string().max(200).optional(),
   })

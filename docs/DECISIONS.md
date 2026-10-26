@@ -1318,3 +1318,25 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
 - D13b-09 The `Sidebar` kit component was deleted with its CSS (nothing used it after the shell
   change); `BottomTabs` stays for the barber portal. The owner guide still describes the old menu;
   it is rewritten with prompt 13d's barber portal and editor work.
+- D13b-10 The floor rules are pure functions in `shared/lib/floor.ts` (`chairState`, `currentBooking`,
+  `chairWindow`, `progressOf`), fed by `server/services/floor.ts` and tested with a frozen clock in
+  `tests/unit/floor.test.ts`. In chair: the confirmed booking Start was pressed on (latest first),
+  else the one whose booked window holds now; its bar runs from the real start (or the booked start)
+  for the booked duration, so a late start ends late. Free: no current booking and the chair has
+  hours; Off today: no hours and nothing booked; Instagram: a chair that does not book online and
+  has a handle, unless something is booked in the system for it today. Coming up: today's confirmed
+  bookings not started and not in a chair; waiting: those marked Arrived.
+- D13b-11 `arrivedAt` and `startedAt` are optional nullable UTC dates on the booking document, exposed
+  on the admin view, stamped by `POST /api/admin/bookings/:id/arrived` and `/start` (owner only).
+  The repo update matches `status: confirmed` and the field still empty, so a second tap or a race
+  writes nothing and the service answers with the stored booking; one audit entry
+  (`booking.arrived`, `booking.start`) per real stamp; 409 INVALID_TRANSITION for completed, no-show
+  and cancelled bookings. Done and No show use the existing status route (with Undo in the toast,
+  back to confirmed); Move opens the booking sheet, whose move already reprices. The barber portal
+  is left alone for 13d.
+- D13b-12 Today keeps the alerts strip, the quick actions, the week chart and the latest events
+  from the old Overview under the floor (existing behavior, the mockup's look); the four old stat
+  tiles became Today so far (booked, done, walk-ins by source, takings as the sum of completed
+  stored totals). The floor refreshes every 30 seconds while the tab is visible, when it comes back,
+  and after every action, keeping the last data on screen (`useFloor`); progress is computed from
+  the server's `now` in the response and the bar is a plain width with no transition. No websockets.

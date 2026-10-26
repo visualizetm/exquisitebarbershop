@@ -152,7 +152,7 @@ test.describe('the owner dashboard shell', () => {
       for (const size of [DESKTOP, PHONE]) {
         await page.setViewportSize(size);
         await page.goto('/admin');
-        await page.waitForSelector('.exq-chairrow');
+        await page.waitForSelector('.exq-floorcard[data-kind]:not([data-kind="loading"])');
         await page.waitForTimeout(500);
         const check = async (label: string) => {
           const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
@@ -177,7 +177,7 @@ test.describe('the owner dashboard shell', () => {
     });
   }
 
-  test('the overview shows real numbers, the quick actions and the chart with a text table', async ({
+  test('Today shows real numbers, the quick actions and the chart with a text table', async ({
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
@@ -192,21 +192,15 @@ test.describe('the owner dashboard shell', () => {
     ]) {
       await expect(quick.getByRole('button', { name })).toBeVisible();
     }
-    for (const label of [
-      'Bookings today',
-      'Booked value today',
-      'Walk-ins today',
-      'No-shows this week',
-    ]) {
-      await expect(page.locator('.exq-stat', { hasText: label })).toBeVisible();
+    for (const label of ['Booked', 'Done', 'Walk-ins', 'Takings']) {
+      await expect(page.locator('.exq-sofar__tile', { hasText: label })).toBeVisible();
     }
-    // Search, quick actions, tiles, Now and next and the chart all sit in the first screen.
+    // Search, quick actions, the first chair card and Today so far all sit in the first screen.
     for (const locator of [
       page.getByRole('combobox', { name: 'Search bookings and customers' }),
       quick,
-      page.locator('.exq-stat').first(),
-      page.getByRole('heading', { name: 'Now and next' }),
-      page.getByRole('img', { name: /Bookings this week/ }),
+      page.locator('.exq-floorcard').first(),
+      page.getByRole('heading', { name: 'Today so far' }),
     ]) {
       const box = await locator.boundingBox();
       expect(box, 'in view').not.toBeNull();
@@ -221,9 +215,7 @@ test.describe('the owner dashboard shell', () => {
   test('Walk-in adds a booking that shows in the tiles and the activity list', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
-    const walkIns = page
-      .locator('.exq-stat', { hasText: 'Walk-ins today' })
-      .locator('.exq-stat__value');
+    const walkIns = page.locator('.exq-sofar__tile', { hasText: 'Walk-ins' }).locator('dd');
     const before = Number((await walkIns.textContent()) ?? '0');
     await page.getByRole('button', { name: 'Walk-in' }).click();
     const panel = page.getByRole('dialog', { name: 'New booking' });
@@ -244,7 +236,7 @@ test.describe('the owner dashboard shell', () => {
     await expect(page.locator('.exq-activity__item', { hasText: 'Walk In Visitor' })).toContainText(
       'Walk-in',
     );
-    // Now and next shows who is in that chair, and opens the booking.
+    // Recent activity lists the walk-in and opens the booking.
     await page
       .locator('.exq-activity__item', { hasText: 'Walk In Visitor' })
       .getByRole('button')

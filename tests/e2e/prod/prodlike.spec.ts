@@ -226,7 +226,7 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   await page.getByLabel('Email').fill(PRODLIKE_OWNER.email);
   await page.getByLabel('Password').fill(PRODLIKE_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
   // The dashboard is dark only, so the top bar carries the white mark.
   await expect(page.locator('.exq-topbar .exq-mark--dark').first()).toHaveAttribute(
     'src',
@@ -254,7 +254,7 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
 
   // Signing in left no 401 behind, and the day loaded.
   await page.goto('/admin');
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

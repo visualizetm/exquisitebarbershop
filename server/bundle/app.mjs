@@ -21744,7 +21744,7 @@ var PolyNumberFormatter = class {
   constructor(intl, forceSimple, opts) {
     this.padTo = opts.padTo || 0;
     this.floor = opts.floor || false;
-    const { padTo, floor, ...otherOpts } = opts;
+    const { padTo, floor: floor2, ...otherOpts } = opts;
     if (!forceSimple || Object.keys(otherOpts).length > 0) {
       const intlOpts = { useGrouping: false, ...opts };
       if (opts.padTo > 0) intlOpts.minimumIntegerDigits = opts.padTo;
@@ -29485,6 +29485,7 @@ __export(bookingsRepo_exports, {
   searchBookings: () => searchBookings,
   searchCustomers: () => searchCustomers,
   setBookingStatus: () => setBookingStatus,
+  stampBookingMoment: () => stampBookingMoment,
   tablePage: () => tablePage,
   transitionBookingStatus: () => transitionBookingStatus,
   updateBookingNotes: () => updateBookingNotes
@@ -29534,6 +29535,9 @@ var bookingDocumentSchema = external_exports.object({
   manageTokenVersion: external_exports.int().min(1),
   /** When the owner first opened it. Online bookings without it show as new. */
   ownerSeenAt: external_exports.date().nullable().optional(),
+  /** The floor: when the client checked in at the shop, and when the cut started. */
+  arrivedAt: external_exports.date().nullable().optional(),
+  startedAt: external_exports.date().nullable().optional(),
   /** The customer name without accents or case, for the owner's search. Set on insert. */
   nameKey: external_exports.string().max(200).optional()
 }).extend(timestampsSchema.shape).refine((v) => v.endAt.getTime() > v.startAt.getTime(), {
@@ -29632,6 +29636,14 @@ async function setBookingStatus(id, status, now2, options) {
   );
   if (!updated) throw new AppError("NOT_FOUND", "Booking was not found");
   return updated;
+}
+async function stampBookingMoment(id, field, at, options) {
+  const col = await collection("bookings");
+  return col.findOneAndUpdate(
+    { _id: id, status: "confirmed", [field]: { $in: [null, void 0] } },
+    { $set: { [field]: at, updatedAt: at } },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
 }
 async function rescheduleBooking(id, change, now2, options) {
   const col = await collection("bookings");
@@ -33884,6 +33896,9 @@ var adminBookingViewSchema = bookingViewSchema.extend({
   cancellation: external_exports.object({ at: external_exports.iso.datetime(), by: actorTypeSchema, reason: external_exports.string().nullable() }).nullable(),
   rescheduledFromId: idSchema.nullable(),
   ownerSeenAt: external_exports.iso.datetime().nullable(),
+  /** The floor: set by Arrived and Start on Today; both null until then. */
+  arrivedAt: external_exports.iso.datetime().nullable(),
+  startedAt: external_exports.iso.datetime().nullable(),
   updatedAt: external_exports.iso.datetime()
 });
 var timeBlockViewSchema = external_exports.object({
@@ -34311,6 +34326,36 @@ var overviewResponseSchema = external_exports.object({
   activity: external_exports.array(activityEntrySchema),
   alerts: external_exports.array(alertViewSchema)
 });
+var floorChairKindSchema = external_exports.enum(["inChair", "free", "off", "instagram"]);
+var floorChairSchema = external_exports.object({
+  staff: staffRefSchema,
+  photo: photoViewSchema.nullable(),
+  specialty: external_exports.string(),
+  kind: floorChairKindSchema,
+  /** In chair: the booking being cut now. */
+  current: adminBookingViewSchema.nullable(),
+  /** The next confirmed booking after the current one (or after now). */
+  next: adminBookingViewSchema.nullable(),
+  /** In chair: the window the progress bar shows, from the real start when Start was pressed. */
+  window: external_exports.object({ startAt: external_exports.iso.datetime(), endAt: external_exports.iso.datetime() }).nullable()
+});
+var floorResponseSchema = external_exports.object({
+  date: isoDateSchema,
+  now: external_exports.iso.datetime(),
+  chairs: external_exports.array(floorChairSchema),
+  /** Today's confirmed bookings not yet in a chair, in time order. */
+  comingUp: external_exports.array(adminBookingViewSchema),
+  /** The last three completed today, newest first, and how many there are in all. */
+  done: external_exports.array(adminBookingViewSchema),
+  counts: external_exports.object({
+    booked: external_exports.int(),
+    done: external_exports.int(),
+    walkIns: external_exports.int(),
+    takingsCents: external_exports.int(),
+    inChairs: external_exports.int(),
+    waiting: external_exports.int()
+  })
+});
 var bookingRangeSchema = external_exports.enum(["today", "tomorrow", "week", "upcoming", "past", "all"]);
 var bookingSortKeySchema = external_exports.enum(["when", "client", "status", "source"]);
 var BOOKING_TABLE_PAGE_SIZE = 25;
@@ -34413,6 +34458,8 @@ function toAdminBookingView(booking, staff) {
     } : null,
     rescheduledFromId: booking.rescheduledFromId,
     ownerSeenAt: booking.ownerSeenAt?.toISOString() ?? null,
+    arrivedAt: booking.arrivedAt?.toISOString() ?? null,
+    startedAt: booking.startedAt?.toISOString() ?? null,
     updatedAt: booking.updatedAt.toISOString()
   });
 }
@@ -37142,6 +37189,42 @@ async function ownerReschedule(principal, scope, id, input2, meta3) {
     outboxIds: done.outboxIds
   };
 }
+async function stampBookingMoment2(principal, scope, id, moment, meta3) {
+  const booking = await loadBookingInScope(scope, id);
+  const staff = await staffRepo_exports.findStaffById(booking.staffId) ?? unknownStaff(booking.staffId);
+  if (booking.status !== "confirmed") {
+    throw new AppError(
+      "INVALID_TRANSITION",
+      `A ${booking.status} booking cannot be marked ${moment === "arrived" ? "arrived" : "started"}`
+    );
+  }
+  const field = moment === "arrived" ? "arrivedAt" : "startedAt";
+  if (booking[field]) return { booking: toAdminBookingView(booking, staff), changed: false };
+  const updated = await withTransaction(async (session) => {
+    const next2 = await bookingsRepo_exports.stampBookingMoment(booking._id, field, meta3.now, { session });
+    if (!next2) return null;
+    await auditLogRepo_exports.appendAuditEntry(
+      {
+        actor: actorOf2(principal),
+        action: moment === "arrived" ? "booking.arrived" : "booking.start",
+        entityType: "booking",
+        entityId: booking._id,
+        before: { [field]: null },
+        after: { [field]: meta3.now.toISOString() },
+        meta: null,
+        requestId: meta3.requestId
+      },
+      meta3.now,
+      { session }
+    );
+    return next2;
+  });
+  if (!updated) {
+    const again = await loadBookingInScope(scope, id);
+    return { booking: toAdminBookingView(again, staff), changed: false };
+  }
+  return { booking: toAdminBookingView(updated, staff), changed: true };
+}
 async function updateBookingNotes2(principal, scope, id, notes, meta3) {
   const booking = await loadBookingInScope(scope, id);
   const updated = await withTransaction(async (session) => {
@@ -38733,6 +38816,86 @@ async function bookingTable(input2, now2) {
   };
 }
 
+// shared/lib/floor.ts
+function currentBooking(bookings, now2) {
+  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  const started = confirmed.filter((b) => b.startedAt !== null).sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
+  if (started[0]) return started[0];
+  return confirmed.filter((b) => b.startAt <= now2 && b.endAt > now2).sort((a, b) => a.startAt.getTime() - b.startAt.getTime())[0] ?? null;
+}
+function chairWindow(b) {
+  const startAt = b.startedAt ?? b.startAt;
+  return { startAt, endAt: new Date(startAt.getTime() + b.durationMinutes * 6e4) };
+}
+function chairState(input2) {
+  const { bookings, now: now2 } = input2;
+  const confirmed = bookings.filter((b) => b.status === "confirmed").sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+  const current = currentBooking(confirmed, now2);
+  const after = current ? Math.max(now2.getTime(), current.startAt.getTime()) : now2.getTime();
+  const next2 = confirmed.find((b) => b !== current && b.startAt.getTime() > after) ?? null;
+  if (current) return { kind: "inChair", current, next: next2, window: chairWindow(current) };
+  if (input2.instagramOnly && confirmed.length === 0)
+    return { kind: "instagram", current: null, next: null, window: null };
+  if (!input2.working && confirmed.length === 0)
+    return { kind: "off", current: null, next: null, window: null };
+  return { kind: "free", current: null, next: next2, window: null };
+}
+
+// server/services/floor.ts
+var DONE_SHOWN = 3;
+async function floor(now2) {
+  const today = shopDateOf(now2);
+  const [data, bookings, photos] = await Promise.all([
+    loadScheduleData(today, today),
+    bookingsRepo_exports.listBookingsBetween(shopDayBounds(today)),
+    staffPhotoMap()
+  ]);
+  const staffById = new Map(data.staff.map((s2) => [s2._id, s2]));
+  const view = (b) => {
+    const s2 = staffById.get(b.staffId);
+    return toAdminBookingView(b, s2 ?? { _id: b.staffId, name: "Former staff", slug: "" });
+  };
+  const asFloor = (b) => ({ ...b, id: b._id, startedAt: b.startedAt ?? null });
+  const inChairIds = /* @__PURE__ */ new Set();
+  const chairs = activeStaff(data.staff).map((s2) => {
+    const mine = bookings.filter((b) => b.staffId === s2._id).map(asFloor);
+    const state = chairState({
+      bookings: mine,
+      working: workingRangesFor(s2._id, today, data.source).ranges.length > 0,
+      instagramOnly: !s2.acceptsOnlineBooking && s2.instagramHandle !== null,
+      now: now2
+    });
+    if (state.current) inChairIds.add(state.current._id);
+    return {
+      staff: toStaffRef(s2),
+      photo: photos.get(s2._id) ?? null,
+      specialty: s2.specialty,
+      kind: state.kind,
+      current: state.current ? view(state.current) : null,
+      next: state.next ? view(state.next) : null,
+      window: state.window ? { startAt: state.window.startAt.toISOString(), endAt: state.window.endAt.toISOString() } : null
+    };
+  });
+  const comingUp = bookings.filter((b) => b.status === "confirmed" && !b.startedAt && !inChairIds.has(b._id)).sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+  const completed = bookings.filter((b) => b.status === "completed").sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  const live2 = bookings.filter((b) => b.status !== "cancelled");
+  return {
+    date: today,
+    now: now2.toISOString(),
+    chairs,
+    comingUp: comingUp.map(view),
+    done: completed.slice(0, DONE_SHOWN).map(view),
+    counts: {
+      booked: live2.length,
+      done: completed.length,
+      walkIns: live2.filter((b) => b.source === "walkIn").length,
+      takingsCents: completed.reduce((sum, b) => sum + b.totalPriceCents, 0),
+      inChairs: inChairIds.size,
+      waiting: comingUp.filter((b) => b.arrivedAt).length
+    }
+  };
+}
+
 // server/services/adminSearch.ts
 var LIMIT = 5;
 var backfilled = null;
@@ -38853,6 +39016,10 @@ var adminRoutes = [
     ctxScope(ctx);
     return { body: overviewResponseSchema.parse(await overview(ctx.now)), headers: NO_STORE };
   }),
+  owner("GET", "/api/admin/floor", async (ctx) => {
+    ctxScope(ctx);
+    return { body: floorResponseSchema.parse(await floor(ctx.now)), headers: NO_STORE };
+  }),
   owner("GET", "/api/admin/booking-table", async (ctx) => {
     ctxScope(ctx);
     const query = parseQuery(ctx, bookingTableQuerySchema);
@@ -38916,6 +39083,18 @@ var adminRoutes = [
     const done = await changeBookingStatus(principal, scope, id, input2, metaOf(ctx));
     scheduleDelivery(done.outboxIds);
     return { body: bookingResponseSchema.parse(done.body) };
+  }),
+  owner("POST", "/api/admin/bookings/:id/arrived", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await stampBookingMoment2(principal, scope, id, "arrived", metaOf(ctx));
+    return { body: bookingResponseSchema.parse({ booking: done.booking }) };
+  }),
+  owner("POST", "/api/admin/bookings/:id/start", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const done = await stampBookingMoment2(principal, scope, id, "start", metaOf(ctx));
+    return { body: bookingResponseSchema.parse({ booking: done.booking }) };
   }),
   owner("POST", "/api/admin/bookings/:id/cancel", async (ctx) => {
     const { principal, scope } = ctxScope(ctx);

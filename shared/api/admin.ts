@@ -76,6 +76,9 @@ export const adminBookingViewSchema = bookingViewSchema.extend({
     .nullable(),
   rescheduledFromId: idSchema.nullable(),
   ownerSeenAt: z.iso.datetime().nullable(),
+  /** The floor: set by Arrived and Start on Today; both null until then. */
+  arrivedAt: z.iso.datetime().nullable(),
+  startedAt: z.iso.datetime().nullable(),
   updatedAt: z.iso.datetime(),
 });
 export type AdminBookingView = z.infer<typeof adminBookingViewSchema>;
@@ -628,6 +631,46 @@ export const overviewResponseSchema = z.object({
   alerts: z.array(alertViewSchema),
 });
 export type OverviewResponse = z.infer<typeof overviewResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// The floor (Shop, Today)
+// ---------------------------------------------------------------------------
+
+export const floorChairKindSchema = z.enum(['inChair', 'free', 'off', 'instagram']);
+export type FloorChairKind = z.infer<typeof floorChairKindSchema>;
+
+export const floorChairSchema = z.object({
+  staff: staffRefSchema,
+  photo: photoViewSchema.nullable(),
+  specialty: z.string(),
+  kind: floorChairKindSchema,
+  /** In chair: the booking being cut now. */
+  current: adminBookingViewSchema.nullable(),
+  /** The next confirmed booking after the current one (or after now). */
+  next: adminBookingViewSchema.nullable(),
+  /** In chair: the window the progress bar shows, from the real start when Start was pressed. */
+  window: z.object({ startAt: z.iso.datetime(), endAt: z.iso.datetime() }).nullable(),
+});
+export type FloorChair = z.infer<typeof floorChairSchema>;
+
+export const floorResponseSchema = z.object({
+  date: isoDateSchema,
+  now: z.iso.datetime(),
+  chairs: z.array(floorChairSchema),
+  /** Today's confirmed bookings not yet in a chair, in time order. */
+  comingUp: z.array(adminBookingViewSchema),
+  /** The last three completed today, newest first, and how many there are in all. */
+  done: z.array(adminBookingViewSchema),
+  counts: z.object({
+    booked: z.int(),
+    done: z.int(),
+    walkIns: z.int(),
+    takingsCents: z.int(),
+    inChairs: z.int(),
+    waiting: z.int(),
+  }),
+});
+export type FloorResponse = z.infer<typeof floorResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Bookings table (server paged, sortable)

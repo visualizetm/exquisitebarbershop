@@ -6,7 +6,7 @@ async function signInAsOwner(page: Page) {
   await page.getByLabel('Email').fill(E2E_OWNER.email);
   await page.getByLabel('Password').fill(E2E_OWNER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'The floor' })).toBeVisible();
 }
 
 /** A real PNG made in the browser, so the upload exercises the resize and WebP step. */
