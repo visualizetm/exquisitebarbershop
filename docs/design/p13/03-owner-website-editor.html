@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Website editor</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E0E0E}
+a{color:#FF5470}a:hover{color:#FF8098}
+.x{font-family:Archivo,system-ui,sans-serif;color:#FFFFFF}
+.lab{font-stretch:115%;font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#A8A8A8}
+.h{font-stretch:118%;font-weight:850;text-transform:uppercase;letter-spacing:-.01em;margin:0}
+.btn{font-family:Archivo,sans-serif;font-stretch:112%;font-weight:750;font-size:12px;letter-spacing:.1em;text-transform:uppercase;border-radius:999px;min-height:44px;padding:0 20px;border:1.5px solid #FFFFFF;background:transparent;color:#FFFFFF;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:#FFFFFF;color:#0E0E0E}
+.red{background:#C8102E;border-color:#C8102E}
+.red:hover{background:#E0183A;border-color:#E0183A;color:#FFFFFF}
+.sm{min-height:36px;padding:0 14px;font-size:11px}
+.sec{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font-family:Archivo,sans-serif;font-size:15px;font-weight:650;color:#E6E6E6;background:transparent;border:0;border-radius:12px;padding:12px 14px;min-height:48px;cursor:pointer}
+.sec:hover{background:#1F1F1F}
+.field{display:flex;flex-direction:column;gap:8px}
+.in{font-family:Archivo,sans-serif;font-size:15px;color:#FFFFFF;background:#0E0E0E;border:1.5px solid #3A3A3A;border-radius:12px;min-height:48px;padding:0 14px}
+.in:focus{outline:none;border-color:#FFFFFF}
+.tag{font-stretch:112%;font-weight:700;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#A8A8A8;margin-left:auto}
+</style>
+<div class="x" style="width: 100%; min-height: 900px; background: #0E0E0E; display: flex; flex-direction: column">
+
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 1px solid #2B2B2B">
+    <img src="../../../public/brand/exq-stacked-white.svg" alt="Exquisite Barber and Beauty Lounge" style="height: 30px; width: auto">
+    <div role="group" aria-label="Dashboard side" style="display: flex; background: #1F1F1F; border: 1px solid #2B2B2B; border-radius: 999px; padding: 4px; margin-left: 12px">
+      <button class="btn sm" aria-pressed="false" style="border-color: transparent; color: #A8A8A8">Shop</button>
+      <button class="btn sm" aria-pressed="true" style="background: #FFFFFF; color: #0E0E0E; border-color: #FFFFFF">Website</button>
+    </div>
+    <span class="lab" style="margin-left: 12px; display: inline-flex; align-items: center; gap: 8px; color: #E6E6E6">
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF5470" stroke-width="2.5"><path d="M5 12l5 5L20 7"></path></svg>
+      All changes saved and live
+    </span>
+    <div style="margin-left: auto; display: flex; gap: 10px">
+      <button class="btn">View site</button>
+      <button aria-label="Account, Dontrise" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid #3A3A3A; background: #1F1F1F; color: #FFFFFF; font: 800 14px Archivo, sans-serif">D</button>
+    </div>
+  </header>
+
+  <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 0">
+
+    <nav aria-label="Website sections" style="flex: 1 1 260px; max-width: 300px; border-right: 1px solid #2B2B2B; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px">
+      <div class="lab" style="padding: 4px 14px 10px">Home page</div>
+      <button class="sec">Announcement bar<span class="tag">On</span></button>
+      <button class="sec" aria-current="true" style="background: #FFFFFF; color: #0E0E0E">Top of page<span class="tag" style="color: #0E0E0E">Photo + headline</span></button>
+      <button class="sec">The work<span class="tag">6 photos</span></button>
+      <button class="sec">Reviews<span class="tag">3 shown</span></button>
+      <div class="lab" style="padding: 18px 14px 10px">Shop info</div>
+      <button class="sec">Hours<span class="tag">Closed Mon</span></button>
+      <button class="sec">Services and prices<span class="tag">15</span></button>
+      <button class="sec">Team<span class="tag">5</span></button>
+      <button class="sec">Gallery<span class="tag">14 photos</span></button>
+      <button class="sec">Visit, map and contact</button>
+    </nav>
+
+    <section aria-label="Live preview" style="flex: 1 1 420px; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px; background: #141414">
+      <div role="group" aria-label="Preview size" style="display: flex; background: #1F1F1F; border: 1px solid #2B2B2B; border-radius: 999px; padding: 4px">
+        <button class="btn sm" aria-pressed="true" style="background: #FFFFFF; color: #0E0E0E; border-color: #FFFFFF">Phone</button>
+        <button class="btn sm" aria-pressed="false" style="border-color: transparent; color: #A8A8A8">Computer</button>
+      </div>
+      <div style="width: 340px; border-radius: 36px; border: 8px solid #2B2B2B; overflow: hidden; background: #FFFFFF; box-shadow: 0 24px 60px rgba(0,0,0,.45)">
+        <div style="background: #111111; color: #FFFFFF; text-align: center; padding: 9px; font: 700 10px Archivo, sans-serif; font-stretch: 115%; letter-spacing: .14em; text-transform: uppercase">Walk-ins welcome · <span style="color: #FF5470; text-decoration: underline">Book online</span></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #D9D9D9">
+          <img src="../../../public/brand/exq-wordmark-black.svg" alt="Exquisite" style="height: 16px; width: auto">
+          <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+        </div>
+        <div style="position: relative; height: 420px; overflow: hidden; outline: 3px solid #FF5470; outline-offset: -3px">
+          <img src="../../../seed/photos/exq-01-hero.webp" alt="A barber smiling beside his client in the chair" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% 30%">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(17,17,17,.15) 0%, rgba(17,17,17,.55) 45%, rgba(17,17,17,.94) 78%)"></div>
+          <div style="position: absolute; left: 18px; right: 18px; bottom: 22px; color: #FFFFFF">
+            <div style="font: 700 9px Archivo, sans-serif; font-stretch: 115%; letter-spacing: .16em; text-transform: uppercase">Barber &amp; Beauty Lounge · Brookhaven PA</div>
+            <div style="font: 900 38px/0.98 Archivo, sans-serif; font-stretch: 125%; text-transform: uppercase; margin-top: 8px">Gifted hands.<br><span style="color: #FF5470">Exquisite</span><br>cuts.</div>
+            <div style="display: flex; gap: 8px; margin-top: 14px">
+              <span style="background: #C8102E; color: #FFFFFF; border-radius: 999px; padding: 10px 14px; font: 750 10px Archivo, sans-serif; font-stretch: 112%; letter-spacing: .1em; text-transform: uppercase">Book a chair</span>
+              <span style="border: 1.5px solid #FFFFFF; border-radius: 999px; padding: 9px 14px; font: 750 10px Archivo, sans-serif; font-stretch: 112%; letter-spacing: .1em; text-transform: uppercase">See services</span>
+            </div>
+          </div>
+          <span style="position: absolute; top: 10px; left: 10px; background: #FF5470; color: #111111; border-radius: 999px; padding: 4px 10px; font: 750 9px Archivo, sans-serif; letter-spacing: .1em; text-transform: uppercase">Editing</span>
+        </div>
+        <div style="padding: 16px; font: 800 14px Archivo, sans-serif; font-stretch: 118%; text-transform: uppercase; color: #111111">Today's chairs</div>
+      </div>
+    </section>
+
+    <section aria-labelledby="ed" style="flex: 1 1 380px; max-width: 460px; border-left: 1px solid #2B2B2B; padding: 24px; display: flex; flex-direction: column; gap: 22px">
+      <div>
+        <div class="lab">Home page</div>
+        <h1 id="ed" class="h" style="font-size: 24px; margin-top: 4px">Top of page</h1>
+        <p style="margin: 8px 0 0; color: #A8A8A8; font-size: 14px">The first thing people see. Changes show in the preview and go live when you save.</p>
+      </div>
+
+      <div class="field">
+        <span class="lab">Photo</span>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <button aria-pressed="true" aria-label="Use photo: barber smiling with client" style="padding: 0; border: 3px solid #FF5470; border-radius: 12px; overflow: hidden; height: 96px; cursor: pointer; background: #000"><img src="../../../seed/photos/exq-01-hero.webp" alt="" style="width: 100%; height: 100%; object-fit: cover"></button>
+          <button aria-label="Use photo: waves and beard" style="padding: 0; border: 3px solid transparent; border-radius: 12px; overflow: hidden; height: 96px; cursor: pointer; background: #000"><img src="../../../seed/photos/exq-02-waves-beard.webp" alt="" style="width: 100%; height: 100%; object-fit: cover"></button>
+          <button aria-label="Use photo: skin fade" style="padding: 0; border: 3px solid transparent; border-radius: 12px; overflow: hidden; height: 96px; cursor: pointer; background: #000"><img src="../../../seed/photos/exq-03-skin-fade.webp" alt="" style="width: 100%; height: 100%; object-fit: cover"></button>
+        </div>
+        <button class="btn sm" style="align-self: flex-start">Upload a new photo</button>
+      </div>
+
+      <label class="field">
+        <span class="lab">Headline</span>
+        <input class="in" value="Gifted hands. Exquisite cuts.">
+      </label>
+      <label class="field">
+        <span class="lab">Word in red</span>
+        <input class="in" value="Exquisite">
+      </label>
+      <label class="field">
+        <span class="lab">Line under it</span>
+        <input class="in" value="Barbers and stylists under one roof. Pick your chair and book in under a minute.">
+      </label>
+
+      <div style="display: flex; gap: 10px; margin-top: auto; border-top: 1px solid #2B2B2B; padding-top: 18px">
+        <button class="btn" style="flex: 1">Undo changes</button>
+        <button class="btn red" style="flex: 2">Save and publish</button>
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>
