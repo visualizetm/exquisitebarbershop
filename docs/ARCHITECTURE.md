@@ -605,8 +605,8 @@ schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 | POST          | /api/admin/bookings                   | owner, Idempotency-Key   | phone or walkIn; `override` audited; never takes a held slot                                                     |
 | GET, PATCH    | /api/admin/bookings/:id               | owner                    | detail with audit, emails and allowed transitions (marks it seen); PATCH edits notes                             |
 | POST          | /api/admin/bookings/:id/status        | owner                    | allowed transitions only, else INVALID_TRANSITION; restore re-takes locks or SLOT_TAKEN                          |
-| POST          | /api/admin/bookings/:id/arrived       | owner                    | the floor: stamps arrivedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled   |
-| POST          | /api/admin/bookings/:id/start         | owner                    | the floor: stamps startedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled   |
+| POST          | /api/admin/bookings/:id/arrived       | owner                    | the floor: stamps arrivedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled    |
+| POST          | /api/admin/bookings/:id/start         | owner                    | the floor: stamps startedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled    |
 | POST          | /api/admin/bookings/:id/cancel        | owner                    | `{ reason?, notify }`                                                                                            |
 | POST          | /api/admin/bookings/:id/reschedule    | owner                    | `{ startAt, staff?, notify, override }`                                                                          |
 | GET           | /api/admin/customers                  | owner                    | query `phone`; names, counts, spend, history                                                                     |

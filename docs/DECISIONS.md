@@ -1309,7 +1309,7 @@ durationMinutes?}` on the staff document. Rejected: a separate prices collection
   Sign out); a native `details` was tried first and dropped because `summary` has no button role.
   A `data-slot="check-in"` span in the top bar is the place for prompt 13c's Check in button.
 - D13b-08 New addresses: `/admin/shop/{today,bookings,bookings/:id,schedule,clients,clients/:phone,
-  team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its path remainder and
+team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its path remainder and
   query kept (`/admin/bookings?range=past` to `/admin/shop/bookings?range=past`, `/admin/customers`
   to clients, `/admin/website?tab=photo` to `/admin/website/top`, `/admin/photos` to the gallery),
   so bookmarks, the guide's links and the printed cards keep working. The Website page reads its
