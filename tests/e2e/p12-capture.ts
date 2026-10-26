@@ -7,7 +7,8 @@ import { chromium, type Browser, type BrowserContext, type Page } from '@playwri
  * Prompt 12 screenshots: the real shop content (the 15 seed photos, the five people, the real menus
  * and prices, the reviews) on the demo build, after a Demo data reset:
  *   /tmp/start-demo.sh   (npm run e2e:prod-server -- --port=4176 --profile=demo)
- *   npx tsx tests/e2e/p12-capture.ts
+ *   npx tsx tests/e2e/p12-capture.ts        every page below
+ *   npx tsx tests/e2e/p12-capture.ts hero   only the Home shots, then the montages that hold them
  *
  * Every public page is saved twice per theme and width: the first screen (`-top`, what a phone shows
  * before any scroll, bottom bar included) and the whole page. The owner screens are Website, Reviews
@@ -18,6 +19,7 @@ const BASE = process.env.CAPTURE_BASE ?? 'https://127.0.0.1:4176';
 const OUT = join('docs', 'screens', 'p12');
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
+const mode = process.argv[2] ?? 'all';
 
 const PUBLIC: [string, string][] = [
   ['home', '/'],
@@ -129,13 +131,13 @@ async function measure(page: Page, label: string): Promise<void> {
   process.stdout.write(`${label} ${JSON.stringify(facts)}\n`);
 }
 
-async function publicPages(browser: Browser): Promise<void> {
+async function publicPages(browser: Browser, pages: [string, string][]): Promise<void> {
   for (const theme of ['light', 'dark'] as const) {
     for (const size of [PHONE, DESKTOP]) {
       const context = await newContext(browser, size, theme);
       const page = await context.newPage();
       watch(page);
-      for (const [name, path] of PUBLIC) {
+      for (const [name, path] of pages) {
         await page.goto(`${BASE}${path}`);
         await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 15_000 });
         await page.locator('.exq-footer[data-state="ready"]').waitFor({ timeout: 15_000 });
@@ -211,11 +213,20 @@ async function resetDemoData(browser: Browser): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  if (mode !== 'all' && mode !== 'hero') throw new Error(`unknown mode ${mode}`);
   const browser = await launch();
   try {
     await resetDemoData(browser);
-    await publicPages(browser);
-    await ownerPages(browser);
+    if (mode === 'hero') {
+      await publicPages(
+        browser,
+        PUBLIC.filter(([name]) => name === 'home'),
+      );
+    } else {
+      await publicPages(browser, PUBLIC);
+      await ownerPages(browser);
+    }
+    // Every montage holds the Home first screen, so both modes rebuild all four.
     for (const theme of ['light', 'dark']) {
       montage(new RegExp(`-${theme}-390-top\\.png$`), `montage-${theme}-390.png`, '390x844', 6);
       montage(new RegExp(`-${theme}-1280-top\\.png$`), `montage-${theme}-1280.png`, '640x400', 3);
