@@ -1340,3 +1340,7 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   stored totals). The floor refreshes every 30 seconds while the tab is visible, when it comes back,
   and after every action, keeping the last data on screen (`useFloor`); progress is computed from
   the server's `now` in the response and the bar is a plain width with no transition. No websockets.
+- D13b-13 `availabilityRoutes.test.ts` built its "inverted range" from `nextDate(3, 7)` and
+  `nextDate(3, 3)`, which land on the same Wednesday when the suite runs on a Monday (both roll
+  forward to it), so the range was not inverted and the test failed on Mondays. The second date is
+  now the day before the first, whatever the weekday. Not a product change.

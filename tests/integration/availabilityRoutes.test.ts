@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   availabilityDaysResponseSchema,
@@ -145,7 +146,8 @@ describe('GET /api/availability/days', () => {
     const inverted = await call(
       server.baseUrl,
       'GET',
-      `/api/availability/days?serviceIds=${cutId}&from=${wed}&to=${nextDate(3, 3)}`,
+      // The day before, so the range is inverted whatever weekday the test runs on.
+      `/api/availability/days?serviceIds=${cutId}&from=${wed}&to=${DateTime.fromISO(wed).minus({ days: 1 }).toISODate() ?? ''}`,
     );
     expect(inverted.status).toBe(400);
   });
