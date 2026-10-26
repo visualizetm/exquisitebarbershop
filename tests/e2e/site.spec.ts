@@ -51,7 +51,46 @@ test('a next-opening chip on the profile lands on the details step with that tim
   ).toBeVisible();
 });
 
-test('the gallery opens a photo in the lightbox with the barber and a book link', async ({
+test('an uncredited gallery photo opens in the lightbox with no barber line and no book link', async ({
+  page,
+  context,
+}) => {
+  await signInAsOwner(page);
+  await uploadSamplePhoto(page, {
+    kind: 'gallery',
+    alt: 'Shop work, not credited',
+    label: 'SHOP',
+    color: '#1f3a5f',
+  });
+  // Home shows "the work" only once the gallery holds three photos (HOME_WORK_MIN, D12-49).
+  for (const [label, color] of [
+    ['ONE', '#3f5f1f'],
+    ['TWO', '#5f3f1f'],
+  ] as const) {
+    await uploadSamplePhoto(page, { kind: 'gallery', alt: `Shop work ${label}`, label, color });
+  }
+  await context.clearCookies();
+
+  await page.goto('/gallery');
+  await expect(page.getByRole('heading', { name: 'The work' })).toBeVisible();
+  await page
+    .locator('.exq-photo-grid__button', { has: page.locator('img[alt="Shop work, not credited"]') })
+    .first()
+    .click();
+  const dialog = page.locator('dialog.exq-dialog[open]');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('img[alt="Shop work, not credited"]').first()).toBeVisible();
+  // No photo is credited to a chair yet, so there is no barber line and no book link.
+  await expect(dialog.getByRole('heading', { name: /^By / })).toHaveCount(0);
+  await expect(dialog.getByRole('link', { name: /^Book / })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  // The home page shows the work section now that three photos exist.
+  await page.goto('/');
+  await expect(page.locator('.exq-home__work .exq-photo-grid__item').first()).toBeVisible();
+});
+
+test('a photo credited to a barber shows the name and a book link in the lightbox', async ({
   page,
   context,
 }) => {
@@ -67,12 +106,11 @@ test('the gallery opens a photo in the lightbox with the barber and a book link'
   await context.clearCookies();
 
   await page.goto('/gallery');
-  await expect(page.getByRole('heading', { name: 'The work' })).toBeVisible();
   await expect(page.getByRole('link', { name: /Drew/ }).first()).toBeVisible();
-  const tile = page.locator('.exq-photo-grid__button', {
-    has: page.locator('img[alt="Design by Drew"]'),
-  });
-  await tile.first().click();
+  await page
+    .locator('.exq-photo-grid__button', { has: page.locator('img[alt="Design by Drew"]') })
+    .first()
+    .click();
   const dialog = page.locator('dialog.exq-dialog[open]');
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'By Drew' })).toBeVisible();
@@ -81,11 +119,6 @@ test('the gallery opens a photo in the lightbox with the barber and a book link'
     'href',
     '/book?barber=drew',
   );
-  await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  // The home page shows the work section once a photo exists.
-  await page.goto('/');
-  await expect(page.locator('.exq-home__work .exq-photo-grid__item').first()).toBeVisible();
 });
 
 test('a profile page carries its own title, description, canonical and the shop JSON-LD', async ({

@@ -139,10 +139,27 @@ test.describe('team and the resolver', () => {
     await expect(
       items.filter({ hasText: code }).getByRole('radio', { name: /^Move/ }),
     ).toBeEnabled();
+    // A move takes the new chair's own length (D12-81), so two moves in one change can collide
+    // when a length grows (two back to back cuts both sent to a 75 minute chair); the server then
+    // refuses the whole change. So the other clients move only to a chair that keeps their length
+    // (its label carries no minutes) and are kept otherwise; this test's own booking always moves.
     for (let i = 0; i < count; i += 1) {
-      const move = items.nth(i).getByRole('radio', { name: /^Move/ });
-      if (await move.isEnabled()) await move.check({ force: true });
-      else await items.nth(i).getByRole('radio', { name: /^Keep/ }).check({ force: true });
+      const item = items.nth(i);
+      const move = item.getByRole('radio', { name: /^Move/ });
+      const keep = item.getByRole('radio', { name: /^Keep/ });
+      if (!(await move.isEnabled())) {
+        await keep.check({ force: true });
+        continue;
+      }
+      await move.check({ force: true });
+      const moveTo = item.getByLabel('Move to');
+      await expect(moveTo).toBeVisible();
+      const sameLength = (await moveTo.locator('option').allTextContents()).find(
+        (label) => !label.endsWith(' min'),
+      );
+      const own = ((await item.textContent()) ?? '').includes(code);
+      if (sameLength) await moveTo.selectOption({ label: sameLength });
+      else if (!own) await keep.check({ force: true });
     }
     await expect(panel.getByText(`${String(count)} of ${String(count)} decided`)).toBeVisible();
     // Only chairs that do the service and are free are offered, never Nelly himself, each with
