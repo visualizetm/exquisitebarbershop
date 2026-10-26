@@ -6,6 +6,7 @@ import Phone01 from '@untitled-ui/icons-react/build/esm/Phone01';
 import type { PublicShop } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
 import { HoursTable } from '@/components/site/HoursTable';
+import { VisitMap } from '@/components/site/VisitMap';
 import { ButtonAnchor, ErrorState, Reveal, SectionHead } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { usePageMeta } from '@/lib/usePageTitle';
@@ -63,6 +64,7 @@ export function VisitPage() {
                   {result.data.address.postalCode}
                 </address>
               </div>
+              <VisitMap shop={result.data} />
               <p className="exq-visit__actions">
                 <ButtonAnchor
                   href={directionsUrl(result.data)}

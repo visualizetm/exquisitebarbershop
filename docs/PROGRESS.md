@@ -639,3 +639,10 @@ commit, and what is still open.
   all passing as found), reveal tokens `--d-reveal` and `--stagger-reveal`, 8px travel, early
   rootMargin in `useReveal`, passive visualViewport listener, dvh on body.
 - Heartbeat: 01:33 UTC, next is M3 (Visit map, hero gradient, no-photo panel, Iniya's bar, site.spec).
+
+### M3: Visit map and four fixes
+
+- Shipped: `VisitMap` on Visit with the CSP `frame-src`, the hero gradient scrim (measured), the
+  no-photo panel in `PhotoFrame`, the Instagram phone bar on chair pages, and the narrowed
+  site.spec check. Tests: `tests/e2e/p13a.spec.ts`, `heroScrim.test.ts`, `csp.test.ts`.
+- Heartbeat: 01:41 UTC, next is SHIP (gate, screenshots, Lighthouse, report, PR, merge).

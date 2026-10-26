@@ -54,6 +54,10 @@ describe('the content security policy and Cloudinary', () => {
     expect(directive('img-src')).toEqual(["'self'", 'data:', 'https://res.cloudinary.com']);
   });
 
+  it('allows frames only from Google Maps (the Visit page map)', () => {
+    expect(directive('frame-src')).toEqual(['https://www.google.com', 'https://maps.google.com']);
+  });
+
   it('allows connections only to the site and api.cloudinary.com', () => {
     expect(directive('connect-src')).toEqual(["'self'", 'https://api.cloudinary.com']);
   });

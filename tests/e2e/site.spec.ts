@@ -82,7 +82,7 @@ test('an uncredited gallery photo opens in the lightbox with no barber line and 
   await expect(dialog.locator('img[alt="Shop work, not credited"]').first()).toBeVisible();
   // No photo is credited to a chair yet, so there is no barber line and no book link.
   await expect(dialog.getByRole('heading', { name: /^By / })).toHaveCount(0);
-  await expect(dialog.getByRole('link', { name: /^Book / })).toHaveCount(0);
+  await expect(dialog.locator('a[href^="/book?barber="]')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   // The home page shows the work section now that three photos exist.

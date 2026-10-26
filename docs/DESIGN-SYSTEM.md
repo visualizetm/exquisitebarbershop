@@ -248,7 +248,7 @@ the same rules. Every rule here holds with any photo, so a new upload never brea
   so nothing shifts while it loads (CLS 0). Frames have a fixed ratio (`PhotoFrame` 4:5, 1:1 or 16:9) and crop
   with `object-fit: cover`.
 - The Home hero photo is the LCP image: eager, `fetchpriority="high"`, `sizes` for its slot, never inside a
-  reveal. Below 1024px it fills the ink hero behind the text under `--scrim-photo`, cropped `85% 30%` (where the
+  reveal. Below 1024px it fills the ink hero behind the text under the directional scrim gradient (`--scrim-photo-strong` behind the text, `--scrim-photo-light` over the rest), cropped `85% 30%` (where the
   faces are); from 1024px it stands in its own 4:5 column. Without a photo the hero is text only.
 - Everything below the fold is `loading="lazy"` with `sizes` for its grid (`PhotoGrid`). Gallery and work tiles
   crop square toward the upper middle (`50% 35%`), so heads and the cut stay in frame. These crops were checked on

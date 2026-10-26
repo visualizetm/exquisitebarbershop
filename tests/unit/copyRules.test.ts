@@ -65,8 +65,8 @@ describe('copy rules (CLAUDE.md rule 8)', () => {
         /purple|violet|indigo|#(?:[89ab][0-9a-f]){1}[0-9a-f]{2}[ef][0-9a-f]/i,
       );
       const gradients = text.match(/(?:linear|radial|conic)-gradient\(/g) ?? [];
-      // The only gradient is the hard-edged diagonal stripe of the photo placeholder.
-      if (!file.endsWith('kit.css')) expect(gradients, file).toEqual([]);
+      // The only gradient is the hero's directional scrim (D13a-09).
+      if (!file.endsWith('pages.css')) expect(gradients, file).toEqual([]);
       else expect(gradients).toHaveLength(1);
     }
   });

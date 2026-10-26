@@ -18,6 +18,18 @@ export function directionsUrl(shop: Pick<PublicShop, 'address' | 'name' | 'googl
 }
 
 /** The street address on one line, suite included: "3309 Edgmont Ave, Suite F, Brookhaven, PA 19015". */
+/** The Google Maps embed for the shop, from its name and address; no API key. */
+export function mapEmbedUrl(shop: Pick<PublicShop, 'address' | 'name'>): string {
+  const { address } = shop;
+  const query = [
+    shop.name,
+    [address.line1, address.line2].filter(Boolean).join(' '),
+    address.city,
+    `${address.state} ${address.postalCode}`,
+  ].join(', ');
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
+}
+
 export function addressLine(address: PublicShop['address']): string {
   return [
     address.line1,

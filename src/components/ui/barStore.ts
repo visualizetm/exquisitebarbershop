@@ -5,6 +5,8 @@ export interface BarAction {
   label: string;
   to?: string;
   href?: string;
+  /** The href opens another site in a new tab (a chair that books on Instagram). */
+  external?: boolean;
   onClick?: () => void;
   disabled?: boolean;
   /** Makes the button submit that form (the booking details step). */

@@ -68,7 +68,11 @@ function Half({ action }: { action: BarAction }) {
   }
   if (action.href && !action.disabled) {
     return (
-      <a href={action.href} {...props}>
+      <a
+        href={action.href}
+        {...props}
+        {...(action.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      >
         {label}
       </a>
     );
