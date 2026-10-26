@@ -632,3 +632,10 @@ commit, and what is still open.
 - Tests: `tests/unit/carouselAutoplay.test.ts` (6), `tests/e2e/carousel.spec.ts` (snap, dots, page
   scroll over the strip, auto-advance and its stop, reduced motion).
 - Heartbeat: 01:29 UTC, next is M2 (scroll spec, overflow fixes, lighter reveals).
+
+### M2: smooth scrolling and lighter reveals
+
+- Shipped: `tests/e2e/scroll.spec.ts` (no sideways overflow at 360, 390, 414 on ten public pages,
+  all passing as found), reveal tokens `--d-reveal` and `--stagger-reveal`, 8px travel, early
+  rootMargin in `useReveal`, passive visualViewport listener, dvh on body.
+- Heartbeat: 01:33 UTC, next is M3 (Visit map, hero gradient, no-photo panel, Iniya's bar, site.spec).

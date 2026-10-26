@@ -17,7 +17,7 @@ themes, on `/kit` (development builds only; the production build contains no kit
 | Type    | `--font` Jost Variable; `--t-label` 13, `--t-body` 17 (18), `--t-h3` 22 (26), `--t-h2` 36 (56), `--t-display` 52 (96), `--t-price` 22; the value in brackets applies from 1024px    |
 | Space   | `--s1` 4, `--s2` 8, `--s3` 12, `--s4` 16, `--s5` 24, `--s6` 32, `--s7` 48, `--s8` 64, `--s9` 96; `--hit` 44; `--rule` 2; `--wrap` 1200                                              |
 | Shape   | `--r-card` 4 (cards, inputs, photos), `--r-pill` (buttons, chips); the phone bottom bar is square                                                                                   |
-| Motion  | `--ease-out`, `--ease-in`, `--d-fast` 150ms, `--d-base` 250ms, `--d-slow` 400ms, `--stagger` 60ms                                                                                   |
+| Motion  | `--ease-out`, `--ease-in`, `--d-fast` 150ms, `--d-base` 250ms, `--d-slow` 400ms, `--stagger` 60ms, `--d-reveal` 280ms, `--stagger-reveal` 40ms                                      |
 | Shadow  | `--shadow-pop` (hover lift, toasts, popovers)                                                                                                                                       |
 
 `--t-display` is `clamp(40px, 13.4vw, 52px)` on phones: exactly 52px from 385px wide, a little
@@ -108,7 +108,7 @@ no loops except the spinner).
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------- |
 | Page change             | cross-fade with an 8px rise (View Transitions)                                                                       | 250ms                   |
 | Home hero on load       | H1 lines rise (clipped, 60ms apart), then sub, buttons, info row rise 12px                                           | done by 610ms           |
-| Scroll reveals          | chair cards, price rows, gallery tiles, Visit rise 16px, 60ms stagger; photos wipe up (clip-path)                    | 250ms, 400ms            |
+| Scroll reveals          | chair cards, price rows, gallery tiles, Visit rise 8px, 40ms stagger, started 15% early; photos wipe up (clip-path)  | 280ms, 400ms            |
 | CTA band headline       | the same line rise, on scroll                                                                                        | 400ms                   |
 | Buttons                 | press .97; hover sweeps a red fill left to right (primary, outline); spinner keeps width                             | 150ms, 250ms            |
 | Cards and chips         | hover lift -2px with `--shadow-pop` (desktop); selected color; red underline grows 0 to 32px                         | 150ms                   |

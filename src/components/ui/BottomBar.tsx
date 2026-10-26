@@ -36,7 +36,7 @@ function useKeyboardOpen(): boolean {
     };
     document.addEventListener('focusin', update);
     document.addEventListener('focusout', update);
-    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('resize', update, { passive: true });
     return () => {
       document.removeEventListener('focusin', update);
       document.removeEventListener('focusout', update);

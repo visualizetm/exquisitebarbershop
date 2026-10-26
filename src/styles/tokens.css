@@ -67,6 +67,9 @@
   --d-base: 250ms;
   --d-slow: 400ms;
   --stagger: 60ms;
+  /* Scroll reveals: short and early, so nothing on a phone visibly waits. */
+  --d-reveal: 280ms;
+  --stagger-reveal: 40ms;
 
   /* the phone bottom bar sets this to its own height; zero when it is not shown */
   --bar-h: 0px;

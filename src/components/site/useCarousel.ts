@@ -115,23 +115,27 @@ export function useCarousel(
     document.addEventListener('visibilitychange', onVisibility);
     onVisibility();
 
-    // Off screen: nothing moves where nobody can see it.
-    play.hold('offscreen');
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) play.release('offscreen');
-          else play.hold('offscreen');
-        }
-      },
-      { threshold: 0.5 },
-    );
-    io.observe(list);
+    // Off screen: nothing moves where nobody can see it. Without the observer (very old browsers)
+    // the strip simply runs while the tab is visible.
+    let io: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== 'undefined') {
+      play.hold('offscreen');
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) play.release('offscreen');
+            else play.hold('offscreen');
+          }
+        },
+        { threshold: 0.5 },
+      );
+      io.observe(list);
+    }
     enable();
 
     return () => {
       play.dispose();
-      io.disconnect();
+      io?.disconnect();
       if (frame) cancelAnimationFrame(frame);
       narrow.removeEventListener('change', enable);
       reduce.removeEventListener('change', enable);
