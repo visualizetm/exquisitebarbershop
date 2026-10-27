@@ -767,3 +767,9 @@ commit, and what is still open.
   Out for the day, week and time off, Me, the tablet), screens in docs/screens/p13d/guide, the PDF
   re-rendered. Lighthouse mobile Home 85, CLS 0.
 - Heartbeat: 12:21 UTC, commit follows, next is SHIP.
+
+### SHIP
+
+- Gate green after four spec fixes (680 unit and integration, dev e2e 156 plus the reruns, prod-like 7,
+  showcase 13, vercel-function 97), Lighthouse Home 85, screens in docs/screens/p13d, PR 15 merged
+  into main as 92bf393 at 13:07 UTC. This closes the three-prompt dashboard and portal revamp.
