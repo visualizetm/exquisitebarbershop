@@ -21,6 +21,7 @@ const ManagePage = lazy(() =>
 );
 // The barber portal is another chunk of its own, for the same reason.
 const TeamApp = lazy(() => import('@/team/TeamApp'));
+const KioskPage = lazy(() => import('@/checkin/KioskPage').then((m) => ({ default: m.KioskPage })));
 // The kit showcase exists only in development builds, for visual checks and screenshots.
 const KitPage = import.meta.env.DEV ? lazy(() => import('@/pages/KitPage')) : null;
 
@@ -66,6 +67,15 @@ export function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
         <Route element={<TeamLayout />}>
+          {/* The locked front desk tablet: no nav, no footer, no links, its own chunk. */}
+          <Route
+            path="checkin"
+            element={
+              <Suspense fallback={<Status state="loading" />}>
+                <KioskPage />
+              </Suspense>
+            }
+          />
           <Route
             path="team/*"
             element={

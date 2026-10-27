@@ -1587,3 +1587,15 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   so the slot locks, the line rules and the 13e offer rule (online only) all apply unchanged; the
   audit actor type gains `kiosk`. The owner's device routes live under `/api/admin/kiosk/devices`
   and every setup, pairing and unpairing is audited (`kiosk.setup`, `kiosk.pair`, `kiosk.unpair`).
+- D13f-06 "Keep this tablet signed in" is gone from the owner's check in page: the locked tablet
+  replaces it, and an owner session that never idles out on a desk is exactly what the kiosk
+  exists to avoid. The device flag route stays (a cookie already set keeps working); the page's
+  top bar points at Settings, Check in tablets instead.
+- D13f-07 The tablet never leaves its page without the exit PIN: no Exit, no links, press and hold
+  the logo for three seconds for the pad, then only Reload, Unpair this tablet and Close. Text
+  selection, the context menu and pinch zoom are stopped with CSS (`user-select`, `touch-action:
+pan-x pan-y`) and the context menu handler, not with `user-scalable=no` in the viewport meta,
+  which axe flags as a WCAG failure. On an iPad, Guided Access does the rest (the owner guide).
+- D13f-08 The kiosk e2e freezes the page clock (Playwright's clock) for the 45 second idle reset
+  and the three second hold, so the spec never waits in real time; the server's clock is untouched
+  because the e2e server opens the shop all day.

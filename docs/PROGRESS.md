@@ -823,3 +823,13 @@ commit, and what is still open.
   tests/integration/kiosk.test.ts (pair once, expiry, the lock, the 403 loop over every owner and
   team route, the response scan, no offer on a kiosk walk in).
 - Heartbeat: 17:40 UTC, commit follows, next is M1 (the locked page at /checkin).
+
+### M1: the locked page at /checkin
+
+- Shipped: `/checkin` as its own chunk under the team layout (dark tokens, no nav, no links), the
+  check in page's kiosk mode (pairing pad, the Who's in today board, hold the logo for the exit
+  PIN, the Reload, Unpair, Close menu, the 45 second idle reset, 20 second refresh, D13f-06 to
+  D13f-08), the booking flow's kiosk session (`FLOW_API`), "Keep this tablet signed in" removed
+  from the owner's page, and tests/e2e/kiosk.spec.ts (pair, board, walk in, check in, idle reset
+  with a frozen clock, exit PIN, unpair, 403 on the dashboard, axe, 64px targets, both sizes).
+- Heartbeat: 17:46 UTC, commit follows, next is M2 (takings after the discount).

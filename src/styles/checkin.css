@@ -231,3 +231,224 @@
   align-items: flex-start;
   text-align: left;
 }
+
+/*
+ * The locked front desk tablet (prompt 13f): no selection, no pinch, 64px targets, 22px type on the
+ * start screen and the board. White for free, red for busy, steel for away. Tokens only.
+ */
+.exq-checkin[data-mode='kiosk'] {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: pan-x pan-y;
+}
+.exq-checkin[data-mode='kiosk'] .exq-checkin__main {
+  font-size: 1.375rem;
+}
+.exq-checkin[data-mode='kiosk'] .exq-checkin__choice-sub,
+.exq-checkin[data-mode='kiosk'] .exq-checkin__sub {
+  font-size: 1.375rem;
+}
+.exq-checkin__hold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 64px;
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 800;
+  font-stretch: var(--w-head);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.exq-checkin__hold[data-state='holding'] {
+  background: var(--card);
+}
+.exq-checkin__hint {
+  margin: 0;
+  color: var(--fg-3);
+  font-size: var(--t-small);
+}
+.exq-checkin__hint a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit);
+  color: var(--fg);
+}
+.exq-checkin__pairing {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--s5);
+}
+.exq-checkin__logo {
+  color: var(--fg);
+}
+.exq-checkin__exit-actions {
+  display: grid;
+  gap: var(--s3);
+  width: min(100%, 420px);
+}
+.exq-checkin__exit-actions .exq-btn {
+  min-height: 64px;
+}
+.exq-checkin__back .exq-btn {
+  min-height: 64px;
+}
+
+/* The six digit pad: 64px keys, dots above. */
+.exq-codepad {
+  display: grid;
+  gap: var(--s4);
+  justify-items: center;
+}
+.exq-codepad__dots {
+  display: flex;
+  gap: var(--s3);
+  margin: 0;
+}
+.exq-codepad__dot {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--fg);
+  border-radius: 50%;
+}
+.exq-codepad__dot[data-state='on'] {
+  background: var(--fg);
+}
+.exq-codepad__error {
+  margin: 0;
+  color: var(--accent-text);
+}
+.exq-codepad__keys {
+  display: grid;
+  grid-template-columns: repeat(3, 84px);
+  gap: var(--s3);
+}
+.exq-codepad__key {
+  min-width: 84px;
+  min-height: 64px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-size: 1.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.exq-codepad__key:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.exq-codepad__key svg {
+  width: 28px;
+  height: 28px;
+}
+
+/* Who's in today. */
+.exq-board {
+  display: grid;
+  gap: var(--s4);
+}
+.exq-board__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.exq-board__title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-stretch: var(--w-head);
+  text-transform: uppercase;
+}
+.exq-board__hours {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 1.375rem;
+}
+.exq-board[data-state='closed'] .exq-board__hours {
+  color: var(--accent-text);
+}
+.exq-board__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--s3);
+}
+.exq-board__tile {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-areas:
+    'photo who'
+    'photo status'
+    'photo waiting';
+  column-gap: var(--s3);
+  row-gap: var(--s1);
+  align-items: center;
+  min-height: 112px;
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-tile);
+  background: var(--card);
+  font-size: 1.375rem;
+}
+.exq-board__photo {
+  grid-area: photo;
+  width: 72px;
+}
+.exq-board__who {
+  grid-area: who;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2);
+}
+.exq-board__name {
+  font-weight: 800;
+}
+.exq-board__chair {
+  color: var(--fg-3);
+}
+.exq-board__status {
+  grid-area: status;
+}
+.exq-board__waiting {
+  grid-area: waiting;
+  color: var(--fg-2);
+}
+/* White for free, red for busy, steel for away. */
+.exq-board__tile[data-tone='free'] {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+.exq-board__tile[data-tone='free'] .exq-board__chair,
+.exq-board__tile[data-tone='free'] .exq-board__waiting {
+  color: var(--bg);
+  opacity: 0.8;
+}
+.exq-board__tile[data-tone='busy'] {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+.exq-board__tile[data-tone='busy'] .exq-board__chair,
+.exq-board__tile[data-tone='busy'] .exq-board__waiting {
+  color: #fff;
+}
+.exq-board__tile[data-tone='away'] {
+  color: var(--fg-2);
+}
+.exq-board__off {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 1.375rem;
+}
