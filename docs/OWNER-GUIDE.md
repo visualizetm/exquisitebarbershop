@@ -177,6 +177,15 @@ opens the preview full screen.
   under it**. The preview follows as you type; **Save and publish** puts it live
   and the bar says **Saved. Live on the site now**. **Undo changes** goes back to
   what is saved.
+- **Launch offer**: the "$10 off your first online booking" from the ads. **Offer on**
+  switches it; the amount and the minimum price are whole dollars; **Words on the site** is the
+  small red line on the home page and the Book page; **First day** and **Last day** are optional
+  (after the last day it switches itself off). The line **Used 12 times, $120 off** counts the
+  bookings that stand. The site gives it on its own: online bookings only, once per phone number,
+  only when the price reaches the minimum. Bookings you or a barber add, walk-ins and check-ins
+  never get it. A booking with it shows **$45, $10 off online** on Today and in its panel; the
+  client's email shows the line and the total after it. Cancelling frees the phone number for a
+  later first booking; moving or rescheduling keeps the offer.
 - **The work** and **Gallery**: upload, caption, order, credit a photo to a barber,
   and mark the six that show on Home.
 - **Reviews**, **Hours**, **Services and prices** (with each barber's own prices) and

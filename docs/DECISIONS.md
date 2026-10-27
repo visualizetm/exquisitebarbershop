@@ -1517,3 +1517,42 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   text than it shows. Rows that scroll sideways on purpose (the chairs carousel) and screen
   reader text in 1px boxes are skipped. On the e2e data the guard passed before the CSS fix too,
   so the fix is hardening against longer names and the proof is the guard plus the demo screens.
+- D13e-04 The hero's request chain was HTML, then the app, then `/api/shop`, then the photo. The
+  inline head script (already in the CSP by hash) now starts the shop request on public paths, so
+  it downloads alongside the app and the photo request starts as soon as the app runs. A static
+  `<link rel="preload">` for the photo was rejected: the photo's address only arrives with the
+  shop response, so a preload could not name it. Book and Manage are their own chunks, so Home
+  no longer carries the booking flow.
+- D13e-05 Responsive widths for the hero exist on Cloudinary (400, 800, 1200 and 1600; the
+  production driver). The local and GridFS drivers still serve one file, so the demo build's
+  Lighthouse measures the one-size hero; resized copies for those drivers were not built (no
+  image tool in the dependencies, D12-79 stands). Lighthouse Home after: 84, LCP 3.7 s in the
+  report run (a run 15 minutes earlier on the same build measured 82 and LCP 2.8 s; the sandbox
+  varies by a second). Top three opportunities: the one-size hero on local storage, the 153 KB
+  main chunk (54 percent unused on Home), and boot time. The cheapest, the chunk split, is in.
+- D13e-06 `/api/shop` is sent with `max-age=0, must-revalidate` and no `s-maxage`, so neither the
+  CDN nor the browser keeps it: there is nothing to purge, and a public tab shows a save on its
+  next load. The editor's message now says what is true: "Saved. Live on the site now".
+- D13e-07 The launch offer is a settings block (`launchOffer`: on, amount, minimum, label, first
+  and last day, integer cents) and a `discounts` list on the booking (`code`, `amountCents`,
+  `label`). The price (`totalPriceCents`) is the services' price as before; what the client pays
+  is price minus discounts (`totalAfterDiscounts`), so the pricing rule, the takings and every
+  older booking are untouched. One field per booking was rejected: a second offer later would
+  need a second field.
+- D13e-08 The server decides inside the booking transaction with the pure rule in
+  `shared/lib/launchOffer.ts`: public online bookings only, once per phone, above the minimum,
+  while on and inside the dates. Two first bookings for one phone placed at the same moment are
+  stopped by a unique partial index on `bookings` (`customer.phone` where the discount is
+  LAUNCH10 and the status is confirmed, completed or no show); the loser is placed again without
+  the offer. A cancelled booking leaves the index, so the phone is free again. Reschedules and
+  moves keep the same document and so keep the discount. A claims collection was rejected: the
+  index is one line and needs no cleanup.
+- D13e-09 The public flow shows the offer label as a small red tag on Home and Book, and the
+  discount line and the new total on the confirmation only, from the server's answer. A check
+  before confirm ("does this phone qualify?") was rejected: it would tell anyone whether a phone
+  has booked here before.
+- D13e-10 The owner and the barbers see "$45, $10 off online" next to the price (detail sheet,
+  floor card, done list, Today row and In your chair); the email lists "First online booking:
+  -$10" and the total after it; the editor's Launch offer section carries the switch, the
+  amounts in whole dollars, the words, the dates and "Used 12 times, $120 off" counted over the
+  bookings that stand.

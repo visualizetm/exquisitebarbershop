@@ -46,7 +46,13 @@ export async function bookPublicly(
   await first.click();
   await page.getByLabel('Name').fill(customer.name);
   await page.getByLabel('Mobile phone').fill(phone);
-  await page.getByRole('button', { name: 'Review booking' }).click();
+  // On a phone the bottom bar carries Continue and steps aside while a field has focus.
+  if ((page.viewportSize()?.width ?? 1280) < 1024) {
+    await page.getByLabel('Mobile phone').blur();
+    await page.locator('.exq-bar').getByRole('button', { name: 'Continue' }).click();
+  } else {
+    await page.getByRole('button', { name: 'Review booking' }).click();
+  }
   await page.getByRole('button', { name: 'Confirm booking' }).click();
   await expect(page.getByRole('heading', { name: 'You are booked' })).toBeFocused();
   const code = (await page.locator('.exq-book-done__code').textContent()) ?? '';

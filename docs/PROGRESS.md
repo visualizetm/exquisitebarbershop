@@ -782,3 +782,25 @@ commit, and what is still open.
   `tests/e2e/fit.spec.ts` (D13e-03, 4 specs, every portal screen and six public pages at 360 x 740
   and 390 x 844). Demo screens at docs/screens/p13e follow with M1's build.
 - Heartbeat: 15:40 UTC, commit follows, next is M1 (the hero and honest saves).
+
+### M1: the hero and honest saves
+
+- Shipped: the shop request starts from the head script on public paths and Book and Manage are
+  their own chunks (D13e-04); the Cloudinary widths stay the hero's responsive set (D13e-05);
+  `/api/shop` is never cached, so the editor says "Saved. Live on the site now" (D13e-06).
+  Lighthouse Home 84, LCP 3.7 s in the report run (2.8 s in the first run), CLS 0.
+- Heartbeat: 15:50 UTC, commit db26b5c, next is M2.
+
+### M2: the $10 launch offer
+
+- Shipped: `launchOffer` in the settings and `discounts` on the booking (D13e-07), the decision
+  inside the booking transaction with the unique partial index (D13e-08), the tags on Home and
+  Book and the confirmation line (D13e-09), the owner, barber, email and editor views with the
+  usage count (D13e-10). Tests: 10 unit, 2 integration (one the race), 1 e2e at 390.
+- Heartbeat: 15:58 UTC, commit db26b5c, next is M3.
+
+### M3: the guides
+
+- Shipped: the offer in the owner guide (section 12) and the barber guide (section 3), the PDF
+  re-rendered, SITE-REPORT and DESIGN-SYSTEM updated, screens in docs/screens/p13e.
+- Heartbeat: 16:05 UTC, commit follows, next is SHIP.
