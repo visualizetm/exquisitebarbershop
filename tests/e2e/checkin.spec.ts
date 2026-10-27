@@ -65,9 +65,10 @@ test.describe('the front desk check in at 1180x820', () => {
     await walkIn(page, second, /^Nelly Cutz/);
     await expect(done).toContainText(/You're #\d+ for Nelly Cutz/);
     await expect(done).toContainText('Have a seat');
-    // The end screen goes back to the start on its own.
+    // The end screen counts down from 15 and goes back to the start on its own.
+    await expect(done).toContainText('Closing in');
     await expect(page.getByRole('heading', { name: "Who's coming in?" })).toBeVisible({
-      timeout: 10_000,
+      timeout: 25_000,
     });
 
     // Exit, then hand the chair back and take the second person out of the line.

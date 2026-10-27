@@ -1610,3 +1610,24 @@ pan-x pan-y`) and the context menu handler, not with `user-scalable=no` in the v
   tries at scripting that hit the ten minute rule. The closed line itself is built in `kioskBoard`
   from the same hours rule (`closedText`, Walk in greyed) and reads in the code; a screen from
   Rob's tablet after hours will do.
+
+## Prompt 13g
+
+- D13g-01 `END_SCREEN_SECONDS = 15` replaces `BACK_AFTER_MS` in one place. The count is one
+  `setInterval` inside the end screen component, cleared on Done, at 0 and on unmount, so no timer
+  outlives the screen; taps elsewhere never touch it. It applies to the owner's check in page too,
+  where the same screen is used. At 0 the screen runs the same reset as Done (start screen, board
+  refreshed). The bar steps with the number (no transition) and is hidden under reduced motion;
+  the number stays.
+- D13g-02 A screen reader hears the message and "Closing in 15 seconds" once, from one live
+  region; the visible counting line is hidden from it, because announcing every second would
+  drown the message.
+- D13g-03 Fit, in the order the prompt gave, stopping when it fits: the two choices shrink to 34vh
+  (and the choice icon to 56px, the start screen's gaps and the header margin tighten), and sideways
+  (landscape, 1000px and up) the board is one row of five tiles. Tile padding was not touched.
+  The tile's photo column is 56px with the status under it across the full width. Type stays at
+  22px and up, targets at 64px; the kiosk spec asserts no vertical scroll at both sizes with five
+  barbers working.
+- D13g-04 A tile shows the barber's photo as a 56px circle, or an initials circle (white on steel,
+  `--ink-3`) like the portal's cards. The shop mark was `PhotoFrame`'s placeholder panel; the board
+  no longer uses `PhotoFrame` at all.

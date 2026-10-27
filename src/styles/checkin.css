@@ -385,15 +385,14 @@
 }
 .exq-board__tile {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(0, 1fr);
   grid-template-areas:
     'photo who'
-    'photo status'
-    'photo waiting';
+    'status status'
+    'waiting waiting';
   column-gap: var(--s3);
   row-gap: var(--s1);
   align-items: center;
-  min-height: 112px;
   padding: var(--s3);
   border: 1px solid var(--border);
   border-radius: var(--r-tile);
@@ -402,7 +401,25 @@
 }
 .exq-board__photo {
   grid-area: photo;
-  width: 72px;
+  display: block;
+  width: 56px;
+  height: 56px;
+}
+.exq-board__photo img,
+.exq-board__initials {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+/* No photo yet: initials, white on steel, like the portal's Who's working cards. */
+.exq-board__initials {
+  background: var(--ink-3);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.25rem;
 }
 .exq-board__who {
   grid-area: who;
@@ -451,4 +468,85 @@
   margin: 0;
   color: var(--fg-2);
   font-size: 1.375rem;
+}
+
+/* The end screen's countdown (prompt 13g): a big line, a stepped red bar, a 64px Done. */
+.exq-countdown {
+  display: grid;
+  gap: var(--s3);
+  width: min(100%, 560px);
+}
+.exq-countdown__line {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800;
+  font-stretch: var(--w-head);
+  text-transform: uppercase;
+}
+.exq-countdown__n {
+  color: var(--accent-text);
+  font-variant-numeric: tabular-nums;
+}
+.exq-countdown__track {
+  height: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.exq-countdown__bar {
+  height: 100%;
+  background: var(--red);
+}
+.exq-countdown__sub {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 1.375rem;
+}
+.exq-checkin .exq-checkin__done .exq-btn.exq-countdown__done {
+  min-height: 64px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .exq-countdown__track {
+    display: none;
+  }
+}
+
+/*
+ * The start screen fits one screen (prompt 13g, D13g-03): the two choices shrink toward 34% of the
+ * screen height, and sideways the board is one row of up to five tiles. Type stays at 22px and up,
+ * targets at 64px.
+ */
+.exq-checkin[data-mode='kiosk'] .exq-checkin__choice {
+  min-height: 34vh;
+  padding: var(--s4);
+}
+.exq-checkin[data-mode='kiosk'] .exq-checkin__choice-icon {
+  width: 56px;
+  height: 56px;
+}
+.exq-checkin[data-mode='kiosk'][data-state='start'] .exq-checkin__main {
+  min-height: 0;
+  gap: var(--s4);
+}
+.exq-checkin[data-mode='kiosk'] .exq-checkin__head {
+  margin-bottom: var(--s3);
+}
+@media (orientation: landscape) and (min-width: 1000px) {
+  .exq-board__tiles {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+/* Step 3 of the fit, after the demo showed a busy tile wrapping to three lines: smaller start heading and choice titles, tighter tiles. */
+.exq-checkin[data-mode='kiosk'][data-state='start'] .exq-checkin__title {
+  font-size: 2.5rem;
+}
+.exq-checkin[data-mode='kiosk'] .exq-checkin__choice-title {
+  font-size: clamp(1.75rem, 3.2vw, 2.25rem);
+}
+.exq-checkin[data-mode='kiosk'] .exq-board__tile {
+  padding: var(--s2) var(--s3);
+  line-height: 1.2;
+  align-content: start;
+}
+.exq-checkin[data-mode='kiosk'] .exq-board {
+  gap: var(--s3);
 }
