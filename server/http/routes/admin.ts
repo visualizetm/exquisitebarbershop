@@ -126,6 +126,7 @@ import {
   seatFromLine,
   updateInLine,
 } from '../../services/line';
+import { arriveFromCheckIn, lookupToday } from '../../services/checkIn';
 import {
   lineAddRequestSchema,
   lineMoveRequestSchema,
@@ -135,6 +136,11 @@ import {
   lineUpdateRequestSchema,
   walkInResponseSchema,
 } from '../../../shared/api/line';
+import {
+  checkInArrivedResponseSchema,
+  checkInLookupQuerySchema,
+  checkInLookupResponseSchema,
+} from '../../../shared/api/checkIn';
 import { adminSearch } from '../../services/adminSearch';
 import { dismissAlert, resolveAlert } from '../../services/alerts';
 import { createManualBooking } from '../../services/bookingService';
@@ -260,6 +266,21 @@ export const adminRoutes: RouteDefinition[] = [
     const input = await parseBody(ctx, nowRequestSchema);
     const done = await bookNow(principal, scope, input, { ...metaOf(ctx), idempotencyKey: key });
     return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+  }),
+  // Front desk check in: masked lookup of today's confirmed bookings, and the arrived tap.
+  owner('GET', '/api/admin/checkin/lookup', async (ctx) => {
+    const { scope } = ctxScope(ctx);
+    const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+    return {
+      body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+      headers: NO_STORE,
+    };
+  }),
+  owner('POST', '/api/admin/checkin/:id/arrived', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const match = await arriveFromCheckIn(principal, scope, id, metaOf(ctx));
+    return { body: checkInArrivedResponseSchema.parse({ match }), headers: NO_STORE };
   }),
   owner('GET', '/api/admin/booking-table', async (ctx) => {
     ctxScope(ctx);

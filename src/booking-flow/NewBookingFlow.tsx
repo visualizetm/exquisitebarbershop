@@ -92,6 +92,11 @@ const FIRST = 'any';
  * through the NOW route, which books the minute when the chair is free and joins the line when it
  * is not. Move and Reschedule reuse the same steps on an existing booking.
  */
+/** "chair 3 for Drew", or "Drew's chair" when the chair has no number. */
+function chairWord(chairNumber: number | null, name: string): string {
+  return chairNumber !== null ? `chair ${String(chairNumber)} for ${name}` : `${name}'s chair`;
+}
+
 export function NewBookingFlow({
   open,
   session,
@@ -276,11 +281,13 @@ export function NewBookingFlow({
             ? {
                 kind: 'booking',
                 bookingId: done.booking.id,
-                text: `In the chair now with ${done.booking.staff.name}${done.booking.staff.name ? '' : ''}`,
+                text: checkIn
+                  ? `Head to ${chairWord(chairs.find((c) => c.id === done.booking.staff.id)?.chairNumber ?? null, done.booking.staff.name)}`
+                  : `In the chair now with ${done.booking.staff.name}`,
               }
             : {
                 kind: 'line',
-                text: `Walk-in #${String(done.walkIn.position + 1)} for ${done.walkIn.staffName}, ${estimateLabel(done.walkIn.estimate)}`,
+                text: `${checkIn ? "You're" : 'Walk-in'} #${String(done.walkIn.position + 1)} for ${done.walkIn.staffName}, ${estimateLabel(done.walkIn.estimate)}`,
               },
         );
       } else if (session === 'owner') {

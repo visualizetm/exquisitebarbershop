@@ -1,0 +1,195 @@
+/*
+ * The front desk check-in tablet: 1180x820 upright or sideways, ink background, Archivo, giant
+ * targets (64px main actions, 44px everything else), nothing hover-only. Tokens only.
+ */
+.exq-checkin {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: var(--s4) var(--s5) calc(var(--s5) + env(safe-area-inset-bottom));
+  background: var(--bg);
+  color: var(--fg);
+}
+.exq-checkin__head {
+  display: flex;
+  gap: var(--s4);
+  align-items: center;
+  margin-bottom: var(--s5);
+}
+.exq-checkin__brand {
+  margin: 0;
+  font-weight: 800;
+  font-stretch: var(--w-head);
+  text-transform: uppercase;
+}
+.exq-checkin__clock {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--fg-3);
+}
+.exq-checkin__exit {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit);
+  padding: 0 var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--fg-2);
+  text-decoration: none;
+}
+.exq-checkin__main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--s5);
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+}
+.exq-checkin__title {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.exq-checkin__sub {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--t-h3);
+}
+.exq-checkin__error {
+  margin: 0;
+  color: var(--accent-text);
+  font-size: var(--t-h3);
+  font-weight: 700;
+}
+
+/* The two giant choices */
+.exq-checkin__choices {
+  display: grid;
+  gap: var(--s4);
+}
+@media (min-width: 900px) {
+  .exq-checkin__choices {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.exq-checkin__choice {
+  display: grid;
+  gap: var(--s2);
+  min-height: 160px;
+  padding: var(--s5);
+  border: 2px solid var(--fg);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-checkin__choice[data-variant='accent'] {
+  border-color: var(--red);
+  background: var(--red);
+  color: var(--paper);
+}
+.exq-checkin__choice:active {
+  transform: scale(0.99);
+}
+.exq-checkin__choice-title {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.exq-checkin__choice-sub {
+  font-size: var(--t-body);
+  opacity: 0.85;
+}
+
+/* Chairs right now */
+.exq-checkin__chairs h2 {
+  margin: 0 0 var(--s3);
+  color: var(--fg-3);
+}
+.exq-checkin__chair-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--s3);
+}
+.exq-checkin__chair {
+  display: grid;
+  gap: var(--s1);
+  min-height: 72px;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-tile);
+  background: var(--card);
+}
+.exq-checkin__chair-name {
+  font-weight: 800;
+}
+.exq-checkin__chair-state {
+  color: var(--fg-2);
+}
+.exq-checkin__chair[data-state='free'] .exq-checkin__chair-state {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+/* Find your appointment */
+.exq-checkin__search {
+  max-width: 640px;
+}
+.exq-checkin__search .exq-field__control {
+  min-height: 64px;
+  font-size: var(--t-h3);
+}
+.exq-checkin__matches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s3);
+}
+.exq-checkin__match {
+  display: grid;
+  gap: var(--s1);
+  width: 100%;
+  min-height: 120px;
+  padding: var(--s4);
+  border: 2px solid var(--fg);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-checkin__match[data-state='arrived'] {
+  border-color: var(--border);
+  color: var(--fg-2);
+}
+.exq-checkin__match:disabled {
+  cursor: progress;
+}
+.exq-checkin__match-time {
+  font-size: var(--t-h2);
+  font-weight: 800;
+}
+.exq-checkin__match-name {
+  font-size: var(--t-h3);
+  font-weight: 700;
+}
+.exq-checkin__match-sub {
+  color: var(--fg-2);
+}
+.exq-checkin__back {
+  margin-top: auto;
+}
+.exq-checkin__done {
+  justify-content: center;
+  align-items: flex-start;
+  text-align: left;
+}

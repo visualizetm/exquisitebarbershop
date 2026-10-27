@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
+import { CheckInPage } from '@/checkin/CheckInPage';
 import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
 import ClipboardCheck from '@untitled-ui/icons-react/build/esm/ClipboardCheck';
 import Clock from '@untitled-ui/icons-react/build/esm/Clock';
@@ -35,6 +36,7 @@ export default function TeamApp() {
 
 function Gate() {
   const { state } = useTeamSession();
+  const location = useLocation();
   if (state.status === 'loading') {
     return (
       <div className="exq-team-center" data-state="loading">
@@ -50,6 +52,15 @@ function Gate() {
     );
   }
   if (state.status === 'signedOut') return <SignIn />;
+  if (location.pathname === '/team/checkin') {
+    return (
+      <CheckInPage
+        session="team"
+        ownChair={{ id: state.me.staff.id, name: state.me.staff.name }}
+        exitTo="/team"
+      />
+    );
+  }
   return (
     <div className="exq-team" data-state="ready">
       <main id="exq-team-main" className="exq-team-main" tabIndex={-1}>

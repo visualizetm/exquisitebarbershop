@@ -33,8 +33,14 @@ import {
   teamBookingRequestSchema,
   walkInResponseSchema,
 } from '../../../shared/api/line';
+import {
+  checkInArrivedResponseSchema,
+  checkInLookupQuerySchema,
+  checkInLookupResponseSchema,
+} from '../../../shared/api/checkIn';
 import { chairScope } from '../../services/access';
 import { addToLine, bookNow, lineView, seatFromLine } from '../../services/line';
+import { arriveFromCheckIn, lookupToday } from '../../services/checkIn';
 import { createManualBooking } from '../../services/bookingService';
 import { actorOf } from '../../services/access';
 import { idSchema } from '../../../shared/schemas/common';
@@ -59,7 +65,7 @@ import {
   teamWeek,
 } from '../../services/teamPortal';
 import { idempotencyKeyOf, metaOf, NO_STORE, principalOf } from '../context';
-import { parseBody, parseParams } from '../request';
+import { parseBody, parseParams, parseQuery } from '../request';
 import type { RouteDefinition } from '../types';
 
 const idParams = z.object({ id: idSchema });
@@ -197,6 +203,31 @@ export const teamRoutes: RouteDefinition[] = [
       const input = await parseBody(ctx, nowRequestSchema);
       const done = await bookNow(principal, scope, input, { ...metaOf(ctx), idempotencyKey: key });
       return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+    },
+  },
+  // Front desk check in signed in as this barber: only this chair's bookings, masked.
+  {
+    method: 'GET',
+    path: '/api/team/checkin/lookup',
+    auth: 'team',
+    handler: async (ctx) => {
+      const scope = chairScope(principalOf(ctx));
+      const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+      return {
+        body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+        headers: NO_STORE,
+      };
+    },
+  },
+  {
+    method: 'POST',
+    path: '/api/team/checkin/:id/arrived',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { id } = parseParams(ctx, idParams);
+      const match = await arriveFromCheckIn(principal, chairScope(principal), id, metaOf(ctx));
+      return { body: checkInArrivedResponseSchema.parse({ match }), headers: NO_STORE };
     },
   },
   // A later time on this chair: the normal rules (grid, lead time), never an override.

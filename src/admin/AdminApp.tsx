@@ -18,6 +18,7 @@ import { TeamPage } from './team/TeamPage';
 import { AdminShell } from './shell/AdminShell';
 import { SIDE_HOME, loadSide } from './shell/ownerNav';
 import { SessionProvider } from './session';
+import { CheckInPage } from '@/checkin/CheckInPage';
 import { useSession } from './useSession';
 
 /**
@@ -67,6 +68,9 @@ function Gate() {
   if (onLogin) return <Navigate to="/admin" replace />;
 
   if (state.me.user.role === 'owner') {
+    if (location.pathname === '/admin/checkin') {
+      return <CheckInPage session="owner" exitTo="/admin/shop/today" />;
+    }
     return (
       <AdminShell>
         {state.me.features.demo ? <DemoBanner /> : null}

@@ -13,6 +13,7 @@ import {
 import {
   Button,
   ButtonAnchor,
+  ButtonLink,
   EmptyState,
   ErrorState,
   Sheet,
@@ -125,6 +126,9 @@ export function TodayPage() {
           >
             Add booking
           </Button>
+          <ButtonLink to="/team/checkin" size="lg" variant="ghost">
+            Check in
+          </ButtonLink>
         </div>
       </header>
 

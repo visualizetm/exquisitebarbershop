@@ -5,7 +5,7 @@ import { Link, matchPath, useLocation, useNavigate } from 'react-router';
 import Plus from '@untitled-ui/icons-react/build/esm/Plus';
 import { okResponseSchema } from '@shared/api/auth';
 import { SHOP_TIMEZONE } from '@shared/lib/constants';
-import { Button, Mark, NavLink, Sheet } from '@/components/ui';
+import { Button, ButtonLink, Mark, NavLink, Sheet } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { NewBookingFlow, type FlowIntent } from '@/booking-flow/NewBookingFlow';
 import { BookingSheet } from '../bookings/BookingSheet';
@@ -234,8 +234,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
           <span className="exq-topbar__spacer" />
           <span className="exq-topbar__date exq-label">{clock}</span>
-          {/* Check in (tablet check-in) goes here in prompt 13c. */}
-          <span className="exq-topbar__slot" data-slot="check-in" />
+          <ButtonLink
+            to="/admin/checkin"
+            variant="outline"
+            size="sm"
+            className="exq-topbar__checkin"
+          >
+            Check in
+          </ButtonLink>
           <Button
             className="exq-topbar__new"
             variant="accent"

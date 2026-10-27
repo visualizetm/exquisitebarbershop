@@ -89,11 +89,17 @@
   color: var(--fg-2);
   white-space: nowrap;
 }
-.exq-topbar__slot:empty {
-  display: none;
-}
+.exq-topbar__checkin,
 .exq-topbar__new {
   flex: none;
+}
+.exq-topbar__checkin {
+  display: none;
+}
+@media (min-width: 768px) {
+  .exq-topbar__checkin {
+    display: inline-flex;
+  }
 }
 @media (min-width: 1024px) {
   .exq-topbar {

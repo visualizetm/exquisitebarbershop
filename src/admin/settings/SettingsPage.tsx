@@ -336,6 +336,14 @@ function RulesForm({ initial, onSaved }: { initial: Settings; onSaved: () => voi
           setBooking('requireEmail', e.target.checked);
         }}
       />
+      <Checkbox
+        label="Keep the check-in tablet signed in"
+        hint="A dashboard sign-in stays good for 30 idle days instead of 14. Anyone holding the tablet can open the dashboard, so keep it behind the desk."
+        checked={s.keepTabletSignedIn}
+        onChange={(e) => {
+          setS((prev) => ({ ...prev, keepTabletSignedIn: e.target.checked }));
+        }}
+      />
       <ErrorNote error={error} />
       <div className="exq-panelbody__row">
         <Button type="submit" loading={working}>

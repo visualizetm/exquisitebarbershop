@@ -184,7 +184,8 @@
 
 /* The owner dashboard and the full-screen booking flow: dark whatever the device or the public theme says. */
 .exq-app[data-state='admin'],
-.exq-dialog[data-variant='full'] {
+.exq-dialog[data-variant='full'],
+.exq-checkin {
   --bg: var(--adm-page);
   --card: var(--adm-card);
   --card-2: var(--adm-raised);

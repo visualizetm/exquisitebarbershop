@@ -1392,3 +1392,23 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
 - D13c-12 "Discard this booking?" is a nested modal inside the full dialog. The kit's `Dialog`
   ignores close and cancel events that bubble from a nested dialog (`event.target` check), which
   is what let Keep going close only the modal.
+- D13c-13 The check-in screen is one component (`src/checkin/CheckInPage.tsx`) at two addresses:
+  `/admin/checkin` for an owner session and `/team/checkin` for a barber's PIN session. The two
+  sessions live in different cookies and different apps, so one route could not serve both; the
+  screen itself is identical. Neither address renders the shell or the portal tabs.
+- D13c-14 The appointment lookup is masked at the API, not in the client: `/api/admin/checkin/lookup`
+  and `/api/team/checkin/lookup` answer first name plus last initial, the time, the barber and the
+  chair number, never a phone or an email, and only today's confirmed bookings (a barber session
+  sees its own chair only). Four or more digits match the end of the phone; letters match the
+  start of any name word. The tap goes through the same audited `stampBookingMoment` the dashboard
+  uses, with the chair scope for barbers.
+- D13c-15 "Keep the check-in tablet signed in" is an owner setting (`keepTabletSignedIn`, off by
+  default). On, every dashboard sign-in idles out after 30 days instead of 14 (the 60 day cap
+  stays). Trade-off: it widens the window for a lost or stolen tablet, and it applies to every
+  owner session, not one device, because the session has no notion of a device yet. Barber PIN
+  sessions keep their 12 hours. A per-device flag can be added on the session document later.
+- D13c-16 The walk-in end screen is the booking flow's own result text ("Head to chair 4 for
+  Nelly Cutz", "You're #2 for Drew, about 25 min"); the tablet closes the flow and shows it for
+  six seconds, then returns to the start. The flow's close event after a finished walk-in is
+  ignored so it cannot replace the end screen. The Wake Lock is requested where the browser has
+  it and silently skipped elsewhere.

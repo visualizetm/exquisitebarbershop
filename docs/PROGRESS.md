@@ -713,3 +713,13 @@ commit, and what is still open.
   joins the line). Tests: now integration (4), flow e2e (owner 1440, barber 390, discard, entry
   points at 1440 and 390), updated dashboard, team, realshop, portal and authz specs.
 - Heartbeat: 00:50 UTC, commit follows, next is M3 (the front desk check in).
+
+### M3: the front desk check in
+
+- Shipped: `/admin/checkin` and `/team/checkin` (no shell), the start screen with Walk in, I have
+  an appointment and every chair's state, Walk in through the flow in check-in mode (always NOW,
+  big tiles, end screen, back after six seconds), the masked appointment lookup and the arrived
+  tap for owner and barber sessions, Check in buttons in the top bar and the portal, the Wake Lock,
+  the "Keep the check-in tablet signed in" setting. Tests: checkIn integration (3: masking and
+  matching, owner lookup and arrive, barber scope), checkin e2e at 1180x820 and 820x1180 (3).
+- Heartbeat: 01:08 UTC, commit follows, next is SHIP (gate, Lighthouse, screenshots, report, PR).

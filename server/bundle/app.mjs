@@ -27910,7 +27910,12 @@ var shopSettingsDocumentSchema = external_exports.object({
   google: googleSettingsSchema.default(DEFAULT_GOOGLE),
   reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
-  nextOpenServiceId: idSchema.nullable().default(null)
+  nextOpenServiceId: idSchema.nullable().default(null),
+  /**
+   * The front desk tablet: when on, a dashboard sign-in stays good for 30 idle days instead of
+   * 14, so the check-in screen does not sign itself out over a long weekend. Off by default.
+   */
+  keepTabletSignedIn: external_exports.boolean().default(false)
 }).extend(timestampsSchema.shape);
 var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   _id: true,
@@ -31325,23 +31330,27 @@ function clearTeamCookie(res) {
 
 // server/auth/sessions.ts
 var SESSION_IDLE_MS = 14 * 24 * 60 * 6e4;
+var SESSION_TABLET_IDLE_MS = 30 * 24 * 60 * 6e4;
 var SESSION_ABSOLUTE_MS = 60 * 24 * 60 * 6e4;
 var SESSION_TOUCH_MS = 60 * 6e4;
-function expiryFor(createdAt, now2) {
-  return new Date(
-    Math.min(now2.getTime() + SESSION_IDLE_MS, createdAt.getTime() + SESSION_ABSOLUTE_MS)
-  );
+function expiryFor(createdAt, now2, idleMs) {
+  return new Date(Math.min(now2.getTime() + idleMs, createdAt.getTime() + SESSION_ABSOLUTE_MS));
+}
+async function idleWindowMs() {
+  const settings = await shopSettingsRepo_exports.getShopSettings();
+  return settings?.keepTabletSignedIn ? SESSION_TABLET_IDLE_MS : SESSION_IDLE_MS;
 }
 function maxAgeSeconds(expiresAt, now2) {
   return (expiresAt.getTime() - now2.getTime()) / 1e3;
 }
 async function startSession(res, user, meta3) {
   const token = randomToken(32);
+  const idleMs = await idleWindowMs();
   const session = await sessionsRepo_exports.insertSession(
     {
       tokenHash: sha256Hex(token),
       userId: user._id,
-      expiresAt: expiryFor(meta3.now, meta3.now),
+      expiresAt: expiryFor(meta3.now, meta3.now, idleMs),
       ip: meta3.ip?.slice(0, 64) ?? null,
       userAgent: meta3.userAgent?.slice(0, 512) ?? null
     },
@@ -31369,7 +31378,7 @@ async function authenticateFromCookie(ctx) {
     return null;
   }
   if (ctx.now.getTime() - session.lastSeenAt.getTime() >= SESSION_TOUCH_MS) {
-    const expiresAt = expiryFor(session.createdAt, ctx.now);
+    const expiresAt = expiryFor(session.createdAt, ctx.now, await idleWindowMs());
     await sessionsRepo_exports.touchSession(session._id, ctx.now, expiresAt);
     setSessionCookie(ctx.res, token, maxAgeSeconds(expiresAt, ctx.now));
   }
@@ -39501,6 +39510,74 @@ async function floor(now2) {
   };
 }
 
+// server/services/checkIn.ts
+var MAX_MATCHES = 8;
+function maskName(full) {
+  const words = full.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "Guest";
+  const first = words[0] ?? "";
+  const last = words[words.length - 1] ?? "";
+  return words.length > 1 ? `${first} ${last.charAt(0).toUpperCase()}.` : first;
+}
+function matchesQuery(b, q) {
+  const digits = q.replace(/\D/g, "");
+  if (digits.length >= 4 && digits.length === q.replace(/[\s()-]/g, "").length) {
+    return b.customer.phone.endsWith(digits.slice(-10));
+  }
+  const needle = q.trim().toLowerCase();
+  if (needle.length === 0) return false;
+  const name = b.customer.name.toLowerCase();
+  return name.startsWith(needle) || name.split(/\s+/).some((w) => w.startsWith(needle));
+}
+async function toMatch(b) {
+  const staff = await staffRepo_exports.findStaffById(b.staffId);
+  return {
+    id: b._id,
+    startAt: b.startAt.toISOString(),
+    name: maskName(b.customer.name),
+    staffName: staff?.name ?? "Barber",
+    chairNumber: staff?.chairNumber ?? null,
+    arrived: b.arrivedAt !== null
+  };
+}
+async function lookupToday(scope, q, now2) {
+  const bounds = shopDayBounds(shopDateOf(now2));
+  const today = await bookingsRepo_exports.listBookingsStartingBetween(bounds);
+  const hits = today.filter((b) => b.status === "confirmed").filter((b) => scope.kind === "all" || scope.staffId === b.staffId).filter((b) => matchesQuery(b, q)).slice(0, MAX_MATCHES);
+  return Promise.all(hits.map(toMatch));
+}
+async function arriveFromCheckIn(principal, scope, id, meta3) {
+  const { booking } = await stampBookingMoment2(principal, scope, id, "arrived", meta3);
+  assertInScope(scope, booking.staff.id);
+  const staff = await staffRepo_exports.findStaffById(booking.staff.id);
+  return {
+    id: booking.id,
+    startAt: booking.startAt,
+    name: maskName(booking.customer.name),
+    staffName: booking.staff.name,
+    chairNumber: staff?.chairNumber ?? null,
+    arrived: booking.arrivedAt !== null
+  };
+}
+
+// shared/api/checkIn.ts
+var checkInLookupQuerySchema = external_exports.object({
+  q: external_exports.string().trim().min(1).max(60)
+});
+var checkInMatchSchema = external_exports.object({
+  id: idSchema,
+  startAt: external_exports.iso.datetime(),
+  /** "Chris M." */
+  name: external_exports.string(),
+  staffName: external_exports.string(),
+  chairNumber: external_exports.int().nullable(),
+  arrived: external_exports.boolean()
+});
+var checkInLookupResponseSchema = external_exports.object({
+  matches: external_exports.array(checkInMatchSchema)
+});
+var checkInArrivedResponseSchema = external_exports.object({ match: checkInMatchSchema });
+
 // server/services/adminSearch.ts
 var LIMIT = 5;
 var backfilled = null;
@@ -39681,6 +39758,21 @@ var adminRoutes = [
     const input2 = await parseBody(ctx, nowRequestSchema);
     const done = await bookNow(principal, scope, input2, { ...metaOf(ctx), idempotencyKey: key });
     return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+  }),
+  // Front desk check in: masked lookup of today's confirmed bookings, and the arrived tap.
+  owner("GET", "/api/admin/checkin/lookup", async (ctx) => {
+    const { scope } = ctxScope(ctx);
+    const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+    return {
+      body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+      headers: NO_STORE
+    };
+  }),
+  owner("POST", "/api/admin/checkin/:id/arrived", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const match2 = await arriveFromCheckIn(principal, scope, id, metaOf(ctx));
+    return { body: checkInArrivedResponseSchema.parse({ match: match2 }), headers: NO_STORE };
   }),
   owner("GET", "/api/admin/booking-table", async (ctx) => {
     ctxScope(ctx);
@@ -41868,6 +41960,31 @@ var teamRoutes = [
       const input2 = await parseBody(ctx, nowRequestSchema);
       const done = await bookNow(principal, scope, input2, { ...metaOf(ctx), idempotencyKey: key });
       return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  // Front desk check in signed in as this barber: only this chair's bookings, masked.
+  {
+    method: "GET",
+    path: "/api/team/checkin/lookup",
+    auth: "team",
+    handler: async (ctx) => {
+      const scope = chairScope(principalOf(ctx));
+      const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+      return {
+        body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+        headers: NO_STORE
+      };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/checkin/:id/arrived",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { id } = parseParams(ctx, idParams3);
+      const match2 = await arriveFromCheckIn(principal, chairScope(principal), id, metaOf(ctx));
+      return { body: checkInArrivedResponseSchema.parse({ match: match2 }), headers: NO_STORE };
     }
   },
   // A later time on this chair: the normal rules (grid, lead time), never an override.
