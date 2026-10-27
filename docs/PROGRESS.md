@@ -841,3 +841,12 @@ commit, and what is still open.
   launch offers" line under Today's takings, and the unit test (two $45 cuts, one with LAUNCH10,
   $80).
 - Heartbeat: 17:48 UTC, commit follows, next is M3 (the guide).
+
+### M3: the guide
+
+- Shipped: OWNER-GUIDE section 8b "The front desk tablet" (pairing, the board, the exit PIN and the
+  hold, a lost tablet, Guided Access and Screen pinning), the check in section without "Keep this
+  tablet signed in", the PDF re-rendered, SITE-REPORT (auth level, routes, collection), screens in
+  docs/screens/p13f (pairing, board sideways and upright, walk in end, exit PIN, tablets panel,
+  montage; the closed board is missing, D13f-10).
+- Heartbeat: 17:56 UTC, commit follows, next is SHIP.

@@ -1605,3 +1605,8 @@ pan-x pan-y`) and the context menu handler, not with `user-scalable=no` in the v
   13e) reads as full price, so no stored document needs touching. Today also carries
   `discountsCents` for the "after $20 in launch offers" line; it is optional in the schema so an
   older server's answer still parses.
+- D13f-10 The "board with the shop closed" screen is not in docs/screens/p13f: closing the demo's
+  day needs the six sample bookings resolved one by one through the conflict rule, and three
+  tries at scripting that hit the ten minute rule. The closed line itself is built in `kioskBoard`
+  from the same hours rule (`closedText`, Walk in greyed) and reads in the code; a screen from
+  Rob's tablet after hours will do.

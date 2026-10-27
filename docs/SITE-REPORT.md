@@ -246,6 +246,23 @@ None. Directions use the shop's own Google Maps page, built from the place id in
   editor's Launch offer section with its usage count. `GET /api/shop` carries `launchOffer` while it
   is live; `GET /api/admin/settings` carries `launchOfferUsage`.
 
+## Prompt 13f additions
+
+- A fourth auth level, `kiosk`: a paired front desk tablet with its own Strict cookie
+  (`__Host-exq_kiosk`, 180 days sliding). It reaches `/api/kiosk/*` only; every owner and team
+  route answers it 403 (tests/integration/kiosk.test.ts loops over all of them).
+- The collection `kioskDevices` (name, tokenHash, exitPinHash, pairCodeHash, pairCodeExpiresAt,
+  pairedAt, lastSeenAt, revokedAt, demo); index `uniq_tokenHash` (unique, partial on string).
+- Routes: `POST /api/kiosk/pair` (public), `POST /api/kiosk/pair-demo` (public, showcase only),
+  `GET /api/kiosk/board`, `GET /api/kiosk/lookup`, `POST /api/kiosk/bookings/:id/arrived`,
+  `POST /api/kiosk/now`, `POST /api/kiosk/exit`, `POST /api/kiosk/unpair` (kiosk);
+  `GET`, `POST /api/admin/kiosk/devices` and `DELETE /api/admin/kiosk/devices/:id` (owner).
+- `/checkin`: the locked page (pairing pad, the Who's in today board, walk in and check in through
+  the same components in kiosk mode, hold the logo for the exit PIN, idle reset). The owner's
+  `/admin/checkin` stays, without "Keep this tablet signed in".
+- Every owner money sum is the price after the launch offer (`sumAfterDiscounts`); Today shows
+  "after $20 in launch offers".
+
 ## Last commit
 
 Prompt 12, 2026-10-25: the shop's real content (facts, team, services and per barber prices, photos, reviews)
