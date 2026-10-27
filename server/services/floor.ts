@@ -1,4 +1,5 @@
 import type { FloorResponse } from '../../shared/api/admin';
+import { sumAfterDiscounts, sumDiscounts } from '../../shared/lib/launchOffer';
 import { walkInViewSchema } from '../../shared/api/line';
 import { chairState } from '../../shared/lib/floor';
 import type { BookingDocument } from '../../shared/schemas/booking';
@@ -84,7 +85,9 @@ export async function floor(now: Date): Promise<FloorResponse> {
       booked: live.length,
       done: completed.length,
       walkIns: live.filter((b) => b.source === 'walkIn').length,
-      takingsCents: completed.reduce((sum, b) => sum + b.totalPriceCents, 0),
+      // The price after the launch offer: a $45 cut with $10 off brings in $35.
+      takingsCents: sumAfterDiscounts(completed),
+      discountsCents: sumDiscounts(completed),
       inChairs: inChairIds.size,
       waiting: line.line.length + comingUp.filter((b) => b.arrivedAt).length,
     },

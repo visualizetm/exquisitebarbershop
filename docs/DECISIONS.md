@@ -1599,3 +1599,9 @@ pan-x pan-y`) and the context menu handler, not with `user-scalable=no` in the v
 - D13f-08 The kiosk e2e freezes the page clock (Playwright's clock) for the 45 second idle reset
   and the three second hold, so the spec never waits in real time; the server's clock is untouched
   because the e2e server opens the shop all day.
+- D13f-09 Every sum of money the owner sees goes through `sumAfterDiscounts` from the shared
+  offer helper: Today's takings, the overview's four numbers, the customer's spend and the
+  bookings' expected and completed revenue. A booking without a discounts list (written before
+  13e) reads as full price, so no stored document needs touching. Today also carries
+  `discountsCents` for the "after $20 in launch offers" line; it is optional in the schema so an
+  older server's answer still parses.

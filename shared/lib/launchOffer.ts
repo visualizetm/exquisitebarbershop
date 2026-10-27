@@ -53,3 +53,17 @@ export function discountTag(discounts: readonly Discount[] | undefined): string 
   const dollars = cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
   return `$${dollars} off online`;
 }
+
+/** What a list of bookings is worth to the shop: each price after its discounts. */
+export function sumAfterDiscounts(
+  bookings: readonly { totalPriceCents: number; discounts?: readonly Discount[] | undefined }[],
+): number {
+  return bookings.reduce((sum, b) => sum + totalAfterDiscounts(b.totalPriceCents, b.discounts), 0);
+}
+
+/** What the discounts took off across a list of bookings. */
+export function sumDiscounts(
+  bookings: readonly { discounts?: readonly Discount[] | undefined }[],
+): number {
+  return bookings.reduce((sum, b) => sum + discountCents(b.discounts), 0);
+}

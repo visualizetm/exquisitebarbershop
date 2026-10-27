@@ -833,3 +833,11 @@ commit, and what is still open.
   from the owner's page, and tests/e2e/kiosk.spec.ts (pair, board, walk in, check in, idle reset
   with a frozen clock, exit PIN, unpair, 403 on the dashboard, axe, 64px targets, both sizes).
 - Heartbeat: 17:46 UTC, commit follows, next is M2 (takings after the discount).
+
+### M2: takings after the discount
+
+- Shipped: `sumAfterDiscounts` and `sumDiscounts` in shared/lib/launchOffer.ts, every owner money
+  sum through them (floor, overview, customer spend, bookings revenue, D13f-09), the "after $20 in
+  launch offers" line under Today's takings, and the unit test (two $45 cuts, one with LAUNCH10,
+  $80).
+- Heartbeat: 17:48 UTC, commit follows, next is M3 (the guide).

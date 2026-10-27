@@ -2486,3 +2486,7 @@
   font-variant-numeric: tabular-nums;
   margin: 0;
 }
+.exq-sofar__note {
+  margin: var(--s2) 0 0;
+  font-size: var(--t-small);
+}

@@ -10,6 +10,7 @@ import type {
   TodayResponse,
   WhoIsInEntry,
 } from '../../shared/api/admin';
+import { sumAfterDiscounts } from '../../shared/lib/launchOffer';
 import { CUSTOMER_PAGE_SIZE } from '../../shared/api/admin';
 import { formatUsPhone, normalizeUsPhone } from '../../shared/lib/phone';
 import { normalizeReferenceCode } from '../../shared/lib/referenceCode';
@@ -191,12 +192,10 @@ export async function todaySummary(date: string | undefined, now: Date): Promise
     },
     chairsBooked: new Set(live.map((b) => b.staffId)).size,
     chairsWorking: whoIsIn.filter((w) => w.status === 'in').length,
-    expectedRevenueCents: live
-      .filter((b) => b.status === 'confirmed' || b.status === 'completed')
-      .reduce((sum, b) => sum + b.totalPriceCents, 0),
-    completedRevenueCents: live
-      .filter((b) => b.status === 'completed')
-      .reduce((sum, b) => sum + b.totalPriceCents, 0),
+    expectedRevenueCents: sumAfterDiscounts(
+      live.filter((b) => b.status === 'confirmed' || b.status === 'completed'),
+    ),
+    completedRevenueCents: sumAfterDiscounts(live.filter((b) => b.status === 'completed')),
     nextUp,
     whoIsIn,
   };
@@ -762,7 +761,7 @@ export async function customerByPhone(rawPhone: string, now: Date): Promise<Cust
       noShow: by('noShow').length,
       cancelled: by('cancelled').length,
     },
-    completedSpendCents: by('completed').reduce((sum, b) => sum + b.totalPriceCents, 0),
+    completedSpendCents: sumAfterDiscounts(by('completed')),
     bookings: bookings.map((b) => toAdminBookingView(b, staffName(staffById, b.staffId))),
     notes: note?.notes ?? null,
     usualBarber: usualStaff ? toStaffRef(usualStaff) : null,
