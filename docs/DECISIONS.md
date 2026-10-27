@@ -1344,3 +1344,71 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   `nextDate(3, 3)`, which land on the same Wednesday when the suite runs on a Monday (both roll
   forward to it), so the range was not inverted and the test failed on Mondays. The second date is
   now the day before the first, whatever the weekday. Not a product change.
+- D13c-01 Archivo is self-hosted from `public/fonts`: the fontsource latin file with the width axis
+  instanced to 100 to 125% by `fonttools varLib.instancer` (the site uses nothing narrower), full
+  weight axis kept, 62 KB against 91 KB. `src/styles/fonts.css` declares the face, `index.html`
+  carries one static preload, `vercel.json` caches `/fonts/*` a year, the brand and guide scripts
+  read the same file, and the package is gone. Characters outside latin fall back to the system
+  font (the old latin-ext and vietnamese files only ever loaded for those characters).
+- D13c-02 The week chart and the latest events moved from Today to the bottom of Bookings; Today
+  still fetches the overview for the alerts strip only. Plainer than a new alerts endpoint.
+- D13c-03 Rob's standing rule is in CLAUDE.md under Conventions: booking flows never open in a
+  side drawer or sheet; they all open the full-screen `NewBookingFlow`. Side sheets read details.
+- D13c-04 The walk-in line is the `walkIns` collection (zod in `shared/schemas/walkIn.ts`, index
+  `(status, position)` plus `createdAt`). The phone is stored in E.164 like every other number
+  (so client lookups match) and shown as (XXX) XXX-XXXX in every view; the prompt's display form is
+  the view, the storage form stays consistent. Positions are integers; move swaps with the
+  neighbor in one transaction. Audit actions `line.add`, `line.update`, `line.move`, `line.left`,
+  `line.seat` on entity type `walkIn`.
+- D13c-05 Wait estimates are pure in `shared/lib/waitEstimate.ts`: a chair's free time is the end of
+  its current cut (real start when Start was pressed) or now; each person ahead takes the first gap
+  that fits their minutes before the chair's next booking; first available goes to whichever chair
+  frees first. "Free" within one minute, otherwise "about <time> (n min)", and "unknown" when the
+  chair has no hours today and no cut going (then nothing is shown as a number). Minutes come from
+  the chair's own service times when a chair is chosen, else the shop's. The per-chair state
+  ("Free about 2:50") counts only that chair's own line, not the shared pool.
+- D13c-06 Seating goes through `createManualBooking` (source walk-in, `arrived: true` so arrivedAt
+  is set at insert) and so through the slot locks in the booking transaction. The entry is claimed
+  first with a conditional update (waiting to seated), so two taps make one booking; a seat that
+  loses the slot race is handed back to the line and answered with CHAIR_BUSY and the estimate.
+  Seating ignores the hours (the barber is standing there, like any walk-in); the chair's current
+  cut and its bookings still decide. Barbers seat into their own chair only (chair scope).
+- D13c-07 The line rides in the floor response (`line`, and `seatWalkIn` on a free chair for the
+  first person it can take) so Today keeps one 30 second poll; `GET /api/admin/line` and
+  `GET /api/team/line` serve the panel's actions and the portal.
+- D13c-08 NOW is decided on the server in `bookNow`: a free chair with nobody ahead in its line gets
+  a walk-in booking starting this minute (off the 15 minute grid, no lead time, source walk-in,
+  arrivedAt set); any other case joins the line with the estimate. A slot race lost mid-way also
+  joins the line. Only owner and barber sessions reach it (`/api/admin/now`, `/api/team/now`);
+  the public `/api/bookings` keeps the grid and the lead time and `/api/now` does not exist.
+- D13c-09 Seat from the line stays a one-tap action on Today (the person is already in the line
+  with their services and chair); the flow is for new bookings. A free chair's "Seat walk-in #n"
+  is the same action with the chair chosen.
+- D13c-10 Move and Reschedule open the flow on the Barber or Time step and post to the existing
+  `/api/admin/bookings/:id/reschedule`, so repricing, the slot lock swap and the customer email
+  are unchanged. The flow shows the new barber's exact price before Confirm.
+- D13c-11 A barber books a later time on their own chair through `POST /api/team/bookings`
+  (source phone, no override), and the Barber step is skipped for a team session.
+- D13c-12 "Discard this booking?" is a nested modal inside the full dialog. The kit's `Dialog`
+  ignores close and cancel events that bubble from a nested dialog (`event.target` check), which
+  is what let Keep going close only the modal.
+- D13c-13 The check-in screen is one component (`src/checkin/CheckInPage.tsx`) at two addresses:
+  `/admin/checkin` for an owner session and `/team/checkin` for a barber's PIN session. The two
+  sessions live in different cookies and different apps, so one route could not serve both; the
+  screen itself is identical. Neither address renders the shell or the portal tabs.
+- D13c-14 The appointment lookup is masked at the API, not in the client: `/api/admin/checkin/lookup`
+  and `/api/team/checkin/lookup` answer first name plus last initial, the time, the barber and the
+  chair number, never a phone or an email, and only today's confirmed bookings (a barber session
+  sees its own chair only). Four or more digits match the end of the phone; letters match the
+  start of any name word. The tap goes through the same audited `stampBookingMoment` the dashboard
+  uses, with the chair scope for barbers.
+- D13c-15 "Keep the check-in tablet signed in" is an owner setting (`keepTabletSignedIn`, off by
+  default). On, every dashboard sign-in idles out after 30 days instead of 14 (the 60 day cap
+  stays). Trade-off: it widens the window for a lost or stolen tablet, and it applies to every
+  owner session, not one device, because the session has no notion of a device yet. Barber PIN
+  sessions keep their 12 hours. A per-device flag can be added on the session document later.
+- D13c-16 The walk-in end screen is the booking flow's own result text ("Head to chair 4 for
+  Nelly Cutz", "You're #2 for Drew, about 25 min"); the tablet closes the flow and shows it for
+  six seconds, then returns to the start. The flow's close event after a finished walk-in is
+  ignored so it cannot replace the end screen. The Wake Lock is requested where the browser has
+  it and silently skipped elsewhere.

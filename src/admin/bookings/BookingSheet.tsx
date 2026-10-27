@@ -2,42 +2,24 @@ import { useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import AlertCircle from '@untitled-ui/icons-react/build/esm/AlertCircle';
 import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
+import SwitchHorizontal01 from '@untitled-ui/icons-react/build/esm/SwitchHorizontal01';
 import Check from '@untitled-ui/icons-react/build/esm/Check';
 import Link01 from '@untitled-ui/icons-react/build/esm/Link01';
 import Mail01 from '@untitled-ui/icons-react/build/esm/Mail01';
 import XCircle from '@untitled-ui/icons-react/build/esm/XCircle';
-import {
-  bookingDetailResponseSchema,
-  bookingResponseSchema,
-  serviceListResponseSchema,
-  staffListResponseSchema,
-  type AdminStaffView,
-  type BookingDetailResponse,
-} from '@shared/api/admin';
+import { bookingDetailResponseSchema, bookingResponseSchema } from '@shared/api/admin';
 import { okResponseSchema } from '@shared/api/auth';
-import { quoteMove } from '@shared/lib/servicePricing';
 import type { BookingStatus } from '@shared/schemas/booking';
-import {
-  Button,
-  Checkbox,
-  Chip,
-  Chips,
-  Input,
-  Select,
-  StatusChip,
-  Textarea,
-  useToast,
-} from '@/components/ui';
+import { Button, Chip, Chips, Input, StatusChip, Textarea, useToast } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { ApiRequestError, apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { ErrorNote } from '../components/ErrorNote';
-import { SOURCE_LABEL, money, phoneLabel, shopDateTime, shopInstant, shopParts } from '../format';
-import { optionLabel } from '../panels/moveOption';
+import { SOURCE_LABEL, money, phoneLabel, shopDateTime } from '../format';
 import { useQuick } from '../shell/quick';
 import { useMe } from '../useSession';
 
-type Panel = null | 'reschedule' | 'cancel';
+type Panel = null | 'cancel';
 
 const ACTION_WORDS: Record<string, string> = {
   'booking.create': 'Booked',
@@ -195,16 +177,28 @@ export function BookingSheet({ id }: { id: string }) {
 
       <div className="exq-bsheet__actions" role="group" aria-label="Actions">
         {b.status === 'confirmed' ? (
-          <Button
-            size="sm"
-            variant="outline"
-            icon={<Calendar aria-hidden="true" />}
-            onClick={() => {
-              setPanel(panel === 'reschedule' ? null : 'reschedule');
-            }}
-          >
-            Reschedule
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              icon={<Calendar aria-hidden="true" />}
+              onClick={() => {
+                quick.openNewBooking({ reschedule: b });
+              }}
+            >
+              Reschedule
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              icon={<SwitchHorizontal01 aria-hidden="true" />}
+              onClick={() => {
+                quick.openNewBooking({ move: b });
+              }}
+            >
+              Move to another barber
+            </Button>
+          </>
         ) : null}
         {can('cancelled') ? (
           <Button
@@ -297,23 +291,6 @@ export function BookingSheet({ id }: { id: string }) {
       {resendBlocked ? <p className="exq-muted exq-bsheet__why">{resendReason}</p> : null}
       <ErrorNote error={error} />
 
-      {panel === 'reschedule' ? (
-        <RescheduleForm
-          detail={detail}
-          working={working === 'reschedule'}
-          onSubmit={(body) => {
-            void run(
-              'reschedule',
-              () =>
-                apiRequest(`/api/admin/bookings/${b.id}/reschedule`, bookingResponseSchema, {
-                  method: 'POST',
-                  body,
-                }),
-              (r) => `Moved to ${shopDateTime(r.booking.startAt)}.`,
-            );
-          }}
-        />
-      ) : null}
       {panel === 'cancel' ? (
         <CancelForm
           hasEmail={!noEmail}
@@ -439,137 +416,6 @@ function CancelForm({
       />
       <Button type="submit" variant="accent" loading={working}>
         {notify ? 'Cancel and notify' : 'Cancel booking'}
-      </Button>
-    </form>
-  );
-}
-
-function RescheduleForm({
-  detail,
-  working,
-  onSubmit,
-}: {
-  detail: BookingDetailResponse;
-  working: boolean;
-  onSubmit: (body: { startAt: string; staff?: string; notify: boolean; override: boolean }) => void;
-}) {
-  const b = detail.booking;
-  const parts = shopParts(b.startAt);
-  const staff = useApi('/api/admin/staff', staffListResponseSchema);
-  const services = useApi('/api/admin/services', serviceListResponseSchema);
-  const [date, setDate] = useState(parts.date);
-  const [time, setTime] = useState(parts.time);
-  const [chair, setChair] = useState(b.staff.slug);
-  const [notify, setNotify] = useState(b.customer.email !== null);
-  const [override, setOverride] = useState(false);
-  // What the booking costs with each barber, shown before the owner moves it: the same barber keeps
-  // the booked price and time, another one has their own (as the server prices the move).
-  const shop = services.status === 'ready' ? services.data.services : null;
-  /** Undefined while the menu loads; null when the barber does not do these services. */
-  const priceWith = (
-    s: AdminStaffView,
-  ): { totalPriceCents: number; durationMinutes: number } | null | undefined => {
-    if (s.id === b.staff.id) {
-      return { totalPriceCents: b.totalPriceCents, durationMinutes: b.durationMinutes };
-    }
-    if (!shop) return undefined;
-    const quote = quoteMove(b.services, (id) => shop.find((x) => x.id === id), s);
-    return quote
-      ? { totalPriceCents: quote.totalCents, durationMinutes: quote.totalMinutes }
-      : null;
-  };
-  const chairs = staff.status === 'ready' ? staff.data.staff.filter((s) => !s.deletedAt) : [];
-  const target = chairs.find((s) => s.slug === chair && s.id !== b.staff.id);
-  const targetPrice = target ? priceWith(target) : undefined;
-  return (
-    <form
-      className="exq-bsheet__panel"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit({
-          startAt: shopInstant(date, time),
-          ...(chair !== b.staff.slug ? { staff: chair } : {}),
-          notify,
-          override,
-        });
-      }}
-    >
-      <h3 className="exq-bsheet__h">Reschedule</h3>
-      <div className="exq-panelbody__row">
-        <Input
-          label="Day"
-          type="date"
-          required
-          value={date}
-          onChange={(e) => {
-            setDate(e.target.value);
-          }}
-        />
-        <Input
-          label="Time"
-          type="time"
-          step={900}
-          required
-          value={time}
-          onChange={(e) => {
-            setTime(e.target.value);
-          }}
-        />
-      </div>
-      <Select
-        label="Barber"
-        value={chair}
-        onChange={(e) => {
-          setChair(e.target.value);
-        }}
-      >
-        {staff.status === 'ready' ? (
-          chairs.map((s) => {
-            const price = priceWith(s);
-            return (
-              <option key={s.id} value={s.slug} disabled={price === null}>
-                {price === undefined
-                  ? s.name
-                  : price === null
-                    ? `${s.name}, does not do these services`
-                    : optionLabel(b, {
-                        staffId: s.id,
-                        staffName: s.name,
-                        totalPriceCents: price.totalPriceCents,
-                        durationMinutes: price.durationMinutes,
-                      })}
-              </option>
-            );
-          })
-        ) : (
-          <option value={b.staff.slug}>{b.staff.name}</option>
-        )}
-      </Select>
-      {target && targetPrice ? (
-        <p className="exq-bsheet__move exq-muted" aria-live="polite">
-          With {target.name}: {money(targetPrice.totalPriceCents)},{' '}
-          {String(targetPrice.durationMinutes)} min (now {money(b.totalPriceCents)},{' '}
-          {String(b.durationMinutes)} min). The booking takes their price and time.
-        </p>
-      ) : null}
-      <Checkbox
-        label="Email the client the new time"
-        checked={notify}
-        disabled={b.customer.email === null}
-        onChange={(e) => {
-          setNotify(e.target.checked);
-        }}
-      />
-      <Checkbox
-        label="Allow inside the lead time or past the booking window"
-        hint="Recorded in the audit log."
-        checked={override}
-        onChange={(e) => {
-          setOverride(e.target.checked);
-        }}
-      />
-      <Button type="submit" loading={working}>
-        Move booking
       </Button>
     </form>
   );

@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
-import '@fontsource-variable/archivo/wdth.css';
+import './styles/fonts.css';
 import './styles/reset.css';
 import './styles/tokens.css';
 import './styles/base.css';

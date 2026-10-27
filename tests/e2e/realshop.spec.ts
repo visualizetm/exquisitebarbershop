@@ -258,34 +258,30 @@ test.describe('a chair only lists the services it does', () => {
     }
   });
 
-  test('the owner New booking panel narrows to the chosen barber, and says so for a barber with none', async ({
+  test('the owner New booking flow lists the whole menu, then greys out a barber who does not do the pick', async ({
     page,
   }) => {
     await signInOwner(page);
     await page.getByRole('button', { name: 'Walk-in', exact: true }).click();
     const panel = page.getByRole('dialog', { name: 'New booking' });
-    const services = panel.locator('fieldset', { hasText: 'Services' });
-
-    await panel.getByLabel('Barber').selectOption({ label: 'Nelly Cutz' });
-    await expect(services.getByRole('checkbox')).toHaveCount(NELLY_MENU.length);
-    for (const name of NELLY_MENU) {
-      // The label is the name, then the length and price as a hint.
-      await expect(services.getByLabel(new RegExp(`^${name}`)), name).toBeVisible();
-    }
-    await expect(services.getByLabel('Eyebrows')).toHaveCount(0);
-
-    // A phone booking can go to first available, which shows the whole menu.
-    await panel.getByRole('button', { name: 'Phone booking' }).click();
-    await panel.getByLabel('Barber').selectOption({ label: 'First available' });
-    await expect(services.getByRole('checkbox')).toHaveCount(15);
-
-    // A barber with no menu: a plain sentence, no boxes, and nothing to submit.
-    await panel.getByLabel('Barber').selectOption({ label: 'Iniya' });
-    await expect(services.getByRole('checkbox')).toHaveCount(0);
-    await expect(
-      panel.getByText('Iniya has no services yet. Add some under Team, Services.'),
-    ).toBeVisible();
-    await expect(panel.getByRole('button', { name: 'Book it' })).toBeDisabled();
+    const tiles = panel.locator('.exq-flow__tiles .exq-flow__tile');
+    await expect(tiles).toHaveCount(15);
+    // Eyebrows is not on Nelly's menu: her tile says so and cannot be picked.
+    await panel.getByRole('button', { name: /^Eyebrows/ }).click();
+    await panel.getByRole('button', { name: 'Continue' }).click();
+    const nelly = panel.getByRole('button', { name: /^Nelly Cutz/ });
+    await expect(nelly).toBeDisabled();
+    await expect(nelly).toContainText('Does not do these services');
+    // A barber with no menu at all is greyed out too.
+    await expect(panel.getByRole('button', { name: /^Iniya/ })).toBeDisabled();
+    // Back to the menu: with Haircut instead, Nelly is offered with her own price.
+    await panel.getByRole('button', { name: 'Back' }).click();
+    await panel.getByRole('button', { name: /^Eyebrows/ }).click();
+    await panel.getByRole('button', { name: /^Haircut\b(?! and| with)/ }).click();
+    await panel.getByRole('button', { name: 'Continue' }).click();
+    await expect(panel.getByRole('button', { name: /^Nelly Cutz/ })).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Discard this booking?' })).toBeVisible();
   });
 
   async function openPortalWalkIn(page: Page, name: string) {
@@ -297,17 +293,17 @@ test.describe('a chair only lists the services it does', () => {
       await pad.getByRole('button', { name: digit, exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
     await page.getByRole('button', { name: 'Walk-in', exact: true }).click();
-    return page.getByRole('dialog', { name: 'Walk-in' });
+    return page.getByRole('dialog', { name: 'New booking' });
   }
 
   test("a barber's walk-in form lists only that barber's own services", async ({ page }) => {
     const sheet = await openPortalWalkIn(page, 'Nelly');
-    const boxes = sheet.locator('fieldset', { hasText: 'Services' }).getByRole('checkbox');
-    await expect(boxes).toHaveCount(NELLY_MENU.length);
+    const tiles = sheet.locator('.exq-flow__tiles .exq-flow__tile');
+    await expect(tiles).toHaveCount(NELLY_MENU.length);
     for (const name of NELLY_MENU) {
-      await expect(sheet.getByLabel(new RegExp(`^${name},`)), name).toBeVisible();
+      await expect(sheet.getByRole('button', { name: new RegExp(`^${name}`) }), name).toBeVisible();
     }
-    await expect(sheet.getByLabel(/^Eyebrows/)).toHaveCount(0);
+    await expect(sheet.getByRole('button', { name: /^Eyebrows/ })).toHaveCount(0);
   });
 
   test('a barber with no menu is told so instead of seeing an empty box', async ({ page }) => {
@@ -315,7 +311,7 @@ test.describe('a chair only lists the services it does', () => {
     await expect(
       sheet.getByText('You have no services set up yet. Ask the owner to add them.'),
     ).toBeVisible();
-    await expect(sheet.getByRole('checkbox')).toHaveCount(0);
+    await expect(sheet.locator('.exq-flow__tiles .exq-flow__tile')).toHaveCount(0);
   });
 });
 

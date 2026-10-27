@@ -91,6 +91,11 @@ code structure must let these be added without a rewrite.
   the single error helper, in the one error format described in the architecture.
 - Tests live in `/tests`: `tests/unit` for pure helpers, `tests/integration` for
   repositories and routes against mongodb-memory-server.
+- Booking flows never open in a side drawer or side sheet. New booking, NOW and walk-ins,
+  seating from the line, Move to another barber, and Reschedule all open in the full-screen
+  booking popup (`NewBookingFlow`), with the Exquisite look: ink background, Archivo, big
+  step tiles, the step bar, the summary rail or the bottom bar, and one red main action.
+  Side sheets are only for reading details.
 - Commit in logical steps with clear messages. Never include model identifiers in
   commits or code.
 - Run `npm run typecheck && npm run lint && npm run test && npm run build` before

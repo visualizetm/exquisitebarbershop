@@ -206,7 +206,8 @@ test.describe('the owner dashboard shell', () => {
       expect(box, 'in view').not.toBeNull();
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(800);
     }
-    // The chart has a real table for screen readers.
+    // The week chart lives under the Bookings list and has a real table for screen readers.
+    await page.goto('/admin/shop/bookings');
     const table = page.locator('.exq-chart table');
     await expect(table.getByRole('row')).toHaveCount(8);
     await expect(table.getByRole('columnheader', { name: 'Last week' })).toHaveCount(1);
@@ -217,26 +218,34 @@ test.describe('the owner dashboard shell', () => {
     await signInOwner(page);
     const walkIns = page.locator('.exq-sofar__tile', { hasText: 'Walk-ins' }).locator('dd');
     const before = Number((await walkIns.textContent()) ?? '0');
-    await page.getByRole('button', { name: 'Walk-in' }).click();
+    await page.getByRole('button', { name: 'Walk-in', exact: true }).click();
     const panel = page.getByRole('dialog', { name: 'New booking' });
-    await panel.getByLabel(/^Haircut(?! and| with)/).check();
-    // Any chair: an earlier run on the same server may already have one in the chair now.
-    const chair =
-      ['Dontrise', 'Lee', 'Drew', 'Nelly Cutz'][Math.floor(Math.random() * 4)] ?? 'Dontrise';
-    await panel.getByLabel('Barber').selectOption({ label: chair });
-    await panel.getByLabel('Client name').fill('Walk In Visitor');
+    // The full-screen flow: service, barber, NOW (already chosen), client, confirm.
+    await panel.getByRole('button', { name: /^Haircut\b(?! and| with)/ }).click();
+    await panel.getByRole('button', { name: 'Continue' }).click();
+    // Dontrise's chair: the portal specs never seat anyone with him.
+    const chair = 'Dontrise';
+    await panel.getByRole('button', { name: /^Dontrise/ }).click();
+    await panel.getByRole('button', { name: 'Continue' }).click();
+    await expect(panel.getByRole('button', { name: /^Now/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await panel.getByRole('button', { name: 'Continue' }).click();
+    await panel.getByLabel('Name', { exact: true }).fill('Walk In Visitor');
     await panel
-      .getByLabel('Phone')
+      .getByLabel('Mobile phone')
       .fill(`215555${String(Math.floor(Math.random() * 9000) + 1000)}`);
-    await panel.getByRole('button', { name: 'Add walk-in' }).click();
-    await expect(
-      page.getByText(new RegExp(`Walk In Visitor is booked with ${chair}`)),
-    ).toBeVisible();
+    await panel.getByRole('button', { name: 'Continue' }).click();
+    await panel.getByRole('button', { name: 'Confirm', exact: true }).click();
+    await expect(panel.getByText(`In the chair now with ${chair}`)).toBeVisible();
+    await panel.getByRole('button', { name: 'Done' }).click();
     await expect(walkIns).toHaveText(String(before + 1));
+    // Recent activity (under the Bookings list) lists the walk-in and opens the booking.
+    await page.goto('/admin/shop/bookings');
     await expect(page.locator('.exq-activity__item', { hasText: 'Walk In Visitor' })).toContainText(
       'Walk-in',
     );
-    // Recent activity lists the walk-in and opens the booking.
     await page
       .locator('.exq-activity__item', { hasText: 'Walk In Visitor' })
       .getByRole('button')

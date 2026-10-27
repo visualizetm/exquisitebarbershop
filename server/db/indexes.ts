@@ -8,6 +8,7 @@ export const COLLECTIONS = {
   closures: 'closures',
   timeBlocks: 'timeBlocks',
   bookings: 'bookings',
+  walkIns: 'walkIns',
   slotLocks: 'slotLocks',
   users: 'users',
   sessions: 'sessions',
@@ -90,6 +91,19 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { startAt: 1 },
     options: { name: 'by_start' },
     reason: 'Shop-wide schedule views for a day.',
+  },
+  // walkIns: the line in order, and the day's seated and left entries by time
+  {
+    collection: 'walkIns',
+    keys: { status: 1, position: 1 },
+    options: { name: 'status_position' },
+    reason: 'The walk-in line is read and reordered by status and position.',
+  },
+  {
+    collection: 'walkIns',
+    keys: { createdAt: 1 },
+    options: { name: 'createdAt' },
+    reason: "Today's seated and left entries are listed by when they joined.",
   },
   // bookings
   {

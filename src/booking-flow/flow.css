@@ -1,0 +1,394 @@
+/*
+ * The full-screen booking flow (NewBookingFlow): ink background, Archivo, big tiles, the step bar,
+ * a summary rail from 1024px or a bottom bar on phones, one red main action. Tokens only.
+ */
+.exq-dialog[data-variant='full'] .exq-dialog__inner > .exq-flow {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 64px);
+  padding: 0 var(--s4) var(--s4);
+}
+@media (min-width: 1024px) {
+  .exq-dialog[data-variant='full'] .exq-dialog__inner > .exq-flow {
+    padding-inline: var(--s6);
+  }
+}
+.exq-flow__steps {
+  padding: var(--s3) 0 var(--s4);
+}
+.exq-flow__body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: var(--s5);
+  align-items: start;
+}
+.exq-flow__main {
+  min-width: 0;
+  padding-bottom: 140px;
+}
+.exq-flow__kicker {
+  margin: 0 0 var(--s2);
+  color: var(--fg-3);
+}
+.exq-flow__title {
+  margin: 0 0 var(--s2);
+  font-size: var(--t-h2);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+.exq-flow__sub {
+  margin: 0 0 var(--s4);
+  color: var(--fg-2);
+}
+.exq-flow__status,
+.exq-flow__error {
+  margin: var(--s4) 0;
+  color: var(--fg-2);
+}
+.exq-flow__error {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+/* Tiles: services and barbers */
+.exq-flow__tiles {
+  display: grid;
+  gap: var(--s3);
+}
+.exq-flow__tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name price'
+    'sub price';
+  column-gap: var(--s3);
+  width: 100%;
+  min-height: 72px;
+  padding: var(--s3) var(--s4);
+  border: 2px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-flow__tile[data-state='selected'] {
+  border-color: var(--red);
+}
+.exq-flow__tile:disabled {
+  color: var(--fg-3);
+  cursor: not-allowed;
+}
+.exq-flow__tile-name {
+  grid-area: name;
+  font-weight: 700;
+  font-size: var(--t-body);
+}
+.exq-flow__tile-sub {
+  grid-area: sub;
+  color: var(--fg-3);
+  font-size: var(--t-label);
+}
+.exq-flow__tile-price {
+  grid-area: price;
+  align-self: center;
+  font-size: var(--t-h3);
+  font-weight: 800;
+}
+.exq-flow[data-checkin='true'] .exq-flow__tile {
+  min-height: 88px;
+}
+
+/* NOW */
+.exq-flow__now {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s3) var(--s4);
+  align-items: center;
+  width: 100%;
+  margin-bottom: var(--s5);
+  padding: var(--s4);
+  border: 2px solid var(--fg);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-flow__now[data-state='selected'] {
+  border-color: var(--red);
+}
+.exq-flow__now-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--red);
+  color: var(--paper);
+}
+.exq-flow__now-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.exq-flow__now-text {
+  display: grid;
+  gap: var(--s1);
+}
+.exq-flow__now-title {
+  font-size: var(--t-h2);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.exq-flow__now-sub {
+  color: var(--fg-2);
+}
+.exq-flow__now-chip {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+@media (min-width: 768px) {
+  .exq-flow__now {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .exq-flow__now-chip {
+    grid-column: auto;
+  }
+}
+.exq-flow__taken {
+  margin-bottom: var(--s4);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--accent-text);
+  border-radius: var(--r-tile);
+}
+.exq-flow__taken p {
+  margin: 0 0 var(--s2);
+  font-weight: 700;
+}
+.exq-flow__times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.exq-flow__time {
+  min-height: var(--hit);
+  padding: 0 var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-tile);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.exq-flow__time:hover {
+  border-color: var(--fg);
+}
+
+/* Client */
+.exq-flow__search {
+  position: relative;
+  margin-bottom: var(--s4);
+}
+.exq-flow__matches {
+  display: grid;
+  gap: var(--s1);
+  margin-top: var(--s2);
+}
+.exq-flow__match {
+  display: grid;
+  width: 100%;
+  min-height: var(--hit);
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-tile);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.exq-flow__match-sub {
+  color: var(--fg-3);
+  font-weight: 400;
+  font-size: var(--t-label);
+}
+.exq-flow__form {
+  display: grid;
+  gap: var(--s3);
+  max-width: 560px;
+}
+.exq-flow[data-checkin='true'] .exq-flow__form .exq-field__control {
+  min-height: 64px;
+  font-size: var(--t-h3);
+}
+
+/* Confirm and the ticket */
+.exq-flow__summary {
+  display: grid;
+  gap: var(--s3);
+  max-width: 560px;
+  margin: 0 0 var(--s4);
+}
+.exq-flow__summary > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--s3);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+.exq-flow__summary dt {
+  color: var(--fg-3);
+}
+.exq-flow__summary dd {
+  margin: 0;
+  font-weight: 700;
+}
+.exq-flow__total {
+  font-size: var(--t-h2);
+  font-weight: 800;
+}
+.exq-flow__check {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  max-width: 560px;
+  margin-bottom: var(--s3);
+}
+.exq-flow__ticket {
+  padding: var(--s6) 0;
+}
+.exq-flow__ticket-title {
+  margin: var(--s2) 0 var(--s5);
+  font-size: var(--t-h2);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+.exq-flow__ticket-actions,
+.exq-flow__discard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.exq-flow__discard {
+  margin-top: var(--s4);
+}
+
+/* The rail: a bottom bar on phones, a card at the right from 1024px */
+.exq-flow__rail {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 2;
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4) calc(var(--s3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.exq-flow__rail-title,
+.exq-flow__rail-rows,
+.exq-flow__rail-note {
+  display: none;
+}
+.exq-flow__rail-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+}
+.exq-flow__rail-total .exq-num {
+  font-size: var(--t-h2);
+  font-weight: 800;
+}
+.exq-flow__rail-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--s2);
+}
+.exq-flow__rail-actions .exq-btn {
+  min-width: 0;
+  padding-inline: var(--s3);
+}
+@media (min-width: 1024px) {
+  .exq-flow__body {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+  .exq-flow__main {
+    padding-bottom: 0;
+  }
+  .exq-flow__rail {
+    position: sticky;
+    top: 80px;
+    inset: auto;
+    padding: var(--s5);
+    border: 1px solid var(--border);
+    border-radius: var(--r-card);
+    background: var(--card);
+  }
+  .exq-flow__rail-title {
+    display: block;
+    margin: 0 0 var(--s3);
+    font-size: var(--t-h3);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-stretch: var(--w-head);
+  }
+  .exq-flow__rail-rows {
+    display: grid;
+    margin: 0 0 var(--s4);
+  }
+  .exq-flow__rail-row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: var(--s2);
+    padding: var(--s3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .exq-flow__rail-row dd {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--s2);
+    align-items: start;
+  }
+  .exq-flow__rail-row dt {
+    color: var(--fg-3);
+  }
+  .exq-flow__rail-row dd {
+    margin: 0;
+    font-weight: 700;
+  }
+  .exq-flow__rail-sub {
+    display: block;
+    color: var(--fg-3);
+    font-weight: 400;
+    font-size: var(--t-label);
+  }
+  .exq-flow__change {
+    min-height: var(--hit);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent-text);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .exq-flow__rail-note {
+    display: block;
+    margin: var(--s3) 0 0;
+    color: var(--fg-3);
+    font-size: var(--t-label);
+  }
+}

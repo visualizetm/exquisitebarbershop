@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import AlertTriangle from '@untitled-ui/icons-react/build/esm/AlertTriangle';
 import Announcement01 from '@untitled-ui/icons-react/build/esm/Announcement01';
@@ -9,26 +9,20 @@ import UserX01 from '@untitled-ui/icons-react/build/esm/UserX01';
 import {
   bookingResponseSchema,
   overviewResponseSchema,
-  type ActivityKind,
+  seatResponseSchema,
   type AdminBookingView,
   type FloorChair,
 } from '@shared/api/admin';
+import { lineResponseSchema, walkInResponseSchema, type WalkInView } from '@shared/api/line';
 import { progressOf } from '@shared/lib/floor';
-import { BarChart, Button, EmptyState, ErrorState, StatusChip, useToast } from '@/components/ui';
+import { Button, EmptyState, ErrorState, useToast } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
-import { firstNameLastInitial, money, shopDateLabel, shopTime, shopWhen } from '../format';
+import { firstNameLastInitial, money, shopDateLabel, shopTime } from '../format';
 import { useQuick } from '../shell/quick';
 import { useFloor } from './useFloor';
-
-const KIND_WORDS: Record<ActivityKind, string> = {
-  booked: 'Booked online',
-  walkIn: 'Walk-in',
-  canceled: 'Cancelled',
-  rescheduled: 'Rescheduled',
-  noShow: 'No show',
-};
+import { WalkInLine, type LineActions } from './WalkInLine';
 
 const SOURCE_WORDS: Record<AdminBookingView['source'], string> = {
   online: 'Booked online',
@@ -61,7 +55,7 @@ function chairLabel(n: number | null): string {
 /**
  * Shop, Today: the floor. One card per chair, who is coming up, what is done and today's
  * numbers, all from today's bookings and the server clock; refreshed every 30 seconds and after
- * every action. The week chart and the latest events stay under it.
+ * every action. The alerts strip comes from the overview.
  */
 export function TodayPage() {
   usePageTitle('Today');
@@ -129,6 +123,77 @@ export function TodayPage() {
   );
 
   const doneHref = '/admin/shop/bookings?range=today&status=completed';
+
+  const lineCall = useCallback(
+    async (run: () => Promise<unknown>, ok: string, id: string) => {
+      setBusy(id);
+      try {
+        await run();
+        if (ok) toast({ tone: 'ok', text: ok });
+        await floor.refresh();
+      } catch (error) {
+        toast({
+          tone: 'danger',
+          text: error instanceof Error ? error.message : 'That did not go through.',
+        });
+        await floor.refresh();
+      } finally {
+        setBusy(null);
+      }
+    },
+    [floor, toast],
+  );
+  const lineActions = useMemo<LineActions>(
+    () => ({
+      seat: (w: WalkInView, staffId?: string) =>
+        lineCall(
+          async () => {
+            const done = await apiRequest(`/api/admin/line/${w.id}/seat`, seatResponseSchema, {
+              method: 'POST',
+              body: staffId ? { staffId } : {},
+            });
+            toast({ tone: 'ok', text: `${w.name} is in with ${done.booking.staff.name}.` });
+            quick.changed();
+          },
+          '',
+          w.id,
+        ),
+      left: (w: WalkInView) =>
+        lineCall(
+          () =>
+            apiRequest(`/api/admin/line/${w.id}/left`, walkInResponseSchema, {
+              method: 'POST',
+              body: {},
+            }),
+          `${w.name} left the line.`,
+          w.id,
+        ),
+      move: (w: WalkInView, direction: 'up' | 'down') =>
+        lineCall(
+          () =>
+            apiRequest(`/api/admin/line/${w.id}/move`, lineResponseSchema, {
+              method: 'POST',
+              body: { direction },
+            }),
+          '',
+          w.id,
+        ),
+      changeChair: (w: WalkInView, staffId: string | null) =>
+        lineCall(
+          () =>
+            apiRequest(`/api/admin/line/${w.id}`, walkInResponseSchema, {
+              method: 'PATCH',
+              body: { staffId },
+            }),
+          `${w.name} moved.`,
+          w.id,
+        ),
+      add: () => {
+        quick.openNewBooking({ source: 'walkIn' });
+      },
+    }),
+    [lineCall, quick, toast],
+  );
 
   return (
     <div className="exq-today" data-state={data ? 'ready' : floor.error ? 'error' : 'loading'}>
@@ -248,6 +313,10 @@ export function TodayPage() {
                       busy={busy}
                       onAct={act}
                       onOpen={quick.openBooking}
+                      onSeat={(id, staffId) => {
+                        const w = data.line.find((x) => x.id === id);
+                        if (w) void lineActions.seat(w, staffId);
+                      }}
                     />
                   ))}
                 </ul>
@@ -347,6 +416,7 @@ export function TodayPage() {
           </div>
 
           <aside className="exq-today__aside">
+            <WalkInLine line={data?.line ?? []} busy={busy} actions={lineActions} />
             <section className="exq-panel" aria-labelledby="exq-sofar-head">
               <div className="exq-panel__head">
                 <h2 id="exq-sofar-head">Today so far</h2>
@@ -418,67 +488,6 @@ export function TodayPage() {
           </aside>
         </div>
       )}
-
-      <div className="exq-dash-grid" data-cols="split">
-        <section className="exq-panel" aria-labelledby="exq-recent">
-          <div className="exq-panel__head">
-            <h2 id="exq-recent">Recent activity</h2>
-          </div>
-          {overview.status === 'loading' ? (
-            <p className="exq-skeleton exq-activity__placeholder" aria-busy="true">
-              Loading recent activity
-            </p>
-          ) : ov?.activity.length === 0 ? (
-            <EmptyState title="Nothing yet">
-              Bookings, cancellations and walk-ins will show here as they happen.
-            </EmptyState>
-          ) : ov ? (
-            <ul className="exq-activity exq-bare">
-              {ov.activity.map((event) => (
-                <li key={event.id} className="exq-activity__item">
-                  <button
-                    type="button"
-                    className="exq-activity__btn"
-                    onClick={() => {
-                      quick.openBooking(event.bookingId);
-                    }}
-                  >
-                    <span className="exq-activity__time">{shopWhen(event.at, ov.date)}</span>
-                    <span className="exq-activity__who">
-                      {event.clientName}
-                      <span className="exq-activity__sub">
-                        {KIND_WORDS[event.kind]}, with {event.staffName}
-                      </span>
-                    </span>
-                    <StatusChip status={event.status} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <ErrorState title="Recent activity did not load">Reload the page.</ErrorState>
-          )}
-        </section>
-        <section className="exq-panel">
-          {ov ? (
-            <BarChart
-              title="Bookings this week"
-              nameA="This week"
-              nameB="Last week"
-              groups={ov.week.map((d) => ({
-                label: d.label,
-                a: d.thisWeek,
-                b: d.lastWeek,
-                current: d.today,
-              }))}
-            />
-          ) : (
-            <div className="exq-skeleton exq-chart__placeholder" aria-busy="true">
-              Loading the chart
-            </div>
-          )}
-        </section>
-      </div>
     </div>
   );
 }
@@ -489,12 +498,14 @@ function ChairCard({
   busy,
   onAct,
   onOpen,
+  onSeat,
 }: {
   chair: FloorChair;
   now: string;
   busy: string | null;
   onAct: (b: AdminBookingView, action: FloorAction) => Promise<void>;
   onOpen: (id: string) => void;
+  onSeat: (walkInId: string, staffId: string) => void;
 }) {
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -623,6 +634,20 @@ function ChairCard({
               : 'Free for the rest of the day'}
           </p>
           {nextLine}
+          {chair.seatWalkIn ? (
+            <div className="exq-floorcard__actions">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy === chair.seatWalkIn.id}
+                onClick={() => {
+                  if (chair.seatWalkIn) onSeat(chair.seatWalkIn.id, chair.staff.id);
+                }}
+              >
+                Seat walk-in #{chair.seatWalkIn.position + 1}
+              </Button>
+            </div>
+          ) : null}
         </>
       ) : chair.kind === 'instagram' ? (
         <>

@@ -283,6 +283,31 @@ card redemption, `rewardsStampId`, `reminders: { smsSentAt }`.
 | uniq_staff_slot (unique) | staffId, slotStart | the double booking guard                    |
 | by_holder                | holderId           | release all locks of a holder in one delete |
 
+### walkIns
+
+The walk-in line (prompt 13c). One document per person waiting; seating turns it into a real
+booking through the booking service and slot locks, so the line never holds a chair by itself.
+
+| Field      | Type                  | Notes                                           |
+| ---------- | --------------------- | ----------------------------------------------- |
+| name       | string                | required                                        |
+| phone      | string, E.164         | required, shown formatted                       |
+| serviceIds | string[] (1 to 6)     |                                                 |
+| staffId    | string or null        | null is first available                         |
+| status     | waiting, seated, left |                                                 |
+| position   | int                   | order in the line; move swaps with the neighbor |
+| note       | string or null        |                                                 |
+| createdAt  | Date                  | arrival; the wait so far is measured from it    |
+| seatedAt   | Date or null          |                                                 |
+| leftAt     | Date or null          |                                                 |
+| bookingId  | string or null        | the booking made by seating                     |
+| createdBy  | actor                 |                                                 |
+
+| Index           | Keys             | Why                               |
+| --------------- | ---------------- | --------------------------------- |
+| status_position | status, position | the line in order                 |
+| createdAt       | createdAt        | the day's seated and left entries |
+
 ### users
 
 | Field                | Type              | Notes                                        |
@@ -587,49 +612,58 @@ login with a temporary password gets 403 PASSWORD_CHANGE_REQUIRED on every
 route except the four marked "forced change ok". Every request and response
 schema lives in `shared/api/auth.ts` and `shared/api/admin.ts`.
 
-| Method        | Path                                  | Auth                     | Notes                                                                                                            |
-| ------------- | ------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| POST          | /api/auth/login                       | public, throttled        | `{ email, password }`; `meResponseSchema` plus Set-Cookie; INVALID_CREDENTIALS, ACCOUNT_LOCKED 423, RATE_LIMITED |
-| POST          | /api/auth/logout                      | barber, forced change ok | ends this session                                                                                                |
-| POST          | /api/auth/logout-all                  | barber, forced change ok | ends every session of this login; `{ ok, sessionsEnded }`                                                        |
-| GET           | /api/auth/me                          | barber, forced change ok | `{ user, staff, permissions }`                                                                                   |
-| POST          | /api/me/password                      | barber, forced change ok | `{ currentPassword, newPassword }`; ends the login's other sessions                                              |
-| GET           | /api/me/schedule                      | barber                   | query `date`, `days` 1 to 7; own chair only                                                                      |
-| GET           | /api/me/bookings/:id                  | barber                   | own chair only; another chair's id is NOT_FOUND                                                                  |
-| POST          | /api/me/bookings/:id/status           | barber                   | completed or noShow, and back to confirmed; never cancel                                                         |
-| POST, DELETE  | /api/me/time-blocks, /:id             | barber                   | only when `permissions.barbersCanBlockTime`; conflicts may only be kept                                          |
-| GET           | /api/admin/today                      | owner                    | counts, chairs booked, revenue, next up per chair, who's in, new online count                                    |
-| GET           | /api/admin/schedule                   | owner                    | query `date`, `staffId?`                                                                                         |
-| GET           | /api/admin/whos-in                    | owner                    | query `date`                                                                                                     |
-| GET           | /api/admin/bookings                   | owner                    | query `from, to, staffId, status, source, q, cursor, limit`; cursor paged                                        |
-| POST          | /api/admin/bookings                   | owner, Idempotency-Key   | phone or walkIn; `override` audited; never takes a held slot                                                     |
-| GET, PATCH    | /api/admin/bookings/:id               | owner                    | detail with audit, emails and allowed transitions (marks it seen); PATCH edits notes                             |
-| POST          | /api/admin/bookings/:id/status        | owner                    | allowed transitions only, else INVALID_TRANSITION; restore re-takes locks or SLOT_TAKEN                          |
-| POST          | /api/admin/bookings/:id/arrived       | owner                    | the floor: stamps arrivedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled    |
-| POST          | /api/admin/bookings/:id/start         | owner                    | the floor: stamps startedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled    |
-| POST          | /api/admin/bookings/:id/cancel        | owner                    | `{ reason?, notify }`                                                                                            |
-| POST          | /api/admin/bookings/:id/reschedule    | owner                    | `{ startAt, staff?, notify, override }`                                                                          |
-| GET           | /api/admin/customers                  | owner                    | query `phone`; names, counts, spend, history                                                                     |
-| GET, POST     | /api/admin/time-blocks                | owner                    | conflict rule                                                                                                    |
-| DELETE        | /api/admin/time-blocks/:id            | owner                    | conflict rule (removing extra hours)                                                                             |
-| POST          | /api/admin/staff/:id/day              | owner                    | `{ date, status: in or out, start?, end? }`; conflict rule                                                       |
-| GET, POST     | /api/admin/services                   | owner                    |                                                                                                                  |
-| PATCH, DELETE | /api/admin/services/:id               | owner                    | DELETE is a soft delete through the conflict rule                                                                |
-| GET, POST     | /api/admin/staff                      | owner                    | SLUG_TAKEN                                                                                                       |
-| PATCH, DELETE | /api/admin/staff/:id                  | owner                    | conflict rule; DELETE soft deletes and disables the login; PATCH takes `servicePrices`                           |
-| POST          | /api/admin/staff/:id/slug             | owner                    | old slug becomes an alias                                                                                        |
-| PUT           | /api/admin/staff/:id/hours            | owner                    | conflict rule                                                                                                    |
-| GET, PUT      | /api/admin/hours                      | owner                    | PUT is the shop hours; conflict rule                                                                             |
-| GET, PUT      | /api/admin/closures                   | owner                    | upsert by date; conflict rule                                                                                    |
-| DELETE        | /api/admin/closures/:id               | owner                    | conflict rule (removing special hours)                                                                           |
-| GET, PUT      | /api/admin/settings                   | owner                    | full `shopSettingsInputSchema`; `google` optional; never writes `reviews`                                        |
-| PUT           | /api/admin/reviews                    | owner                    | `{ enabled?, google?, items? }`: show, hide, order, rating; strict, no review text; audited                      |
-| GET, POST     | /api/admin/users                      | owner                    | POST `{ email, staffId }` returns a one-time temporary password                                                  |
-| POST          | /api/admin/users/:id/reset-password   | owner                    | new temporary password; ends the login's sessions                                                                |
-| POST          | /api/admin/users/:id/disable, /enable | owner                    | disable ends every session                                                                                       |
-| GET           | /api/admin/audit                      | owner                    | query `entityType, entityId, action (prefix), actorType, from, to, cursor`                                       |
-| GET           | /api/admin/outbox                     | owner                    | query `status, cursor`; payloads are never returned                                                              |
-| POST          | /api/admin/outbox/:id/retry           | owner                    | failed messages only, else CONFLICT                                                                              |
+| Method        | Path                                   | Auth                     | Notes                                                                                                            |
+| ------------- | -------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| POST          | /api/auth/login                        | public, throttled        | `{ email, password }`; `meResponseSchema` plus Set-Cookie; INVALID_CREDENTIALS, ACCOUNT_LOCKED 423, RATE_LIMITED |
+| POST          | /api/auth/logout                       | barber, forced change ok | ends this session                                                                                                |
+| POST          | /api/auth/logout-all                   | barber, forced change ok | ends every session of this login; `{ ok, sessionsEnded }`                                                        |
+| GET           | /api/auth/me                           | barber, forced change ok | `{ user, staff, permissions }`                                                                                   |
+| POST          | /api/me/password                       | barber, forced change ok | `{ currentPassword, newPassword }`; ends the login's other sessions                                              |
+| GET           | /api/me/schedule                       | barber                   | query `date`, `days` 1 to 7; own chair only                                                                      |
+| GET           | /api/me/bookings/:id                   | barber                   | own chair only; another chair's id is NOT_FOUND                                                                  |
+| POST          | /api/me/bookings/:id/status            | barber                   | completed or noShow, and back to confirmed; never cancel                                                         |
+| POST, DELETE  | /api/me/time-blocks, /:id              | barber                   | only when `permissions.barbersCanBlockTime`; conflicts may only be kept                                          |
+| GET           | /api/admin/today                       | owner                    | counts, chairs booked, revenue, next up per chair, who's in, new online count                                    |
+| GET           | /api/admin/schedule                    | owner                    | query `date`, `staffId?`                                                                                         |
+| GET           | /api/admin/whos-in                     | owner                    | query `date`                                                                                                     |
+| GET           | /api/admin/bookings                    | owner                    | query `from, to, staffId, status, source, q, cursor, limit`; cursor paged                                        |
+| POST          | /api/admin/bookings                    | owner, Idempotency-Key   | phone or walkIn; `override` audited; never takes a held slot                                                     |
+| GET, PATCH    | /api/admin/bookings/:id                | owner                    | detail with audit, emails and allowed transitions (marks it seen); PATCH edits notes                             |
+| POST          | /api/admin/bookings/:id/status         | owner                    | allowed transitions only, else INVALID_TRANSITION; restore re-takes locks or SLOT_TAKEN                          |
+| POST          | /api/admin/bookings/:id/arrived        | owner                    | the floor: stamps arrivedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled    |
+| POST          | /api/admin/bookings/:id/start          | owner                    | the floor: stamps startedAt once on a confirmed booking (idempotent), audited; 409 when finished or cancelled    |
+| GET, POST     | /api/admin/line                        | owner                    | the walk-in line with every chair's wait estimate; POST adds `{ name, phone, serviceIds, staffId?, note? }`      |
+| PATCH         | /api/admin/line/:id                    | owner                    | change chair, services or note while waiting                                                                     |
+| POST          | /api/admin/line/:id/move, seat, left   | owner                    | reorder one step; seat = a walk-in booking starting now through slot locks (409 CHAIR_BUSY with estimate); left  |
+| POST          | /api/admin/now                         | owner, Idempotency-Key   | NOW: a free chair with nobody ahead gets a booking this minute, else a place in the line (`{ kind }`)            |
+| GET           | /api/admin/checkin/lookup              | owner                    | query `q`; today's confirmed bookings masked (first name, last initial, time, barber, chair)                     |
+| POST          | /api/admin/checkin/:id/arrived         | owner                    | the check-in tap: the same arrived stamp as the floor, answered masked                                           |
+| GET, POST     | /api/team/line, /:id/seat              | barber                   | the line for the portal; seat lands in the barber's own chair whatever the entry asked for                       |
+| POST          | /api/team/now, /api/team/bookings      | barber, Idempotency-Key  | NOW and a later time on the barber's own chair; no override, public rules for later times                        |
+| GET, POST     | /api/team/checkin/lookup, /:id/arrived | barber                   | the check-in screen signed in as a barber: this chair's bookings only, masked                                    |
+| POST          | /api/admin/bookings/:id/cancel         | owner                    | `{ reason?, notify }`                                                                                            |
+| POST          | /api/admin/bookings/:id/reschedule     | owner                    | `{ startAt, staff?, notify, override }`                                                                          |
+| GET           | /api/admin/customers                   | owner                    | query `phone`; names, counts, spend, history                                                                     |
+| GET, POST     | /api/admin/time-blocks                 | owner                    | conflict rule                                                                                                    |
+| DELETE        | /api/admin/time-blocks/:id             | owner                    | conflict rule (removing extra hours)                                                                             |
+| POST          | /api/admin/staff/:id/day               | owner                    | `{ date, status: in or out, start?, end? }`; conflict rule                                                       |
+| GET, POST     | /api/admin/services                    | owner                    |                                                                                                                  |
+| PATCH, DELETE | /api/admin/services/:id                | owner                    | DELETE is a soft delete through the conflict rule                                                                |
+| GET, POST     | /api/admin/staff                       | owner                    | SLUG_TAKEN                                                                                                       |
+| PATCH, DELETE | /api/admin/staff/:id                   | owner                    | conflict rule; DELETE soft deletes and disables the login; PATCH takes `servicePrices`                           |
+| POST          | /api/admin/staff/:id/slug              | owner                    | old slug becomes an alias                                                                                        |
+| PUT           | /api/admin/staff/:id/hours             | owner                    | conflict rule                                                                                                    |
+| GET, PUT      | /api/admin/hours                       | owner                    | PUT is the shop hours; conflict rule                                                                             |
+| GET, PUT      | /api/admin/closures                    | owner                    | upsert by date; conflict rule                                                                                    |
+| DELETE        | /api/admin/closures/:id                | owner                    | conflict rule (removing special hours)                                                                           |
+| GET, PUT      | /api/admin/settings                    | owner                    | full `shopSettingsInputSchema`; `google` optional; never writes `reviews`                                        |
+| PUT           | /api/admin/reviews                     | owner                    | `{ enabled?, google?, items? }`: show, hide, order, rating; strict, no review text; audited                      |
+| GET, POST     | /api/admin/users                       | owner                    | POST `{ email, staffId }` returns a one-time temporary password                                                  |
+| POST          | /api/admin/users/:id/reset-password    | owner                    | new temporary password; ends the login's sessions                                                                |
+| POST          | /api/admin/users/:id/disable, /enable  | owner                    | disable ends every session                                                                                       |
+| GET           | /api/admin/audit                       | owner                    | query `entityType, entityId, action (prefix), actorType, from, to, cursor`                                       |
+| GET           | /api/admin/outbox                      | owner                    | query `status, cursor`; payloads are never returned                                                              |
+| POST          | /api/admin/outbox/:id/retry            | owner                    | failed messages only, else CONFLICT                                                                              |
 
 ### Prompt 5: setup, doctor and operations
 

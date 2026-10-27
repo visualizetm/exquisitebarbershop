@@ -27910,7 +27910,12 @@ var shopSettingsDocumentSchema = external_exports.object({
   google: googleSettingsSchema.default(DEFAULT_GOOGLE),
   reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
-  nextOpenServiceId: idSchema.nullable().default(null)
+  nextOpenServiceId: idSchema.nullable().default(null),
+  /**
+   * The front desk tablet: when on, a dashboard sign-in stays good for 30 idle days instead of
+   * 14, so the check-in screen does not sign itself out over a long weekend. Off by default.
+   */
+  keepTabletSignedIn: external_exports.boolean().default(false)
 }).extend(timestampsSchema.shape);
 var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   _id: true,
@@ -28354,6 +28359,7 @@ var COLLECTIONS = {
   closures: "closures",
   timeBlocks: "timeBlocks",
   bookings: "bookings",
+  walkIns: "walkIns",
   slotLocks: "slotLocks",
   users: "users",
   sessions: "sessions",
@@ -28420,6 +28426,19 @@ var INDEXES = [
     keys: { startAt: 1 },
     options: { name: "by_start" },
     reason: "Shop-wide schedule views for a day."
+  },
+  // walkIns: the line in order, and the day's seated and left entries by time
+  {
+    collection: "walkIns",
+    keys: { status: 1, position: 1 },
+    options: { name: "status_position" },
+    reason: "The walk-in line is read and reordered by status and position."
+  },
+  {
+    collection: "walkIns",
+    keys: { createdAt: 1 },
+    options: { name: "createdAt" },
+    reason: "Today's seated and left entries are listed by when they joined."
   },
   // bookings
   {
@@ -28694,6 +28713,9 @@ var ERROR_CODES = {
   METHOD_NOT_ALLOWED: 405,
   CONFLICT: 409,
   SLOT_TAKEN: 409,
+  /** Seating a walk-in: the chair cannot take the full service now; the body carries the estimate. */
+  CHAIR_BUSY: 409,
+  ALREADY_SEATED: 409,
   SCHEDULE_CONFLICT: 409,
   INVALID_TRANSITION: 409,
   SLUG_TAKEN: 409,
@@ -31161,6 +31183,104 @@ async function revokeTeamSessionsForStaff(staffId, now2, options) {
   return result.modifiedCount;
 }
 
+// server/repos/walkInsRepo.ts
+var walkInsRepo_exports = {};
+__export(walkInsRepo_exports, {
+  claimForSeating: () => claimForSeating,
+  findWalkInById: () => findWalkInById,
+  finishSeating: () => finishSeating,
+  insertWalkIn: () => insertWalkIn,
+  listSince: () => listSince,
+  listWaiting: () => listWaiting,
+  markLeft: () => markLeft,
+  releaseSeating: () => releaseSeating,
+  updateWalkIn: () => updateWalkIn
+});
+
+// shared/schemas/walkIn.ts
+var walkInStatusSchema = external_exports.enum(["waiting", "seated", "left"]);
+var walkInDocumentSchema = external_exports.object({
+  _id: idSchema,
+  name: nonEmptyText(80),
+  phone: phoneSchema,
+  serviceIds: external_exports.array(idSchema).min(1).max(6),
+  /** Null means first available: any chair that frees up. */
+  staffId: idSchema.nullable(),
+  status: walkInStatusSchema,
+  position: external_exports.int().min(0),
+  note: external_exports.string().trim().max(MAX_NOTE_LENGTH).nullable(),
+  createdAt: external_exports.date(),
+  seatedAt: external_exports.date().nullable(),
+  leftAt: external_exports.date().nullable(),
+  bookingId: idSchema.nullable(),
+  createdBy: actorSchema
+});
+
+// server/repos/walkInsRepo.ts
+async function insertWalkIn(input2, now2, options) {
+  const col = await collection("walkIns");
+  const last = await col.find({ status: "waiting" }, { ...sessionOf(options), sort: { position: -1 }, limit: 1 }).toArray();
+  const doc = walkInDocumentSchema.parse({
+    ...input2,
+    _id: newId(),
+    position: (last[0]?.position ?? -1) + 1,
+    createdAt: now2
+  });
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findWalkInById(id, options) {
+  const col = await collection("walkIns");
+  return col.findOne({ _id: id }, sessionOf(options));
+}
+async function listWaiting(options) {
+  const col = await collection("walkIns");
+  return col.find({ status: "waiting" }, { ...sessionOf(options), sort: { position: 1, createdAt: 1 } }).toArray();
+}
+async function listSince(since, options) {
+  const col = await collection("walkIns");
+  return col.find(
+    { $or: [{ status: "waiting" }, { createdAt: { $gte: since } }] },
+    { ...sessionOf(options), sort: { position: 1, createdAt: 1 } }
+  ).toArray();
+}
+async function updateWalkIn(id, patch, options) {
+  const col = await collection("walkIns");
+  return col.findOneAndUpdate(
+    { _id: id, status: "waiting" },
+    { $set: patch },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
+}
+async function claimForSeating(id, now2, options) {
+  const col = await collection("walkIns");
+  return col.findOneAndUpdate(
+    { _id: id, status: "waiting" },
+    { $set: { status: "seated", seatedAt: now2 } },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
+}
+async function finishSeating(id, bookingId, options) {
+  const col = await collection("walkIns");
+  await col.updateOne({ _id: id }, { $set: { bookingId } }, sessionOf(options));
+}
+async function releaseSeating(id, options) {
+  const col = await collection("walkIns");
+  await col.updateOne(
+    { _id: id, status: "seated", bookingId: null },
+    { $set: { status: "waiting", seatedAt: null } },
+    sessionOf(options)
+  );
+}
+async function markLeft(id, now2, options) {
+  const col = await collection("walkIns");
+  return col.findOneAndUpdate(
+    { _id: id, status: "waiting" },
+    { $set: { status: "left", leftAt: now2 } },
+    { returnDocument: "after", ...sessionOf(options) }
+  );
+}
+
 // server/auth/cookies.ts
 var SESSION_COOKIE = "__Host-exq_session";
 var TEAM_COOKIE = "__Host-exq_team";
@@ -31210,23 +31330,27 @@ function clearTeamCookie(res) {
 
 // server/auth/sessions.ts
 var SESSION_IDLE_MS = 14 * 24 * 60 * 6e4;
+var SESSION_TABLET_IDLE_MS = 30 * 24 * 60 * 6e4;
 var SESSION_ABSOLUTE_MS = 60 * 24 * 60 * 6e4;
 var SESSION_TOUCH_MS = 60 * 6e4;
-function expiryFor(createdAt, now2) {
-  return new Date(
-    Math.min(now2.getTime() + SESSION_IDLE_MS, createdAt.getTime() + SESSION_ABSOLUTE_MS)
-  );
+function expiryFor(createdAt, now2, idleMs) {
+  return new Date(Math.min(now2.getTime() + idleMs, createdAt.getTime() + SESSION_ABSOLUTE_MS));
+}
+async function idleWindowMs() {
+  const settings = await shopSettingsRepo_exports.getShopSettings();
+  return settings?.keepTabletSignedIn ? SESSION_TABLET_IDLE_MS : SESSION_IDLE_MS;
 }
 function maxAgeSeconds(expiresAt, now2) {
   return (expiresAt.getTime() - now2.getTime()) / 1e3;
 }
 async function startSession(res, user, meta3) {
   const token = randomToken(32);
+  const idleMs = await idleWindowMs();
   const session = await sessionsRepo_exports.insertSession(
     {
       tokenHash: sha256Hex(token),
       userId: user._id,
-      expiresAt: expiryFor(meta3.now, meta3.now),
+      expiresAt: expiryFor(meta3.now, meta3.now, idleMs),
       ip: meta3.ip?.slice(0, 64) ?? null,
       userAgent: meta3.userAgent?.slice(0, 512) ?? null
     },
@@ -31254,7 +31378,7 @@ async function authenticateFromCookie(ctx) {
     return null;
   }
   if (ctx.now.getTime() - session.lastSeenAt.getTime() >= SESSION_TOUCH_MS) {
-    const expiresAt = expiryFor(session.createdAt, ctx.now);
+    const expiresAt = expiryFor(session.createdAt, ctx.now, await idleWindowMs());
     await sessionsRepo_exports.touchSession(session._id, ctx.now, expiresAt);
     setSessionCookie(ctx.res, token, maxAgeSeconds(expiresAt, ctx.now));
   }
@@ -33667,6 +33791,80 @@ async function enqueueBookingNotifications(input2, now2, session) {
   return ids;
 }
 
+// shared/api/line.ts
+var waitEstimateViewSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("free") }),
+  external_exports.object({ kind: external_exports.literal("about"), at: external_exports.iso.datetime(), minutes: external_exports.int().min(0) }),
+  external_exports.object({ kind: external_exports.literal("unknown") })
+]);
+var chairEstimateSchema = external_exports.object({
+  staffId: idSchema,
+  name: external_exports.string(),
+  chairNumber: external_exports.int().nullable(),
+  estimate: waitEstimateViewSchema
+});
+var walkInViewSchema = external_exports.object({
+  id: idSchema,
+  name: external_exports.string(),
+  /** Shown as (XXX) XXX-XXXX. */
+  phone: external_exports.string(),
+  services: external_exports.array(external_exports.object({ id: idSchema, name: external_exports.string() })),
+  serviceMinutes: external_exports.int(),
+  staffId: idSchema.nullable(),
+  /** The chair's name, or "First available". */
+  staffName: external_exports.string(),
+  status: walkInStatusSchema,
+  position: external_exports.int(),
+  note: external_exports.string().nullable(),
+  createdAt: external_exports.iso.datetime(),
+  seatedAt: external_exports.iso.datetime().nullable(),
+  bookingId: idSchema.nullable(),
+  waitingMinutes: external_exports.int().min(0),
+  estimate: waitEstimateViewSchema,
+  /** For first available: the chair the estimate expects to free up first. */
+  expectedStaffId: idSchema.nullable(),
+  /** The same person on every other chair, for Move. */
+  options: external_exports.array(chairEstimateSchema)
+});
+var lineResponseSchema = external_exports.object({
+  now: external_exports.iso.datetime(),
+  line: external_exports.array(walkInViewSchema),
+  chairs: external_exports.array(chairEstimateSchema)
+});
+var lineAddRequestSchema = external_exports.object({
+  name: external_exports.string().trim().min(1).max(80),
+  phone: phoneSchema,
+  serviceIds: external_exports.array(idSchema).min(1).max(6),
+  /** Null or missing means first available. */
+  staffId: idSchema.nullable().optional(),
+  note: external_exports.string().trim().max(MAX_NOTE_LENGTH).optional()
+});
+var lineUpdateRequestSchema = external_exports.object({
+  staffId: idSchema.nullable().optional(),
+  serviceIds: external_exports.array(idSchema).min(1).max(6).optional()
+}).refine((v) => v.staffId !== void 0 || v.serviceIds !== void 0, {
+  message: "Nothing to change"
+});
+var lineMoveRequestSchema = external_exports.object({ direction: external_exports.enum(["up", "down"]) });
+var lineSeatRequestSchema = external_exports.object({
+  /** The chair to seat at; required when the walk-in is first available. */
+  staffId: idSchema.optional()
+});
+var walkInResponseSchema = external_exports.object({ walkIn: walkInViewSchema });
+var nowRequestSchema = external_exports.object({
+  serviceIds: external_exports.array(idSchema).min(1).max(6),
+  /** Null or missing means first available. */
+  staffId: idSchema.nullable().optional(),
+  customer: bookingCustomerSchema,
+  notes: external_exports.string().trim().max(MAX_NOTE_LENGTH).optional()
+});
+var teamBookingRequestSchema = external_exports.object({
+  serviceIds: external_exports.array(idSchema).min(1).max(6),
+  startAt: external_exports.iso.datetime({ offset: true }),
+  customer: bookingCustomerSchema,
+  notes: external_exports.string().trim().max(MAX_NOTE_LENGTH).optional()
+});
+
 // shared/api/availability.ts
 var staffSelectorSchema = external_exports.union([
   external_exports.literal("any"),
@@ -34071,7 +34269,9 @@ var manualBookingRequestSchema = external_exports.object({
   /** Phone only: ignore lead time and the booking window. Audited. */
   override: external_exports.boolean().default(false),
   /** Send the customer a confirmation email when they gave one. */
-  notifyCustomer: external_exports.boolean().optional()
+  notifyCustomer: external_exports.boolean().optional(),
+  /** Walk-ins only: the client is in the shop, so the booking carries arrivedAt from the start. */
+  arrived: external_exports.boolean().optional()
 }).refine((v) => v.source === "walkIn" || v.startAt !== void 0, {
   message: "Phone bookings need a start time",
   path: ["startAt"]
@@ -34326,6 +34526,14 @@ var overviewResponseSchema = external_exports.object({
   activity: external_exports.array(activityEntrySchema),
   alerts: external_exports.array(alertViewSchema)
 });
+var seatResponseSchema = external_exports.object({
+  walkIn: walkInViewSchema,
+  booking: adminBookingViewSchema
+});
+var nowResponseSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("booking"), booking: adminBookingViewSchema }),
+  external_exports.object({ kind: external_exports.literal("line"), walkIn: walkInViewSchema })
+]);
 var floorChairKindSchema = external_exports.enum(["inChair", "free", "off", "instagram"]);
 var floorChairSchema = external_exports.object({
   staff: staffRefSchema,
@@ -34337,12 +34545,16 @@ var floorChairSchema = external_exports.object({
   /** The next confirmed booking after the current one (or after now). */
   next: adminBookingViewSchema.nullable(),
   /** In chair: the window the progress bar shows, from the real start when Start was pressed. */
-  window: external_exports.object({ startAt: external_exports.iso.datetime(), endAt: external_exports.iso.datetime() }).nullable()
+  window: external_exports.object({ startAt: external_exports.iso.datetime(), endAt: external_exports.iso.datetime() }).nullable(),
+  /** Free now: the first person in the line this chair can take right away. */
+  seatWalkIn: external_exports.object({ id: idSchema, position: external_exports.int(), name: external_exports.string() }).nullable()
 });
 var floorResponseSchema = external_exports.object({
   date: isoDateSchema,
   now: external_exports.iso.datetime(),
   chairs: external_exports.array(floorChairSchema),
+  /** The walk-in line, in order. */
+  line: external_exports.array(walkInViewSchema),
   /** Today's confirmed bookings not yet in a chair, in time order. */
   comingUp: external_exports.array(adminBookingViewSchema),
   /** The last three completed today, newest first, and how many there are in all. */
@@ -34884,7 +35096,8 @@ async function placeWalkIn(input2, startAt, referenceCode, meta3, actor, idempot
       cancellation: null,
       rescheduledFromId: null,
       manageTokenVersion: 1,
-      ownerSeenAt: meta3.now
+      ownerSeenAt: meta3.now,
+      arrivedAt: input2.arrived ? meta3.now : null
     },
     meta3.now,
     { session }
@@ -36986,13 +37199,13 @@ async function bookingDetail(principal, scope, id, now2) {
   const booking = await loadBookingInScope(scope, id);
   if (scope.kind === "all") await bookingsRepo_exports.markOwnerSeen(booking._id, now2);
   const fresh = await bookingsRepo_exports.findBookingById(booking._id) ?? booking;
-  const [audit3, outbox] = scope.kind === "all" ? await Promise.all([
+  const [audit4, outbox] = scope.kind === "all" ? await Promise.all([
     auditLogRepo_exports.listAuditForEntity("booking", booking._id, 50),
     emailOutboxRepo_exports.listOutboxForBooking(booking._id)
   ]) : [[], []];
   return {
     booking: await viewOf(fresh),
-    audit: audit3.map(toAuditView),
+    audit: audit4.map(toAuditView),
     outbox: outbox.map(toOutboxView),
     transitions: allowedTransitions(principal, scope, fresh.status),
     managePath: scope.kind === "all" ? manageLinkFor(fresh) : null
@@ -37372,8 +37585,8 @@ async function loadSnapshot(staffIds, now2, session) {
     upcoming
   };
 }
-function inside(snapshot, booking) {
-  return isWithinWorkingTime(booking, snapshot.staffById.get(booking.staffId), snapshot.source);
+function inside(snapshot2, booking) {
+  return isWithinWorkingTime(booking, snapshot2.staffById.get(booking.staffId), snapshot2.source);
 }
 function summarize(booking, staffById) {
   const staff = staffById.get(booking.staffId);
@@ -37409,19 +37622,19 @@ function repriceFor(booking, staff, servicesById) {
     endAt: addMinutes(booking.startAt, quote.totalMinutes)
   };
 }
-function moveTo(snapshot, booking, staff, servicesById) {
+function moveTo(snapshot2, booking, staff, servicesById) {
   if (staff.deletedAt !== null) return null;
   const moved = repriceFor(booking, staff, servicesById);
   if (!moved) return null;
   const span = { staffId: staff._id, startAt: booking.startAt, endAt: moved.endAt };
-  return isWithinWorkingTime(span, staff, snapshot.source) ? moved : null;
+  return isWithinWorkingTime(span, staff, snapshot2.source) ? moved : null;
 }
-async function moveOptionsFor(snapshot, booking, servicesById, session) {
+async function moveOptionsFor(snapshot2, booking, servicesById, session) {
   const options = [];
-  const sorted = [...snapshot.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+  const sorted = [...snapshot2.staffById.values()].sort((a, b) => a.sortOrder - b.sortOrder);
   for (const staff of sorted) {
     if (staff._id === booking.staffId) continue;
-    const moved = moveTo(snapshot, booking, staff, servicesById);
+    const moved = moveTo(snapshot2, booking, staff, servicesById);
     if (!moved) continue;
     const span = heldSpan({ ...booking, endAt: moved.endAt });
     const locks = await slotLocksRepo_exports.listSlotLocksForStaff(staff._id, span, { session });
@@ -38656,7 +38869,7 @@ async function overview(now2) {
   const nextMonday = monday.plus({ weeks: 1 });
   const todayStart = shopDayStart(today);
   const sameDayLastWeek = todayStart.minus({ weeks: 1 }).toISODate() ?? today;
-  const [data, weekBookings, photos, alerts, audit3] = await Promise.all([
+  const [data, weekBookings, photos, alerts, audit4] = await Promise.all([
     loadScheduleData(today, today),
     bookingsRepo_exports.listBookingsStartingBetween({
       start: lastMonday.toJSDate(),
@@ -38715,13 +38928,13 @@ async function overview(now2) {
     },
     week,
     chairs,
-    activity: await activityFrom(audit3),
+    activity: await activityFrom(audit4),
     alerts
   };
 }
-async function activityFrom(audit3) {
+async function activityFrom(audit4) {
   const picked = [];
-  for (const entry of audit3) {
+  for (const entry of audit4) {
     const after = entry.after ?? {};
     const meta3 = entry.meta ?? {};
     if (entry.action === "booking.create")
@@ -38841,14 +39054,410 @@ function chairState(input2) {
   return { kind: "free", current: null, next: next2, window: null };
 }
 
+// shared/lib/waitEstimate.ts
+var MINUTE = 6e4;
+var FREE_GRACE_MINUTES = 1;
+function firstFit(from, minutes, bookings) {
+  const sorted = [...bookings].sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+  let t = from.getTime();
+  for (let guard = 0; guard < 100; guard += 1) {
+    const end = t + minutes * MINUTE;
+    const clash = sorted.find((b) => b.startAt.getTime() < end && b.endAt.getTime() > t);
+    if (!clash) return new Date(t);
+    t = Math.max(t, clash.endAt.getTime());
+  }
+  return new Date(t);
+}
+function toEstimate(at, now2) {
+  const minutes = Math.ceil((at.getTime() - now2.getTime()) / MINUTE);
+  if (minutes <= FREE_GRACE_MINUTES) return { kind: "free" };
+  return { kind: "about", at, minutes };
+}
+function estimateForChair(chair, aheadMinutes, serviceMinutes, now2) {
+  if (!chair.working) return { kind: "unknown" };
+  if (!Number.isFinite(serviceMinutes) || serviceMinutes <= 0) return { kind: "unknown" };
+  let t = chair.busyUntil && chair.busyUntil > now2 ? chair.busyUntil : now2;
+  for (const ahead of aheadMinutes) {
+    const start = firstFit(t, ahead, chair.bookings);
+    t = new Date(start.getTime() + ahead * MINUTE);
+  }
+  return toEstimate(firstFit(t, serviceMinutes, chair.bookings), now2);
+}
+function estimateInLine(chairs, line, index, now2) {
+  const working = chairs.filter((c) => c.working);
+  if (working.length === 0) return { estimate: { kind: "unknown" }, staffId: null };
+  const free = new Map(
+    working.map((c) => [c.staffId, c.busyUntil && c.busyUntil > now2 ? c.busyUntil : now2])
+  );
+  const place = (person) => {
+    const candidates = person.staffId ? working.filter((c) => c.staffId === person.staffId) : working;
+    let best = null;
+    for (const chair of candidates) {
+      const at = firstFit(free.get(chair.staffId) ?? now2, person.minutes, chair.bookings);
+      if (!best || at < best.at) best = { at, chair };
+    }
+    if (!best) return null;
+    free.set(best.chair.staffId, new Date(best.at.getTime() + person.minutes * MINUTE));
+    return { at: best.at, staffId: best.chair.staffId };
+  };
+  for (let i = 0; i < index; i += 1) {
+    const person = line[i];
+    if (person) place(person);
+  }
+  const me = line[index];
+  if (!me) return { estimate: { kind: "unknown" }, staffId: null };
+  const placed = place(me);
+  if (!placed) return { estimate: { kind: "unknown" }, staffId: null };
+  return { estimate: toEstimate(placed.at, now2), staffId: placed.staffId };
+}
+
+// server/services/line.ts
+var FIRST_AVAILABLE = "First available";
+async function snapshot(now2) {
+  const today = shopDateOf(now2);
+  const [data, bookings, services, settings, waiting] = await Promise.all([
+    loadScheduleData(today, today),
+    bookingsRepo_exports.listBookingsBetween(shopDayBounds(today)),
+    servicesRepo_exports.listServices(),
+    shopSettingsRepo_exports.requireShopSettings(),
+    walkInsRepo_exports.listWaiting()
+  ]);
+  const chairs = activeStaff(data.staff).map((s2) => chairLoad(s2, bookings, data, today, now2));
+  return {
+    now: now2,
+    data,
+    services,
+    settings,
+    waiting,
+    chairs,
+    staffById: new Map(data.staff.map((s2) => [s2._id, s2]))
+  };
+}
+function chairLoad(staff, bookings, data, today, now2) {
+  const mine = bookings.filter((b) => b.staffId === staff._id).map((b) => ({ ...b, id: b._id, startedAt: b.startedAt ?? null }));
+  const state = chairState({ bookings: mine, working: true, instagramOnly: false, now: now2 });
+  return {
+    staffId: staff._id,
+    // Hours today, or a cut going on right now (a walk-in outside the hours still means the
+    // barber is in).
+    working: workingRangesFor(staff._id, today, data.source).ranges.length > 0 || state.window !== null,
+    busyUntil: state.window?.endAt ?? null,
+    bookings: mine.filter((b) => b.status === "confirmed" && b !== state.current && b.endAt > now2).map((b) => ({ startAt: b.startAt, endAt: b.endAt }))
+  };
+}
+function minutesFor(snap, serviceIds, staffId) {
+  const services = serviceIds.map((id) => snap.services.find((s2) => s2._id === id)).filter((s2) => s2 !== void 0);
+  const staff = staffId ? snap.staffById.get(staffId) : void 0;
+  if (staff) {
+    const quote = quoteStaff(staff, services, snap.settings.booking);
+    if (quote) return quote.serviceMinutes;
+  }
+  return services.reduce((sum, s2) => sum + s2.durationMinutes, 0);
+}
+function toView(e) {
+  return e.kind === "about" ? { kind: "about", at: e.at.toISOString(), minutes: e.minutes } : e;
+}
+function persons(snap) {
+  return snap.waiting.map((w) => ({
+    staffId: w.staffId,
+    minutes: minutesFor(snap, w.serviceIds, w.staffId)
+  }));
+}
+function chairEstimates(snap) {
+  return snap.chairs.map((chair) => {
+    const staff = snap.staffById.get(chair.staffId);
+    const ahead = snap.waiting.filter((w) => w.staffId === chair.staffId).map((w) => minutesFor(snap, w.serviceIds, chair.staffId));
+    return {
+      staffId: chair.staffId,
+      name: staff?.name ?? "Chair",
+      chairNumber: staff?.chairNumber ?? null,
+      estimate: toView(estimateForChair(chair, ahead, 1, snap.now))
+    };
+  });
+}
+function walkInView(snap, w) {
+  const index = snap.waiting.findIndex((x) => x._id === w._id);
+  const line = persons(snap);
+  const inLine = index >= 0;
+  const mine = inLine ? estimateInLine(snap.chairs, line, index, snap.now) : { estimate: { kind: "unknown" }, staffId: null };
+  const options = snap.chairs.map((chair) => {
+    const staff = snap.staffById.get(chair.staffId);
+    const minutes = minutesFor(snap, w.serviceIds, chair.staffId);
+    const estimate = inLine ? estimateInLine(
+      snap.chairs,
+      line.map((p, i) => i === index ? { staffId: chair.staffId, minutes } : p),
+      index,
+      snap.now
+    ).estimate : estimateForChair(chair, [], minutes, snap.now);
+    return {
+      staffId: chair.staffId,
+      name: staff?.name ?? "Chair",
+      chairNumber: staff?.chairNumber ?? null,
+      estimate: toView(estimate)
+    };
+  });
+  return {
+    id: w._id,
+    name: w.name,
+    phone: formatUsPhone(w.phone),
+    services: w.serviceIds.map((id) => ({
+      id,
+      name: snap.services.find((s2) => s2._id === id)?.name ?? "Service"
+    })),
+    serviceMinutes: minutesFor(snap, w.serviceIds, w.staffId),
+    staffId: w.staffId,
+    staffName: w.staffId ? snap.staffById.get(w.staffId)?.name ?? "Chair" : FIRST_AVAILABLE,
+    status: w.status,
+    position: w.position,
+    note: w.note,
+    createdAt: w.createdAt.toISOString(),
+    seatedAt: w.seatedAt?.toISOString() ?? null,
+    bookingId: w.bookingId,
+    waitingMinutes: Math.max(
+      0,
+      Math.floor(((w.seatedAt ?? snap.now).getTime() - w.createdAt.getTime()) / 6e4)
+    ),
+    estimate: toView(mine.estimate),
+    expectedStaffId: w.staffId ?? mine.staffId,
+    options
+  };
+}
+async function lineView(now2) {
+  const snap = await snapshot(now2);
+  return {
+    now: now2.toISOString(),
+    line: snap.waiting.map((w) => walkInView(snap, w)),
+    chairs: chairEstimates(snap)
+  };
+}
+async function requireChair(staffId) {
+  const staff = await staffRepo_exports.findStaffById(staffId);
+  if (staff?.deletedAt !== null) throw new AppError("NOT_FOUND", "That chair was not found");
+  return staff;
+}
+async function requireWaiting(id) {
+  const w = await walkInsRepo_exports.findWalkInById(id);
+  if (!w) throw new AppError("NOT_FOUND", "That walk-in was not found");
+  if (w.status === "seated") throw new AppError("ALREADY_SEATED", "They are already in a chair");
+  if (w.status === "left") throw new AppError("INVALID_TRANSITION", "They left the line");
+  return w;
+}
+async function audit3(principal, action, w, before, after, meta3) {
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actorOf2(principal),
+      action,
+      entityType: "walkIn",
+      entityId: w._id,
+      before,
+      after,
+      meta: null,
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function addToLine(principal, input2, meta3) {
+  const staffId = input2.staffId ?? null;
+  if (staffId) await requireChair(staffId);
+  const services = await servicesRepo_exports.findServicesByIds(input2.serviceIds);
+  if (services.length !== new Set(input2.serviceIds).size) {
+    throw new AppError("SERVICE_UNAVAILABLE", "A chosen service was not found");
+  }
+  const w = await walkInsRepo_exports.insertWalkIn(
+    {
+      name: input2.name,
+      phone: input2.phone,
+      serviceIds: input2.serviceIds,
+      staffId,
+      status: "waiting",
+      note: input2.note?.trim() ? input2.note.trim() : null,
+      seatedAt: null,
+      leftAt: null,
+      bookingId: null,
+      createdBy: actorOf2(principal)
+    },
+    meta3.now
+  );
+  await audit3(principal, "line.add", w, null, { staffId, serviceIds: input2.serviceIds }, meta3);
+  return walkInView(await snapshot(meta3.now), w);
+}
+async function updateInLine(principal, id, patch, meta3) {
+  const before = await requireWaiting(id);
+  if (patch.staffId) await requireChair(patch.staffId);
+  const set2 = {};
+  if (patch.staffId !== void 0) set2.staffId = patch.staffId;
+  if (patch.serviceIds !== void 0) set2.serviceIds = patch.serviceIds;
+  const w = await walkInsRepo_exports.updateWalkIn(id, set2);
+  if (!w) throw new AppError("ALREADY_SEATED", "They are already in a chair");
+  await audit3(
+    principal,
+    "line.update",
+    w,
+    { staffId: before.staffId, serviceIds: before.serviceIds },
+    { staffId: w.staffId, serviceIds: w.serviceIds },
+    meta3
+  );
+  return walkInView(await snapshot(meta3.now), w);
+}
+async function moveInLine(principal, id, direction, meta3) {
+  const me = await requireWaiting(id);
+  const waiting = await walkInsRepo_exports.listWaiting();
+  const index = waiting.findIndex((w) => w._id === id);
+  const other = waiting[direction === "up" ? index - 1 : index + 1];
+  if (other) {
+    await withTransaction(async (session) => {
+      await walkInsRepo_exports.updateWalkIn(me._id, { position: other.position }, { session });
+      await walkInsRepo_exports.updateWalkIn(other._id, { position: me.position }, { session });
+    });
+    await audit3(
+      principal,
+      "line.move",
+      me,
+      { position: me.position },
+      { position: other.position, direction },
+      meta3
+    );
+  }
+  return lineView(meta3.now);
+}
+async function leaveLine(principal, id, meta3) {
+  await requireWaiting(id);
+  const w = await walkInsRepo_exports.markLeft(id, meta3.now);
+  if (!w) throw new AppError("ALREADY_SEATED", "They are already in a chair");
+  await audit3(principal, "line.left", w, { status: "waiting" }, { status: "left" }, meta3);
+  return walkInView(await snapshot(meta3.now), w);
+}
+function busyError(estimate, staffName2) {
+  const when = estimate.kind === "about" ? `${staffName2} is busy for about ${String(estimate.minutes)} more minutes` : `${staffName2} cannot take this now`;
+  return new AppError("CHAIR_BUSY", when, { details: [], extra: { estimate } });
+}
+async function seatFromLine(principal, scope, id, requestedStaffId, meta3) {
+  const w = await requireWaiting(id);
+  const snap = await snapshot(meta3.now);
+  const minutesOn = (staffId2) => minutesFor(snap, w.serviceIds, staffId2);
+  const freeNow = (staffId2) => {
+    const chair = snap.chairs.find((c) => c.staffId === staffId2);
+    return chair ? estimateForChair({ ...chair, working: true }, [], minutesOn(staffId2), meta3.now) : null;
+  };
+  let staffId = requestedStaffId ?? w.staffId;
+  if (!staffId) {
+    const free = snap.chairs.find((c) => freeNow(c.staffId)?.kind === "free");
+    if (!free) {
+      const view = walkInView(snap, w);
+      throw busyError(view.estimate, "Every chair");
+    }
+    staffId = free.staffId;
+  }
+  assertInScope(scope, staffId, "Chair");
+  const staff = await requireChair(staffId);
+  const estimate = freeNow(staffId);
+  if (estimate?.kind !== "free") {
+    throw busyError(toView(estimate ?? { kind: "unknown" }), staff.name);
+  }
+  const claimed = await walkInsRepo_exports.claimForSeating(id, meta3.now);
+  if (!claimed) throw new AppError("ALREADY_SEATED", "They are already in a chair");
+  let booking;
+  try {
+    const outcome2 = await createManualBooking(
+      {
+        source: "walkIn",
+        serviceIds: w.serviceIds,
+        staff: staffId,
+        customer: { name: w.name, phone: w.phone, email: null },
+        ...w.note ? { notes: w.note } : {},
+        override: false,
+        notifyCustomer: false,
+        arrived: true
+      },
+      actorOf2(principal),
+      { ...meta3, idempotencyKey: `line-seat-${id}-${meta3.requestId}` }
+    );
+    booking = outcome2.body.booking;
+  } catch (error62) {
+    await walkInsRepo_exports.releaseSeating(id);
+    if (error62 instanceof AppError && error62.code === "SLOT_TAKEN") {
+      throw busyError(toView(freeNow(staffId) ?? { kind: "unknown" }), staff.name);
+    }
+    throw error62;
+  }
+  await walkInsRepo_exports.finishSeating(id, booking.id);
+  const seated = await walkInsRepo_exports.findWalkInById(id) ?? { ...claimed, bookingId: booking.id };
+  await audit3(
+    principal,
+    "line.seat",
+    seated,
+    { status: "waiting" },
+    { status: "seated", staffId, bookingId: booking.id },
+    meta3
+  );
+  const fresh = await bookingsRepo_exports.findBookingById(booking.id);
+  return {
+    walkIn: walkInView(await snapshot(meta3.now), seated),
+    booking: fresh ? toAdminBookingView(fresh, staff) : booking
+  };
+}
+async function bookNow(principal, scope, input2, meta3) {
+  const wanted = scope.kind === "chair" ? scope.staffId : input2.staffId ?? null;
+  if (wanted) await requireChair(wanted);
+  const snap = await snapshot(meta3.now);
+  const candidates = snap.chairs.filter((c) => wanted ? c.staffId === wanted : c.working);
+  const free = candidates.filter(
+    (c) => estimateForChair(
+      { ...c, working: true },
+      [],
+      minutesFor(snap, input2.serviceIds, c.staffId),
+      meta3.now
+    ).kind === "free"
+  );
+  const joinLine = async () => ({
+    kind: "line",
+    walkIn: await addToLine(
+      principal,
+      {
+        name: input2.customer.name,
+        phone: input2.customer.phone,
+        serviceIds: input2.serviceIds,
+        staffId: wanted,
+        ...input2.notes ? { note: input2.notes } : {}
+      },
+      meta3
+    )
+  });
+  const nobodyAhead = (staffId) => !snap.waiting.some((w) => w.staffId === staffId || w.staffId === null && !wanted);
+  const chair = free.find((c) => nobodyAhead(c.staffId));
+  if (!chair) return joinLine();
+  try {
+    const outcome2 = await createManualBooking(
+      {
+        source: "walkIn",
+        serviceIds: input2.serviceIds,
+        staff: chair.staffId,
+        customer: input2.customer,
+        ...input2.notes ? { notes: input2.notes } : {},
+        override: false,
+        notifyCustomer: input2.customer.email !== null,
+        arrived: true
+      },
+      actorOf2(principal),
+      meta3
+    );
+    return { kind: "booking", booking: outcome2.body.booking };
+  } catch (error62) {
+    if (error62 instanceof AppError && error62.code === "SLOT_TAKEN") return joinLine();
+    throw error62;
+  }
+}
+
 // server/services/floor.ts
 var DONE_SHOWN = 3;
 async function floor(now2) {
   const today = shopDateOf(now2);
-  const [data, bookings, photos] = await Promise.all([
+  const [data, bookings, photos, line] = await Promise.all([
     loadScheduleData(today, today),
     bookingsRepo_exports.listBookingsBetween(shopDayBounds(today)),
-    staffPhotoMap()
+    staffPhotoMap(),
+    lineView(now2)
   ]);
   const staffById = new Map(data.staff.map((s2) => [s2._id, s2]));
   const view = (b) => {
@@ -38866,6 +39475,9 @@ async function floor(now2) {
       now: now2
     });
     if (state.current) inChairIds.add(state.current._id);
+    const next2 = state.kind === "free" ? line.line.find(
+      (w) => (w.staffId === null || w.staffId === s2._id) && w.options.some((o) => o.staffId === s2._id && o.estimate.kind === "free")
+    ) : void 0;
     return {
       staff: toStaffRef(s2),
       photo: photos.get(s2._id) ?? null,
@@ -38873,7 +39485,8 @@ async function floor(now2) {
       kind: state.kind,
       current: state.current ? view(state.current) : null,
       next: state.next ? view(state.next) : null,
-      window: state.window ? { startAt: state.window.startAt.toISOString(), endAt: state.window.endAt.toISOString() } : null
+      window: state.window ? { startAt: state.window.startAt.toISOString(), endAt: state.window.endAt.toISOString() } : null,
+      seatWalkIn: next2 ? { id: next2.id, position: next2.position, name: next2.name } : null
     };
   });
   const comingUp = bookings.filter((b) => b.status === "confirmed" && !b.startedAt && !inChairIds.has(b._id)).sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
@@ -38883,6 +39496,7 @@ async function floor(now2) {
     date: today,
     now: now2.toISOString(),
     chairs,
+    line: line.line.map((w) => walkInViewSchema.parse(w)),
     comingUp: comingUp.map(view),
     done: completed.slice(0, DONE_SHOWN).map(view),
     counts: {
@@ -38891,10 +39505,78 @@ async function floor(now2) {
       walkIns: live2.filter((b) => b.source === "walkIn").length,
       takingsCents: completed.reduce((sum, b) => sum + b.totalPriceCents, 0),
       inChairs: inChairIds.size,
-      waiting: comingUp.filter((b) => b.arrivedAt).length
+      waiting: line.line.length + comingUp.filter((b) => b.arrivedAt).length
     }
   };
 }
+
+// server/services/checkIn.ts
+var MAX_MATCHES = 8;
+function maskName(full) {
+  const words = full.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "Guest";
+  const first = words[0] ?? "";
+  const last = words[words.length - 1] ?? "";
+  return words.length > 1 ? `${first} ${last.charAt(0).toUpperCase()}.` : first;
+}
+function matchesQuery(b, q) {
+  const digits = q.replace(/\D/g, "");
+  if (digits.length >= 4 && digits.length === q.replace(/[\s()-]/g, "").length) {
+    return b.customer.phone.endsWith(digits.slice(-10));
+  }
+  const needle = q.trim().toLowerCase();
+  if (needle.length === 0) return false;
+  const name = b.customer.name.toLowerCase();
+  return name.startsWith(needle) || name.split(/\s+/).some((w) => w.startsWith(needle));
+}
+async function toMatch(b) {
+  const staff = await staffRepo_exports.findStaffById(b.staffId);
+  return {
+    id: b._id,
+    startAt: b.startAt.toISOString(),
+    name: maskName(b.customer.name),
+    staffName: staff?.name ?? "Barber",
+    chairNumber: staff?.chairNumber ?? null,
+    arrived: b.arrivedAt !== null
+  };
+}
+async function lookupToday(scope, q, now2) {
+  const bounds = shopDayBounds(shopDateOf(now2));
+  const today = await bookingsRepo_exports.listBookingsStartingBetween(bounds);
+  const hits = today.filter((b) => b.status === "confirmed").filter((b) => scope.kind === "all" || scope.staffId === b.staffId).filter((b) => matchesQuery(b, q)).slice(0, MAX_MATCHES);
+  return Promise.all(hits.map(toMatch));
+}
+async function arriveFromCheckIn(principal, scope, id, meta3) {
+  const { booking } = await stampBookingMoment2(principal, scope, id, "arrived", meta3);
+  assertInScope(scope, booking.staff.id);
+  const staff = await staffRepo_exports.findStaffById(booking.staff.id);
+  return {
+    id: booking.id,
+    startAt: booking.startAt,
+    name: maskName(booking.customer.name),
+    staffName: booking.staff.name,
+    chairNumber: staff?.chairNumber ?? null,
+    arrived: booking.arrivedAt !== null
+  };
+}
+
+// shared/api/checkIn.ts
+var checkInLookupQuerySchema = external_exports.object({
+  q: external_exports.string().trim().min(1).max(60)
+});
+var checkInMatchSchema = external_exports.object({
+  id: idSchema,
+  startAt: external_exports.iso.datetime(),
+  /** "Chris M." */
+  name: external_exports.string(),
+  staffName: external_exports.string(),
+  chairNumber: external_exports.int().nullable(),
+  arrived: external_exports.boolean()
+});
+var checkInLookupResponseSchema = external_exports.object({
+  matches: external_exports.array(checkInMatchSchema)
+});
+var checkInArrivedResponseSchema = external_exports.object({ match: checkInMatchSchema });
 
 // server/services/adminSearch.ts
 var LIMIT = 5;
@@ -39019,6 +39701,78 @@ var adminRoutes = [
   owner("GET", "/api/admin/floor", async (ctx) => {
     ctxScope(ctx);
     return { body: floorResponseSchema.parse(await floor(ctx.now)), headers: NO_STORE };
+  }),
+  // The walk-in line -------------------------------------------------------
+  owner("GET", "/api/admin/line", async (ctx) => {
+    ctxScope(ctx);
+    return { body: lineResponseSchema.parse(await lineView(ctx.now)), headers: NO_STORE };
+  }),
+  owner("POST", "/api/admin/line", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, lineAddRequestSchema);
+    return {
+      status: 201,
+      body: walkInResponseSchema.parse({ walkIn: await addToLine(principal, input2, metaOf(ctx)) }),
+      headers: NO_STORE
+    };
+  }),
+  owner("PATCH", "/api/admin/line/:id", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const patch = await parseBody(ctx, lineUpdateRequestSchema);
+    return {
+      body: walkInResponseSchema.parse({
+        walkIn: await updateInLine(principal, id, patch, metaOf(ctx))
+      })
+    };
+  }),
+  owner("POST", "/api/admin/line/:id/move", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { direction } = await parseBody(ctx, lineMoveRequestSchema);
+    return {
+      body: lineResponseSchema.parse(await moveInLine(principal, id, direction, metaOf(ctx)))
+    };
+  }),
+  owner("POST", "/api/admin/line/:id/seat", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { staffId } = await parseBody(ctx, lineSeatRequestSchema);
+    return {
+      status: 201,
+      body: seatResponseSchema.parse(
+        await seatFromLine(principal, scope, id, staffId, metaOf(ctx))
+      )
+    };
+  }),
+  owner("POST", "/api/admin/line/:id/left", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    return {
+      body: walkInResponseSchema.parse({ walkIn: await leaveLine(principal, id, metaOf(ctx)) })
+    };
+  }),
+  owner("POST", "/api/admin/now", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const key = idempotencyKeyOf(ctx);
+    const input2 = await parseBody(ctx, nowRequestSchema);
+    const done = await bookNow(principal, scope, input2, { ...metaOf(ctx), idempotencyKey: key });
+    return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+  }),
+  // Front desk check in: masked lookup of today's confirmed bookings, and the arrived tap.
+  owner("GET", "/api/admin/checkin/lookup", async (ctx) => {
+    const { scope } = ctxScope(ctx);
+    const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+    return {
+      body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+      headers: NO_STORE
+    };
+  }),
+  owner("POST", "/api/admin/checkin/:id/arrived", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const match2 = await arriveFromCheckIn(principal, scope, id, metaOf(ctx));
+    return { body: checkInArrivedResponseSchema.parse({ match: match2 }), headers: NO_STORE };
   }),
   owner("GET", "/api/admin/booking-table", async (ctx) => {
     ctxScope(ctx);
@@ -41192,6 +41946,119 @@ var teamRoutes = [
         idempotencyKey: key
       });
       return { status: 201, body: teamWalkInResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  // NOW on this chair: a booking this minute when free, else a place in the line.
+  {
+    method: "POST",
+    path: "/api/team/now",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const key = idempotencyKeyOf(ctx);
+      const input2 = await parseBody(ctx, nowRequestSchema);
+      const done = await bookNow(principal, scope, input2, { ...metaOf(ctx), idempotencyKey: key });
+      return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  // Front desk check in signed in as this barber: only this chair's bookings, masked.
+  {
+    method: "GET",
+    path: "/api/team/checkin/lookup",
+    auth: "team",
+    handler: async (ctx) => {
+      const scope = chairScope(principalOf(ctx));
+      const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+      return {
+        body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+        headers: NO_STORE
+      };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/checkin/:id/arrived",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { id } = parseParams(ctx, idParams3);
+      const match2 = await arriveFromCheckIn(principal, chairScope(principal), id, metaOf(ctx));
+      return { body: checkInArrivedResponseSchema.parse({ match: match2 }), headers: NO_STORE };
+    }
+  },
+  // A later time on this chair: the normal rules (grid, lead time), never an override.
+  {
+    method: "POST",
+    path: "/api/team/bookings",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const key = idempotencyKeyOf(ctx);
+      const input2 = await parseBody(ctx, teamBookingRequestSchema);
+      const outcome2 = await createManualBooking(
+        {
+          source: "phone",
+          serviceIds: input2.serviceIds,
+          staff: scope.staffId,
+          startAt: input2.startAt,
+          customer: input2.customer,
+          ...input2.notes ? { notes: input2.notes } : {},
+          override: false,
+          notifyCustomer: input2.customer.email !== null
+        },
+        actorOf2(principal),
+        { ...metaOf(ctx), idempotencyKey: key }
+      );
+      return {
+        status: outcome2.status,
+        body: manualBookingResponseSchema.parse(outcome2.body),
+        headers: NO_STORE
+      };
+    }
+  },
+  // The walk-in line: see it, add to it, seat into this chair.
+  {
+    method: "GET",
+    path: "/api/team/line",
+    auth: "team",
+    handler: async (ctx) => {
+      chairScope(principalOf(ctx));
+      return { body: lineResponseSchema.parse(await lineView(ctx.now)), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/line",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      chairScope(principal);
+      const input2 = await parseBody(ctx, lineAddRequestSchema);
+      return {
+        status: 201,
+        body: walkInResponseSchema.parse({
+          walkIn: await addToLine(principal, input2, metaOf(ctx))
+        }),
+        headers: NO_STORE
+      };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/team/line/:id/seat",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const { id } = parseParams(ctx, idParams3);
+      return {
+        status: 201,
+        body: seatResponseSchema.parse(
+          await seatFromLine(principal, scope, id, scope.staffId, metaOf(ctx))
+        )
+      };
     }
   },
   {

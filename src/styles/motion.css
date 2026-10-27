@@ -200,7 +200,8 @@
     transform: translateY(100%);
   }
   .exq-dialog[data-variant='modal']:not([open]),
-  .exq-dialog[data-variant='lightbox']:not([open]) {
+  .exq-dialog[data-variant='lightbox']:not([open]),
+  .exq-dialog[data-variant='full']:not([open]) {
     opacity: 0;
     transform: scale(0.96);
   }
@@ -209,7 +210,8 @@
       transform: translateY(100%);
     }
     .exq-dialog[data-variant='modal'][open],
-    .exq-dialog[data-variant='lightbox'][open] {
+    .exq-dialog[data-variant='lightbox'][open],
+    .exq-dialog[data-variant='full'][open] {
       opacity: 0;
       transform: scale(0.96);
     }

@@ -7,7 +7,7 @@ import { chromium } from '@playwright/test';
  * Outputs land in public/ and are committed, so the build never needs a browser.
  */
 const INK = '#111111';
-const fonts = `${process.cwd()}/node_modules/@fontsource-variable/archivo/files`;
+const fonts = `${process.cwd()}/public/fonts`;
 const primaryWhite = readFileSync('public/brand/exq-primary-white.svg', 'utf8');
 const qBlack = readFileSync('public/brand/exq-q-icon-black.svg', 'utf8');
 const qWhite = readFileSync('public/brand/exq-q-icon-white.svg', 'utf8');
@@ -55,7 +55,7 @@ async function main() {
     1200,
     630,
     `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Archivo;font-weight:100 900;font-stretch:62% 125%;src:url(file://${fonts}/archivo-latin-wdth-normal.woff2) format('woff2-variations')}
+@font-face{font-family:Archivo;font-weight:100 900;font-stretch:100% 125%;src:url(file://${fonts}/archivo-latin-wdth-normal.woff2) format('woff2-variations')}
 html,body{margin:0;width:1200px;height:630px;background:${INK};overflow:hidden}
 .wrap{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:40px;height:630px;padding:0 96px;box-sizing:border-box;font-family:Archivo,sans-serif;color:#fff}
 .logo{width:680px}

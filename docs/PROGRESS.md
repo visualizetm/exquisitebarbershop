@@ -684,3 +684,42 @@ commit, and what is still open.
 - SHIP: 23:36 UTC, gate green after five spec fixes for the new paths and one weekday de-flake,
   screens and Lighthouse captured (Home 79 then 84, 13a was 88; the 91 KB font is the cause),
   report written; next is the PR, the merge and the production check.
+
+## Prompt 13c
+
+### M0: font instancing and the Today cleanup
+
+- Shipped: Archivo instanced to width 100 to 125% and self-hosted (62 KB, one static preload), the
+  week chart and recent activity moved under the Bookings list, the standing full-screen booking
+  rule in CLAUDE.md. Lighthouse is measured once before SHIP.
+- Heartbeat: 00:16 UTC, commit follows, next is M1 (the walk-in line).
+
+### M1: the walk-in line
+
+- Shipped: `walkIns` collection and repo, pure wait estimates, the line service (add, update,
+  move, left, seat through the booking service and slot locks), owner and barber routes, the
+  Today panel (numbered cards, Seat, Move sheet, Left, up and down, Add walk-in) and "Seat
+  walk-in #n" on free chairs. Tests: waitEstimate (7, frozen clock), line integration (4: add,
+  order, estimate, phone check, seat with arrivedAt, busy refusal, concurrency, barber scope).
+- Heartbeat: 00:21 UTC, commit follows, next is M2 (the full-screen NewBookingFlow).
+
+### M2: the full-screen NewBookingFlow
+
+- Shipped: `src/booking-flow/NewBookingFlow.tsx` (Service, Barber, Time with NOW first, Client with
+  the owner's client search, Confirm, the ticket), the `full` dialog variant, every entry point
+  opens it (top bar, Add walk-in, Seat from a free chair, Move, Reschedule, portal Add booking and
+  Walk-in); the New booking drawer and the portal forms are deleted. NOW goes through `bookNow`
+  (free chair with nobody ahead books this minute through the booking service and slot locks, else
+  joins the line). Tests: now integration (4), flow e2e (owner 1440, barber 390, discard, entry
+  points at 1440 and 390), updated dashboard, team, realshop, portal and authz specs.
+- Heartbeat: 00:50 UTC, commit follows, next is M3 (the front desk check in).
+
+### M3: the front desk check in
+
+- Shipped: `/admin/checkin` and `/team/checkin` (no shell), the start screen with Walk in, I have
+  an appointment and every chair's state, Walk in through the flow in check-in mode (always NOW,
+  big tiles, end screen, back after six seconds), the masked appointment lookup and the arrived
+  tap for owner and barber sessions, Check in buttons in the top bar and the portal, the Wake Lock,
+  the "Keep the check-in tablet signed in" setting. Tests: checkIn integration (3: masking and
+  matching, owner lookup and arrive, barber scope), checkin e2e at 1180x820 and 820x1180 (3).
+- Heartbeat: 01:08 UTC, commit follows, next is SHIP (gate, Lighthouse, screenshots, report, PR).

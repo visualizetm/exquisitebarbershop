@@ -30,6 +30,8 @@ import {
   outboxListResponseSchema,
   overviewResponseSchema,
   floorResponseSchema,
+  nowResponseSchema,
+  seatResponseSchema,
   ownerCancelRequestSchema,
   ownerRescheduleRequestSchema,
   resolutionsBodySchema,
@@ -115,6 +117,30 @@ import {
 } from '../../services/adminSchedule';
 import { bookingTable, overview } from '../../services/adminDashboard';
 import { floor } from '../../services/floor';
+import {
+  addToLine,
+  bookNow,
+  leaveLine,
+  lineView,
+  moveInLine,
+  seatFromLine,
+  updateInLine,
+} from '../../services/line';
+import { arriveFromCheckIn, lookupToday } from '../../services/checkIn';
+import {
+  lineAddRequestSchema,
+  lineMoveRequestSchema,
+  nowRequestSchema,
+  lineResponseSchema,
+  lineSeatRequestSchema,
+  lineUpdateRequestSchema,
+  walkInResponseSchema,
+} from '../../../shared/api/line';
+import {
+  checkInArrivedResponseSchema,
+  checkInLookupQuerySchema,
+  checkInLookupResponseSchema,
+} from '../../../shared/api/checkIn';
 import { adminSearch } from '../../services/adminSearch';
 import { dismissAlert, resolveAlert } from '../../services/alerts';
 import { createManualBooking } from '../../services/bookingService';
@@ -183,6 +209,78 @@ export const adminRoutes: RouteDefinition[] = [
   owner('GET', '/api/admin/floor', async (ctx) => {
     ctxScope(ctx);
     return { body: floorResponseSchema.parse(await floor(ctx.now)), headers: NO_STORE };
+  }),
+  // The walk-in line -------------------------------------------------------
+  owner('GET', '/api/admin/line', async (ctx) => {
+    ctxScope(ctx);
+    return { body: lineResponseSchema.parse(await lineView(ctx.now)), headers: NO_STORE };
+  }),
+  owner('POST', '/api/admin/line', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input = await parseBody(ctx, lineAddRequestSchema);
+    return {
+      status: 201,
+      body: walkInResponseSchema.parse({ walkIn: await addToLine(principal, input, metaOf(ctx)) }),
+      headers: NO_STORE,
+    };
+  }),
+  owner('PATCH', '/api/admin/line/:id', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const patch = await parseBody(ctx, lineUpdateRequestSchema);
+    return {
+      body: walkInResponseSchema.parse({
+        walkIn: await updateInLine(principal, id, patch, metaOf(ctx)),
+      }),
+    };
+  }),
+  owner('POST', '/api/admin/line/:id/move', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { direction } = await parseBody(ctx, lineMoveRequestSchema);
+    return {
+      body: lineResponseSchema.parse(await moveInLine(principal, id, direction, metaOf(ctx))),
+    };
+  }),
+  owner('POST', '/api/admin/line/:id/seat', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { staffId } = await parseBody(ctx, lineSeatRequestSchema);
+    return {
+      status: 201,
+      body: seatResponseSchema.parse(
+        await seatFromLine(principal, scope, id, staffId, metaOf(ctx)),
+      ),
+    };
+  }),
+  owner('POST', '/api/admin/line/:id/left', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    return {
+      body: walkInResponseSchema.parse({ walkIn: await leaveLine(principal, id, metaOf(ctx)) }),
+    };
+  }),
+  owner('POST', '/api/admin/now', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const key = idempotencyKeyOf(ctx);
+    const input = await parseBody(ctx, nowRequestSchema);
+    const done = await bookNow(principal, scope, input, { ...metaOf(ctx), idempotencyKey: key });
+    return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+  }),
+  // Front desk check in: masked lookup of today's confirmed bookings, and the arrived tap.
+  owner('GET', '/api/admin/checkin/lookup', async (ctx) => {
+    const { scope } = ctxScope(ctx);
+    const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+    return {
+      body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+      headers: NO_STORE,
+    };
+  }),
+  owner('POST', '/api/admin/checkin/:id/arrived', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const match = await arriveFromCheckIn(principal, scope, id, metaOf(ctx));
+    return { body: checkInArrivedResponseSchema.parse({ match }), headers: NO_STORE };
   }),
   owner('GET', '/api/admin/booking-table', async (ctx) => {
     ctxScope(ctx);

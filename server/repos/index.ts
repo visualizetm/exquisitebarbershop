@@ -22,3 +22,4 @@ export * as customerNotesRepo from './customerNotesRepo';
 export * as staffPinsRepo from './staffPinsRepo';
 export * as setupTokensRepo from './setupTokensRepo';
 export * as teamSessionsRepo from './teamSessionsRepo';
+export * as walkInsRepo from './walkInsRepo';

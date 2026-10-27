@@ -1,4 +1,5 @@
 import type { FloorResponse } from '../../shared/api/admin';
+import { walkInViewSchema } from '../../shared/api/line';
 import { chairState } from '../../shared/lib/floor';
 import type { BookingDocument } from '../../shared/schemas/booking';
 import { shopDateOf, shopDayBounds } from '../../shared/lib/time';
@@ -7,6 +8,7 @@ import { activeStaff } from './adminBookings';
 import { workingRangesFor } from './availability';
 import { toAdminBookingView, toStaffRef } from './bookingView';
 import { staffPhotoMap } from './photosService';
+import { lineView } from './line';
 import { loadScheduleData } from './scheduleData';
 
 const DONE_SHOWN = 3;
@@ -17,10 +19,11 @@ const DONE_SHOWN = 3;
  */
 export async function floor(now: Date): Promise<FloorResponse> {
   const today = shopDateOf(now);
-  const [data, bookings, photos] = await Promise.all([
+  const [data, bookings, photos, line] = await Promise.all([
     loadScheduleData(today, today),
     bookingsRepo.listBookingsBetween(shopDayBounds(today)),
     staffPhotoMap(),
+    lineView(now),
   ]);
   const staffById = new Map(data.staff.map((s) => [s._id, s]));
   const view = (b: BookingDocument) => {
@@ -39,6 +42,15 @@ export async function floor(now: Date): Promise<FloorResponse> {
       now,
     });
     if (state.current) inChairIds.add(state.current._id);
+    // A free chair offers the first person in the line it can take right now.
+    const next =
+      state.kind === 'free'
+        ? line.line.find(
+            (w) =>
+              (w.staffId === null || w.staffId === s._id) &&
+              w.options.some((o) => o.staffId === s._id && o.estimate.kind === 'free'),
+          )
+        : undefined;
     return {
       staff: toStaffRef(s),
       photo: photos.get(s._id) ?? null,
@@ -49,6 +61,7 @@ export async function floor(now: Date): Promise<FloorResponse> {
       window: state.window
         ? { startAt: state.window.startAt.toISOString(), endAt: state.window.endAt.toISOString() }
         : null,
+      seatWalkIn: next ? { id: next.id, position: next.position, name: next.name } : null,
     };
   });
 
@@ -64,6 +77,7 @@ export async function floor(now: Date): Promise<FloorResponse> {
     date: today,
     now: now.toISOString(),
     chairs,
+    line: line.line.map((w) => walkInViewSchema.parse(w)),
     comingUp: comingUp.map(view),
     done: completed.slice(0, DONE_SHOWN).map(view),
     counts: {
@@ -72,7 +86,7 @@ export async function floor(now: Date): Promise<FloorResponse> {
       walkIns: live.filter((b) => b.source === 'walkIn').length,
       takingsCents: completed.reduce((sum, b) => sum + b.totalPriceCents, 0),
       inChairs: inChairIds.size,
-      waiting: comingUp.filter((b) => b.arrivedAt).length,
+      waiting: line.line.length + comingUp.filter((b) => b.arrivedAt).length,
     },
   };
 }

@@ -284,6 +284,11 @@ export const shopSettingsDocumentSchema = z
     reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
     /** The service "next open" times are computed for. Null means each chair's shortest service. */
     nextOpenServiceId: idSchema.nullable().default(null),
+    /**
+     * The front desk tablet: when on, a dashboard sign-in stays good for 30 idle days instead of
+     * 14, so the check-in screen does not sign itself out over a long weekend. Off by default.
+     */
+    keepTabletSignedIn: z.boolean().default(false),
   })
   .extend(timestampsSchema.shape);
 export type ShopSettingsDocument = z.infer<typeof shopSettingsDocumentSchema>;

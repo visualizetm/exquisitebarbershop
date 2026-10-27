@@ -5,14 +5,14 @@ import { Link, matchPath, useLocation, useNavigate } from 'react-router';
 import Plus from '@untitled-ui/icons-react/build/esm/Plus';
 import { okResponseSchema } from '@shared/api/auth';
 import { SHOP_TIMEZONE } from '@shared/lib/constants';
-import { Button, Mark, NavLink, Sheet } from '@/components/ui';
+import { Button, ButtonLink, Mark, NavLink, Sheet } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
+import { NewBookingFlow, type FlowIntent } from '@/booking-flow/NewBookingFlow';
 import { BookingSheet } from '../bookings/BookingSheet';
 import { AnnouncementPanel } from '../panels/AnnouncementPanel';
 import { BarberOutPanel } from '../panels/BarberOutPanel';
 import { AlertPanel } from '../panels/AlertPanel';
 import { BlockTimePanel } from '../panels/BlockTimePanel';
-import { NewBookingPanel } from '../panels/NewBookingPanel';
 import { useMe, useSession } from '../useSession';
 import { GlobalSearch } from './GlobalSearch';
 import {
@@ -27,14 +27,12 @@ import {
 import { QuickContext, type NewBookingPrefill, type QuickApi } from './quick';
 
 type Panel =
-  | { kind: 'new'; prefill: NewBookingPrefill }
   | { kind: 'block'; staffId?: string | undefined; blockKind?: 'block' | 'timeOff' | undefined }
   | { kind: 'alert'; id: string }
   | { kind: 'out'; staffId?: string | undefined }
   | { kind: 'announcement' };
 
 const PANEL_TITLE: Record<Panel['kind'], string> = {
-  new: 'New booking',
   block: 'Block time',
   out: 'Barber out',
   announcement: 'Announcement',
@@ -109,6 +107,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [panel, setPanel] = useState<Panel | null>(null);
+  const [flow, setFlow] = useState<FlowIntent | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
   const [leaving, setLeaving] = useState(false);
@@ -147,8 +146,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const activeBookingId = routeId ?? bookingId;
   const api = useMemo<QuickApi>(
     () => ({
-      openNewBooking: (prefill = {}) => {
-        setPanel({ kind: 'new', prefill });
+      openNewBooking: (prefill: NewBookingPrefill = {}) => {
+        if (prefill.move) setFlow({ kind: 'move', booking: prefill.move });
+        else if (prefill.reschedule) setFlow({ kind: 'reschedule', booking: prefill.reschedule });
+        else
+          setFlow({
+            kind: 'new',
+            ...(prefill.staffId ? { staffId: prefill.staffId } : {}),
+            ...(prefill.startAt ? { startAt: prefill.startAt } : {}),
+            now: prefill.source === 'walkIn',
+          });
       },
       openBooking: (id) => {
         if (onBookings) void navigate(`/admin/shop/bookings/${id}${location.search}`);
@@ -227,8 +234,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
           <span className="exq-topbar__spacer" />
           <span className="exq-topbar__date exq-label">{clock}</span>
-          {/* Check in (tablet check-in) goes here in prompt 13c. */}
-          <span className="exq-topbar__slot" data-slot="check-in" />
+          <ButtonLink
+            to="/admin/checkin"
+            variant="outline"
+            size="sm"
+            className="exq-topbar__checkin"
+          >
+            Check in
+          </ButtonLink>
           <Button
             className="exq-topbar__new"
             variant="accent"
@@ -236,7 +249,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             icon={<Plus aria-hidden="true" />}
             aria-label="New booking"
             onClick={() => {
-              setPanel({ kind: 'new', prefill: {} });
+              setFlow({ kind: 'new' });
             }}
           >
             New booking
@@ -305,20 +318,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <Sheet
           open={panel !== null}
           title={panel ? PANEL_TITLE[panel.kind] : ''}
-          size={panel?.kind === 'new' ? 'lg' : 'md'}
+          size="md"
           onClose={() => {
             setPanel(null);
           }}
         >
           <div className="exq-panelhost">
-            {panel?.kind === 'new' ? (
-              <NewBookingPanel
-                prefill={panel.prefill}
-                onDone={() => {
-                  setPanel(null);
-                }}
-              />
-            ) : null}
             {panel?.kind === 'block' ? (
               <BlockTimePanel
                 {...(panel.staffId ? { staffId: panel.staffId } : {})}
@@ -353,6 +358,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
             ) : null}
           </div>
         </Sheet>
+
+        <NewBookingFlow
+          open={flow !== null}
+          session="owner"
+          intent={flow ?? { kind: 'new' }}
+          onClose={() => {
+            setFlow(null);
+          }}
+          onDone={(result) => {
+            changed();
+            if (result.kind === 'booking' && flow?.kind !== 'new') api.closeBooking();
+          }}
+        />
 
         <Sheet open={activeBookingId !== null} title="Booking" size="lg" onClose={api.closeBooking}>
           <div className="exq-panelhost">

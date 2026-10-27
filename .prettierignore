@@ -11,3 +11,4 @@ docs/content
 seed/photos/manifest.json
 # Design references for prompt 13: mockups kept exactly as delivered.
 docs/design
+docs/screens/**/lighthouse.json

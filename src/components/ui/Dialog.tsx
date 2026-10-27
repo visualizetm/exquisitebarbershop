@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import XClose from '@untitled-ui/icons-react/build/esm/XClose';
 
-export type DialogVariant = 'sheet' | 'modal' | 'lightbox';
+export type DialogVariant = 'sheet' | 'modal' | 'lightbox' | 'full';
 
 /** How long the exit transition runs (--d-fast), so content stays until the dialog has left. */
 function exitMs(): number {
@@ -14,7 +14,8 @@ function exitMs(): number {
 /**
  * The one overlay, on the native dialog element (focus trap, Escape and focus restore for free).
  * sheet: from the bottom on phones, from the side on desktop. modal: centered, scales in.
- * lightbox: the dark photo viewer. Closing is faster than opening (see motion.css).
+ * lightbox: the dark photo viewer. full: the whole screen on ink (the booking flow). Closing is
+ * faster than opening (see motion.css).
  */
 export function Dialog({
   variant,
@@ -72,7 +73,16 @@ export function Dialog({
       data-size={size}
       data-state={open ? 'open' : 'closed'}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onClose={(event) => {
+        // A dialog nested inside this one (a confirm over the booking flow) closes on its own.
+        if (event.target === ref.current) onClose();
+      }}
+      onCancel={(event) => {
+        if (event.target !== ref.current) return;
+        // Escape asks the owner of the dialog, which may keep it open (a half-entered booking).
+        event.preventDefault();
+        onClose();
+      }}
       onClick={(event) => {
         // A click on the backdrop lands on the dialog itself, not on its content.
         if (event.target === ref.current) onClose();

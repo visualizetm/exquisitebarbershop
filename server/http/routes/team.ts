@@ -18,8 +18,31 @@ import {
   teamWalkInResponseSchema,
   teamWeekResponseSchema,
 } from '../../../shared/api/team';
-import { conflictOnlyResponseSchema, timeBlockResponseSchema } from '../../../shared/api/admin';
+import {
+  conflictOnlyResponseSchema,
+  manualBookingResponseSchema,
+  nowResponseSchema,
+  seatResponseSchema,
+  timeBlockResponseSchema,
+} from '../../../shared/api/admin';
 import { okResponseSchema } from '../../../shared/api/auth';
+import {
+  lineAddRequestSchema,
+  lineResponseSchema,
+  nowRequestSchema,
+  teamBookingRequestSchema,
+  walkInResponseSchema,
+} from '../../../shared/api/line';
+import {
+  checkInArrivedResponseSchema,
+  checkInLookupQuerySchema,
+  checkInLookupResponseSchema,
+} from '../../../shared/api/checkIn';
+import { chairScope } from '../../services/access';
+import { addToLine, bookNow, lineView, seatFromLine } from '../../services/line';
+import { arriveFromCheckIn, lookupToday } from '../../services/checkIn';
+import { createManualBooking } from '../../services/bookingService';
+import { actorOf } from '../../services/access';
 import { idSchema } from '../../../shared/schemas/common';
 import {
   changePin,
@@ -42,7 +65,7 @@ import {
   teamWeek,
 } from '../../services/teamPortal';
 import { idempotencyKeyOf, metaOf, NO_STORE, principalOf } from '../context';
-import { parseBody, parseParams } from '../request';
+import { parseBody, parseParams, parseQuery } from '../request';
 import type { RouteDefinition } from '../types';
 
 const idParams = z.object({ id: idSchema });
@@ -166,6 +189,119 @@ export const teamRoutes: RouteDefinition[] = [
         idempotencyKey: key,
       });
       return { status: 201, body: teamWalkInResponseSchema.parse(done), headers: NO_STORE };
+    },
+  },
+  // NOW on this chair: a booking this minute when free, else a place in the line.
+  {
+    method: 'POST',
+    path: '/api/team/now',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const key = idempotencyKeyOf(ctx);
+      const input = await parseBody(ctx, nowRequestSchema);
+      const done = await bookNow(principal, scope, input, { ...metaOf(ctx), idempotencyKey: key });
+      return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+    },
+  },
+  // Front desk check in signed in as this barber: only this chair's bookings, masked.
+  {
+    method: 'GET',
+    path: '/api/team/checkin/lookup',
+    auth: 'team',
+    handler: async (ctx) => {
+      const scope = chairScope(principalOf(ctx));
+      const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+      return {
+        body: checkInLookupResponseSchema.parse({ matches: await lookupToday(scope, q, ctx.now) }),
+        headers: NO_STORE,
+      };
+    },
+  },
+  {
+    method: 'POST',
+    path: '/api/team/checkin/:id/arrived',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { id } = parseParams(ctx, idParams);
+      const match = await arriveFromCheckIn(principal, chairScope(principal), id, metaOf(ctx));
+      return { body: checkInArrivedResponseSchema.parse({ match }), headers: NO_STORE };
+    },
+  },
+  // A later time on this chair: the normal rules (grid, lead time), never an override.
+  {
+    method: 'POST',
+    path: '/api/team/bookings',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const key = idempotencyKeyOf(ctx);
+      const input = await parseBody(ctx, teamBookingRequestSchema);
+      const outcome = await createManualBooking(
+        {
+          source: 'phone',
+          serviceIds: input.serviceIds,
+          staff: scope.staffId,
+          startAt: input.startAt,
+          customer: input.customer,
+          ...(input.notes ? { notes: input.notes } : {}),
+          override: false,
+          notifyCustomer: input.customer.email !== null,
+        },
+        actorOf(principal),
+        { ...metaOf(ctx), idempotencyKey: key },
+      );
+      return {
+        status: outcome.status,
+        body: manualBookingResponseSchema.parse(outcome.body),
+        headers: NO_STORE,
+      };
+    },
+  },
+  // The walk-in line: see it, add to it, seat into this chair.
+  {
+    method: 'GET',
+    path: '/api/team/line',
+    auth: 'team',
+    handler: async (ctx) => {
+      chairScope(principalOf(ctx));
+      return { body: lineResponseSchema.parse(await lineView(ctx.now)), headers: NO_STORE };
+    },
+  },
+  {
+    method: 'POST',
+    path: '/api/team/line',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      chairScope(principal);
+      const input = await parseBody(ctx, lineAddRequestSchema);
+      return {
+        status: 201,
+        body: walkInResponseSchema.parse({
+          walkIn: await addToLine(principal, input, metaOf(ctx)),
+        }),
+        headers: NO_STORE,
+      };
+    },
+  },
+  {
+    method: 'POST',
+    path: '/api/team/line/:id/seat',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const { id } = parseParams(ctx, idParams);
+      return {
+        status: 201,
+        body: seatResponseSchema.parse(
+          await seatFromLine(principal, scope, id, scope.staffId, metaOf(ctx)),
+        ),
+      };
     },
   },
   {

@@ -7,6 +7,7 @@ import {
   bookingStatusSchema,
 } from '../schemas/booking';
 import { closureInputSchema } from '../schemas/closure';
+import { walkInViewSchema } from './line';
 import {
   hhmmSchema,
   idSchema,
@@ -294,6 +295,8 @@ export const manualBookingRequestSchema = z
     override: z.boolean().default(false),
     /** Send the customer a confirmation email when they gave one. */
     notifyCustomer: z.boolean().optional(),
+    /** Walk-ins only: the client is in the shop, so the booking carries arrivedAt from the start. */
+    arrived: z.boolean().optional(),
   })
   .refine((v) => v.source === 'walkIn' || v.startAt !== undefined, {
     message: 'Phone bookings need a start time',
@@ -633,8 +636,22 @@ export const overviewResponseSchema = z.object({
 export type OverviewResponse = z.infer<typeof overviewResponseSchema>;
 
 // ---------------------------------------------------------------------------
-// The floor (Shop, Today)
+// The floor (Shop, Today) and seating from the walk-in line
 // ---------------------------------------------------------------------------
+
+/** Seating a walk-in: the entry as it now stands and the booking that was made. */
+export const seatResponseSchema = z.object({
+  walkIn: walkInViewSchema,
+  booking: adminBookingViewSchema,
+});
+export type SeatResponse = z.infer<typeof seatResponseSchema>;
+
+/** NOW: the booking that was made, or the place in the line when the chair was busy. */
+export const nowResponseSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('booking'), booking: adminBookingViewSchema }),
+  z.object({ kind: z.literal('line'), walkIn: walkInViewSchema }),
+]);
+export type NowResponse = z.infer<typeof nowResponseSchema>;
 
 export const floorChairKindSchema = z.enum(['inChair', 'free', 'off', 'instagram']);
 export type FloorChairKind = z.infer<typeof floorChairKindSchema>;
@@ -650,6 +667,8 @@ export const floorChairSchema = z.object({
   next: adminBookingViewSchema.nullable(),
   /** In chair: the window the progress bar shows, from the real start when Start was pressed. */
   window: z.object({ startAt: z.iso.datetime(), endAt: z.iso.datetime() }).nullable(),
+  /** Free now: the first person in the line this chair can take right away. */
+  seatWalkIn: z.object({ id: idSchema, position: z.int(), name: z.string() }).nullable(),
 });
 export type FloorChair = z.infer<typeof floorChairSchema>;
 
@@ -657,6 +676,8 @@ export const floorResponseSchema = z.object({
   date: isoDateSchema,
   now: z.iso.datetime(),
   chairs: z.array(floorChairSchema),
+  /** The walk-in line, in order. */
+  line: z.array(walkInViewSchema),
   /** Today's confirmed bookings not yet in a chair, in time order. */
   comingUp: z.array(adminBookingViewSchema),
   /** The last three completed today, newest first, and how many there are in all. */
