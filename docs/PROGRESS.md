@@ -723,3 +723,9 @@ commit, and what is still open.
   the "Keep the check-in tablet signed in" setting. Tests: checkIn integration (3: masking and
   matching, owner lookup and arrive, barber scope), checkin e2e at 1180x820 and 820x1180 (3).
 - Heartbeat: 01:08 UTC, commit follows, next is SHIP (gate, Lighthouse, screenshots, report, PR).
+
+### SHIP
+
+- Gate green (668 unit and integration, 153 dev e2e with three spec-state fixes rerun, prod-like 7,
+  showcase 13, vercel-function 97), Lighthouse Home 92, screens in docs/screens/p13c, PR 13 merged
+  into main as e95d10a at 10:38 UTC. Next is 13d (the barber portal redo and the website editor).

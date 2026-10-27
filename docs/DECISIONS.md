@@ -1412,3 +1412,7 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   six seconds, then returns to the start. The flow's close event after a finished walk-in is
   ignored so it cannot replace the end screen. The Wake Lock is requested where the browser has
   it and silently skipped elsewhere.
+- D13c-17 `teamPortal.test.ts` derived THU and FRI separately as "the next such weekday at least
+  three days ahead", so on a Tuesday or Wednesday THU jumped a week past FRI and the week test
+  failed (it turned main red right after the 13c merge). FRI is now the day after THU. Same
+  class of flake as D13b-13.
