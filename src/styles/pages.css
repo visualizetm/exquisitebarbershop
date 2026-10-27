@@ -647,3 +647,12 @@
 .exq-demo-notice__about {
   font-size: var(--t-label);
 }
+
+/* The launch offer tag: one small red line under the hero actions and the Book title. */
+.exq-offer-tag {
+  color: var(--red);
+  margin: 0;
+}
+.exq-hero[data-state='photo'] .exq-offer-tag {
+  color: var(--red-on-dark);
+}

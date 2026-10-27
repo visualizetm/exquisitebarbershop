@@ -281,3 +281,8 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.exq-editor__usage {
+  margin: 0;
+  font-weight: 600;
+}

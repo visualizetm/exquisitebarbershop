@@ -1,6 +1,7 @@
 import { publicEmail } from '../../lib/publicEmail';
 import { buildIcs, bookingIcsUid } from '../../../shared/lib/ics';
 import { formatCents } from '../../../shared/lib/money';
+import { totalAfterDiscounts } from '../../../shared/lib/launchOffer';
 import { formatUsPhone } from '../../../shared/lib/phone';
 import { formatShopDateTime, formatShopTime } from '../../../shared/lib/time';
 import type { OutboxTemplate } from '../../../shared/schemas/emailOutbox';
@@ -35,6 +36,11 @@ function serviceLines(p: BookingEmailPayload): string[] {
   return p.booking.services.map(
     (s) => `${s.name}: ${formatCents(s.priceCents)} (${s.durationMinutes} min)`,
   );
+}
+
+/** "First online booking: -$10", one line per discount; none on most bookings. */
+function discountLines(p: BookingEmailPayload): string[] {
+  return p.booking.discounts.map((d) => `First online booking: -${formatCents(d.amountCents)}`);
 }
 
 function whenLine(p: BookingEmailPayload): string {
@@ -110,7 +116,8 @@ function customerConfirmed(p: BookingEmailPayload, env: RenderEnv, rescheduled: 
     `Reference code: ${p.booking.referenceCode}`,
     'Services:',
     ...serviceLines(p).map((l) => `  ${l}`),
-    `Total: ${formatCents(p.booking.totalPriceCents)}`,
+    ...discountLines(p),
+    `Total: ${formatCents(totalAfterDiscounts(p.booking.totalPriceCents, p.booking.discounts))}`,
     ...(url ? [`Need to change it? Cancel or reschedule here: ${url}`] : []),
     'A calendar file is attached.',
     '',
@@ -124,7 +131,8 @@ function customerConfirmed(p: BookingEmailPayload, env: RenderEnv, rescheduled: 
       : []),
     `<strong>Reference code: ${esc(p.booking.referenceCode)}</strong>`,
     `Services:<br>${serviceLines(p).map(esc).join('<br>')}`,
-    `Total: ${esc(formatCents(p.booking.totalPriceCents))}`,
+    ...discountLines(p).map(esc),
+    `Total: ${esc(formatCents(totalAfterDiscounts(p.booking.totalPriceCents, p.booking.discounts)))}`,
     ...(url ? [`Need to change it? <a href="${esc(url)}">Cancel or reschedule</a>.`] : []),
     'A calendar file is attached.',
   ];
@@ -180,7 +188,8 @@ function ownerAlert(
     `Reference: ${p.booking.referenceCode}`,
     'Services:',
     ...serviceLines(p).map((l) => `  ${l}`),
-    `Total: ${formatCents(p.booking.totalPriceCents)}`,
+    ...discountLines(p),
+    `Total: ${formatCents(totalAfterDiscounts(p.booking.totalPriceCents, p.booking.discounts))}`,
     ...(p.booking.notes ? [`Notes: ${p.booking.notes}`] : []),
     ...(p.cancelReason ? [`Reason: ${p.cancelReason}`] : []),
     `Dashboard: ${env.appBaseUrl}/admin`,

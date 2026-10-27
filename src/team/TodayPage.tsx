@@ -15,6 +15,7 @@ import {
 } from '@shared/api/team';
 import { currentBooking } from '@shared/lib/floor';
 import { formatCents } from '@shared/lib/money';
+import { discountTag } from '@shared/lib/launchOffer';
 import {
   Button,
   ButtonAnchor,
@@ -280,6 +281,12 @@ export function TodayPage() {
             <p className="exq-muted">
               {inChair.services.join(', ')} <span aria-hidden="true">·</span>{' '}
               {formatCents(inChair.priceCents)}
+              {discountTag(inChair.discounts) ? (
+                <>
+                  {' '}
+                  <span aria-hidden="true">·</span> {discountTag(inChair.discounts)}
+                </>
+              ) : null}
               {inChair.startedAt
                 ? ` · started ${shopTime(inChair.startedAt)}`
                 : ` · ${shopTime(inChair.startAt)} to ${shopTime(inChair.endAt)}`}
@@ -382,6 +389,7 @@ export function TodayPage() {
                     <span>
                       {b.services.join(', ')} <span aria-hidden="true">·</span>{' '}
                       {formatCents(b.priceCents)}
+                      {discountTag(b.discounts) ? `, ${discountTag(b.discounts) ?? ''}` : ''}
                     </span>
                   </span>
                   <span className="exq-team-row__tag exq-label" data-source={b.source}>

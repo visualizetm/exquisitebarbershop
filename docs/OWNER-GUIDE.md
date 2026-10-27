@@ -175,7 +175,7 @@ opens the preview full screen.
 - **Top of page**: the photo (upload a new one), the **Headline** (up to 48
   characters), the **Word in red** (one of the headline's words) and the **Line
   under it**. The preview follows as you type; **Save and publish** puts it live
-  and the bar says **All changes saved and live**. **Undo changes** goes back to
+  and the bar says **Saved. Live on the site now**. **Undo changes** goes back to
   what is saved.
 - **The work** and **Gallery**: upload, caption, order, credit a photo to a barber,
   and mark the six that show on Home.

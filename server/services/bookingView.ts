@@ -27,6 +27,7 @@ export function toBookingView(
     endAt: booking.endAt.toISOString(),
     durationMinutes: booking.durationMinutes,
     totalPriceCents: booking.totalPriceCents,
+    discounts: booking.discounts,
     customer: booking.customer,
     notes: booking.notes,
     sequence: booking.manageTokenVersion,

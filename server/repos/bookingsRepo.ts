@@ -10,13 +10,59 @@ import { AppError, isDuplicateKeyError } from '../lib/errors';
 import { newId } from '../lib/ids';
 import { sessionOf, type RepoOptions } from './types';
 
-export type BookingInput = Omit<BookingDocument, '_id' | 'createdAt' | 'updatedAt'>;
+/** The discounts list defaults to empty, so a walk-in or a fixture never has to name it. */
+export type BookingInput = Omit<BookingDocument, '_id' | 'createdAt' | 'updatedAt' | 'discounts'> & {
+  discounts?: BookingDocument['discounts'];
+};
 
 export class ReferenceCodeCollision extends Error {
   constructor(cause: unknown) {
     super('Reference code already exists', { cause });
     this.name = 'ReferenceCodeCollision';
   }
+}
+
+/** Another booking for the same phone took the launch offer first (the unique partial index). */
+export class LaunchOfferTaken extends Error {
+  constructor() {
+    super('The launch offer was already used by this phone');
+  }
+}
+
+const OFFER_HOLDING_STATUSES: BookingStatus[] = ['confirmed', 'completed', 'noShow'];
+
+/** Whether a phone already holds the launch offer on a booking that is booked, done or a no show. */
+export async function launchOfferUsedByPhone(
+  phone: string,
+  options?: RepoOptions,
+): Promise<boolean> {
+  const col = await collection('bookings');
+  const found = await col.findOne(
+    {
+      'customer.phone': phone,
+      'discounts.code': 'LAUNCH10',
+      status: { $in: OFFER_HOLDING_STATUSES },
+    },
+    { projection: { _id: 1 }, ...sessionOf(options) },
+  );
+  return found !== null;
+}
+
+/** How often the launch offer was given and what it took off, for the editor's count. */
+export async function launchOfferUsage(): Promise<{ count: number; amountCents: number }> {
+  const col = await collection('bookings');
+  const rows = await col
+    .aggregate<{ count: number; amountCents: number }>([
+      { $match: { 'discounts.code': 'LAUNCH10', status: { $in: OFFER_HOLDING_STATUSES } } },
+      { $unwind: '$discounts' },
+      { $match: { 'discounts.code': 'LAUNCH10' } },
+      {
+        $group: { _id: null, count: { $sum: 1 }, amountCents: { $sum: '$discounts.amountCents' } },
+      },
+    ])
+    .toArray();
+  const row = rows[0];
+  return row ? { count: row.count, amountCents: row.amountCents } : { count: 0, amountCents: 0 };
 }
 
 /** Inserts a booking. Throws ReferenceCodeCollision so the service can draw a new code and retry. */
@@ -36,7 +82,12 @@ export async function insertBooking(
   try {
     await col.insertOne(doc, sessionOf(options));
   } catch (error) {
-    if (isDuplicateKeyError(error)) throw new ReferenceCodeCollision(error);
+    if (isDuplicateKeyError(error)) {
+      if (error instanceof Error && error.message.includes('launchOfferOncePerPhone')) {
+        throw new LaunchOfferTaken();
+      }
+      throw new ReferenceCodeCollision(error);
+    }
     throw error;
   }
   return doc;

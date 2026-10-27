@@ -70,6 +70,7 @@ import { getEnv } from '../../env';
 import { runAfterResponse } from '../../lib/afterResponse';
 import { deliverOutboxIds } from '../../notifications/deliver';
 import { ownerScope, actorOf } from '../../services/access';
+import { bookingsRepo } from '../../repos';
 import {
   bookingDetail,
   changeBookingStatus,
@@ -579,7 +580,14 @@ export const adminRoutes: RouteDefinition[] = [
   }),
   owner('GET', '/api/admin/settings', async (ctx) => {
     ctxScope(ctx);
-    return { body: settingsResponseSchema.parse(await getSettings()), headers: NO_STORE };
+    const [settings, launchOfferUsage] = await Promise.all([
+      getSettings(),
+      bookingsRepo.launchOfferUsage(),
+    ]);
+    return {
+      body: settingsResponseSchema.parse({ ...settings, launchOfferUsage }),
+      headers: NO_STORE,
+    };
   }),
   owner('PUT', '/api/admin/settings', async (ctx) => {
     const { principal } = ctxScope(ctx);

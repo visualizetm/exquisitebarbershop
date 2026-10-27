@@ -9,9 +9,10 @@
       content="Barbers and stylists under one roof in Brookhaven, PA. Gifted Hands. Pick your chair and book online in under a minute."
     />
     <meta name="theme-color" content="#FFFFFF" />
-    <!-- Applies the stored theme before the first paint. Its sha256 is in the CSP (vercel.json). -->
+    <!-- Applies the stored theme before the first paint and, on public paths, starts the shop request
+         so it downloads alongside the app. Its sha256 is in the CSP (vercel.json). -->
     <!-- prettier-ignore -->
-    <script>(function(){try{var t=localStorage.getItem('exq-theme');var r=document.documentElement;if(t==='light'||t==='dark'){r.setAttribute('data-theme',t)}var d=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);var m=document.querySelector('meta[name="theme-color"]');if(m){m.setAttribute('content',d?'#111111':'#FFFFFF')}}catch(e){}})();</script>
+    <script>(function(){try{var t=localStorage.getItem('exq-theme');var r=document.documentElement;if(t==='light'||t==='dark'){r.setAttribute('data-theme',t)}var d=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);var m=document.querySelector('meta[name="theme-color"]');if(m){m.setAttribute('content',d?'#111111':'#FFFFFF')}}catch(e){}var p=location.pathname;if(!/^\/(admin|team|setup|api)(\/|$)/.test(p)){var l=document.createElement('link');l.rel='preload';l.as='fetch';l.href='/api/shop';l.crossOrigin='anonymous';document.head.appendChild(l)}})();</script>
     <link
       rel="preload"
       as="font"

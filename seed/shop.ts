@@ -236,6 +236,15 @@ export const shopSettingsSeed: ShopSettingsInput = {
     rewards: false,
     smsReminders: false,
   },
+  // The ads promise $10 off a first online booking. The minimum price is a guess. // PLACEHOLDER
+  launchOffer: {
+    enabled: true,
+    amountCents: 1000,
+    minTotalCents: 2000,
+    label: '$10 off your first online booking',
+    startsOn: '',
+    endsOn: '',
+  },
   announcement: {
     enabled: true,
     text: 'Walk-ins welcome',

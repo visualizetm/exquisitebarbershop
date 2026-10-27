@@ -23,6 +23,7 @@ import { servicesRepo, shopSettingsRepo, staffRepo, weeklyHoursRepo } from '../.
 import { demoEnabled } from '../../services/demo';
 import { staffOpenings } from '../../services/nextOpening';
 import { galleryPage, heroPhoto, staffPhotoMap } from '../../services/photosService';
+import { launchOfferIsLive } from '../../../shared/lib/launchOffer';
 import { parseParams, parseQuery } from '../request';
 import type { RouteDefinition } from '../types';
 
@@ -102,6 +103,9 @@ export const publicRoutes: RouteDefinition[] = [
         timezone: settings.timezone,
         hero: settings.hero,
         visit: settings.visit,
+        launchOffer: launchOfferIsLive(settings.launchOffer, shopDateOf(ctx.now))
+          ? { label: settings.launchOffer.label, amountCents: settings.launchOffer.amountCents }
+          : null,
         hours: hours?.days ?? EMPTY_WEEK,
         booking: {
           slotStepMinutes: settings.booking.slotStepMinutes,

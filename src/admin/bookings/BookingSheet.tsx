@@ -16,6 +16,7 @@ import { ApiRequestError, apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { ErrorNote } from '../components/ErrorNote';
 import { SOURCE_LABEL, money, phoneLabel, shopDateTime } from '../format';
+import { discountTag } from '@shared/lib/launchOffer';
 import { useQuick } from '../shell/quick';
 import { useMe } from '../useSession';
 
@@ -160,7 +161,10 @@ export function BookingSheet({ id }: { id: string }) {
           {b.staffRequested ? '' : ' (first available)'}
         </Fact>
         <Fact term="Services">{b.services.map((s) => s.name).join(', ')}</Fact>
-        <Fact term="Total">{money(b.totalPriceCents)}</Fact>
+        <Fact term="Total">
+          {money(b.totalPriceCents)}
+          {discountTag(b.discounts) ? `, ${discountTag(b.discounts) ?? ''}` : ''}
+        </Fact>
         <Fact term="Phone">
           <a href={`tel:${b.customer.phone}`}>{phoneLabel(b.customer.phone)}</a>
         </Fact>

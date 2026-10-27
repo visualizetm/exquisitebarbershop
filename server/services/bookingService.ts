@@ -31,7 +31,8 @@ import {
   slotLocksRepo,
   staffRepo,
 } from '../repos';
-import { ReferenceCodeCollision } from '../repos/bookingsRepo';
+import { LaunchOfferTaken, ReferenceCodeCollision } from '../repos/bookingsRepo';
+import { launchOfferDiscount } from '../../shared/lib/launchOffer';
 import {
   computeAvailability,
   findSlot,
@@ -312,6 +313,8 @@ interface PlacementPolicy {
   audience: { customer: boolean; owner: boolean };
   /** Owner-made bookings are already seen. */
   ownerSeenAt: Date | null;
+  /** The launch offer is only for public online bookings; a staff-made booking never gets it. */
+  offerAllowed: boolean;
 }
 
 const ONLINE_POLICY: PlacementPolicy = {
@@ -321,6 +324,7 @@ const ONLINE_POLICY: PlacementPolicy = {
   enforcePhoneCap: true,
   audience: { customer: true, owner: true },
   ownerSeenAt: null,
+  offerAllowed: true,
 };
 
 interface PlacementInput {
@@ -419,6 +423,18 @@ async function placeBooking(
     }
   }
 
+  // The launch offer, decided here inside the transaction so two first bookings for one phone can
+  // never both carry it (the unique partial index is the last line; placeWithFallback retries
+  // without the offer when it fires).
+  const discount = policy.offerAllowed
+    ? launchOfferDiscount(settings.launchOffer, {
+        source: policy.source,
+        priceCents: quote.price.totalCents,
+        shopDate: shopDateOf(meta.now),
+        alreadyUsed: await bookingsRepo.launchOfferUsedByPhone(input.customer.phone, { session }),
+      })
+    : null;
+
   // Price and time are the assigned chair's own, also when "first available" picked the chair.
   const endAt = addMinutes(startAt, quote.serviceMinutes);
   const booking = await bookingsRepo.insertBooking(
@@ -432,6 +448,7 @@ async function placeBooking(
       durationMinutes: quote.serviceMinutes,
       bufferMinutes: quote.bufferMinutes,
       totalPriceCents: quote.price.totalCents,
+      discounts: discount ? [discount] : [],
       customer: input.customer,
       status: 'confirmed',
       source: policy.source,
@@ -517,14 +534,20 @@ async function placeWithFallback(
 ): Promise<PlacedBooking> {
   const tried = new Set<string>();
   let lastConflict: unknown = null;
+  let effective = policy;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const referenceCode = await freshReferenceCode();
     try {
       return await withTransaction((session) =>
-        placeBooking(input, startAt, tried, referenceCode, meta, policy, idempotency, session),
+        placeBooking(input, startAt, tried, referenceCode, meta, effective, idempotency, session),
       );
     } catch (error) {
       if (error instanceof ReferenceCodeCollision) continue;
+      if (error instanceof LaunchOfferTaken) {
+        // Another booking for this phone won the offer a moment ago: place this one without it.
+        effective = { ...effective, offerAllowed: false };
+        continue;
+      }
       if (error instanceof AppError && error.code === 'SLOT_TAKEN') {
         lastConflict = error;
         // The lock error names the chair that conflicted; try the next qualified one.
@@ -750,6 +773,7 @@ export async function createManualBooking(
           actor,
           override: input.override,
           enforcePhoneCap: false,
+          offerAllowed: false,
           audience: { customer: notifyCustomer, owner: false },
           ownerSeenAt: meta.now,
         },

@@ -93,6 +93,14 @@ export function HomePage() {
                 See services
               </ButtonLink>
             </p>
+            {data?.launchOffer ? (
+              <p
+                className="exq-offer-tag exq-label exq-hero__rise"
+                style={{ '--rise-i': 5 } as React.CSSProperties}
+              >
+                {data.launchOffer.label}
+              </p>
+            ) : null}
             <dl
               className="exq-hero__info exq-hero__rise"
               data-state={data ? 'ready' : 'loading'}

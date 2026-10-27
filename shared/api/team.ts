@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MAX_NOTE_LENGTH } from '../lib/constants';
 import { PIN_PATTERN } from '../lib/pin';
-import { bookingSourceSchema, bookingStatusSchema } from '../schemas/booking';
+import { bookingSourceSchema, bookingStatusSchema, discountSchema } from '../schemas/booking';
 import { hhmmSchema, idSchema, isoDateSchema, phoneSchema } from '../schemas/common';
 import { timeBlockViewSchema, workingDaySchema } from './admin';
 import { photoViewSchema } from './photos';
@@ -68,6 +68,7 @@ export const teamBookingViewSchema = z.object({
   services: z.array(z.string()),
   notes: z.string().nullable(),
   priceCents: z.int().min(0),
+  discounts: z.array(discountSchema).default([]),
   arrivedAt: z.iso.datetime().nullable(),
   startedAt: z.iso.datetime().nullable(),
 });

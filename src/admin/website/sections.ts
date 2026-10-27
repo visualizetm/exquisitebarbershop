@@ -1,5 +1,14 @@
 export type SectionId =
-  'announcement' | 'top' | 'work' | 'reviews' | 'hours' | 'services' | 'team' | 'gallery' | 'visit';
+  | 'announcement'
+  | 'top'
+  | 'offer'
+  | 'work'
+  | 'reviews'
+  | 'hours'
+  | 'services'
+  | 'team'
+  | 'gallery'
+  | 'visit';
 
 export interface Section {
   id: SectionId;
@@ -12,6 +21,7 @@ export interface Section {
 export const SECTIONS: Section[] = [
   { id: 'announcement', label: 'Announcement bar', group: 'Home page', path: '/' },
   { id: 'top', label: 'Top of page', group: 'Home page', path: '/' },
+  { id: 'offer', label: 'Launch offer', group: 'Home page', path: '/book' },
   { id: 'work', label: 'The work', group: 'Home page', path: '/' },
   { id: 'reviews', label: 'Reviews', group: 'Home page', path: '/' },
   { id: 'hours', label: 'Hours', group: 'Shop info', path: '/visit' },
