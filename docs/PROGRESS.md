@@ -850,3 +850,11 @@ commit, and what is still open.
   docs/screens/p13f (pairing, board sideways and upright, walk in end, exit PIN, tablets panel,
   montage; the closed board is missing, D13f-10).
 - Heartbeat: 17:56 UTC, commit follows, next is SHIP.
+
+### SHIP
+
+- Gate: 699 unit and integration (one revenue assertion updated for the offer), dev e2e 166 of 167
+  on the full run (the block time resolver spec passes alone, order dependent), prod-like 7,
+  showcase 13, vercel-function 97. PR 21 merged into main as 5314d7d at 18:16 UTC; Vercel
+  production for it completed at 18:17 UTC. The three production URLs could not be read from the
+  sandbox (proxy and connector both refuse), so Rob opens them.
