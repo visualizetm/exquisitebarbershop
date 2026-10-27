@@ -124,7 +124,10 @@ sideways or upright; it keeps the screen awake where the tablet allows it.
 
 - **Walk in** (red, half the screen) runs the booking flow with big tiles. The end
   screen says **Head to chair 3 for Drew** or **You're #2 for Drew, about 25 min**,
-  then goes back on its own after six seconds.
+  then shows **Closing in 15**, counting down with a red bar and a big **Done**
+  button. Done goes back to the start at once; at 0 it goes back on its own and clears
+  everything, so the next client starts from a clean screen. The same countdown ends
+  an I have an appointment check in.
 - **I have an appointment**: the client types their name or the last 4 of their
   phone and sees today's bookings as big tiles (time, first name and last initial,
   barber). One tap marks them arrived; it shows up on Today at once. The screen never
@@ -172,7 +175,9 @@ open the recent apps view, tap the app's icon and choose Pin.
 
 ![The pairing screen](screens/p13f/guide/t01-pairing.png)
 
-![The start screen and the board](screens/p13f/guide/t02-board.png)
+![The start screen and the board](screens/p13g/guide/t02-board.png)
+
+![The end screen counting down](screens/p13g/guide/t05-closing.png)
 
 ![The exit PIN](screens/p13f/guide/t03-exit-pin.png)
 

@@ -112,6 +112,11 @@ test('pair, the board, a walk in, a check in, the idle reset, the exit PIN, unpa
   expect((await done.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(64);
   await done.click();
   await expect(page.getByRole('heading', { name: "Who's coming in?" })).toBeVisible();
+  // With a barber now busy ("With a client, free about 2:08 PM" wraps), it still fits.
+  await expect(board.locator('.exq-board__tile[data-tone="busy"]').first()).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight),
+  ).toBeLessThanOrEqual(0);
 
   // Check in the booking: name, then one tap.
   await page.getByRole('button', { name: 'I have an appointment' }).click();

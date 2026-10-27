@@ -873,3 +873,10 @@ commit, and what is still open.
 - Shipped: the start screen fits at 1180 x 820 and 820 x 1180 with five barbers (D13g-03), tiles
   with photos or initials circles (D13g-04), asserted in tests/e2e/kiosk.spec.ts.
 - Heartbeat: 18:50 UTC, commit follows, next is M3 (guide, screens).
+
+### M3: the guide
+
+- Shipped: OWNER-GUIDE section 8b (and the check in section) describe the 15 second countdown and
+  Done, the PDF re-rendered, screens in docs/screens/p13g (board and closing at both sizes, montage;
+  the demo has four barbers in today, the five barber fit is asserted in the kiosk e2e).
+- Heartbeat: 18:56 UTC, commit follows, next is SHIP.

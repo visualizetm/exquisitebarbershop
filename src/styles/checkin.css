@@ -535,3 +535,18 @@
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
+/* Step 3 of the fit, after the demo showed a busy tile wrapping to three lines: smaller start heading and choice titles, tighter tiles. */
+.exq-checkin[data-mode='kiosk'][data-state='start'] .exq-checkin__title {
+  font-size: 2.5rem;
+}
+.exq-checkin[data-mode='kiosk'] .exq-checkin__choice-title {
+  font-size: clamp(1.75rem, 3.2vw, 2.25rem);
+}
+.exq-checkin[data-mode='kiosk'] .exq-board__tile {
+  padding: var(--s2) var(--s3);
+  line-height: 1.2;
+  align-content: start;
+}
+.exq-checkin[data-mode='kiosk'] .exq-board {
+  gap: var(--s3);
+}
