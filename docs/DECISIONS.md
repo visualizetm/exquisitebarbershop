@@ -1610,3 +1610,15 @@ pan-x pan-y`) and the context menu handler, not with `user-scalable=no` in the v
   tries at scripting that hit the ten minute rule. The closed line itself is built in `kioskBoard`
   from the same hours rule (`closedText`, Walk in greyed) and reads in the code; a screen from
   Rob's tablet after hours will do.
+
+## Prompt 13g
+
+- D13g-01 `END_SCREEN_SECONDS = 15` replaces `BACK_AFTER_MS` in one place. The count is one
+  `setInterval` inside the end screen component, cleared on Done, at 0 and on unmount, so no timer
+  outlives the screen; taps elsewhere never touch it. It applies to the owner's check in page too,
+  where the same screen is used. At 0 the screen runs the same reset as Done (start screen, board
+  refreshed). The bar steps with the number (no transition) and is hidden under reduced motion;
+  the number stays.
+- D13g-02 A screen reader hears the message and "Closing in 15 seconds" once, from one live
+  region; the visible counting line is hidden from it, because announcing every second would
+  drown the message.

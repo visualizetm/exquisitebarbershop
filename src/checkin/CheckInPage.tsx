@@ -25,8 +25,8 @@ import { CodePad } from './CodePad';
 import { usePageTitle } from '@/lib/usePageTitle';
 import '@/styles/checkin.css';
 
-/** How long an end screen stays before the tablet goes back to the start. */
-const BACK_AFTER_MS = 6000;
+/** How long an end screen counts down before the tablet goes back to the start (D13g-01). */
+export const END_SCREEN_SECONDS = 15;
 /** The locked tablet: back to the start after this long without a tap, hold the logo this long to exit. */
 const IDLE_MS = 45_000;
 const HOLD_MS = 3000;
@@ -111,14 +111,6 @@ export function CheckInPage({
       );
       return () => {
         window.clearInterval(id);
-      };
-    }
-    if (screen.kind === 'done') {
-      const id = window.setTimeout(() => {
-        setScreen({ kind: 'start' });
-      }, BACK_AFTER_MS);
-      return () => {
-        window.clearTimeout(id);
       };
     }
     return undefined;
@@ -294,19 +286,14 @@ export function CheckInPage({
       ) : null}
 
       {screen.kind === 'done' ? (
-        <main className="exq-checkin__main exq-checkin__done" role="status">
-          <h1 className="exq-checkin__title">{screen.title}</h1>
-          {screen.sub ? <p className="exq-checkin__sub">{screen.sub}</p> : null}
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={() => {
-              setScreen({ kind: 'start' });
-            }}
-          >
-            Done
-          </Button>
-        </main>
+        <EndScreen
+          title={screen.title}
+          sub={screen.sub}
+          onClose={() => {
+            setScreen({ kind: 'start' });
+            bump();
+          }}
+        />
       ) : null}
 
       <NewBookingFlow
@@ -779,5 +766,60 @@ function Board({ board }: { board: KioskBoardResponse | null }) {
         <p className="exq-board__off">Off today: {board.offToday.join(', ')}.</p>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * An end screen: the message, "Closing in 15" counting to 1 with a stepped red bar, and a big Done.
+ * One interval drives the count; it is cleared on Done, at 0 and on unmount, so no timer outlives
+ * the screen. Taps elsewhere neither restart nor extend it. A screen reader hears the message and
+ * "Closing in 15 seconds" once; the changing number is hidden from it.
+ */
+function EndScreen({
+  title,
+  sub,
+  onClose,
+}: {
+  title: string;
+  sub: string | null;
+  onClose: () => void;
+}) {
+  const [left, setLeft] = useState(END_SCREEN_SECONDS);
+  const close = useRef(onClose);
+  close.current = onClose;
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setLeft((n) => n - 1);
+    }, 1000);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, []);
+  useEffect(() => {
+    if (left <= 0) close.current();
+  }, [left]);
+  return (
+    <main className="exq-checkin__main exq-checkin__done">
+      <div role="status">
+        <h1 className="exq-checkin__title">{title}</h1>
+        {sub ? <p className="exq-checkin__sub">{sub}</p> : null}
+        <p className="exq-visually-hidden">{`Closing in ${String(END_SCREEN_SECONDS)} seconds`}</p>
+      </div>
+      <div className="exq-countdown" aria-hidden="true" data-testid="countdown">
+        <p className="exq-countdown__line">
+          Closing in <span className="exq-countdown__n exq-num">{Math.max(left, 1)}</span>
+        </p>
+        <div className="exq-countdown__track">
+          <div
+            className="exq-countdown__bar"
+            style={{ width: `${String((Math.max(left, 0) / END_SCREEN_SECONDS) * 100)}%` }}
+          />
+        </div>
+        <p className="exq-countdown__sub">The next client can start right after.</p>
+      </div>
+      <Button size="lg" variant="outline" className="exq-countdown__done" onClick={onClose}>
+        Done
+      </Button>
+    </main>
   );
 }

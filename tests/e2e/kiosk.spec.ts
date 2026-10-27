@@ -96,7 +96,16 @@ test('pair, the board, a walk in, a check in, the idle reset, the exit PIN, unpa
   await expect(page.locator('.exq-checkin__done')).toContainText(
     /Head to chair \d for Drew|You're #\d+ for Drew/,
   );
-  await page.locator('.exq-checkin__done').getByRole('button', { name: 'Done' }).click();
+  const count = page.getByTestId('countdown');
+  await expect(count).toContainText('Closing in 15');
+  await expect(count).toContainText('The next client can start right after.');
+  await expect(page.locator('.exq-checkin__done [role="status"]')).toContainText(
+    'Closing in 15 seconds',
+  );
+  await noAxe(page, 'end screen');
+  const done = page.locator('.exq-checkin__done').getByRole('button', { name: 'Done' });
+  expect((await done.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(64);
+  await done.click();
   await expect(page.getByRole('heading', { name: "Who's coming in?" })).toBeVisible();
 
   // Check in the booking: name, then one tap.
@@ -111,7 +120,20 @@ test('pair, the board, a walk in, a check in, the idle reset, the exit PIN, unpa
   await expect(page.locator('.exq-checkin__done')).toContainText("You're checked in");
   await expect(page.locator('.exq-checkin__done')).toContainText('Lee will be right with you');
   expect(booked.code).toMatch(/^[A-Z0-9]{3}-[A-Z0-9]{4}$/);
-  await page.locator('.exq-checkin__done').getByRole('button', { name: 'Done' }).click();
+  // The count goes 15, 10, 8 (a tap elsewhere changes nothing), 1, then the start screen.
+  const left = page.getByTestId('countdown');
+  await expect(left).toContainText('Closing in 15');
+  await page.clock.runFor(5000);
+  await expect(left).toContainText('Closing in 10');
+  await page.clock.runFor(2000);
+  await expect(left).toContainText('Closing in 8');
+  await page.locator('.exq-checkin__done .exq-checkin__title').click();
+  await expect(left).toContainText('Closing in 8');
+  await page.clock.runFor(7000);
+  await expect(left).toContainText('Closing in 1');
+  await page.clock.runFor(1000);
+  await expect(page.getByRole('heading', { name: "Who's coming in?" })).toBeVisible();
+  await expect(page.getByTestId('countdown')).toHaveCount(0);
 
   // Idle: 45 seconds without a tap in a flow goes back to the start and clears the form.
   await page.getByRole('button', { name: 'I have an appointment' }).click();

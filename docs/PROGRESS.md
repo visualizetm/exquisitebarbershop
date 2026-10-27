@@ -858,3 +858,12 @@ commit, and what is still open.
   showcase 13, vercel-function 97. PR 21 merged into main as 5314d7d at 18:16 UTC; Vercel
   production for it completed at 18:17 UTC. The three production URLs could not be read from the
   sandbox (proxy and connector both refuse), so Rob opens them.
+
+## Prompt 13g
+
+### M1: the countdown
+
+- Shipped: the end screen's "Closing in 15" to 1, the stepped red bar, the 64px Done, one interval
+  (D13g-01, D13g-02); tests/e2e/kiosk.spec.ts counts 15, 10, 8 (a tap elsewhere changes nothing), 1,
+  then the cleared start screen with a frozen clock; the owner's checkin spec waits for the count.
+- Heartbeat: 18:47 UTC, commit follows, next is M2 (the board fits, initials).
