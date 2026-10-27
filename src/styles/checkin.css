@@ -106,11 +106,15 @@
   width: 36px;
   height: 36px;
 }
-.exq-checkin__choice:disabled {
+.exq-checkin__choice:disabled,
+.exq-checkin__choice[data-variant='accent']:disabled {
   border-color: var(--border);
   background: var(--card);
   color: var(--fg-3);
   cursor: not-allowed;
+}
+.exq-checkin__chair[data-state='closed'] .exq-checkin__chair-state {
+  color: var(--fg-3);
 }
 @media (max-width: 599px) {
   .exq-checkin__choices {

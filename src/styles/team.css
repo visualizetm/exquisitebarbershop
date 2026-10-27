@@ -325,7 +325,7 @@ button.exq-team-row:hover {
 }
 .exq-team-head__text h1 {
   margin: 0;
-  font-size: var(--t-h2);
+  font-size: clamp(1.5rem, 7vw, 2.25rem);
   font-weight: 900;
   font-stretch: var(--w-display);
   line-height: 1;
@@ -335,6 +335,11 @@ button.exq-team-row:hover {
   display: block;
   margin-bottom: var(--s1);
   color: var(--fg-3);
+  white-space: nowrap;
+}
+.exq-team-head > .exq-btn {
+  flex: none;
+  white-space: nowrap;
 }
 .exq-team-actions {
   display: grid;

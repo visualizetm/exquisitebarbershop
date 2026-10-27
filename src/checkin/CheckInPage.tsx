@@ -11,7 +11,7 @@ import {
 import { okResponseSchema } from '@shared/api/auth';
 import { SHOP_TIMEZONE } from '@shared/lib/constants';
 import { shopTime } from '@/admin/format';
-import { chairEstimateLabel } from '@/admin/today/estimateLabel';
+import { chairStateLabel } from '@/admin/today/estimateLabel';
 import { NewBookingFlow, type FlowResult } from '@/booking-flow/NewBookingFlow';
 import { useChairEstimates, type FlowSession } from '@/booking-flow/flowData';
 import { Button, Input } from '@/components/ui';
@@ -138,9 +138,15 @@ export function CheckInPage({
             </h2>
             <ul className="exq-bare exq-checkin__chair-list">
               {estimates.chairs.map((c) => (
-                <li key={c.staffId} className="exq-checkin__chair" data-state={c.estimate.kind}>
+                <li
+                  key={c.staffId}
+                  className="exq-checkin__chair"
+                  data-state={c.gate.kind === 'open' ? c.estimate.kind : 'closed'}
+                >
                   <span className="exq-checkin__chair-name">{c.name}</span>
-                  <span className="exq-checkin__chair-state">{chairEstimateLabel(c.estimate)}</span>
+                  <span className="exq-checkin__chair-state">
+                    {chairStateLabel(c.gate, c.estimate)}
+                  </span>
                 </li>
               ))}
             </ul>

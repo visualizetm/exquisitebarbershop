@@ -758,3 +758,12 @@ commit, and what is still open.
   stale-save refusal, every old address redirected. Tests: hero unit (3), settingsEditor
   integration (1), editor e2e at 1440 and 390 with axe, website, dashboard and admin specs updated.
 - Heartbeat: 12:13 UTC, commit follows, next is M3 (the guides).
+
+### M3: the guides
+
+- Shipped: docs/OWNER-GUIDE.md (15 sections: the two sides, the floor, the line, New booking with
+  Now, bookings, schedule, the check-in tablet, clients, team, logins, the editor, settings,
+  launch checks, who to call) and docs/BARBER-GUIDE.md (cards and PIN, Today, Add booking, Done,
+  Out for the day, week and time off, Me, the tablet), screens in docs/screens/p13d/guide, the PDF
+  re-rendered. Lighthouse mobile Home 85, CLS 0.
+- Heartbeat: 12:21 UTC, commit follows, next is SHIP.

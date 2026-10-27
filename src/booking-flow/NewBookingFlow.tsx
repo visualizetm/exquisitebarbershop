@@ -7,7 +7,7 @@ import {
   type AdminBookingView,
   type CustomerListResponse,
 } from '@shared/api/admin';
-import type { WaitEstimateView } from '@shared/api/line';
+import type { NowGateView, WaitEstimateView } from '@shared/api/line';
 import {
   menuPrice,
   quoteFirstAvailable,
@@ -28,7 +28,7 @@ import {
   shopTime,
   todayInShop,
 } from '@/admin/format';
-import { estimateLabel } from '@/admin/today/estimateLabel';
+import { chairStateLabel, estimateLabel } from '@/admin/today/estimateLabel';
 import {
   bookedSchema,
   nowSchema,
@@ -495,7 +495,10 @@ export function NewBookingFlow({
                               ? 'Has it now'
                               : !offers
                                 ? 'Does not do these services'
-                                : chairLabel(chairEstimate(c.id))}
+                                : chairLabel(
+                                    chairEstimate(c.id),
+                                    estimates.chairs.find((x) => x.staffId === c.id)?.gate ?? null,
+                                  )}
                           </span>
                           <span className="exq-flow__tile-price exq-num">
                             {q ? money(q.totalCents) : ''}
@@ -842,7 +845,8 @@ export function NewBookingFlow({
   );
 }
 
-function chairLabel(e: WaitEstimateView): string {
+function chairLabel(e: WaitEstimateView, gate: NowGateView | null): string {
+  if (gate && gate.kind !== 'open') return chairStateLabel(gate, e);
   if (e.kind === 'free') return 'Free now';
   if (e.kind === 'about') return `Free about ${shopTime(e.at)}`;
   return 'Off today';

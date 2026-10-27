@@ -1491,3 +1491,10 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   stand-in, as before. Team edits reuse the Team page inside the panel (portraits are the first
   staff photo, which already replaces the initials everywhere); the work and the gallery reuse the
   gallery panel, whose Home flag and order pick the six home photos.
+- D13d-17 The guides are rewritten for the two sides, the floor, the line, New booking with Now,
+  the check in and the tablet sign-in, Move and Reschedule, the editor, and the new portal; their
+  screens come from the demo build (docs/screens/p13d/guide) and the PDF is re-rendered with the
+  existing script. The barber guide gained the check-in tablet section.
+- D13d-18 A chair's state on the check in and the barber tiles follows the hours rule before the
+  estimate: "Closed. Opens Tue 10 AM", "Off today" or "Done for the day" beat "Free now", so the
+  screen never says a chair is free while the shop is closed (the 8 AM capture showed it).
