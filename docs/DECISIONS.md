@@ -1444,3 +1444,26 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   other owner session keeps 14. The shop-wide setting is gone and `runSeed` unsets the old field.
   The flag is not a credential: without a valid session it does nothing, and a made-up value is
   ignored. Trade-off: the tablet stays signed in for 30 idle days, so it lives behind the desk.
+- D13d-07 The portal is dark on every screen: `.exq-app[data-state='team']` joins the dashboard's
+  token scope, and the Appearance switch left the Me screen. Sign in is a grid of cards (initials
+  or portrait, name, chair number) and the PIN pad gained a Show and Hide toggle; the keys were
+  64px already.
+- D13d-08 Today's one big action is Add booking, which opens the flow with NOW already picked (the
+  barber can still pick a later time), next to Out for the day; the old Walk-in button is gone.
+  Out for the day is a full-screen confirm over the existing out-today action and the owner
+  resolver; the copy says "the owner" rather than a name, since the owner's name is a setting.
+- D13d-09 "In your chair" reads the same `currentBooking` rule as the floor (Start pressed, else
+  the booked window holding now); when the chair is free it shows the first walk-in waiting for
+  this barber (or first available) with Start cut, which seats through the line service and the
+  slot locks, else the next booked client with Start cut, which stamps arrived and started through
+  `POST /api/team/bookings/:id/arrived` and `/start` (chair scope, the same audited stamps the
+  owner uses).
+- D13d-10 Today refreshes every 30 seconds while the tab is visible and after each action, with
+  the last data kept on screen while a refresh is in flight. Done and no-show rows sit at the
+  bottom on the raised surface in the secondary color rather than faded, because a faded tag
+  failed the contrast check.
+- D13d-11 Done early or a no show hands the rest of the booking's time back: the status change
+  releases the booking's slot locks from the current block onward (the blocks behind us stay as
+  history), so the next NOW walk-in lands in the chair instead of being refused as busy. An undo
+  back to confirmed takes the locks again and fails with SLOT_TAKEN when somebody has them by
+  then. Found by the portal spec: a walk-in right after Done was refused.

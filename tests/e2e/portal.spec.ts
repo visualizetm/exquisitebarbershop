@@ -22,12 +22,12 @@ async function signInBarber(page: Page, name: string, pin: string = E2E_BARBER_P
   await page.goto('/team');
   await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
   await enterPin(page, pin);
-  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
 }
 
 /** Walk-in through the full-screen flow: Haircut, NOW, name and phone, confirm. */
 async function walkIn(page: Page, name: string, phone: string) {
-  await page.getByRole('button', { name: 'Walk-in' }).click();
+  await page.getByRole('button', { name: 'Add booking' }).click();
   const flow = page.getByRole('dialog', { name: 'New booking' });
   await flow.getByRole('button', { name: /^Haircut\b(?! and| with)/ }).click();
   await flow.getByRole('button', { name: 'Continue' }).click();
@@ -49,7 +49,7 @@ test.describe('signing in', () => {
   }) => {
     await resetRateLimits();
     await page.goto('/team');
-    await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: "Who's working?" })).toBeVisible();
     // The site-wide bottom bar and header do not belong to the portal.
     await expect(page.locator('.exq-bottombar')).toHaveCount(0);
     await expect(page.getByText(/Demo PIN/)).toHaveCount(0);
@@ -71,10 +71,10 @@ test.describe('signing in', () => {
     await expect(page.getByText('That PIN did not work. Try again.')).toBeVisible();
     await expect(page.locator('.exq-pin__dot[data-state="filled"]')).toHaveCount(0);
     await enterPin(page, E2E_BARBER_PIN);
-    await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
     // Reloading keeps the session; the bottom tabs are the four portal screens.
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
     const tabs = page.getByRole('navigation', { name: 'Barber portal' });
     await expect(tabs.getByRole('link')).toHaveText(['Today', 'Week', 'Time off', 'Me']);
     for (const tab of await tabs.getByRole('link').all()) {
@@ -115,8 +115,8 @@ test.describe('a barber’s day at 390', () => {
 
     // Empty or not, the screen is honest about the day.
     await walkIn(page, client, phone);
-    const next = page.locator('.exq-team-next');
-    await expect(next.locator('.exq-team-next__who')).toHaveText(client);
+    const next = page.locator('.exq-team-chair');
+    await expect(next.locator('.exq-team-chair__who')).toHaveText(client);
     // Next up and the first two bookings fit above the tab bar without scrolling.
     const nextBox = await next.boundingBox();
     const rowBox = await page.locator('.exq-team-row').first().boundingBox();
@@ -125,7 +125,7 @@ test.describe('a barber’s day at 390', () => {
     expect((nextBox?.y ?? 0) + (nextBox?.height ?? 0)).toBeLessThan(tabBarTop);
     expect((rowBox?.y ?? 0) + 2 * (rowBox?.height ?? 0) + 8).toBeLessThanOrEqual(tabBarTop);
     // Tap targets are 48px or more.
-    for (const label of ['Done', 'No show', 'Walk-in']) {
+    for (const label of ['Done', 'No show', 'Add booking']) {
       const box = await page
         .getByRole('button', { name: label, exact: true })
         .first()
@@ -138,15 +138,15 @@ test.describe('a barber’s day at 390', () => {
     // Done, then Undo from the toast.
     await next.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByText(`${client} is done.`)).toBeVisible();
-    await expect(page.locator('.exq-team-next')).toHaveCount(0);
+    await expect(page.locator('.exq-team-chair')).toHaveAttribute('data-state', 'free');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(page.getByText(`${client} is back on the schedule.`)).toBeVisible();
-    await expect(page.locator('.exq-team-next__who')).toHaveText(client);
+    await expect(page.locator('.exq-team-chair__who')).toHaveText(client);
 
     // No show can be undone from the booking sheet too.
-    await page.locator('.exq-team-next').getByRole('button', { name: 'No show' }).click();
+    await page.locator('.exq-team-chair').getByRole('button', { name: 'No show' }).click();
     await expect(page.getByText(`${client} marked no show.`)).toBeVisible();
-    await page.locator('.exq-team-row', { hasText: client }).click();
+    await page.locator(`.exq-team-row[data-client="${client}"]`).click();
     const sheet = page.getByRole('dialog', { name: client });
     await sheet.getByRole('button', { name: 'Undo' }).click();
     await expect(page.getByText(`${client} is back on the schedule.`).last()).toBeVisible();
@@ -157,7 +157,7 @@ test.describe('a barber’s day at 390', () => {
     await expect(page.getByText('Note saved.')).toBeVisible();
     await expect(sheet.getByRole('link', { name: 'Call shop' })).toHaveAttribute('href', /^tel:/);
     await page.keyboard.press('Escape');
-    await expect(page.locator('.exq-team-next__notes')).toHaveText('Likes a number 2 on the sides');
+    await expect(page.locator('.exq-team-chair__notes')).toHaveText('Likes a number 2 on the sides');
 
     // The week shows seven days and the client under today.
     await page.getByRole('link', { name: 'Week', exact: true }).click();
@@ -209,13 +209,13 @@ test.describe('a barber’s day at 390', () => {
     await expect(page.getByRole('button', { name: 'I am out today', exact: true })).toHaveCount(0);
     // The client is still booked: nothing was cancelled.
     await page.getByRole('link', { name: 'Today', exact: true }).click();
-    await expect(page.locator('.exq-team-row', { hasText: client })).toBeVisible();
+    await expect(page.locator(`.exq-team-row[data-client="${client}"]`)).toBeVisible();
 
     // Me, and sign out.
     await page.getByRole('link', { name: 'Me', exact: true }).click();
     await expect(page.locator('.exq-team-me__name')).toHaveText(name);
     await page.getByRole('button', { name: 'Sign out' }).click();
-    await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: "Who's working?" })).toBeVisible();
     const status = await page.evaluate(async () => (await fetch('/api/team/today')).status);
     expect(status).toBe(401);
   });
@@ -277,7 +277,7 @@ test.describe('setup links and the lockout', () => {
       await expect(phone.getByText('Those two did not match. Start again.')).toBeVisible();
       await enterPin(phone, '290417');
       await enterPin(phone, '290417');
-      await expect(phone.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+      await expect(phone.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
       await expect(phone.getByRole('link', { name: 'Me', exact: true })).toBeVisible();
 
       // The link is spent.
@@ -294,7 +294,7 @@ test.describe('setup links and the lockout', () => {
       await phone.goto(new URL(again).pathname);
       await enterPin(phone, E2E_BARBER_PIN);
       await enterPin(phone, E2E_BARBER_PIN);
-      await expect(phone.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+      await expect(phone.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
     } finally {
       await phone.context().close();
     }
@@ -328,7 +328,7 @@ test.describe('setup links and the lockout', () => {
       await phone.goto('/team');
       await phone.getByRole('button', { name: /^Dontrise/ }).click();
       await enterPin(phone, E2E_BARBER_PIN);
-      await expect(phone.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+      await expect(phone.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
     } finally {
       await phone.context().close();
     }
@@ -350,19 +350,19 @@ for (const theme of ['light', 'dark'] as const) {
     };
     await resetRateLimits();
     await page.goto('/team');
-    await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: "Who's working?" })).toBeVisible();
     await check('names');
     const name = theme === 'light' ? 'Drew' : 'Nelly';
     await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
     await check('pin');
     await enterPin(page, E2E_BARBER_PIN);
-    await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
     await walkIn(page, `Axe ${String(Date.now()).slice(-5)}`, randomPhone());
     await check('today');
     await page.locator('.exq-team-row').first().click();
     await check('booking sheet');
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Walk-in' }).click();
+    await page.getByRole('button', { name: 'Add booking' }).click();
     await expect(page.getByRole('dialog', { name: 'New booking' })).toBeVisible();
     await check('walk-in flow');
     await page.keyboard.press('Escape');

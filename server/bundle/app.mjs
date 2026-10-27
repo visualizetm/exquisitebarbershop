@@ -29939,7 +29939,8 @@ __export(slotLocksRepo_exports, {
   acquireUnheldSlotLocks: () => acquireUnheldSlotLocks,
   listSlotLocksForHolder: () => listSlotLocksForHolder,
   listSlotLocksForStaff: () => listSlotLocksForStaff,
-  releaseSlotLocks: () => releaseSlotLocks
+  releaseSlotLocks: () => releaseSlotLocks,
+  releaseSlotLocksFrom: () => releaseSlotLocksFrom
 });
 
 // shared/schemas/slotLock.ts
@@ -29980,6 +29981,11 @@ async function acquireSlotLocks(staffId, range, holder, now2, options) {
     throw error62;
   }
   return docs;
+}
+async function releaseSlotLocksFrom(holderId, from, options) {
+  const col = await collection("slotLocks");
+  const result = await col.deleteMany({ holderId, slotStart: { $gte: from } }, sessionOf(options));
+  return result.deletedCount;
 }
 async function releaseSlotLocks(holderId, options) {
   const col = await collection("slotLocks");
@@ -36394,7 +36400,10 @@ var teamMeResponseSchema = external_exports.object({
     id: idSchema,
     name: external_exports.string(),
     title: external_exports.string(),
-    photo: photoViewSchema.nullable()
+    photo: photoViewSchema.nullable(),
+    chairNumber: external_exports.int().nullable(),
+    bio: external_exports.string(),
+    instagramHandle: external_exports.string().nullable()
   }),
   /** When this sign-in ends, whatever the barber does. */
   expiresAt: external_exports.iso.datetime()
@@ -36408,7 +36417,10 @@ var teamBookingViewSchema = external_exports.object({
   endAt: external_exports.iso.datetime(),
   customerName: external_exports.string(),
   services: external_exports.array(external_exports.string()),
-  notes: external_exports.string().nullable()
+  notes: external_exports.string().nullable(),
+  priceCents: external_exports.int().min(0),
+  arrivedAt: external_exports.iso.datetime().nullable(),
+  startedAt: external_exports.iso.datetime().nullable()
 });
 var teamDayResponseSchema = external_exports.object({
   date: isoDateSchema,
@@ -37393,6 +37405,25 @@ async function changeBookingStatus(principal, scope, id, input2, meta3) {
         "INVALID_TRANSITION",
         "The booking changed in the meantime. Reload and try again."
       );
+    if (to === "completed" || to === "noShow") {
+      await slotLocksRepo_exports.releaseSlotLocksFrom(booking._id, floorToStep(meta3.now), { session });
+    } else {
+      const range = {
+        start: booking.startAt,
+        end: addMinutes(booking.endAt, booking.bufferMinutes)
+      };
+      await slotLocksRepo_exports.acquireUnheldSlotLocks(
+        booking.staffId,
+        range,
+        { holderType: "booking", holderId: booking._id },
+        meta3.now,
+        { session }
+      );
+      const mine = await slotLocksRepo_exports.listSlotLocksForHolder(booking._id, { session });
+      if (mine.length < lockSlotStarts(range.start, range.end).length) {
+        throw new AppError("SLOT_TAKEN", "That time was taken in the meantime. Rebook instead.");
+      }
+    }
     await auditLogRepo_exports.appendAuditEntry(
       {
         actor,
@@ -41739,8 +41770,16 @@ function toTeamBookingView(b) {
     endAt: b.endAt.toISOString(),
     customerName: b.customer.name,
     services: b.services.map((s2) => s2.name),
-    notes: b.notes
+    notes: b.notes,
+    priceCents: b.totalPriceCents,
+    arrivedAt: b.arrivedAt?.toISOString() ?? null,
+    startedAt: b.startedAt?.toISOString() ?? null
   };
+}
+async function bookingDocById(id) {
+  const b = await bookingsRepo_exports.findBookingById(id);
+  if (!b) throw new AppError("NOT_FOUND", "Booking was not found");
+  return b;
 }
 async function ownStaff(principal) {
   const { staffId } = chairScope(principal);
@@ -41760,7 +41799,10 @@ async function teamMe(principal) {
       id: staff._id,
       name: staff.name,
       title: staff.title,
-      photo: photos.get(staff._id) ?? null
+      photo: photos.get(staff._id) ?? null,
+      chairNumber: staff.chairNumber,
+      bio: staff.bio,
+      instagramHandle: staff.instagramHandle
     },
     expiresAt: (session?.expiresAt ?? /* @__PURE__ */ new Date()).toISOString()
   };
@@ -42069,6 +42111,29 @@ var teamRoutes = [
       return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
     }
   },
+  // Arrived and Start on the barber's own bookings: the same audited stamps the floor uses.
+  ...["arrived", "start"].map((moment) => ({
+    method: "POST",
+    path: `/api/team/bookings/:id/${moment}`,
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { id } = parseParams(ctx, idParams3);
+      const done = await stampBookingMoment2(
+        principal,
+        chairScope(principal),
+        id,
+        moment,
+        metaOf(ctx)
+      );
+      return {
+        body: teamStatusResponseSchema.parse({
+          booking: toTeamBookingView(await bookingDocById(done.booking.id))
+        }),
+        headers: NO_STORE
+      };
+    }
+  })),
   {
     method: "POST",
     path: "/api/team/bookings/:id/note",

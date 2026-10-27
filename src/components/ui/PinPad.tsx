@@ -16,6 +16,7 @@ export function PinPad({
   disabled = false,
   error,
   resetKey = 0,
+  revealable = false,
 }: {
   length?: number;
   label: string;
@@ -24,8 +25,11 @@ export function PinPad({
   error?: string | null | undefined;
   /** Change this number to clear the digits. */
   resetKey?: number;
+  /** Offer a Show and Hide toggle that prints the digits in place of the dots. */
+  revealable?: boolean;
 }) {
   const [digits, setDigits] = useState('');
+  const [shown, setShown] = useState(false);
   const done = useRef(false);
 
   useEffect(() => {
@@ -64,15 +68,29 @@ export function PinPad({
       data-state={disabled ? 'disabled' : error ? 'error' : 'ready'}
       onKeyDown={onKeyDown}
     >
-      <div className="exq-pin__dots" aria-hidden="true">
+      <div className="exq-pin__dots" aria-hidden="true" data-state={shown ? 'shown' : 'hidden'}>
         {Array.from({ length }, (_, i) => (
           <span
             key={i}
             className="exq-pin__dot"
             data-state={i < digits.length ? 'filled' : 'empty'}
-          />
+          >
+            {shown ? (digits[i] ?? '') : ''}
+          </span>
         ))}
       </div>
+      {revealable ? (
+        <button
+          type="button"
+          className="exq-pin__reveal"
+          aria-pressed={shown}
+          onClick={() => {
+            setShown((v) => !v);
+          }}
+        >
+          {shown ? 'Hide' : 'Show'}
+        </button>
+      ) : null}
       <p className="exq-pin__status" role="status">
         {error ?? `${digits.length} of ${length} digits`}
       </p>

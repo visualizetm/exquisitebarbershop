@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import { okResponseSchema } from '@shared/api/auth';
-import { Button, Input, Sheet, ThemeSwitch, useToast } from '@/components/ui';
+import { Button, Input, Sheet, useToast } from '@/components/ui';
 import { ApiRequestError } from '@/lib/api';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { Avatar } from '@/admin/components/Avatar';
@@ -37,10 +37,27 @@ export function MePage() {
         <Avatar name={me.staff.name} photo={me.staff.photo} />
         <div>
           <p className="exq-team-me__name">{me.staff.name}</p>
-          <p className="exq-muted">{me.staff.title}</p>
+          <p className="exq-muted">
+            {me.staff.title}
+            {me.staff.chairNumber !== null ? `, chair ${String(me.staff.chairNumber)}` : ''}
+          </p>
           <p className="exq-muted">Signed in until {shopTime(me.expiresAt)}</p>
         </div>
       </section>
+      <dl className="exq-team-profile">
+        <div>
+          <dt className="exq-label">Specialty</dt>
+          <dd>{me.staff.title}</dd>
+        </div>
+        <div>
+          <dt className="exq-label">Bio</dt>
+          <dd>{me.staff.bio.trim() ? me.staff.bio : 'No bio yet.'}</dd>
+        </div>
+        <div>
+          <dt className="exq-label">Instagram</dt>
+          <dd>{me.staff.instagramHandle ? `@${me.staff.instagramHandle}` : 'Not set'}</dd>
+        </div>
+      </dl>
       <p className="exq-muted">To change your photo or your details, ask the owner.</p>
       <div className="exq-team-asks">
         <Button
@@ -57,12 +74,6 @@ export function MePage() {
           Sign out
         </Button>
       </div>
-      <section aria-labelledby="exq-team-theme-title">
-        <h2 id="exq-team-theme-title" className="exq-team-sub">
-          Appearance
-        </h2>
-        <ThemeSwitch />
-      </section>
       <Sheet
         open={changing}
         title="Change PIN"

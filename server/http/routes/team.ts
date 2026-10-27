@@ -39,7 +39,9 @@ import {
   checkInLookupResponseSchema,
 } from '../../../shared/api/checkIn';
 import { chairScope } from '../../services/access';
+import { stampBookingMoment } from '../../services/adminBookings';
 import { addToLine, bookNow, lineView, seatFromLine } from '../../services/line';
+import { bookingDocById, toTeamBookingView } from '../../services/teamPortal';
 import { arriveFromCheckIn, lookupToday } from '../../services/checkIn';
 import { createManualBooking } from '../../services/bookingService';
 import { actorOf } from '../../services/access';
@@ -166,6 +168,29 @@ export const teamRoutes: RouteDefinition[] = [
       return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
     },
   },
+  // Arrived and Start on the barber's own bookings: the same audited stamps the floor uses.
+  ...(['arrived', 'start'] as const).map((moment): RouteDefinition => ({
+    method: 'POST',
+    path: `/api/team/bookings/:id/${moment}`,
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { id } = parseParams(ctx, idParams);
+      const done = await stampBookingMoment(
+        principal,
+        chairScope(principal),
+        id,
+        moment,
+        metaOf(ctx),
+      );
+      return {
+        body: teamStatusResponseSchema.parse({
+          booking: toTeamBookingView(await bookingDocById(done.booking.id)),
+        }),
+        headers: NO_STORE,
+      };
+    },
+  })),
   {
     method: 'POST',
     path: '/api/team/bookings/:id/note',

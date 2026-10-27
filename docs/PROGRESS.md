@@ -740,3 +740,13 @@ commit, and what is still open.
   surfaces, the per-device tablet flag replacing the shop-wide setting. Tests: openNow unit (4),
   now integration (6, two refusals), tabletSession integration (1), line, checkIn and authz.
 - Heartbeat: 11:21 UTC, commit follows, next is M1 (the barber portal redo).
+
+### M1: the barber portal redo
+
+- Shipped: Who's working? cards and the PIN pad with Show and Hide, the dark portal, Today with
+  the barber head, Add booking (NOW first), Out for the day (full-screen confirm), Check in, In
+  your chair (current cut, first walk-in with Start cut, next client with Start cut), the day list
+  with source tags and done rows at the bottom, Me with the profile, 30 second refresh, barber
+  arrived and start routes. Tests: portal13d e2e at 390 with axe on every screen, portal, flow,
+  team, realshop, checkin and admin specs updated.
+- Heartbeat: 11:53 UTC, commit follows, next is M2 (the website editor).

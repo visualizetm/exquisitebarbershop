@@ -49,6 +49,20 @@ export async function acquireSlotLocks(
   return docs;
 }
 
+/**
+ * Releases a holder's locks from a block start onward: a cut finished early or a no show gives the
+ * rest of its time back to the chair, while the blocks already behind us stay as history.
+ */
+export async function releaseSlotLocksFrom(
+  holderId: string,
+  from: Date,
+  options?: RepoOptions,
+): Promise<number> {
+  const col = await collection('slotLocks');
+  const result = await col.deleteMany({ holderId, slotStart: { $gte: from } }, sessionOf(options));
+  return result.deletedCount;
+}
+
 /** Releases every lock held by a booking or time block. Returns how many were removed. */
 export async function releaseSlotLocks(holderId: string, options?: RepoOptions): Promise<number> {
   const col = await collection('slotLocks');

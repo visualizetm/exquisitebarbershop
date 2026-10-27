@@ -18,6 +18,7 @@ let ownerCookie: string;
 let drewCookie: string;
 const cut = serviceSeedId('haircut');
 const drew = staffSeedId('drew');
+const nelly = staffSeedId('nelly');
 const lee = staffSeedId('lee');
 let n = 0;
 const phone = () => `215555${String(3000 + (n += 1))}`;
@@ -242,5 +243,41 @@ describe('NOW', () => {
     } finally {
       await timeBlocksRepo.deleteTimeBlock(block._id);
     }
+  });
+
+  it('a cut marked done early gives the rest of its time back, so the next NOW lands in the chair', async () => {
+    const first = nowResponseSchema.parse(
+      (
+        await owner('POST', '/api/admin/now', {
+          serviceIds: [cut],
+          staffId: nelly,
+          customer: customer('Done Early'),
+        })
+      ).body,
+    );
+    expect(first.kind).toBe('booking');
+    if (first.kind !== 'booking') return;
+    const done = await owner('POST', `/api/admin/bookings/${first.booking.id}/status`, {
+      status: 'completed',
+      notify: false,
+    });
+    expect(done.status).toBe(200);
+    const again = nowResponseSchema.parse(
+      (
+        await owner('POST', '/api/admin/now', {
+          serviceIds: [cut],
+          staffId: nelly,
+          customer: customer('Right After'),
+        })
+      ).body,
+    );
+    expect(again.kind).toBe('booking');
+    // Undoing the first one now fails: its time belongs to the second.
+    const undo = await owner('POST', `/api/admin/bookings/${first.booking.id}/status`, {
+      status: 'confirmed',
+      notify: false,
+    });
+    expect(undo.status).toBe(409);
+    expect(codeOf(undo.body)).toBe('SLOT_TAKEN');
   });
 });

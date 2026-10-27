@@ -12,7 +12,7 @@ async function signInBarber(page: Page, name: string) {
   await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
   const pad = page.getByRole('group', { name: /^PIN for/ });
   for (const d of E2E_BARBER_PIN) await pad.getByRole('button', { name: d, exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
 }
 
 const fullScreen = (page: Page) => page.locator('.exq-dialog[data-variant="full"][open]');
@@ -68,7 +68,7 @@ test.describe('the full-screen booking flow', () => {
   }) => {
     await page.setViewportSize(PHONE);
     await signInBarber(page, 'Drew');
-    await page.getByRole('button', { name: 'Walk-in' }).click();
+    await page.getByRole('button', { name: 'Add booking' }).click();
     const flow = page.getByRole('dialog', { name: 'New booking' });
     await expect(fullScreen(page)).toHaveCount(1);
     await expect(flow.getByRole('button', { name: /^Step \d: Barber/ })).toHaveCount(0);
@@ -96,7 +96,7 @@ test.describe('the full-screen booking flow', () => {
       expect((await b.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     }
     await flow.getByRole('button', { name: 'Done' }).click();
-    await expect(page.locator('.exq-team-next__who')).toHaveText('Now Phone Client');
+    await expect(page.locator('.exq-team-chair__who')).toHaveText('Now Phone Client');
     // Hand the chair back for the specs that follow.
     await page.getByRole('button', { name: 'Done', exact: true }).first().click();
   });
@@ -141,7 +141,7 @@ test.describe('the full-screen booking flow', () => {
         await expect(page.locator('.exq-flow'), label).toBeVisible();
         await page
           .locator(
-            '.exq-dialog[data-variant="full"] > .exq-dialog__inner > .exq-dialog__head .exq-dialog__close',
+            '.exq-dialog[data-variant="full"][open] > .exq-dialog__inner > .exq-dialog__head .exq-dialog__close',
           )
           .click();
         const ask = page.getByRole('dialog', { name: 'Discard this booking?' });
@@ -169,7 +169,6 @@ test.describe('the full-screen booking flow', () => {
       await open('Portal Add booking', () =>
         page.getByRole('button', { name: 'Add booking' }).click(),
       );
-      await open('Portal Walk-in', () => page.getByRole('button', { name: 'Walk-in' }).click());
     });
   }
 });

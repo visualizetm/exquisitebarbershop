@@ -14,7 +14,14 @@ import { CUSTOMER_PAGE_SIZE } from '../../shared/api/admin';
 import { formatUsPhone, normalizeUsPhone } from '../../shared/lib/phone';
 import { normalizeReferenceCode } from '../../shared/lib/referenceCode';
 import { classifySearch } from '../../shared/lib/search';
-import { addMinutes, shopDateOf, shopDayBounds, shopDayStart } from '../../shared/lib/time';
+import {
+  addMinutes,
+  floorToStep,
+  lockSlotStarts,
+  shopDateOf,
+  shopDayBounds,
+  shopDayStart,
+} from '../../shared/lib/time';
 import type { BookingDocument, BookingStatus } from '../../shared/schemas/booking';
 import type { StaffDocument } from '../../shared/schemas/staff';
 import { withTransaction } from '../db/transaction';
@@ -561,6 +568,27 @@ export async function changeBookingStatus(
         'INVALID_TRANSITION',
         'The booking changed in the meantime. Reload and try again.',
       );
+    // Done early or a no show hands the rest of the time back to the chair, so the next walk-in
+    // can take it; an undo takes the time back, or fails if somebody has it by now.
+    if (to === 'completed' || to === 'noShow') {
+      await slotLocksRepo.releaseSlotLocksFrom(booking._id, floorToStep(meta.now), { session });
+    } else {
+      const range = {
+        start: booking.startAt,
+        end: addMinutes(booking.endAt, booking.bufferMinutes),
+      };
+      await slotLocksRepo.acquireUnheldSlotLocks(
+        booking.staffId,
+        range,
+        { holderType: 'booking', holderId: booking._id },
+        meta.now,
+        { session },
+      );
+      const mine = await slotLocksRepo.listSlotLocksForHolder(booking._id, { session });
+      if (mine.length < lockSlotStarts(range.start, range.end).length) {
+        throw new AppError('SLOT_TAKEN', 'That time was taken in the meantime. Rebook instead.');
+      }
+    }
     await auditLogRepo.appendAuditEntry(
       {
         actor,

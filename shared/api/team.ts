@@ -40,6 +40,9 @@ export const teamMeResponseSchema = z.object({
     name: z.string(),
     title: z.string(),
     photo: photoViewSchema.nullable(),
+    chairNumber: z.int().nullable(),
+    bio: z.string(),
+    instagramHandle: z.string().nullable(),
   }),
   /** When this sign-in ends, whatever the barber does. */
   expiresAt: z.iso.datetime(),
@@ -64,6 +67,9 @@ export const teamBookingViewSchema = z.object({
   customerName: z.string(),
   services: z.array(z.string()),
   notes: z.string().nullable(),
+  priceCents: z.int().min(0),
+  arrivedAt: z.iso.datetime().nullable(),
+  startedAt: z.iso.datetime().nullable(),
 });
 export type TeamBookingView = z.infer<typeof teamBookingViewSchema>;
 
