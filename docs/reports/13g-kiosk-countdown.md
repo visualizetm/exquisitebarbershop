@@ -12,7 +12,7 @@ Built:
   API contract: unchanged.
   Tests: unit and integration 699 passed, 0 failed; dev e2e 166 passed, 1 failed in the full run (tests/e2e/team.spec.ts block time resolver, the same order dependent failure as in 13f, 8 of 8 passed rerun alone, it does not touch the check in page); prod-like 7 passed; showcase 13 passed; vercel-function 97 passed; CI green on the PR head. Commands: npm run typecheck && npm run lint && npm run format:check && npm run test:coverage && npm run build && npx playwright test && npx playwright test -c playwright.prod.config.ts && npx playwright test -c playwright.demo.config.ts && npm run test:vercel-function
   Checks: typecheck clean, lint clean, format clean, build clean, CI green. Vercel production for the merge commit and the three production URLs could not be read from this sandbox (the proxy refuses the domain, as in 13f); Rob checks.
-  Commits: 59493cc countdown; c5da834 board fit and initials; fab026b guide and screens; merge **MERGE_SHA**
+  Commits: 59493cc countdown; c5da834 board fit and initials; fab026b guide and screens; merge 5c2c7f0 (PR 24)
   Env vars: none.
   Open questions: none.
   Known gaps and risks: The stepped bar is hidden under reduced motion, as asked, so those clients see the number only. Tiles with a long status ("With a client, free about 3:19 PM") wrap to three lines at 1180 wide; the fit test covers a busy barber.
