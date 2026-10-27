@@ -27729,7 +27729,7 @@ var timestampsSchema = external_exports.object({
 
 // shared/schemas/timeBlock.ts
 var timeBlockKindSchema = external_exports.enum(["timeOff", "block", "dayOff", "extraHours"]);
-var actorTypeSchema = external_exports.enum(["owner", "barber", "customer", "system"]);
+var actorTypeSchema = external_exports.enum(["owner", "barber", "customer", "system", "kiosk"]);
 var actorSchema = external_exports.object({
   type: actorTypeSchema,
   userId: idSchema.nullable(),
@@ -28416,7 +28416,8 @@ var COLLECTIONS = {
   customerNotes: "customerNotes",
   staffPins: "staffPins",
   setupTokens: "setupTokens",
-  teamSessions: "teamSessions"
+  teamSessions: "teamSessions",
+  kioskDevices: "kioskDevices"
 };
 var DAY_SECONDS = 24 * 60 * 60;
 var INDEXES = [
@@ -28563,6 +28564,17 @@ var INDEXES = [
     keys: { staffId: 1 },
     options: { name: "by_staff" },
     reason: "A new link retires the barber's earlier ones."
+  },
+  // kioskDevices
+  {
+    collection: "kioskDevices",
+    keys: { tokenHash: 1 },
+    options: {
+      name: "uniq_tokenHash",
+      unique: true,
+      partialFilterExpression: { tokenHash: { $type: "string" } }
+    },
+    reason: "The tablet cookie is looked up by its token hash on every kiosk request."
   },
   // teamSessions
   {
@@ -31197,6 +31209,101 @@ async function recordSignIn(staffId, now2, options) {
   await col.updateOne({ staffId }, { $set: { lastSignInAt: now2 } }, sessionOf(options));
 }
 
+// server/repos/kioskDevicesRepo.ts
+var kioskDevicesRepo_exports = {};
+__export(kioskDevicesRepo_exports, {
+  deleteDemoKioskDevices: () => deleteDemoKioskDevices,
+  findKioskDeviceById: () => findKioskDeviceById,
+  findKioskDeviceByToken: () => findKioskDeviceByToken,
+  insertKioskDevice: () => insertKioskDevice,
+  listKioskDevices: () => listKioskDevices,
+  listKioskDevicesAwaitingCode: () => listKioskDevicesAwaitingCode,
+  pairKioskDevice: () => pairKioskDevice,
+  revokeKioskDevice: () => revokeKioskDevice,
+  touchKioskDevice: () => touchKioskDevice
+});
+
+// shared/schemas/kioskDevice.ts
+var kioskDeviceDocumentSchema = external_exports.object({
+  _id: idSchema,
+  name: nonEmptyText(40),
+  /** sha256 of the device token in the cookie; null until the tablet pairs. */
+  tokenHash: external_exports.string().nullable(),
+  exitPinHash: external_exports.string(),
+  /** The one-use pairing code, keyed hash; cleared on pairing. */
+  pairCodeHash: external_exports.string().nullable(),
+  pairCodeExpiresAt: external_exports.date().nullable(),
+  pairedAt: external_exports.date().nullable(),
+  lastSeenAt: external_exports.date().nullable(),
+  revokedAt: external_exports.date().nullable(),
+  /** Paired by the showcase's "Use the demo tablet"; cleared by the demo reset. */
+  demo: external_exports.boolean().default(false),
+  createdAt: external_exports.date()
+});
+
+// server/repos/kioskDevicesRepo.ts
+async function insertKioskDevice(input2, now2, options) {
+  const doc = kioskDeviceDocumentSchema.parse({
+    _id: options?.id ?? newId(),
+    ...input2,
+    lastSeenAt: input2.pairedAt,
+    revokedAt: null,
+    createdAt: now2
+  });
+  const col = await collection("kioskDevices");
+  await col.insertOne(doc, sessionOf(options));
+  return doc;
+}
+async function findKioskDeviceById(id) {
+  const col = await collection("kioskDevices");
+  return col.findOne({ _id: id });
+}
+async function listKioskDevicesAwaitingCode(now2) {
+  const col = await collection("kioskDevices");
+  return col.find({ tokenHash: null, revokedAt: null, pairCodeExpiresAt: { $gt: now2 } }).toArray();
+}
+async function findKioskDeviceByToken(tokenHash) {
+  const col = await collection("kioskDevices");
+  return col.findOne({ tokenHash, revokedAt: null });
+}
+async function listKioskDevices() {
+  const col = await collection("kioskDevices");
+  return col.find({ revokedAt: null }).sort({ createdAt: -1 }).toArray();
+}
+async function pairKioskDevice(id, tokenHash, now2) {
+  const col = await collection("kioskDevices");
+  const result = await col.updateOne(
+    { _id: id, tokenHash: null, revokedAt: null },
+    {
+      $set: {
+        tokenHash,
+        pairedAt: now2,
+        lastSeenAt: now2,
+        pairCodeHash: null,
+        pairCodeExpiresAt: null
+      }
+    }
+  );
+  return result.modifiedCount === 1;
+}
+async function touchKioskDevice(id, now2) {
+  const col = await collection("kioskDevices");
+  await col.updateOne({ _id: id }, { $set: { lastSeenAt: now2 } });
+}
+async function revokeKioskDevice(id, now2) {
+  const col = await collection("kioskDevices");
+  const result = await col.updateOne(
+    { _id: id, revokedAt: null },
+    { $set: { revokedAt: now2, tokenHash: null, pairCodeHash: null, pairCodeExpiresAt: null } }
+  );
+  return result.modifiedCount === 1;
+}
+async function deleteDemoKioskDevices() {
+  const col = await collection("kioskDevices");
+  const result = await col.deleteMany({ demo: true });
+  return result.deletedCount;
+}
+
 // server/repos/setupTokensRepo.ts
 var setupTokensRepo_exports = {};
 __export(setupTokensRepo_exports, {
@@ -31406,6 +31513,20 @@ var SESSION_COOKIE = "__Host-exq_session";
 var TEAM_COOKIE = "__Host-exq_team";
 var TABLET_COOKIE = "__Host-exq_tablet";
 var TABLET_COOKIE_DAYS = 400;
+var KIOSK_COOKIE = "__Host-exq_kiosk";
+var KIOSK_COOKIE_DAYS = 180;
+function readKioskCookie(req) {
+  return readCookie(req, KIOSK_COOKIE);
+}
+function setKioskCookie(res, token) {
+  appendSetCookie(
+    res,
+    `${KIOSK_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${String(KIOSK_COOKIE_DAYS * 24 * 60 * 60)}`
+  );
+}
+function clearKioskCookie(res) {
+  appendSetCookie(res, `${KIOSK_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
+}
 var TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 var HEX_PATTERN = /^[a-f0-9]{64}$/;
 function readCookie(req, wanted) {
@@ -31538,26 +31659,8 @@ async function endAllSessions(res, principal, now2) {
   return count;
 }
 
-// shared/lib/pin.ts
-var PIN_LENGTH = 6;
-var PIN_PATTERN = /^\d{6}$/;
-var DEMO_PIN = "246810";
-var REJECTED = "Pick a PIN that is harder to guess. Avoid repeats and runs like 123456.";
-function pinProblem(pin) {
-  if (!PIN_PATTERN.test(pin)) return `Use exactly ${String(PIN_LENGTH)} digits.`;
-  const digits = Array.from(pin, Number);
-  const step = (a, b) => (b - a + 10) % 10;
-  const steps = digits.slice(1).map((d, i) => step(digits[i] ?? 0, d));
-  if (steps.every((s2) => s2 === 0)) return REJECTED;
-  if (steps.every((s2) => s2 === 1) || steps.every((s2) => s2 === 9)) return REJECTED;
-  for (const size of [2, 3]) {
-    if (pin === pin.slice(0, size).repeat(PIN_LENGTH / size)) return REJECTED;
-  }
-  return null;
-}
-
-// server/auth/pin.ts
-import { createHmac } from "node:crypto";
+// server/auth/kioskAuth.ts
+import { randomInt } from "node:crypto";
 
 // server/auth/password.ts
 import { hash as hash2, parseOptions, verify } from "@node-rs/argon2";
@@ -31636,61 +31739,6 @@ function generateTemporaryPassword() {
     for (const byte of bytes) raw += TEMP_ALPHABET.charAt(byte % TEMP_ALPHABET.length);
     const candidate = raw.match(/.{4}/g)?.join("-") ?? raw;
     if (passwordProblems(candidate).length === 0) return candidate;
-  }
-}
-
-// server/auth/pin.ts
-function keyed(staffId, pin) {
-  return createHmac("sha256", getEnv2().MANAGE_LINK_SECRET).update(`pin:${staffId}:${pin}`).digest("hex");
-}
-function hashPin(staffId, pin) {
-  return hashPassword(keyed(staffId, pin));
-}
-function verifyPin(storedHash, staffId, pin) {
-  return verifyPassword(storedHash, keyed(staffId, pin));
-}
-function dummyPinHash() {
-  return getDummyHash();
-}
-
-// server/db/transaction.ts
-var DEFAULT_TX_OPTIONS = {
-  readConcern: { level: "snapshot" },
-  writeConcern: { w: "majority" },
-  readPreference: "primary"
-};
-function hasErrorLabel(error62, label) {
-  if (typeof error62 !== "object" || error62 === null || !("hasErrorLabel" in error62)) return false;
-  const candidate = error62.hasErrorLabel;
-  return typeof candidate === "function" && candidate.call(error62, label);
-}
-function isTransientTransactionError(error62) {
-  return hasErrorLabel(error62, "TransientTransactionError") || hasErrorLabel(error62, "UnknownTransactionCommitResult");
-}
-async function withTransaction(fn, options = {}) {
-  const client = await getMongoClient();
-  const maxRetries = options.maxRetries ?? 3;
-  const txOptions = { ...DEFAULT_TX_OPTIONS, ...options.transaction };
-  let attempt = 0;
-  for (; ; ) {
-    attempt += 1;
-    const session = client.startSession();
-    try {
-      let result;
-      await session.withTransaction(async () => {
-        result = await fn(session);
-      }, txOptions);
-      return result;
-    } catch (error62) {
-      if (isTransientTransactionError(error62) && attempt < maxRetries) {
-        logger.warn("transient transaction error, retrying", { attempt });
-        await new Promise((r) => setTimeout(r, 25 * attempt));
-        continue;
-      }
-      throw error62;
-    } finally {
-      await session.endSession();
-    }
   }
 }
 
@@ -31942,6 +31990,233 @@ async function ensureOwnerLogin(input2, now2) {
   return { created: true };
 }
 
+// server/auth/pin.ts
+import { createHmac } from "node:crypto";
+function keyed(staffId, pin) {
+  return createHmac("sha256", getEnv2().MANAGE_LINK_SECRET).update(`pin:${staffId}:${pin}`).digest("hex");
+}
+function hashPin(staffId, pin) {
+  return hashPassword(keyed(staffId, pin));
+}
+function verifyPin(storedHash, staffId, pin) {
+  return verifyPassword(storedHash, keyed(staffId, pin));
+}
+function dummyPinHash() {
+  return getDummyHash();
+}
+
+// server/auth/kioskAuth.ts
+var PAIR_CODE_MS = 10 * 6e4;
+var PAIR_IP_LIMIT = { limit: 5, windowMs: 15 * 6e4 };
+var EXIT_PIN_LOCKOUT = { threshold: 5, lockMinutes: [15] };
+var SESSION_MS = KIOSK_COOKIE_DAYS * 24 * 60 * 6e4;
+var TOUCH_MS = 60 * 6e4;
+var DEMO_EXIT_PIN = "246810";
+function retryAfter2(windowMs, now2) {
+  return Math.ceil((windowMs - now2.getTime() % windowMs) / 1e3);
+}
+function sixDigits() {
+  return String(randomInt(0, 1e6)).padStart(6, "0");
+}
+function kioskDeviceView(d) {
+  return {
+    id: d._id,
+    name: d.name,
+    paired: d.tokenHash !== null,
+    pairedAt: d.pairedAt?.toISOString() ?? null,
+    lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
+    codeExpiresAt: d.tokenHash === null ? d.pairCodeExpiresAt?.toISOString() ?? null : null
+  };
+}
+async function audit(action, device, actor, meta3) {
+  await auditLogRepo_exports.appendAuditEntry(
+    {
+      actor: actor ? { type: actor.role, userId: actor.role === "owner" ? actor.userId : null, staffId: null } : { type: "system", userId: null, staffId: null },
+      action,
+      entityType: "kioskDevice",
+      entityId: device._id,
+      before: null,
+      after: { name: device.name },
+      meta: { ipHash: ipHashOf(meta3.ip) },
+      requestId: meta3.requestId
+    },
+    meta3.now
+  );
+}
+async function setupKioskDevice(owner2, input2, meta3) {
+  const code = sixDigits();
+  const id = newId();
+  const device = await kioskDevicesRepo_exports.insertKioskDevice(
+    {
+      name: input2.name,
+      exitPinHash: await hashPin(id, input2.exitPin),
+      pairCodeHash: await hashPin(`pair:${id}`, code),
+      pairCodeExpiresAt: new Date(meta3.now.getTime() + PAIR_CODE_MS),
+      tokenHash: null,
+      pairedAt: null,
+      demo: false
+    },
+    meta3.now,
+    { id }
+  );
+  await audit("kiosk.setup", device, owner2, meta3);
+  return { device: kioskDeviceView(device), code };
+}
+async function startDevice(res, device, now2) {
+  const token = randomToken(32);
+  const paired = await kioskDevicesRepo_exports.pairKioskDevice(device._id, sha256Hex(token), now2);
+  if (!paired) throw new AppError("INVALID_CREDENTIALS", "That code is not valid");
+  setKioskCookie(res, token);
+}
+async function pairKioskDevice2(res, code, meta3) {
+  const ipKey = `kiosk:pair:${meta3.ip}`;
+  const count = await rateLimitsRepo_exports.peekRateLimit(ipKey, PAIR_IP_LIMIT, meta3.now);
+  if (count >= PAIR_IP_LIMIT.limit) {
+    throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
+      retryAfterSeconds: retryAfter2(PAIR_IP_LIMIT.windowMs, meta3.now)
+    });
+  }
+  const waiting = await kioskDevicesRepo_exports.listKioskDevicesAwaitingCode(meta3.now);
+  let match2 = null;
+  for (const d of waiting) {
+    if (d.pairCodeHash && await verifyPin(d.pairCodeHash, `pair:${d._id}`, code)) match2 = d;
+  }
+  if (!match2) {
+    await verifyPin(await dummyPinHash(), "pair:none", code);
+    await rateLimitsRepo_exports.hitRateLimit(ipKey, PAIR_IP_LIMIT, meta3.now);
+    throw new AppError("INVALID_CREDENTIALS", "That code is not valid");
+  }
+  await startDevice(res, match2, meta3.now);
+  await audit("kiosk.pair", match2, null, meta3);
+  return { name: match2.name };
+}
+async function pairDemoKioskDevice(res, meta3) {
+  const id = newId();
+  const device = await kioskDevicesRepo_exports.insertKioskDevice(
+    {
+      name: "Demo tablet",
+      exitPinHash: await hashPin(id, DEMO_EXIT_PIN),
+      pairCodeHash: null,
+      pairCodeExpiresAt: null,
+      tokenHash: null,
+      pairedAt: null,
+      demo: true
+    },
+    meta3.now,
+    { id }
+  );
+  await startDevice(res, device, meta3.now);
+  await audit("kiosk.pair", device, null, meta3);
+  return { name: device.name };
+}
+async function authenticateKiosk(ctx) {
+  const token = readKioskCookie(ctx.req);
+  if (!token) return null;
+  const device = await kioskDevicesRepo_exports.findKioskDeviceByToken(sha256Hex(token));
+  const seen = device?.lastSeenAt ?? device?.pairedAt ?? null;
+  if (!device || !seen || seen.getTime() + SESSION_MS < ctx.now.getTime()) {
+    clearKioskCookie(ctx.res);
+    return null;
+  }
+  if (ctx.now.getTime() - seen.getTime() > TOUCH_MS) {
+    await kioskDevicesRepo_exports.touchKioskDevice(device._id, ctx.now);
+  }
+  return {
+    userId: device._id,
+    role: "kiosk",
+    staffId: null,
+    sessionId: device._id,
+    email: "",
+    mustChangePassword: false
+  };
+}
+async function verifyKioskExitPin(principal, exitPin, meta3) {
+  const device = await kioskDevicesRepo_exports.findKioskDeviceById(principal.userId);
+  if (!device || device.revokedAt) throw new AppError("AUTH_REQUIRED", "Pair this tablet");
+  const throttleKey = sha256Hex(`kiosk:exit:${device._id}`);
+  const throttle = await loginThrottleRepo_exports.getLoginThrottle(throttleKey);
+  if (throttle?.lockedUntil && throttle.lockedUntil.getTime() > meta3.now.getTime()) {
+    throw new AppError("ACCOUNT_LOCKED", "Too many wrong tries. Please wait before trying again.", {
+      retryAfterSeconds: Math.ceil((throttle.lockedUntil.getTime() - meta3.now.getTime()) / 1e3)
+    });
+  }
+  const ok = await verifyPin(device.exitPinHash, device._id, exitPin);
+  if (!ok) {
+    await loginThrottleRepo_exports.recordLoginFailure(throttleKey, EXIT_PIN_LOCKOUT, meta3.now);
+    throw new AppError("INVALID_CREDENTIALS", "That PIN is not right");
+  }
+  await loginThrottleRepo_exports.clearLoginThrottle(throttleKey);
+}
+async function unpairKioskDevice(res, id, actor, meta3) {
+  const device = await kioskDevicesRepo_exports.findKioskDeviceById(id);
+  if (!device) throw new AppError("NOT_FOUND", "That tablet was not found");
+  await kioskDevicesRepo_exports.revokeKioskDevice(device._id, meta3.now);
+  if (res) clearKioskCookie(res);
+  await audit("kiosk.unpair", device, actor, meta3);
+}
+async function listKioskDevices2() {
+  return (await kioskDevicesRepo_exports.listKioskDevices()).map(kioskDeviceView);
+}
+
+// shared/lib/pin.ts
+var PIN_LENGTH = 6;
+var PIN_PATTERN = /^\d{6}$/;
+var DEMO_PIN = "246810";
+var REJECTED = "Pick a PIN that is harder to guess. Avoid repeats and runs like 123456.";
+function pinProblem(pin) {
+  if (!PIN_PATTERN.test(pin)) return `Use exactly ${String(PIN_LENGTH)} digits.`;
+  const digits = Array.from(pin, Number);
+  const step = (a, b) => (b - a + 10) % 10;
+  const steps = digits.slice(1).map((d, i) => step(digits[i] ?? 0, d));
+  if (steps.every((s2) => s2 === 0)) return REJECTED;
+  if (steps.every((s2) => s2 === 1) || steps.every((s2) => s2 === 9)) return REJECTED;
+  for (const size of [2, 3]) {
+    if (pin === pin.slice(0, size).repeat(PIN_LENGTH / size)) return REJECTED;
+  }
+  return null;
+}
+
+// server/db/transaction.ts
+var DEFAULT_TX_OPTIONS = {
+  readConcern: { level: "snapshot" },
+  writeConcern: { w: "majority" },
+  readPreference: "primary"
+};
+function hasErrorLabel(error62, label) {
+  if (typeof error62 !== "object" || error62 === null || !("hasErrorLabel" in error62)) return false;
+  const candidate = error62.hasErrorLabel;
+  return typeof candidate === "function" && candidate.call(error62, label);
+}
+function isTransientTransactionError(error62) {
+  return hasErrorLabel(error62, "TransientTransactionError") || hasErrorLabel(error62, "UnknownTransactionCommitResult");
+}
+async function withTransaction(fn, options = {}) {
+  const client = await getMongoClient();
+  const maxRetries = options.maxRetries ?? 3;
+  const txOptions = { ...DEFAULT_TX_OPTIONS, ...options.transaction };
+  let attempt = 0;
+  for (; ; ) {
+    attempt += 1;
+    const session = client.startSession();
+    try {
+      let result;
+      await session.withTransaction(async () => {
+        result = await fn(session);
+      }, txOptions);
+      return result;
+    } catch (error62) {
+      if (isTransientTransactionError(error62) && attempt < maxRetries) {
+        logger.warn("transient transaction error, retrying", { attempt });
+        await new Promise((r) => setTimeout(r, 25 * attempt));
+        continue;
+      }
+      throw error62;
+    } finally {
+      await session.endSession();
+    }
+  }
+}
+
 // server/auth/teamAuth.ts
 var TEAM_SESSION_MS = 12 * 60 * 6e4;
 var SETUP_LINK_MS = 72 * 60 * 6e4;
@@ -31952,11 +32227,11 @@ var SYSTEM2 = { type: "system", userId: null, staffId: null };
 function pinThrottleKey(staffId) {
   return sha256Hex(`pin:${staffId}`);
 }
-function retryAfter2(windowMs, now2) {
+function retryAfter3(windowMs, now2) {
   const windowEnd = (Math.floor(now2.getTime() / windowMs) + 1) * windowMs;
   return Math.max(1, Math.ceil((windowEnd - now2.getTime()) / 1e3));
 }
-async function audit(action, staffId, actor, meta3, extra = null) {
+async function audit2(action, staffId, actor, meta3, extra = null) {
   await auditLogRepo_exports.appendAuditEntry(
     {
       actor,
@@ -32005,7 +32280,7 @@ async function teamLogin(res, input2, meta3) {
   const ipCount = await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
   if (ipCount >= PIN_IP_LIMIT.limit) {
     throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
-      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+      retryAfterSeconds: retryAfter3(PIN_IP_LIMIT.windowMs, meta3.now)
     });
   }
   const staff = await usableStaff(input2.staffId);
@@ -32030,13 +32305,13 @@ async function teamLogin(res, input2, meta3) {
     await rateLimitsRepo_exports.hitRateLimit(ipKey, PIN_IP_LIMIT, meta3.now);
     if (throttleKey) await loginThrottleRepo_exports.recordLoginFailure(throttleKey, PIN_LOCKOUT, meta3.now);
     if (staff)
-      await audit("auth.pin.failure", staff._id, SYSTEM2, meta3, { ipHash: ipHashOf(meta3.ip) });
+      await audit2("auth.pin.failure", staff._id, SYSTEM2, meta3, { ipHash: ipHashOf(meta3.ip) });
     throw new AppError("INVALID_CREDENTIALS", GENERIC_FAILURE2);
   }
   await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staff._id));
   await staffPinsRepo_exports.recordSignIn(staff._id, meta3.now);
   const sessionId = await startTeamSession(res, staff._id, meta3);
-  await audit(
+  await audit2(
     "auth.pin.success",
     staff._id,
     { type: "barber", userId: null, staffId: staff._id },
@@ -32077,7 +32352,7 @@ async function changePin(principal, input2, meta3) {
   const ipKey = `pin:ip:${meta3.ip}`;
   if (await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now) >= PIN_IP_LIMIT.limit) {
     throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
-      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+      retryAfterSeconds: retryAfter3(PIN_IP_LIMIT.windowMs, meta3.now)
     });
   }
   const key = pinThrottleKey(staffId);
@@ -32105,7 +32380,7 @@ async function changePin(principal, input2, meta3) {
   const ended = await teamSessionsRepo_exports.revokeTeamSessionsForStaff(staffId, meta3.now, {
     exceptId: principal.sessionId
   });
-  await audit("auth.pin.change", staffId, teamActor(principal), meta3, {
+  await audit2("auth.pin.change", staffId, teamActor(principal), meta3, {
     otherSessionsEnded: ended
   });
 }
@@ -32125,7 +32400,7 @@ async function issueSetupLink(ownerActor, ownerUserId, staffId, meta3) {
     );
   });
   await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staffId));
-  await audit("auth.pin.setupLink", staffId, ownerActor, meta3);
+  await audit2("auth.pin.setupLink", staffId, ownerActor, meta3);
   return { token, expiresAt };
 }
 async function setupLinkInfo(token, now2) {
@@ -32139,7 +32414,7 @@ async function completeSetup(res, token, pin, meta3) {
   const ipKey = `pin:ip:${meta3.ip}`;
   if (await rateLimitsRepo_exports.peekRateLimit(ipKey, PIN_IP_LIMIT, meta3.now) >= PIN_IP_LIMIT.limit) {
     throw new AppError("RATE_LIMITED", "Too many tries. Please wait and try again.", {
-      retryAfterSeconds: retryAfter2(PIN_IP_LIMIT.windowMs, meta3.now)
+      retryAfterSeconds: retryAfter3(PIN_IP_LIMIT.windowMs, meta3.now)
     });
   }
   const found = await setupTokensRepo_exports.findUsableToken(sha256Hex(token), meta3.now);
@@ -32160,7 +32435,7 @@ async function completeSetup(res, token, pin, meta3) {
   await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staff._id));
   await staffPinsRepo_exports.recordSignIn(staff._id, meta3.now);
   const sessionId = await startTeamSession(res, staff._id, meta3);
-  await audit(
+  await audit2(
     "auth.pin.setup",
     staff._id,
     { type: "barber", userId: null, staffId: staff._id },
@@ -32188,7 +32463,7 @@ async function unlockStaff(ownerActor, staffId, meta3) {
   const staff = await staffRepo_exports.findStaffById(staffId);
   if (!staff) throw new AppError("NOT_FOUND", "Staff member was not found");
   await loginThrottleRepo_exports.clearLoginThrottle(pinThrottleKey(staffId));
-  await audit("auth.pin.unlock", staffId, ownerActor, meta3);
+  await audit2("auth.pin.unlock", staffId, ownerActor, meta3);
 }
 
 // server/http/router.ts
@@ -33905,6 +34180,12 @@ function discountCents(discounts) {
 function totalAfterDiscounts(priceCents, discounts) {
   return Math.max(0, priceCents - discountCents(discounts));
 }
+function sumAfterDiscounts(bookings) {
+  return bookings.reduce((sum, b) => sum + totalAfterDiscounts(b.totalPriceCents, b.discounts), 0);
+}
+function sumDiscounts(bookings) {
+  return bookings.reduce((sum, b) => sum + discountCents(b.discounts), 0);
+}
 
 // server/services/bookingNotifications.ts
 function shopSnapshot(settings) {
@@ -34766,6 +35047,8 @@ var floorResponseSchema = external_exports.object({
     done: external_exports.int(),
     walkIns: external_exports.int(),
     takingsCents: external_exports.int(),
+    /** What the launch offer took off today's completed bookings; absent from older servers. */
+    discountsCents: external_exports.int().optional(),
     inChairs: external_exports.int(),
     waiting: external_exports.int()
   })
@@ -36461,7 +36744,7 @@ async function assertServing(route, pathname, now2) {
     throw new AppError("MAINTENANCE", "Online booking is having a moment. Please call the shop.");
   }
 }
-var KNOWN_LEVELS = /* @__PURE__ */ new Set(["public", "team", "owner", "internal"]);
+var KNOWN_LEVELS = /* @__PURE__ */ new Set(["public", "team", "owner", "kiosk", "internal"]);
 function createRouter(definitions, authenticate) {
   for (const d of definitions) {
     if (!KNOWN_LEVELS.has(d.auth)) {
@@ -36522,14 +36805,26 @@ function createRouter(definitions, authenticate) {
         case "internal":
           assertInternalSecret(req, route);
           break;
+        case "kiosk": {
+          const principal = await authenticate(ctx, "kiosk");
+          if (principal?.role !== "kiosk") throw new AppError("AUTH_REQUIRED", "Pair this tablet");
+          ctx.principal = principal;
+          break;
+        }
         case "team": {
           const principal = await authenticate(ctx, "team");
+          if (!principal && readKioskCookie(req)) {
+            throw new AppError("FORBIDDEN", "The front desk tablet cannot do this");
+          }
           if (principal?.role !== "barber") throw new AppError("AUTH_REQUIRED", "Please sign in");
           ctx.principal = principal;
           break;
         }
         case "owner": {
           const principal = await authenticate(ctx, "owner");
+          if (!principal && readKioskCookie(req)) {
+            throw new AppError("FORBIDDEN", "The front desk tablet cannot do this");
+          }
           if (!principal) throw new AppError("AUTH_REQUIRED", "Please sign in");
           if (principal.mustChangePassword && route.allowDuringPasswordChange !== true) {
             throw new AppError("PASSWORD_CHANGE_REQUIRED", "Please choose a new password first");
@@ -37300,8 +37595,10 @@ async function todaySummary(date5, now2) {
     },
     chairsBooked: new Set(live2.map((b) => b.staffId)).size,
     chairsWorking: whoIsIn2.filter((w) => w.status === "in").length,
-    expectedRevenueCents: live2.filter((b) => b.status === "confirmed" || b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
-    completedRevenueCents: live2.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
+    expectedRevenueCents: sumAfterDiscounts(
+      live2.filter((b) => b.status === "confirmed" || b.status === "completed")
+    ),
+    completedRevenueCents: sumAfterDiscounts(live2.filter((b) => b.status === "completed")),
     nextUp,
     whoIsIn: whoIsIn2
   };
@@ -37430,13 +37727,13 @@ async function bookingDetail(principal, scope, id, now2) {
   const booking = await loadBookingInScope(scope, id);
   if (scope.kind === "all") await bookingsRepo_exports.markOwnerSeen(booking._id, now2);
   const fresh = await bookingsRepo_exports.findBookingById(booking._id) ?? booking;
-  const [audit4, outbox] = scope.kind === "all" ? await Promise.all([
+  const [audit5, outbox] = scope.kind === "all" ? await Promise.all([
     auditLogRepo_exports.listAuditForEntity("booking", booking._id, 50),
     emailOutboxRepo_exports.listOutboxForBooking(booking._id)
   ]) : [[], []];
   return {
     booking: await viewOf(fresh),
-    audit: audit4.map(toAuditView),
+    audit: audit5.map(toAuditView),
     outbox: outbox.map(toOutboxView),
     transitions: allowedTransitions(principal, scope, fresh.status),
     managePath: scope.kind === "all" ? manageLinkFor(fresh) : null
@@ -37748,7 +38045,7 @@ async function customerByPhone(rawPhone, now2) {
       noShow: by("noShow").length,
       cancelled: by("cancelled").length
     },
-    completedSpendCents: by("completed").reduce((sum, b) => sum + b.totalPriceCents, 0),
+    completedSpendCents: sumAfterDiscounts(by("completed")),
     bookings: bookings.map((b) => toAdminBookingView(b, staffName(staffById, b.staffId))),
     notes: note?.notes ?? null,
     usualBarber: usualStaff ? toStaffRef(usualStaff) : null
@@ -38078,7 +38375,7 @@ async function applyScheduleChange(change) {
 }
 
 // server/services/adminCatalog.ts
-async function audit2(principal, entry, meta3) {
+async function audit3(principal, entry, meta3) {
   await auditLogRepo_exports.appendAuditEntry(
     {
       actor: actorOf2(principal),
@@ -38113,7 +38410,7 @@ async function listServices2() {
 }
 async function createService(principal, input2, meta3) {
   const service2 = await servicesRepo_exports.insertService(input2, meta3.now);
-  await audit2(
+  await audit3(
     principal,
     { action: "service.create", entityType: "service", entityId: service2._id, after: input2 },
     meta3
@@ -38124,7 +38421,7 @@ async function updateService2(principal, id, patch, meta3) {
   const before = await servicesRepo_exports.findServiceById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Service was not found");
   const service2 = await servicesRepo_exports.updateService(id, patch, meta3.now);
-  await audit2(
+  await audit3(
     principal,
     {
       action: "service.update",
@@ -38185,7 +38482,7 @@ async function listStaff2() {
 }
 async function createStaff(principal, input2, meta3) {
   const staff = await staffRepo_exports.insertStaff(input2, meta3.now);
-  await audit2(
+  await audit3(
     principal,
     { action: "staff.create", entityType: "staff", entityId: staff._id, after: input2 },
     meta3
@@ -38225,7 +38522,7 @@ async function updateStaff2(principal, id, input2, meta3) {
   });
   const afterPrices = change.result.servicePrices ?? [];
   if (JSON.stringify(afterPrices) !== JSON.stringify(beforePrices)) {
-    await audit2(
+    await audit3(
       principal,
       {
         action: "staff.prices.update",
@@ -38251,7 +38548,7 @@ async function renameStaffSlug2(principal, id, slug, meta3) {
   const before = await staffRepo_exports.findStaffById(id);
   if (!before || before.deletedAt) throw new AppError("NOT_FOUND", "Staff member was not found");
   const staff = await staffRepo_exports.renameStaffSlug(id, slug, meta3.now);
-  await audit2(
+  await audit3(
     principal,
     {
       action: "staff.slug.rename",
@@ -38310,7 +38607,7 @@ async function putSettings(principal, input2, meta3) {
     await shopSettingsRepo_exports.updateShopSettings(update, meta3.now, { session });
   });
   const after = await getSettings();
-  await audit2(
+  await audit3(
     principal,
     {
       action: "settings.update",
@@ -38367,7 +38664,7 @@ async function putReviews(principal, input2, meta3) {
     );
     return { before: stored, after: updated };
   });
-  await audit2(
+  await audit3(
     principal,
     {
       action: "settings.reviews.update",
@@ -38421,7 +38718,7 @@ async function retryOutboxMessage(principal, id, meta3) {
   if (!await emailOutboxRepo_exports.requeueOutboxMessage(id, meta3.now)) {
     throw new AppError("CONFLICT", "Only failed messages can be retried");
   }
-  await audit2(principal, { action: "outbox.retry", entityType: "emailOutbox", entityId: id }, meta3);
+  await audit3(principal, { action: "outbox.retry", entityType: "emailOutbox", entityId: id }, meta3);
   return id;
 }
 
@@ -39115,7 +39412,7 @@ function weekStart(date5) {
   return shopDayStart(date5).startOf("week");
 }
 var live = (b) => b.status !== "cancelled";
-var valueOf = (list) => list.filter(live).reduce((sum, b) => sum + b.totalPriceCents, 0);
+var valueOf = (list) => sumAfterDiscounts(list.filter(live));
 async function overview(now2) {
   const today = shopDateOf(now2);
   const monday = weekStart(today);
@@ -39123,7 +39420,7 @@ async function overview(now2) {
   const nextMonday = monday.plus({ weeks: 1 });
   const todayStart = shopDayStart(today);
   const sameDayLastWeek = todayStart.minus({ weeks: 1 }).toISODate() ?? today;
-  const [data, weekBookings, photos, alerts, audit4] = await Promise.all([
+  const [data, weekBookings, photos, alerts, audit5] = await Promise.all([
     loadScheduleData(today, today),
     bookingsRepo_exports.listBookingsStartingBetween({
       start: lastMonday.toJSDate(),
@@ -39182,13 +39479,13 @@ async function overview(now2) {
     },
     week,
     chairs,
-    activity: await activityFrom(audit4),
+    activity: await activityFrom(audit5),
     alerts
   };
 }
-async function activityFrom(audit4) {
+async function activityFrom(audit5) {
   const picked = [];
-  for (const entry of audit4) {
+  for (const entry of audit5) {
     const after = entry.after ?? {};
     const meta3 = entry.meta ?? {};
     if (entry.action === "booking.create")
@@ -39594,7 +39891,7 @@ async function requireWaiting(id) {
   if (w.status === "left") throw new AppError("INVALID_TRANSITION", "They left the line");
   return w;
 }
-async function audit3(principal, action, w, before, after, meta3) {
+async function audit4(principal, action, w, before, after, meta3) {
   await auditLogRepo_exports.appendAuditEntry(
     {
       actor: actorOf2(principal),
@@ -39632,7 +39929,7 @@ async function addToLine(principal, input2, meta3) {
     },
     meta3.now
   );
-  await audit3(principal, "line.add", w, null, { staffId, serviceIds: input2.serviceIds }, meta3);
+  await audit4(principal, "line.add", w, null, { staffId, serviceIds: input2.serviceIds }, meta3);
   return walkInView(await snapshot(meta3.now), w);
 }
 async function updateInLine(principal, id, patch, meta3) {
@@ -39643,7 +39940,7 @@ async function updateInLine(principal, id, patch, meta3) {
   if (patch.serviceIds !== void 0) set2.serviceIds = patch.serviceIds;
   const w = await walkInsRepo_exports.updateWalkIn(id, set2);
   if (!w) throw new AppError("ALREADY_SEATED", "They are already in a chair");
-  await audit3(
+  await audit4(
     principal,
     "line.update",
     w,
@@ -39663,7 +39960,7 @@ async function moveInLine(principal, id, direction, meta3) {
       await walkInsRepo_exports.updateWalkIn(me._id, { position: other.position }, { session });
       await walkInsRepo_exports.updateWalkIn(other._id, { position: me.position }, { session });
     });
-    await audit3(
+    await audit4(
       principal,
       "line.move",
       me,
@@ -39678,7 +39975,7 @@ async function leaveLine(principal, id, meta3) {
   await requireWaiting(id);
   const w = await walkInsRepo_exports.markLeft(id, meta3.now);
   if (!w) throw new AppError("ALREADY_SEATED", "They are already in a chair");
-  await audit3(principal, "line.left", w, { status: "waiting" }, { status: "left" }, meta3);
+  await audit4(principal, "line.left", w, { status: "waiting" }, { status: "left" }, meta3);
   return walkInView(await snapshot(meta3.now), w);
 }
 function busyError(estimate, staffName2) {
@@ -39736,7 +40033,7 @@ async function seatFromLine(principal, scope, id, requestedStaffId, meta3) {
   }
   await walkInsRepo_exports.finishSeating(id, booking.id);
   const seated = await walkInsRepo_exports.findWalkInById(id) ?? { ...claimed, bookingId: booking.id };
-  await audit3(
+  await audit4(
     principal,
     "line.seat",
     seated,
@@ -39802,6 +40099,98 @@ async function bookNow(principal, scope, input2, meta3) {
     throw error62;
   }
 }
+function clockLabel(at) {
+  const dt = DateTime.fromJSDate(at).setZone(SHOP_TIMEZONE);
+  return dt.minute === 0 ? dt.toFormat("h a") : dt.toFormat("h:mm a");
+}
+async function kioskBoard(now2) {
+  const snap = await snapshot(now2);
+  const estimates = chairEstimates(snap);
+  const photos = await staffPhotoMap();
+  const open2 = isOpenAt(snap.shopRanges, now2);
+  const first = gateFor(snap, null);
+  const shopSpan = snap.shopRanges[0];
+  const todayBlocks = snap.data.source.timeBlocks.filter(
+    (b) => b.startAt.getTime() <= now2.getTime() && b.endAt.getTime() > now2.getTime()
+  );
+  const staffInOrder = [...snap.staffById.values()].sort(
+    (a, b) => (a.chairNumber ?? 99) - (b.chairNumber ?? 99) || a.sortOrder - b.sortOrder
+  );
+  const tiles = [];
+  const offToday = [];
+  for (const staff of staffInOrder) {
+    const chair = snap.chairs.find((c) => c.staffId === staff._id);
+    const est = estimates.find((e) => e.staffId === staff._id);
+    const ranges = snap.hours.get(staff._id) ?? [];
+    if (!chair?.working || !est) {
+      offToday.push(staff.name);
+      continue;
+    }
+    const waiting = snap.waiting.filter((w) => w.staffId === staff._id).length;
+    const base = {
+      staffId: staff._id,
+      name: staff.name,
+      chairNumber: staff.chairNumber,
+      photo: photos.get(staff._id) ?? null,
+      waiting
+    };
+    const firstStart = ranges[0]?.start ?? null;
+    const block = todayBlocks.find((b) => b.staffId === staff._id);
+    if (est.gate.kind === "done") {
+      tiles.push({ ...base, tone: "away", status: "Done for the day" });
+    } else if (firstStart && firstStart.getTime() > now2.getTime() && !chair.busyUntil) {
+      tiles.push({ ...base, tone: "away", status: `Starts at ${clockLabel(firstStart)}` });
+    } else if (block && !chair.busyUntil) {
+      tiles.push({ ...base, tone: "away", status: `On a break until ${clockLabel(block.endAt)}` });
+    } else if (est.estimate.kind === "free" && est.gate.kind === "open") {
+      tiles.push({ ...base, tone: "free", status: "Free now" });
+    } else if (est.estimate.kind === "about") {
+      tiles.push({
+        ...base,
+        tone: "busy",
+        status: `With a client, free about ${clockLabel(new Date(est.estimate.at))}`
+      });
+    } else {
+      tiles.push({ ...base, tone: "busy", status: "With a client" });
+    }
+  }
+  return {
+    now: now2.toISOString(),
+    line: [],
+    chairs: estimates,
+    firstAvailable: gateView(first),
+    shop: {
+      name: snap.settings.name,
+      hoursToday: shopSpan ? `${clockLabel(shopSpan.start)} to ${clockLabel(snap.shopRanges[snap.shopRanges.length - 1]?.end ?? shopSpan.end)}` : "Closed today",
+      open: open2,
+      closedText: open2 ? null : `Closed now.${snap.opensAt ? ` Opens ${opensLabel(snap.opensAt)}.` : ""}`
+    },
+    tiles,
+    offToday
+  };
+}
+async function kioskNow(principal, input2, meta3) {
+  const done = await bookNow(principal, { kind: "all" }, input2, meta3);
+  if (done.kind === "booking") {
+    const staff = await staffRepo_exports.findStaffById(done.booking.staff.id);
+    return {
+      kind: "booking",
+      booking: {
+        id: done.booking.id,
+        staff: { id: done.booking.staff.id, name: done.booking.staff.name },
+        chairNumber: staff?.chairNumber ?? null
+      }
+    };
+  }
+  return {
+    kind: "line",
+    walkIn: {
+      position: done.walkIn.position,
+      staffName: done.walkIn.staffName,
+      estimate: done.walkIn.estimate
+    }
+  };
+}
 
 // server/services/floor.ts
 var DONE_SHOWN = 3;
@@ -39857,7 +40246,9 @@ async function floor(now2) {
       booked: live2.length,
       done: completed.length,
       walkIns: live2.filter((b) => b.source === "walkIn").length,
-      takingsCents: completed.reduce((sum, b) => sum + b.totalPriceCents, 0),
+      // The price after the launch offer: a $45 cut with $10 off brings in $35.
+      takingsCents: sumAfterDiscounts(completed),
+      discountsCents: sumDiscounts(completed),
       inChairs: inChairIds.size,
       waiting: line.line.length + comingUp.filter((b) => b.arrivedAt).length
     }
@@ -39913,6 +40304,80 @@ async function arriveFromCheckIn(principal, scope, id, meta3) {
     arrived: booking.arrivedAt !== null
   };
 }
+
+// shared/api/kiosk.ts
+var kioskPairRequestSchema = external_exports.object({ code: external_exports.string().regex(/^\d{6}$/) });
+var kioskPairResponseSchema = external_exports.object({ device: external_exports.object({ name: external_exports.string() }) });
+var kioskExitRequestSchema = external_exports.object({ exitPin: external_exports.string().regex(PIN_PATTERN) });
+var kioskTileSchema = external_exports.object({
+  staffId: idSchema,
+  name: external_exports.string(),
+  chairNumber: external_exports.int().nullable(),
+  photo: photoViewSchema.nullable(),
+  /** free (white), busy (red), away (steel: break, later start, done). */
+  tone: external_exports.enum(["free", "busy", "away"]),
+  status: external_exports.string(),
+  waiting: external_exports.int().min(0)
+});
+var kioskBoardResponseSchema = external_exports.object({
+  now: external_exports.iso.datetime(),
+  /** Always empty: the tablet never sees who is waiting, only how many. */
+  line: external_exports.array(external_exports.never()),
+  chairs: external_exports.array(chairEstimateSchema),
+  firstAvailable: nowGateViewSchema,
+  shop: external_exports.object({
+    name: external_exports.string(),
+    /** "10 AM to 7 PM" or "Closed today". */
+    hoursToday: external_exports.string(),
+    open: external_exports.boolean(),
+    /** "Closed now. Opens Wed 10 AM." while closed. */
+    closedText: external_exports.string().nullable()
+  }),
+  tiles: external_exports.array(kioskTileSchema),
+  offToday: external_exports.array(external_exports.string())
+});
+var kioskNowRequestSchema = external_exports.object({
+  serviceIds: external_exports.array(idSchema).min(1).max(6),
+  staffId: idSchema.nullable().optional(),
+  customer: external_exports.object({ name: nonEmptyText(80), phone: phoneSchema })
+});
+var kioskNowResponseSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({
+    kind: external_exports.literal("booking"),
+    booking: external_exports.object({
+      id: idSchema,
+      staff: external_exports.object({ id: idSchema, name: external_exports.string() }),
+      chairNumber: external_exports.int().nullable()
+    })
+  }),
+  external_exports.object({
+    kind: external_exports.literal("line"),
+    walkIn: external_exports.object({
+      position: external_exports.int().min(0),
+      staffName: external_exports.string(),
+      estimate: waitEstimateViewSchema
+    })
+  })
+]);
+var kioskDeviceViewSchema = external_exports.object({
+  id: idSchema,
+  name: external_exports.string(),
+  paired: external_exports.boolean(),
+  pairedAt: external_exports.iso.datetime().nullable(),
+  lastSeenAt: external_exports.iso.datetime().nullable(),
+  /** Still waiting for the tablet to type the code. */
+  codeExpiresAt: external_exports.iso.datetime().nullable()
+});
+var kioskDeviceListResponseSchema = external_exports.object({ devices: external_exports.array(kioskDeviceViewSchema) });
+var kioskDeviceCreateRequestSchema = external_exports.object({
+  name: nonEmptyText(40),
+  exitPin: external_exports.string().regex(PIN_PATTERN)
+});
+var kioskDeviceCreateResponseSchema = external_exports.object({
+  device: kioskDeviceViewSchema,
+  /** Shown once; the tablet types it within ten minutes. */
+  code: external_exports.string().regex(/^\d{6}$/)
+});
 
 // shared/api/checkIn.ts
 var checkInLookupQuerySchema = external_exports.object({
@@ -40112,6 +40577,26 @@ var adminRoutes = [
     const input2 = await parseBody(ctx, nowRequestSchema);
     const done = await bookNow(principal, scope, input2, { ...metaOf(ctx), idempotencyKey: key });
     return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+  }),
+  // Settings, Check in tablets: set one up (the answer carries the one-use code), list, unpair.
+  owner("GET", "/api/admin/kiosk/devices", async (ctx) => {
+    ctxScope(ctx);
+    return {
+      body: kioskDeviceListResponseSchema.parse({ devices: await listKioskDevices2() }),
+      headers: NO_STORE
+    };
+  }),
+  owner("POST", "/api/admin/kiosk/devices", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input2 = await parseBody(ctx, kioskDeviceCreateRequestSchema);
+    const made = await setupKioskDevice(principal, input2, metaOf(ctx));
+    return { status: 201, body: kioskDeviceCreateResponseSchema.parse(made), headers: NO_STORE };
+  }),
+  owner("DELETE", "/api/admin/kiosk/devices/:id", async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    await unpairKioskDevice(null, id, principal, metaOf(ctx));
+    return { body: { ok: true }, headers: NO_STORE };
   }),
   // Front desk check in: masked lookup of today's confirmed bookings, and the arrived tap.
   owner("GET", "/api/admin/checkin/lookup", async (ctx) => {
@@ -41834,6 +42319,115 @@ var internalRoutes = [
   }
 ];
 
+// server/http/routes/kiosk.ts
+var idParams2 = external_exports.object({ id: external_exports.string().regex(/^[a-f0-9]{24}$/) });
+var okResponseSchema2 = external_exports.object({ ok: external_exports.literal(true) });
+var KIOSK_IP_LIMIT = { limit: 120, windowMs: 6e4 };
+async function limited(ctx) {
+  const meta3 = metaOf(ctx);
+  const hit = await rateLimitsRepo_exports.hitRateLimit(`kiosk:ip:${meta3.ip}`, KIOSK_IP_LIMIT, meta3.now);
+  if (!hit.allowed) {
+    throw new AppError("RATE_LIMITED", "Too many requests. Please wait a moment.", {
+      retryAfterSeconds: hit.retryAfterSeconds
+    });
+  }
+}
+var kioskRoutes = [
+  {
+    method: "POST",
+    path: "/api/kiosk/pair",
+    auth: "public",
+    handler: async (ctx) => {
+      const { code } = await parseBody(ctx, kioskPairRequestSchema);
+      const device = await pairKioskDevice2(ctx.res, code, metaOf(ctx));
+      return { body: kioskPairResponseSchema.parse({ device }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/kiosk/pair-demo",
+    auth: "public",
+    demoOnly: true,
+    handler: async (ctx) => {
+      const device = await pairDemoKioskDevice(ctx.res, metaOf(ctx));
+      return { body: kioskPairResponseSchema.parse({ device }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "GET",
+    path: "/api/kiosk/board",
+    auth: "kiosk",
+    handler: async (ctx) => ({
+      body: kioskBoardResponseSchema.parse(await kioskBoard(ctx.now)),
+      headers: NO_STORE
+    })
+  },
+  {
+    method: "GET",
+    path: "/api/kiosk/lookup",
+    auth: "kiosk",
+    handler: async (ctx) => {
+      await limited(ctx);
+      const { q } = parseQuery(ctx, checkInLookupQuerySchema);
+      return {
+        body: checkInLookupResponseSchema.parse({
+          matches: await lookupToday({ kind: "all" }, q, ctx.now)
+        }),
+        headers: NO_STORE
+      };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/kiosk/bookings/:id/arrived",
+    auth: "kiosk",
+    handler: async (ctx) => {
+      await limited(ctx);
+      const { id } = parseParams(ctx, idParams2);
+      const match2 = await arriveFromCheckIn(principalOf(ctx), { kind: "all" }, id, metaOf(ctx));
+      return { body: checkInArrivedResponseSchema.parse({ match: match2 }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/kiosk/now",
+    auth: "kiosk",
+    handler: async (ctx) => {
+      await limited(ctx);
+      const key = idempotencyKeyOf(ctx);
+      const input2 = await parseBody(ctx, kioskNowRequestSchema);
+      const done = await kioskNow(
+        principalOf(ctx),
+        { ...input2, customer: { ...input2.customer, email: null } },
+        { ...metaOf(ctx), idempotencyKey: key }
+      );
+      return { status: 201, body: kioskNowResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/kiosk/exit",
+    auth: "kiosk",
+    handler: async (ctx) => {
+      const { exitPin } = await parseBody(ctx, kioskExitRequestSchema);
+      await verifyKioskExitPin(principalOf(ctx), exitPin, metaOf(ctx));
+      return { body: okResponseSchema2.parse({ ok: true }), headers: NO_STORE };
+    }
+  },
+  {
+    method: "POST",
+    path: "/api/kiosk/unpair",
+    auth: "kiosk",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { exitPin } = await parseBody(ctx, kioskExitRequestSchema);
+      await verifyKioskExitPin(principal, exitPin, metaOf(ctx));
+      await unpairKioskDevice(ctx.res, principal.userId, principal, metaOf(ctx));
+      return { body: okResponseSchema2.parse({ ok: true }), headers: NO_STORE };
+    }
+  }
+];
+
 // server/http/routes/media.ts
 var mediaParams = external_exports.object({
   id: external_exports.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/)
@@ -41891,7 +42485,7 @@ var mediaRoutes = [
 ];
 
 // server/http/routes/photos.ts
-var idParams2 = external_exports.object({ id: idSchema });
+var idParams3 = external_exports.object({ id: idSchema });
 var photosRoutes = [
   {
     method: "GET",
@@ -41940,7 +42534,7 @@ var photosRoutes = [
     path: "/api/admin/photos/:id",
     auth: "owner",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams2);
+      const { id } = parseParams(ctx, idParams3);
       const patch = await parseBody(ctx, photoPatchRequestSchema);
       return {
         body: adminPhotoResponseSchema.parse({
@@ -41954,7 +42548,7 @@ var photosRoutes = [
     path: "/api/admin/photos/:id",
     auth: "owner",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams2);
+      const { id } = parseParams(ctx, idParams3);
       await deletePhoto(principalOf(ctx), id, metaOf(ctx));
       return { body: { ok: true } };
     }
@@ -42221,7 +42815,7 @@ async function raiseAlert(kind, staffId, fromDate, toDate, reason, now2) {
 }
 
 // server/http/routes/team.ts
-var idParams3 = external_exports.object({ id: idSchema });
+var idParams4 = external_exports.object({ id: idSchema });
 var tokenParams = external_exports.object({ token: external_exports.string().regex(/^[A-Za-z0-9_-]{43}$/) });
 var teamRoutes = [
   {
@@ -42308,7 +42902,7 @@ var teamRoutes = [
     path: "/api/team/bookings/:id/status",
     auth: "team",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams4);
       const input2 = await parseBody(ctx, teamStatusRequestSchema);
       const booking = await setBookingStatus2(principalOf(ctx), id, input2.status, metaOf(ctx));
       return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
@@ -42321,7 +42915,7 @@ var teamRoutes = [
     auth: "team",
     handler: async (ctx) => {
       const principal = principalOf(ctx);
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams4);
       const done = await stampBookingMoment2(
         principal,
         chairScope(principal),
@@ -42342,7 +42936,7 @@ var teamRoutes = [
     path: "/api/team/bookings/:id/note",
     auth: "team",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams4);
       const input2 = await parseBody(ctx, teamNoteRequestSchema);
       const booking = await setBookingNote(principalOf(ctx), id, input2.notes, metaOf(ctx));
       return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
@@ -42396,7 +42990,7 @@ var teamRoutes = [
     auth: "team",
     handler: async (ctx) => {
       const principal = principalOf(ctx);
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams4);
       const match2 = await arriveFromCheckIn(principal, chairScope(principal), id, metaOf(ctx));
       return { body: checkInArrivedResponseSchema.parse({ match: match2 }), headers: NO_STORE };
     }
@@ -42466,7 +43060,7 @@ var teamRoutes = [
     handler: async (ctx) => {
       const principal = principalOf(ctx);
       const scope = chairScope(principal);
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams4);
       return {
         status: 201,
         body: seatResponseSchema.parse(
@@ -42499,7 +43093,7 @@ var teamRoutes = [
     path: "/api/team/time-blocks/:id",
     auth: "team",
     handler: async (ctx) => {
-      const { id } = parseParams(ctx, idParams3);
+      const { id } = parseParams(ctx, idParams4);
       const done = await removeBlock(principalOf(ctx), id, metaOf(ctx));
       return { body: conflictOnlyResponseSchema.parse(done.body), headers: NO_STORE };
     }
@@ -42533,6 +43127,7 @@ var allRoutes = [
   ...bookingRoutes,
   ...authRoutes,
   ...teamRoutes,
+  ...kioskRoutes,
   ...adminRoutes,
   ...photosRoutes,
   ...mediaRoutes,
@@ -42543,7 +43138,7 @@ var router = null;
 function getRouter() {
   router ??= createRouter(
     allRoutes,
-    (ctx, level) => level === "team" ? authenticateTeam(ctx) : authenticateFromCookie(ctx)
+    (ctx, level) => level === "team" ? authenticateTeam(ctx) : level === "kiosk" ? authenticateKiosk(ctx) : authenticateFromCookie(ctx)
   );
   return router;
 }
