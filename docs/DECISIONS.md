@@ -1344,3 +1344,13 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   `nextDate(3, 3)`, which land on the same Wednesday when the suite runs on a Monday (both roll
   forward to it), so the range was not inverted and the test failed on Mondays. The second date is
   now the day before the first, whatever the weekday. Not a product change.
+- D13c-01 Archivo is self-hosted from `public/fonts`: the fontsource latin file with the width axis
+  instanced to 100 to 125% by `fonttools varLib.instancer` (the site uses nothing narrower), full
+  weight axis kept, 62 KB against 91 KB. `src/styles/fonts.css` declares the face, `index.html`
+  carries one static preload, `vercel.json` caches `/fonts/*` a year, the brand and guide scripts
+  read the same file, and the package is gone. Characters outside latin fall back to the system
+  font (the old latin-ext and vietnamese files only ever loaded for those characters).
+- D13c-02 The week chart and the latest events moved from Today to the bottom of Bookings; Today
+  still fetches the overview for the alerts strip only. Plainer than a new alerts endpoint.
+- D13c-03 Rob's standing rule is in CLAUDE.md under Conventions: booking flows never open in a
+  side drawer or sheet; they all open the full-screen `NewBookingFlow`. Side sheets read details.

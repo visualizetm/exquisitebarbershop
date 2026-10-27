@@ -684,3 +684,12 @@ commit, and what is still open.
 - SHIP: 23:36 UTC, gate green after five spec fixes for the new paths and one weekday de-flake,
   screens and Lighthouse captured (Home 79 then 84, 13a was 88; the 91 KB font is the cause),
   report written; next is the PR, the merge and the production check.
+
+## Prompt 13c
+
+### M0: font instancing and the Today cleanup
+
+- Shipped: Archivo instanced to width 100 to 125% and self-hosted (62 KB, one static preload), the
+  week chart and recent activity moved under the Bookings list, the standing full-screen booking
+  rule in CLAUDE.md. Lighthouse is measured once before SHIP.
+- Heartbeat: 00:16 UTC, commit follows, next is M1 (the walk-in line).

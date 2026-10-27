@@ -65,7 +65,7 @@ in the dashboard; the public site keeps its three choices.
 
 ## Type
 
-- Archivo Variable (`@fontsource-variable/archivo`, its `wdth.css`: one latin file carrying both the
+- Archivo Variable (self-hosted in `public/fonts`, from the fontsource latin file with the width axis instanced to 100 to 125%, 62 KB: one file carrying both the
   weight axis 100 to 900 and the width axis 62% to 125%, preloaded, `font-display: swap`). The logo
   keeps its own lettering (fixed SVG paths).
 - Width tokens: `--w-display` 122%, `--w-head` 116%, `--w-label` 114%; body is 100%.

@@ -7,23 +7,35 @@ import {
   staffListResponseSchema,
   type AdminBookingView,
   type BookingRange,
+  type ActivityKind,
   type BookingSortKey,
+  overviewResponseSchema,
 } from '@shared/api/admin';
 import { bookingStatusSchema } from '@shared/schemas/booking';
 import {
+  BarChart,
   Button,
   Chip,
   Chips,
   DataTable,
   EmptyState,
+  ErrorState,
   Select,
   StatusChip,
   type Column,
 } from '@/components/ui';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
-import { SOURCE_LABEL, phoneLabel, shopDateTime, STATUS_LABEL } from '../format';
+import { SOURCE_LABEL, phoneLabel, shopDateTime, shopWhen, STATUS_LABEL } from '../format';
 import { useQuick } from '../shell/quick';
+
+const KIND_WORDS: Record<ActivityKind, string> = {
+  booked: 'Booked online',
+  walkIn: 'Walk-in',
+  canceled: 'Cancelled',
+  rescheduled: 'Rescheduled',
+  noShow: 'No show',
+};
 
 const RANGES: { key: Exclude<BookingRange, 'all'>; label: string }[] = [
   { key: 'today', label: 'Today' },
@@ -42,6 +54,11 @@ const RANGES: { key: Exclude<BookingRange, 'all'>; label: string }[] = [
 export function BookingsPage() {
   usePageTitle('Bookings');
   const quick = useQuick();
+  // The week against last week and the latest events live under the list (moved off Today in 13c).
+  const overview = useApi('/api/admin/overview', overviewResponseSchema, {
+    version: quick.version,
+  });
+  const ov = overview.status === 'ready' ? overview.data : null;
   const [params, setParams] = useSearchParams();
   const range = bookingRangeSchema.catch('upcoming').parse(params.get('range') ?? 'upcoming');
   const sort = bookingSortKeySchema.catch('when').parse(params.get('sort') ?? 'when');
@@ -259,6 +276,67 @@ export function BookingsPage() {
           }
         />
       </section>
+
+      <div className="exq-dash-grid" data-cols="split">
+        <section className="exq-panel" aria-labelledby="exq-recent">
+          <div className="exq-panel__head">
+            <h2 id="exq-recent">Recent activity</h2>
+          </div>
+          {overview.status === 'loading' ? (
+            <p className="exq-skeleton exq-activity__placeholder" aria-busy="true">
+              Loading recent activity
+            </p>
+          ) : ov?.activity.length === 0 ? (
+            <EmptyState title="Nothing yet">
+              Bookings, cancellations and walk-ins will show here as they happen.
+            </EmptyState>
+          ) : ov ? (
+            <ul className="exq-activity exq-bare">
+              {ov.activity.map((event) => (
+                <li key={event.id} className="exq-activity__item">
+                  <button
+                    type="button"
+                    className="exq-activity__btn"
+                    onClick={() => {
+                      quick.openBooking(event.bookingId);
+                    }}
+                  >
+                    <span className="exq-activity__time">{shopWhen(event.at, ov.date)}</span>
+                    <span className="exq-activity__who">
+                      {event.clientName}
+                      <span className="exq-activity__sub">
+                        {KIND_WORDS[event.kind]}, with {event.staffName}
+                      </span>
+                    </span>
+                    <StatusChip status={event.status} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ErrorState title="Recent activity did not load">Reload the page.</ErrorState>
+          )}
+        </section>
+        <section className="exq-panel">
+          {ov ? (
+            <BarChart
+              title="Bookings this week"
+              nameA="This week"
+              nameB="Last week"
+              groups={ov.week.map((d) => ({
+                label: d.label,
+                a: d.thisWeek,
+                b: d.lastWeek,
+                current: d.today,
+              }))}
+            />
+          ) : (
+            <div className="exq-skeleton exq-chart__placeholder" aria-busy="true">
+              Loading the chart
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

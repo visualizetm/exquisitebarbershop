@@ -22,9 +22,9 @@ function resolveSiteUrl(): string {
 }
 
 /**
- * Fills %SITE_URL% in index.html, preloads the one variable Archivo file (weight and width axes) so text renders in
- * the right font from the first paint (otherwise the swap shifts the whole page below the
- * hero), and adds the Sitemap line to robots.txt when the site URL is known.
+ * Fills %SITE_URL% in index.html, adds the demo noindex tag, and adds the Sitemap line to
+ * robots.txt when the site URL is known. The Archivo preload is a static tag in index.html
+ * (public/fonts, so the file name never changes).
  */
 function headPlugin(): Plugin {
   let outDir = 'dist';
@@ -48,21 +48,8 @@ function headPlugin(): Plugin {
     },
     transformIndexHtml: {
       order: 'post',
-      handler(html, ctx) {
-        const fonts = Object.keys(ctx.bundle ?? {}).filter((file) =>
-          /archivo-latin-wdth-normal.*\.woff2$/.test(file),
-        );
-        const tags: HtmlTagDescriptor[] = fonts.map((href) => ({
-          tag: 'link',
-          injectTo: 'head',
-          attrs: {
-            rel: 'preload',
-            as: 'font',
-            type: 'font/woff2',
-            crossorigin: '',
-            href: `/${href}`,
-          },
-        }));
+      handler(html) {
+        const tags: HtmlTagDescriptor[] = [];
         // DEMO_MODE at build time puts noindex in the static HTML, for crawlers that never run scripts.
         if (demoBuild()) {
           tags.push({

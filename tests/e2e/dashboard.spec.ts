@@ -206,7 +206,8 @@ test.describe('the owner dashboard shell', () => {
       expect(box, 'in view').not.toBeNull();
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(800);
     }
-    // The chart has a real table for screen readers.
+    // The week chart lives under the Bookings list and has a real table for screen readers.
+    await page.goto('/admin/shop/bookings');
     const table = page.locator('.exq-chart table');
     await expect(table.getByRole('row')).toHaveCount(8);
     await expect(table.getByRole('columnheader', { name: 'Last week' })).toHaveCount(1);
@@ -233,10 +234,11 @@ test.describe('the owner dashboard shell', () => {
       page.getByText(new RegExp(`Walk In Visitor is booked with ${chair}`)),
     ).toBeVisible();
     await expect(walkIns).toHaveText(String(before + 1));
+    // Recent activity (under the Bookings list) lists the walk-in and opens the booking.
+    await page.goto('/admin/shop/bookings');
     await expect(page.locator('.exq-activity__item', { hasText: 'Walk In Visitor' })).toContainText(
       'Walk-in',
     );
-    // Recent activity lists the walk-in and opens the booking.
     await page
       .locator('.exq-activity__item', { hasText: 'Walk In Visitor' })
       .getByRole('button')

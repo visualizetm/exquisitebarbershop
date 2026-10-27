@@ -9,26 +9,17 @@ import UserX01 from '@untitled-ui/icons-react/build/esm/UserX01';
 import {
   bookingResponseSchema,
   overviewResponseSchema,
-  type ActivityKind,
   type AdminBookingView,
   type FloorChair,
 } from '@shared/api/admin';
 import { progressOf } from '@shared/lib/floor';
-import { BarChart, Button, EmptyState, ErrorState, StatusChip, useToast } from '@/components/ui';
+import { Button, EmptyState, ErrorState, useToast } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
-import { firstNameLastInitial, money, shopDateLabel, shopTime, shopWhen } from '../format';
+import { firstNameLastInitial, money, shopDateLabel, shopTime } from '../format';
 import { useQuick } from '../shell/quick';
 import { useFloor } from './useFloor';
-
-const KIND_WORDS: Record<ActivityKind, string> = {
-  booked: 'Booked online',
-  walkIn: 'Walk-in',
-  canceled: 'Cancelled',
-  rescheduled: 'Rescheduled',
-  noShow: 'No show',
-};
 
 const SOURCE_WORDS: Record<AdminBookingView['source'], string> = {
   online: 'Booked online',
@@ -61,7 +52,7 @@ function chairLabel(n: number | null): string {
 /**
  * Shop, Today: the floor. One card per chair, who is coming up, what is done and today's
  * numbers, all from today's bookings and the server clock; refreshed every 30 seconds and after
- * every action. The week chart and the latest events stay under it.
+ * every action. The alerts strip comes from the overview.
  */
 export function TodayPage() {
   usePageTitle('Today');
@@ -418,67 +409,6 @@ export function TodayPage() {
           </aside>
         </div>
       )}
-
-      <div className="exq-dash-grid" data-cols="split">
-        <section className="exq-panel" aria-labelledby="exq-recent">
-          <div className="exq-panel__head">
-            <h2 id="exq-recent">Recent activity</h2>
-          </div>
-          {overview.status === 'loading' ? (
-            <p className="exq-skeleton exq-activity__placeholder" aria-busy="true">
-              Loading recent activity
-            </p>
-          ) : ov?.activity.length === 0 ? (
-            <EmptyState title="Nothing yet">
-              Bookings, cancellations and walk-ins will show here as they happen.
-            </EmptyState>
-          ) : ov ? (
-            <ul className="exq-activity exq-bare">
-              {ov.activity.map((event) => (
-                <li key={event.id} className="exq-activity__item">
-                  <button
-                    type="button"
-                    className="exq-activity__btn"
-                    onClick={() => {
-                      quick.openBooking(event.bookingId);
-                    }}
-                  >
-                    <span className="exq-activity__time">{shopWhen(event.at, ov.date)}</span>
-                    <span className="exq-activity__who">
-                      {event.clientName}
-                      <span className="exq-activity__sub">
-                        {KIND_WORDS[event.kind]}, with {event.staffName}
-                      </span>
-                    </span>
-                    <StatusChip status={event.status} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <ErrorState title="Recent activity did not load">Reload the page.</ErrorState>
-          )}
-        </section>
-        <section className="exq-panel">
-          {ov ? (
-            <BarChart
-              title="Bookings this week"
-              nameA="This week"
-              nameB="Last week"
-              groups={ov.week.map((d) => ({
-                label: d.label,
-                a: d.thisWeek,
-                b: d.lastWeek,
-                current: d.today,
-              }))}
-            />
-          ) : (
-            <div className="exq-skeleton exq-chart__placeholder" aria-busy="true">
-              Loading the chart
-            </div>
-          )}
-        </section>
-      </div>
     </div>
   );
 }
