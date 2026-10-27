@@ -12,10 +12,18 @@ export const waitEstimateViewSchema = z.discriminatedUnion('kind', [
 ]);
 export type WaitEstimateView = z.infer<typeof waitEstimateViewSchema>;
 
+/** Whether a walk-in can be taken right now, and if not the sentence that says why. */
+export const nowGateViewSchema = z.object({
+  kind: z.enum(['open', 'closed', 'off', 'done', 'nobody']),
+  text: z.string().nullable(),
+});
+export type NowGateView = z.infer<typeof nowGateViewSchema>;
+
 export const chairEstimateSchema = z.object({
   staffId: idSchema,
   name: z.string(),
   chairNumber: z.int().nullable(),
+  gate: nowGateViewSchema,
   estimate: waitEstimateViewSchema,
 });
 export type ChairEstimate = z.infer<typeof chairEstimateSchema>;
@@ -40,6 +48,8 @@ export const walkInViewSchema = z.object({
   estimate: waitEstimateViewSchema,
   /** For first available: the chair the estimate expects to free up first. */
   expectedStaffId: idSchema.nullable(),
+  /** "Drew is off. Move or mark left" when the chair they wait for is no longer taking anyone. */
+  flag: z.string().nullable(),
   /** The same person on every other chair, for Move. */
   options: z.array(chairEstimateSchema),
 });
@@ -49,6 +59,8 @@ export const lineResponseSchema = z.object({
   now: z.iso.datetime(),
   line: z.array(walkInViewSchema),
   chairs: z.array(chairEstimateSchema),
+  /** The gate for "first available": the shop open and somebody in. */
+  firstAvailable: nowGateViewSchema,
 });
 export type LineResponse = z.infer<typeof lineResponseSchema>;
 

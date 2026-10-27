@@ -89,6 +89,7 @@ const EXPECTED: Record<string, AuthLevel | 'owner+'> = {
   'POST /api/team/now': 'team',
   'POST /api/team/bookings': 'team',
   'POST /api/admin/now': 'owner',
+  'POST /api/auth/tablet': 'owner',
   'GET /api/admin/checkin/lookup': 'owner',
   'POST /api/admin/checkin/:id/arrived': 'owner',
   'GET /api/team/checkin/lookup': 'team',

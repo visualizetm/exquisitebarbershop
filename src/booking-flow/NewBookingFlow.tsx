@@ -203,6 +203,11 @@ export function NewBookingFlow({
   const chairEstimate = (id: string): WaitEstimateView =>
     estimates.chairs.find((c) => c.staffId === id)?.estimate ?? { kind: 'unknown' };
   const firstFree = estimates.chairs.find((c) => c.estimate.kind === 'free');
+  // The hours rule: NOW is only offered while the shop is open and the barber is in.
+  const gate = chair
+    ? (estimates.chairs.find((c) => c.staffId === chair.id)?.gate ?? null)
+    : estimates.firstAvailable;
+  const nowAllowed = gate === null || gate.kind === 'open';
   const nowEstimate: WaitEstimateView = chair
     ? chairEstimate(chair.id)
     : firstFree
@@ -512,10 +517,13 @@ export function NewBookingFlow({
                   <button
                     type="button"
                     className="exq-flow__now"
-                    data-state={picked.when === 'now' ? 'selected' : 'idle'}
+                    data-state={
+                      !nowAllowed ? 'closed' : picked.when === 'now' ? 'selected' : 'idle'
+                    }
                     aria-pressed={picked.when === 'now'}
+                    aria-disabled={!nowAllowed}
                     onClick={() => {
-                      update({ when: 'now' });
+                      if (nowAllowed) update({ when: 'now' });
                     }}
                   >
                     <span className="exq-flow__now-icon" aria-hidden="true">
@@ -524,26 +532,36 @@ export function NewBookingFlow({
                     <span className="exq-flow__now-text">
                       <span className="exq-flow__now-title">Now</span>
                       <span className="exq-flow__now-sub">
-                        Walk-in, booked right this minute
-                        {estimates.now ? ` (${shopTime(estimates.now)})` : ''}.{' '}
-                        {nowEstimate.kind === 'free'
-                          ? chair
-                            ? `${chair.name} is free.`
-                            : firstFree
-                              ? `${firstFree.name} is free.`
-                              : ''
-                          : nowEstimate.kind === 'about'
-                            ? `${chair?.name ?? 'Every chair'} is in a cut until about ${shopTime(nowEstimate.at)}, so they go next in ${chair ? 'the' : 'a'} line.`
-                            : 'No hours on the books right now: a free chair takes them, otherwise they join the line.'}
+                        {gate !== null && gate.kind !== 'open' ? gate.text : null}
+                        {nowAllowed ? 'Walk-in, booked right this minute' : null}
+                        {nowAllowed && estimates.now ? ` (${shopTime(estimates.now)})` : ''}
+                        {nowAllowed ? '. ' : ''}
+                        {!nowAllowed
+                          ? ''
+                          : nowEstimate.kind === 'free'
+                            ? chair
+                              ? `${chair.name} is free.`
+                              : firstFree
+                                ? `${firstFree.name} is free.`
+                                : ''
+                            : nowEstimate.kind === 'about'
+                              ? `${chair?.name ?? 'Every chair'} is in a cut until about ${shopTime(nowEstimate.at)}, so they go next in ${chair ? 'the' : 'a'} line.`
+                              : 'A free chair takes them, otherwise they join the line.'}
                       </span>
                     </span>
-                    <span className="exq-flow__now-chip exq-label">
-                      {nowEstimate.kind === 'free'
-                        ? 'Free now'
-                        : nowEstimate.kind === 'about'
-                          ? `Wait about ${String(nowEstimate.minutes)} min`
-                          : 'Join the line'}
-                    </span>
+                    {nowAllowed ? (
+                      <span className="exq-flow__now-chip exq-label">
+                        {nowEstimate.kind === 'free'
+                          ? 'Free now'
+                          : nowEstimate.kind === 'about'
+                            ? `Wait about ${String(nowEstimate.minutes)} min`
+                            : 'Join the line'}
+                      </span>
+                    ) : (
+                      <span className="exq-flow__now-chip exq-label" data-state="closed">
+                        Not now
+                      </span>
+                    )}
                   </button>
                 ) : null}
                 {alternatives.length > 0 ? (

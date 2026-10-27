@@ -1416,3 +1416,31 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   three days ahead", so on a Tuesday or Wednesday THU jumped a week past FRI and the week test
   failed (it turned main red right after the 13c merge). FRI is now the day after THU. Same
   class of flake as D13b-13.
+- D13d-01 The hours rule for NOW and the line is one pure helper, `shared/lib/openNow.ts`: the shop
+  must be open right now, the barber must have hours today and not be past their last range; first
+  available needs the shop open and somebody in. The server refuses with SHOP_CLOSED ("The shop is
+  closed right now. Opens Tue 10 AM.") or BARBER_OFF ("Drew is off today.", "Drew is done for the
+  day.") in `bookNow` and `addToLine`; the line response carries each chair's gate and the first
+  available gate so the NOW tile and the check in say the same words. A cut already going does not
+  reopen a chair: the rule is about taking new people.
+- D13d-02 A waiting entry whose chair goes off or past close is never dropped: the view carries a
+  `flag` ("Drew is off. Move or mark left") that Today shows in red. "Waiting 0 min, wait time
+  unknown" is gone: with no estimate the card shows the minutes waiting only.
+- D13d-03 The e2e server opens the shop around the clock today and tomorrow with a specialHours
+  closure and gives every barber extra hours over the same span, so NOW, the line and the check in
+  behave the same whenever the suite runs. The weekly hours stay as seeded, so the public pages and
+  the day strip still show the real week. The integration files that use NOW freeze the clock at
+  13:00 on the next Tuesday with always-open hours (the D12-88 pattern) and the refusals are
+  proven with a closure and a day-off block.
+- D13d-04 The time step is the public DayPicker in one scrolling row: the kit wraps `exq-chips` from
+  768px, which is what made the month grid; the flow overrides it to a nowrap strip with scroll
+  snap. The times stay right under it, grouped Morning, Afternoon and Evening. "The shop is closed
+  that day Try another day" now ends its first sentence.
+- D13d-05 No green in the admin or the portal: every `--ok` use on those surfaces became white
+  (free, done, saved) or steel (decided, completed). The token stays for the public setup page.
+- D13d-06 "Keep this tablet signed in" is a button on the owner's check-in screen that sets a
+  device flag cookie (`__Host-exq_tablet`, 400 days, HttpOnly, its value derived from the server
+  secret). A session touched from a request carrying a valid flag idles out after 30 days; every
+  other owner session keeps 14. The shop-wide setting is gone and `runSeed` unsets the old field.
+  The flag is not a credential: without a valid session it does nothing, and a made-up value is
+  ignored. Trade-off: the tablet stays signed in for 30 idle days, so it lives behind the desk.

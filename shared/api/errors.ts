@@ -23,6 +23,8 @@ export const ERROR_CODES = {
   /** Seating a walk-in: the chair cannot take the full service now; the body carries the estimate. */
   CHAIR_BUSY: 409,
   ALREADY_SEATED: 409,
+  /** NOW and the line outside the hours: the barber is off or done (SHOP_CLOSED covers the shop). */
+  BARBER_OFF: 409,
   SCHEDULE_CONFLICT: 409,
   INVALID_TRANSITION: 409,
   SLUG_TAKEN: 409,

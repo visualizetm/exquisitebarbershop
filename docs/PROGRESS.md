@@ -729,3 +729,14 @@ commit, and what is still open.
 - Gate green (668 unit and integration, 153 dev e2e with three spec-state fixes rerun, prod-like 7,
   showcase 13, vercel-function 97), Lighthouse Home 92, screens in docs/screens/p13c, PR 13 merged
   into main as e95d10a at 10:38 UTC. Next is 13d (the barber portal redo and the website editor).
+
+## Prompt 13d
+
+### M0: the five fixes from 13c
+
+- Shipped: the hours rule for NOW and the line (shared helper, SHOP_CLOSED and BARBER_OFF, the
+  flagged line entry, no "wait time unknown" with 0 minutes), the day strip on the time step, the
+  check-in choices filling the screen with icons and 46px titles, no green on admin or portal
+  surfaces, the per-device tablet flag replacing the shop-wide setting. Tests: openNow unit (4),
+  now integration (6, two refusals), tabletSession integration (1), line, checkIn and authz.
+- Heartbeat: 11:21 UTC, commit follows, next is M1 (the barber portal redo).

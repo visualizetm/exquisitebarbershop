@@ -632,8 +632,8 @@
   height: 14px;
 }
 .exq-status-chip[data-tone='ok'] {
-  border-color: var(--ok);
-  color: var(--ok);
+  border-color: var(--fg);
+  color: var(--fg);
   background: transparent;
 }
 .exq-status-chip[data-tone='accent'] {
@@ -1155,7 +1155,7 @@
   border-left: 4px solid var(--red);
 }
 .exq-resolver__item[data-state='decided'] {
-  border-left: 4px solid var(--ok);
+  border-left: 4px solid var(--fg-3);
 }
 .exq-resolver__fieldset {
   display: grid;
@@ -1607,7 +1607,7 @@
 .exq-daygrid__booking[data-status='completed'] {
   background: var(--card);
   color: var(--fg);
-  border-color: var(--ok);
+  border-color: var(--fg-3);
 }
 .exq-daygrid__booking[data-status='completed'] span {
   color: var(--fg-2);
@@ -2154,7 +2154,7 @@
   background: currentColor;
 }
 .exq-floorcard[data-kind='free'] .exq-floorcard__state {
-  color: var(--ok);
+  color: var(--fg);
 }
 .exq-floorcard__client {
   display: block;
@@ -2283,7 +2283,7 @@
   color: var(--fg-3);
 }
 .exq-coming__row[data-state='arrived'] .exq-coming__source {
-  color: var(--ok);
+  color: var(--fg);
 }
 .exq-coming__actions {
   grid-column: 1 / -1;
@@ -2451,4 +2451,11 @@
   color: var(--fg-3);
   font-size: var(--t-label);
   white-space: nowrap;
+}
+
+/* A waiting entry whose chair is no longer taking anyone: never dropped, always flagged. */
+.exq-line__flag {
+  margin: var(--s1) 0 0;
+  color: var(--accent-text);
+  font-weight: 700;
 }

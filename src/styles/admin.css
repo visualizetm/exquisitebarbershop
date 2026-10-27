@@ -327,7 +327,7 @@
 }
 .exq-adm-bookings__status[data-state='completed'],
 .exq-adm-booking__status[data-state='completed'] {
-  color: var(--ok);
+  color: var(--fg-3);
 }
 .exq-adm-bookings__status[data-state='noShow'],
 .exq-adm-booking__status[data-state='noShow'] {

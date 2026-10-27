@@ -6,7 +6,12 @@ import {
   staffListResponseSchema,
   type NowResponse,
 } from '@shared/api/admin';
-import { lineResponseSchema, type ChairEstimate, type LineResponse } from '@shared/api/line';
+import {
+  lineResponseSchema,
+  type ChairEstimate,
+  type LineResponse,
+  type NowGateView,
+} from '@shared/api/line';
 import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@shared/api/public';
 import type { ServicePrice } from '@shared/schemas/staff';
 import { apiRequest } from '@/lib/api';
@@ -124,7 +129,12 @@ export function useChairEstimates(
   session: FlowSession,
   open: boolean,
   tick: number,
-): { chairs: ChairEstimate[]; line: LineResponse['line']; now: string | null } {
+): {
+  chairs: ChairEstimate[];
+  line: LineResponse['line'];
+  now: string | null;
+  firstAvailable: NowGateView | null;
+} {
   const [data, setData] = useState<LineResponse | null>(null);
   useEffect(() => {
     if (!open) return;
@@ -140,7 +150,12 @@ export function useChairEstimates(
       gone = true;
     };
   }, [session, open, tick]);
-  return { chairs: data?.chairs ?? [], line: data?.line ?? [], now: data?.now ?? null };
+  return {
+    chairs: data?.chairs ?? [],
+    line: data?.line ?? [],
+    now: data?.now ?? null,
+    firstAvailable: data?.firstAvailable ?? null,
+  };
 }
 
 export const nowSchema = nowResponseSchema;
