@@ -11,6 +11,7 @@ import { usePageTitle } from '@/lib/usePageTitle';
 import { ErrorNote } from '../components/ErrorNote';
 import { useQuick } from '../shell/quick';
 import { useMe, useSession } from '../useSession';
+import { TabletsTab } from './TabletsTab';
 
 type Settings = ReturnType<typeof settingsResponseSchema.parse>['settings'];
 
@@ -32,6 +33,7 @@ export function SettingsPage() {
     { id: 'rules', label: 'Booking rules' },
     { id: 'account', label: 'Account' },
     { id: 'email', label: 'Email' },
+    { id: 'tablets', label: 'Check in tablets' },
     ...(demo ? [{ id: 'demo', label: 'Demo data' }] : []),
   ];
   const current = tabs.find((t) => t.id === params.get('tab'))?.id ?? 'shop';
@@ -52,6 +54,7 @@ export function SettingsPage() {
           {current === 'shop' || current === 'rules' ? <SettingsForms which={current} /> : null}
           {current === 'account' ? <AccountTab /> : null}
           {current === 'email' ? <EmailTab /> : null}
+          {current === 'tablets' ? <TabletsTab /> : null}
           {current === 'demo' ? <DemoTab /> : null}
         </div>
       </Tabs>

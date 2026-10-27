@@ -1562,3 +1562,51 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   -$10" and the total after it; the editor's Launch offer section carries the switch, the
   amounts in whole dollars, the words, the dates and "Used 12 times, $120 off" counted over the
   bookings that stand.
+
+## Prompt 13f
+
+- D13f-01 The kiosk is its own auth level with its own cookie (`__Host-exq_kiosk`, Strict, 180
+  days slid forward on use, written at most hourly). The router's owner and team cases answer a
+  request that carries only a kiosk cookie with 403 FORBIDDEN, not 401: a tablet is never asked to
+  sign in. Reusing the owner session with a "kiosk" flag was rejected: the tablet must hold no
+  credential that opens the dashboard, and a separate cookie is the one thing the router can check.
+- D13f-02 One collection, `kioskDevices`, holds the whole life of a tablet: the one-use pairing
+  code (a keyed argon2 hash, like a PIN, ten minutes), the device token (sha256, unique partial
+  index) and the exit PIN (the PIN hashing). Pairing tries every device still waiting for a code
+  after the same hashing work, so a wrong code costs the same as a right one. A separate pairing
+  codes collection was rejected as a second thing to expire and clean.
+- D13f-03 Kiosk responses are built as their own shapes (`shared/api/kiosk.ts`): the board carries
+  names, chair numbers, photos, a status word and a count per chair, and an empty line; NOW answers
+  with the chair and the position only. The admin NOW view (customer phone and email) never leaves
+  the server on the kiosk routes. A scan test proves it on every kiosk body.
+- D13f-04 The board is computed inside the line service from the same snapshot, the same hours rule
+  and the same estimates the line uses (`kioskBoard`), so there is no second rule: Free now, With a
+  client free about, Starts at, On a break until (a time block covering now), Done for the day, and
+  Off today from the chair's working flag. A barber in a cut outside the hours still shows as busy.
+- D13f-05 The kiosk walk in goes through `bookNow` with a kiosk principal and the walk-in source,
+  so the slot locks, the line rules and the 13e offer rule (online only) all apply unchanged; the
+  audit actor type gains `kiosk`. The owner's device routes live under `/api/admin/kiosk/devices`
+  and every setup, pairing and unpairing is audited (`kiosk.setup`, `kiosk.pair`, `kiosk.unpair`).
+- D13f-06 "Keep this tablet signed in" is gone from the owner's check in page: the locked tablet
+  replaces it, and an owner session that never idles out on a desk is exactly what the kiosk
+  exists to avoid. The device flag route stays (a cookie already set keeps working); the page's
+  top bar points at Settings, Check in tablets instead.
+- D13f-07 The tablet never leaves its page without the exit PIN: no Exit, no links, press and hold
+  the logo for three seconds for the pad, then only Reload, Unpair this tablet and Close. Text
+  selection, the context menu and pinch zoom are stopped with CSS (`user-select`, `touch-action:
+pan-x pan-y`) and the context menu handler, not with `user-scalable=no` in the viewport meta,
+  which axe flags as a WCAG failure. On an iPad, Guided Access does the rest (the owner guide).
+- D13f-08 The kiosk e2e freezes the page clock (Playwright's clock) for the 45 second idle reset
+  and the three second hold, so the spec never waits in real time; the server's clock is untouched
+  because the e2e server opens the shop all day.
+- D13f-09 Every sum of money the owner sees goes through `sumAfterDiscounts` from the shared
+  offer helper: Today's takings, the overview's four numbers, the customer's spend and the
+  bookings' expected and completed revenue. A booking without a discounts list (written before
+  13e) reads as full price, so no stored document needs touching. Today also carries
+  `discountsCents` for the "after $20 in launch offers" line; it is optional in the schema so an
+  older server's answer still parses.
+- D13f-10 The "board with the shop closed" screen is not in docs/screens/p13f: closing the demo's
+  day needs the six sample bookings resolved one by one through the conflict rule, and three
+  tries at scripting that hit the ten minute rule. The closed line itself is built in `kioskBoard`
+  from the same hours rule (`closedText`, Walk in greyed) and reads in the code; a screen from
+  Rob's tablet after hours will do.

@@ -131,13 +131,52 @@ sideways or upright; it keeps the screen awake where the tablet allows it.
   shows anyone's phone, email or full name.
 - **Chairs right now** at the bottom shows each barber: Free now, Free about 2:50, or
   Off today.
-- **Keep this tablet signed in** (top of the screen) keeps this one tablet signed in
-  for 30 days without use instead of 14. It applies to this tablet only, so keep it
-  behind the desk. **Exit** returns to Today.
+- **Exit** returns to Today. This screen runs on your login, so do not leave it out for
+  clients: for the front desk, pair a locked tablet (section 8b).
 
 When the shop is closed, or nobody is in, Walk in is greyed and says why.
 
 ![Check in](screens/p13d/guide/o07-check-in.png)
+
+## 8b. The front desk tablet
+
+The locked tablet lives at **yoursite/checkin**. Clients can walk in, check in for an
+appointment and see who is in. They cannot reach anything else: no dashboard, no prices to
+change, no client list. It replaces leaving the check in screen open on your own login.
+
+**Pair it.** In **Settings, Check in tablets**, give the tablet a name ("Front desk") and a six
+digit **exit PIN** that only you know, then tap **Get a pairing code**. On the tablet open
+**yoursite/checkin** and type the code on the pad within ten minutes. It works once. Five wrong
+codes lock pairing for 15 minutes.
+
+**The board.** Under Walk in and I have an appointment, **Who's in today** shows one tile per
+barber working today: **Free now** (white), **With a client, free about 2:45** (red), **On a break
+until 3:00**, **Starts at 12 PM** or **Done for the day** (grey), and "2 waiting" when people are
+in their line. Barbers off today sit in one line at the bottom. When the shop is closed the board
+says "Closed now. Opens Wed 10 AM" and Walk in is greyed. It refreshes itself every 20 seconds.
+
+**Leaving the locked screen.** There is no Exit. Press and hold the logo at the top left for three
+seconds, type the exit PIN, and a small menu offers **Reload**, **Unpair this tablet** and
+**Close**. Five wrong PINs lock the exit for 15 minutes. After 45 seconds without a tap, any flow
+goes back to the start on its own and clears what was typed.
+
+**A lost tablet.** In **Settings, Check in tablets**, tap **Unpair** next to it. It goes back to
+its pairing screen at once, wherever it is. The list shows when each tablet was paired and last
+used.
+
+**Pin the browser so nobody can leave it.** On an iPad: Settings, Accessibility, Guided Access,
+turn it on and set a passcode; open the tablet page in Safari, then triple-click the side button
+and tap Start. Triple-click again and type the passcode to end it. On an Android tablet: Settings,
+Security, Screen pinning (on some tablets "App pinning"), turn it on; open the page in Chrome,
+open the recent apps view, tap the app's icon and choose Pin.
+
+![The pairing screen](screens/p13f/guide/t01-pairing.png)
+
+![The start screen and the board](screens/p13f/guide/t02-board.png)
+
+![The exit PIN](screens/p13f/guide/t03-exit-pin.png)
+
+![Settings, Check in tablets](screens/p13f/guide/t04-tablets.png)
 
 ## 9. Clients
 

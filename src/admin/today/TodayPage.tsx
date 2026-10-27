@@ -443,6 +443,11 @@ export function TodayPage() {
                   </div>
                 ))}
               </dl>
+              {data?.counts.discountsCents ? (
+                <p className="exq-sofar__note exq-muted">
+                  after {money(data.counts.discountsCents)} in launch offers
+                </p>
+              ) : null}
             </section>
 
             <section className="exq-panel" aria-labelledby="exq-done-head">

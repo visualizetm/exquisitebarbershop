@@ -57,6 +57,17 @@ const EXPECTED: Record<string, AuthLevel | 'owner+'> = {
   'POST /api/team/setup/:token': 'public',
   'POST /api/team/logout': 'team',
   'GET /api/team/me': 'team',
+  'POST /api/kiosk/pair': 'public',
+  'POST /api/kiosk/pair-demo': 'public',
+  'GET /api/kiosk/board': 'kiosk',
+  'GET /api/kiosk/lookup': 'kiosk',
+  'POST /api/kiosk/bookings/:id/arrived': 'kiosk',
+  'POST /api/kiosk/now': 'kiosk',
+  'POST /api/kiosk/exit': 'kiosk',
+  'POST /api/kiosk/unpair': 'kiosk',
+  'GET /api/admin/kiosk/devices': 'owner',
+  'POST /api/admin/kiosk/devices': 'owner',
+  'DELETE /api/admin/kiosk/devices/:id': 'owner',
   'POST /api/team/pin': 'team',
   'GET /api/team/today': 'team',
   'GET /api/team/week': 'team',
@@ -219,6 +230,8 @@ describe('authorization matrix', () => {
         else if (level === 'public')
           ok = code !== 'AUTH_REQUIRED' && code !== 'PASSWORD_CHANGE_REQUIRED' && !ownerOnly;
         else if (!signedIn) ok = res.status === 401 && code === 'AUTH_REQUIRED';
+        // A kiosk route takes only the paired tablet's cookie: no sign-in opens it.
+        else if (level === 'kiosk') ok = res.status === 401 && code === 'AUTH_REQUIRED';
         // The two kinds of sign-in never stand in for each other: a barber's PIN session opens no
         // owner route, and the owner's login opens no barber route.
         else if (level === 'team')
@@ -246,6 +259,7 @@ describe('authorization matrix', () => {
       expect(demoRoutes.map((r) => `${r.method} ${r.path}`).sort()).toEqual([
         'POST /api/admin/demo/reset',
         'POST /api/auth/demo-login',
+        'POST /api/kiosk/pair-demo',
       ]);
       const failures: string[] = [];
       // The owner goes last: a reset deletes the other logins.

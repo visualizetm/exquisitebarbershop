@@ -1,4 +1,5 @@
 import { authenticateFromCookie } from '../auth/sessions';
+import { authenticateKiosk } from '../auth/kioskAuth';
 import { authenticateTeam } from '../auth/teamAuth';
 import { createRouter, type Router } from './router';
 import { adminRoutes } from './routes/admin';
@@ -8,6 +9,7 @@ import { bookingRoutes } from './routes/bookings';
 import { demoRoutes } from './routes/demo';
 import { healthRoutes } from './routes/health';
 import { internalRoutes } from './routes/internal';
+import { kioskRoutes } from './routes/kiosk';
 import { mediaRoutes } from './routes/media';
 import { photosRoutes } from './routes/photos';
 import { publicRoutes } from './routes/public';
@@ -25,6 +27,7 @@ export const allRoutes: readonly RouteDefinition[] = [
   ...bookingRoutes,
   ...authRoutes,
   ...teamRoutes,
+  ...kioskRoutes,
   ...adminRoutes,
   ...photosRoutes,
   ...mediaRoutes,
@@ -36,7 +39,11 @@ let router: Router | null = null;
 
 export function getRouter(): Router {
   router ??= createRouter(allRoutes, (ctx, level) =>
-    level === 'team' ? authenticateTeam(ctx) : authenticateFromCookie(ctx),
+    level === 'team'
+      ? authenticateTeam(ctx)
+      : level === 'kiosk'
+        ? authenticateKiosk(ctx)
+        : authenticateFromCookie(ctx),
   );
   return router;
 }

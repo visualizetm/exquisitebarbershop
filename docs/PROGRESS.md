@@ -812,3 +812,41 @@ commit, and what is still open.
   the discount, the head preload removed, the fit guard booking later) and rerun green (49), prod-like
   7, showcase 13, vercel-function 97. PR 17 merged into main as b47f552 at 16:43 UTC; Vercel
   production for it completed at 16:44 UTC.
+
+## Prompt 13f
+
+### M0: the kiosk device and its auth level
+
+- Shipped: the `kiosk` auth level and cookie (D13f-01), `kioskDevices` with pairing, the exit PIN
+  and revocation (D13f-02), the kiosk routes with masked shapes and the board (D13f-03, D13f-04),
+  the walk in through NOW (D13f-05), the owner's Check in tablets tab under Settings, and
+  tests/integration/kiosk.test.ts (pair once, expiry, the lock, the 403 loop over every owner and
+  team route, the response scan, no offer on a kiosk walk in).
+- Heartbeat: 17:40 UTC, commit follows, next is M1 (the locked page at /checkin).
+
+### M1: the locked page at /checkin
+
+- Shipped: `/checkin` as its own chunk under the team layout (dark tokens, no nav, no links), the
+  check in page's kiosk mode (pairing pad, the Who's in today board, hold the logo for the exit
+  PIN, the Reload, Unpair, Close menu, the 45 second idle reset, 20 second refresh, D13f-06 to
+  D13f-08), the booking flow's kiosk session (`FLOW_API`), "Keep this tablet signed in" removed
+  from the owner's page, and tests/e2e/kiosk.spec.ts (pair, board, walk in, check in, idle reset
+  with a frozen clock, exit PIN, unpair, 403 on the dashboard, axe, 64px targets, both sizes).
+- Heartbeat: 17:46 UTC, commit follows, next is M2 (takings after the discount).
+
+### M2: takings after the discount
+
+- Shipped: `sumAfterDiscounts` and `sumDiscounts` in shared/lib/launchOffer.ts, every owner money
+  sum through them (floor, overview, customer spend, bookings revenue, D13f-09), the "after $20 in
+  launch offers" line under Today's takings, and the unit test (two $45 cuts, one with LAUNCH10,
+  $80).
+- Heartbeat: 17:48 UTC, commit follows, next is M3 (the guide).
+
+### M3: the guide
+
+- Shipped: OWNER-GUIDE section 8b "The front desk tablet" (pairing, the board, the exit PIN and the
+  hold, a lost tablet, Guided Access and Screen pinning), the check in section without "Keep this
+  tablet signed in", the PDF re-rendered, SITE-REPORT (auth level, routes, collection), screens in
+  docs/screens/p13f (pairing, board sideways and upright, walk in end, exit PIN, tablets panel,
+  montage; the closed board is missing, D13f-10).
+- Heartbeat: 17:56 UTC, commit follows, next is SHIP.

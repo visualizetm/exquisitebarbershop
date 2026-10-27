@@ -16,8 +16,16 @@ import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@sh
 import type { ServicePrice } from '@shared/schemas/staff';
 import { apiRequest } from '@/lib/api';
 
-/** Who is booking: the owner (any chair), or a barber on their own chair. */
-export type FlowSession = 'owner' | 'team';
+/** Who is booking: the owner (any chair), a barber on their own chair, or the locked front desk tablet. */
+export type FlowSession = 'owner' | 'team' | 'kiosk';
+
+/** The API each session books through; the kiosk's answers carry no client details. */
+export const FLOW_API: Record<FlowSession, { line: string; now: string }> = {
+  owner: { line: '/api/admin/line', now: '/api/admin/now' },
+  team: { line: '/api/team/line', now: '/api/team/now' },
+  // The board is shaped like the line response (chairs, now, firstAvailable, an empty line).
+  kiosk: { line: '/api/kiosk/board', now: '/api/kiosk/now' },
+};
 
 export interface FlowService {
   id: string;
@@ -139,9 +147,7 @@ export function useChairEstimates(
   useEffect(() => {
     if (!open) return;
     let gone = false;
-    apiRequest(session === 'owner' ? '/api/admin/line' : '/api/team/line', lineResponseSchema, {
-      fresh: true,
-    })
+    apiRequest(FLOW_API[session].line, lineResponseSchema, { fresh: true })
       .then((d) => {
         if (!gone) setData(d);
       })

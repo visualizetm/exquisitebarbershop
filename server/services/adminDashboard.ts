@@ -1,4 +1,5 @@
 import type { DateTime } from 'luxon';
+import { sumAfterDiscounts } from '../../shared/lib/launchOffer';
 import {
   BOOKING_TABLE_PAGE_SIZE,
   type BookingTableQuery,
@@ -23,8 +24,7 @@ function weekStart(date: string): DateTime {
 }
 
 const live = (b: BookingDocument) => b.status !== 'cancelled';
-const valueOf = (list: BookingDocument[]) =>
-  list.filter(live).reduce((sum, b) => sum + b.totalPriceCents, 0);
+const valueOf = (list: BookingDocument[]) => sumAfterDiscounts(list.filter(live));
 
 /**
  * The owner overview: today's four numbers (each with last week's figure only when last week

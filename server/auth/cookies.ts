@@ -21,6 +21,28 @@ export const TEAM_COOKIE = '__Host-exq_team';
 export const TABLET_COOKIE = '__Host-exq_tablet';
 export const TABLET_COOKIE_DAYS = 400;
 
+/**
+ * The locked front desk tablet's device cookie (prompt 13f). Strict: the tablet only ever talks to
+ * the site from its own page, so no other site may ride on it. 180 days, slid forward on use.
+ */
+export const KIOSK_COOKIE = '__Host-exq_kiosk';
+export const KIOSK_COOKIE_DAYS = 180;
+
+export function readKioskCookie(req: IncomingMessage): string | null {
+  return readCookie(req, KIOSK_COOKIE);
+}
+
+export function setKioskCookie(res: ServerResponse, token: string): void {
+  appendSetCookie(
+    res,
+    `${KIOSK_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${String(KIOSK_COOKIE_DAYS * 24 * 60 * 60)}`,
+  );
+}
+
+export function clearKioskCookie(res: ServerResponse): void {
+  appendSetCookie(res, `${KIOSK_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`);
+}
+
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const HEX_PATTERN = /^[a-f0-9]{64}$/;
 

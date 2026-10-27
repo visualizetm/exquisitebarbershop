@@ -36,7 +36,9 @@ import {
   useFlowData,
   type FlowService,
   type FlowSession,
+  FLOW_API,
 } from './flowData';
+import { kioskNowResponseSchema } from '@shared/api/kiosk';
 import './flow.css';
 
 export type FlowStep = 'service' | 'barber' | 'time' | 'client' | 'confirm' | 'done';
@@ -272,15 +274,16 @@ export function NewBookingFlow({
           text: `Moved: ${shopDateTime(done.booking.startAt)} with ${done.booking.staff.name}`,
         });
       } else if (picked.when === 'now') {
-        const done = await apiRequest(
-          session === 'owner' ? '/api/admin/now' : '/api/team/now',
-          nowSchema,
-          {
-            method: 'POST',
-            headers: { 'Idempotency-Key': key },
-            body: { serviceIds: picked.serviceIds, staffId: chair?.id ?? null, customer, ...notes },
-          },
-        );
+        const nowBody = {
+          method: 'POST' as const,
+          headers: { 'Idempotency-Key': key },
+          body: { serviceIds: picked.serviceIds, staffId: chair?.id ?? null, customer, ...notes },
+        };
+        // The tablet's answer carries the chair and the place in line, nothing about the client.
+        const done =
+          session === 'kiosk'
+            ? await apiRequest(FLOW_API.kiosk.now, kioskNowResponseSchema, nowBody)
+            : await apiRequest(FLOW_API[session].now, nowSchema, nowBody);
         setResult(
           done.kind === 'booking'
             ? {

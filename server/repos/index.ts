@@ -20,6 +20,7 @@ export * as systemStateRepo from './systemStateRepo';
 export * as alertsRepo from './alertsRepo';
 export * as customerNotesRepo from './customerNotesRepo';
 export * as staffPinsRepo from './staffPinsRepo';
+export * as kioskDevicesRepo from './kioskDevicesRepo';
 export * as setupTokensRepo from './setupTokensRepo';
 export * as teamSessionsRepo from './teamSessionsRepo';
 export * as walkInsRepo from './walkInsRepo';

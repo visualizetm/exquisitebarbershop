@@ -696,6 +696,8 @@ export const floorResponseSchema = z.object({
     done: z.int(),
     walkIns: z.int(),
     takingsCents: z.int(),
+    /** What the launch offer took off today's completed bookings; absent from older servers. */
+    discountsCents: z.int().optional(),
     inChairs: z.int(),
     waiting: z.int(),
   }),

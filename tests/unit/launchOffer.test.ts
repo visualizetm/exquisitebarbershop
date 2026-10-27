@@ -3,6 +3,8 @@ import {
   discountTag,
   launchOfferDiscount,
   launchOfferIsLive,
+  sumAfterDiscounts,
+  sumDiscounts,
   totalAfterDiscounts,
 } from '../../shared/lib/launchOffer';
 import { DEFAULT_LAUNCH_OFFER } from '../../shared/schemas/shopSettings';
@@ -64,5 +66,19 @@ describe('launchOfferDiscount', () => {
     expect(discountTag(discounts)).toBe('$10 off online');
     expect(discountTag([])).toBeNull();
     expect(discountTag(undefined)).toBeNull();
+  });
+});
+
+describe('sumAfterDiscounts', () => {
+  it('two completed bookings at $45, one with LAUNCH10, total $80', () => {
+    const plain = { totalPriceCents: 4500, discounts: [] };
+    const offered = {
+      totalPriceCents: 4500,
+      discounts: [{ code: 'LAUNCH10' as const, amountCents: 1000, label: 'x' }],
+    };
+    expect(sumAfterDiscounts([plain, offered])).toBe(8000);
+    expect(sumDiscounts([plain, offered])).toBe(1000);
+    // A booking written before the discounts list existed reads as full price.
+    expect(sumAfterDiscounts([{ totalPriceCents: 4500 }])).toBe(4500);
   });
 });

@@ -248,8 +248,9 @@ describe('today, schedule and who is in', () => {
     );
     expect(today.counts).toMatchObject({ total: 2, completed: 1, confirmed: 1 });
     expect(today.chairsBooked).toBe(2);
-    expect(today.expectedRevenueCents).toBe(2 * cutPrice);
-    expect(today.completedRevenueCents).toBe(cutPrice);
+    // Two first online bookings, each with the $10 launch offer: revenue is the price after it.
+    expect(today.expectedRevenueCents).toBe(2 * (cutPrice - 1000));
+    expect(today.completedRevenueCents).toBe(cutPrice - 1000);
     const drewNext = today.nextUp.find((n) => n.staff.id === drew);
     expect(drewNext?.booking?.startAt).toBe(slotAt(THU, '11:00'));
     expect(today.nextUp.find((n) => n.staff.id === lee)?.booking).toBeNull();

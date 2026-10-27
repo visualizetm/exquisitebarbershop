@@ -5,9 +5,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  * - public: anyone
  * - team: a barber signed in with their PIN; services scope them to their own chair
  * - owner: the owner's login (email and password)
+ * - kiosk: a paired front desk tablet; it reaches the kiosk routes and nothing else
  * - internal: the cron bearer token only
  */
-export type AuthLevel = 'public' | 'team' | 'owner' | 'internal';
+export type AuthLevel = 'public' | 'team' | 'owner' | 'kiosk' | 'internal';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /**
@@ -17,7 +18,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  */
 export interface Principal {
   userId: string;
-  role: 'owner' | 'barber';
+  role: 'owner' | 'barber' | 'kiosk';
   /** The staff record a login acts for. Barbers can only ever touch this chair. */
   staffId: string | null;
   sessionId: string;
