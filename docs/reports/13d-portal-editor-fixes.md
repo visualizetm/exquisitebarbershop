@@ -54,6 +54,6 @@ Needs Rob's phone and tablet: the portal on a real phone (cards, the PIN pad's S
 
 Ready for next step: the next prompt starts from the editor (src/admin/website/WebsiteEditor.tsx) and the portal (src/team/TodayPage.tsx). It must not change the hours rule in shared/lib/openNow.ts and bookNow, NewBookingFlow's entry points, the line service, the slot locks, the pricing rule, the reviews writer, the seed photo ids, the carousel, the reveal tokens or the public booking rules.
 
-Production: PR 15 merged into main as 92bf393 at 13:07 UTC with both CI runs and the Vercel preview green. Vercel's status on the merge commit read "Vercel is deploying your app" at 13:07 UTC; the final state is recorded in the next commit of this file. The health URL is not reachable from this sandbox, so Rob checks /api/health once for buildSha 92bf393.
+Production: PR 15 merged into main as 92bf393 at 13:07 UTC with both CI runs and the Vercel preview green. Vercel's status on the merge commit reads "Deployment has completed" (success) at 13:07:26 UTC. The health URL is not reachable from this sandbox, so Rob checks /api/health once for buildSha 92bf393.
 
 92bf393, production: ready
