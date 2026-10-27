@@ -90,7 +90,8 @@ test.describe('booking with a barber', () => {
     await expect(page.locator('.exq-book-card__total')).not.toContainText('From');
     await page.getByRole('button', { name: 'Confirm booking' }).click();
     await expect(page.getByRole('heading', { name: 'You are booked' })).toBeFocused();
-    await expect(page.locator('.exq-ticket__total')).toContainText('$50');
+    // Dontrise's $50 less the $10 launch offer on a first online booking.
+    await expect(page.locator('.exq-ticket__total')).toContainText('$40');
     await expect(page.locator('.exq-ticket')).toContainText('Dontrise');
   });
 
@@ -122,9 +123,9 @@ test.describe('booking with a barber', () => {
     const chair = (await page.locator('.exq-ticket').textContent()) ?? '';
     const barber = Object.keys(HAIRCUT_TOTAL).find((name) => chair.includes(`${name} (first`));
     expect(barber, chair).toBeDefined();
-    await expect(page.locator('.exq-ticket__total')).toHaveText(
-      new RegExp(`${(HAIRCUT_TOTAL[barber ?? ''] ?? '').replace('$', '\\$')}$`),
-    );
+    // The chair's own price less the $10 launch offer on a first online booking.
+    const net = Number((HAIRCUT_TOTAL[barber ?? ''] ?? '$0').slice(1)) - 10;
+    await expect(page.locator('.exq-ticket__total')).toHaveText(new RegExp(`\\$${String(net)}$`));
   });
 });
 

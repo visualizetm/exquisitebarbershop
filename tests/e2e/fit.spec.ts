@@ -95,15 +95,17 @@ for (const size of SIZES) {
     await flow.getByRole('button', { name: /^Haircut\b(?! and| with)/ }).click();
     await expectNoClipping(page, 'add booking');
     await flow.getByRole('button', { name: 'Continue' }).click();
+    // A later time, never NOW: the chair stays free for the specs that follow.
+    await page.locator('.exq-day-option[data-state="available"] button').last().click();
+    await page.locator('.exq-time-option button').last().click();
     await flow.getByRole('button', { name: 'Continue' }).click();
     await flow.getByLabel('Name', { exact: true }).fill(`Fit Client ${String(size.width)}`);
     await flow.getByLabel('Mobile phone').fill(randomPhone());
     await flow.getByRole('button', { name: 'Continue' }).click();
     await flow.getByRole('button', { name: 'Confirm', exact: true }).click();
-    await expect(flow.getByText(/In the chair now with|Walk-in #\d+ for/)).toBeVisible();
+    await expect(flow.getByText(/^Booked: /)).toBeVisible();
     await flow.getByRole('button', { name: 'Done' }).click();
     await expect(flow).toBeHidden();
-    await expect(page.locator('.exq-team-row').first()).toBeVisible();
     await expectNoClipping(page, 'today');
     await page.getByRole('button', { name: 'Out for the day' }).click();
     await expect(page.getByText(/Block the rest of today\?/)).toBeVisible();
@@ -114,13 +116,6 @@ for (const size of SIZES) {
       await page.waitForLoadState('networkidle').catch(() => undefined);
       await page.waitForTimeout(300);
       await expectNoClipping(page, tab);
-    }
-    // Hand the chair back for the specs that follow.
-    await page.getByRole('link', { name: 'Today', exact: true }).click();
-    const chair = page.locator('.exq-team-chair');
-    if ((await chair.getByRole('button', { name: 'Done' }).count()) > 0) {
-      await chair.getByRole('button', { name: 'Done' }).click();
-      await expect(page.getByText(/is done\.$/).first()).toBeVisible();
     }
   });
 }

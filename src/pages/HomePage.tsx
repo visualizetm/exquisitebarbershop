@@ -70,7 +70,14 @@ export function HomePage() {
       >
         <div className="exq-wrap exq-hero__grid">
           <div className="exq-hero__text">
-            <p className="exq-label exq-hero__label">Barber &amp; Beauty Lounge &middot; {where}</p>
+            {/* While the launch offer is on it takes the eyebrow line, so the first screen keeps its height. */}
+            {data?.launchOffer ? (
+              <p className="exq-label exq-hero__label exq-offer-tag">{data.launchOffer.label}</p>
+            ) : (
+              <p className="exq-label exq-hero__label">
+                Barber &amp; Beauty Lounge &middot; {where}
+              </p>
+            )}
             <Lines
               as="h1"
               id="exq-hero-title"
@@ -93,14 +100,6 @@ export function HomePage() {
                 See services
               </ButtonLink>
             </p>
-            {data?.launchOffer ? (
-              <p
-                className="exq-offer-tag exq-label exq-hero__rise"
-                style={{ '--rise-i': 5 } as React.CSSProperties}
-              >
-                {data.launchOffer.label}
-              </p>
-            ) : null}
             <dl
               className="exq-hero__info exq-hero__rise"
               data-state={data ? 'ready' : 'loading'}
