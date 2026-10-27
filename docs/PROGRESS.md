@@ -880,3 +880,9 @@ commit, and what is still open.
   Done, the PDF re-rendered, screens in docs/screens/p13g (board and closing at both sizes, montage;
   the demo has four barbers in today, the five barber fit is asserted in the kiosk e2e).
 - Heartbeat: 18:56 UTC, commit follows, next is SHIP.
+
+### SHIP
+
+- Gate: 699 unit and integration, dev e2e 166 of 167 (the block time resolver spec, order dependent,
+  passes alone, as in 13f), prod-like 7, showcase 13, vercel-function 97. PR 24 merged into main as
+  5c2c7f0; Vercel production for it completed. The production URLs are for Rob to open.
