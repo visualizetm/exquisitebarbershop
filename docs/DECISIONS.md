@@ -1622,3 +1622,12 @@ pan-x pan-y`) and the context menu handler, not with `user-scalable=no` in the v
 - D13g-02 A screen reader hears the message and "Closing in 15 seconds" once, from one live
   region; the visible counting line is hidden from it, because announcing every second would
   drown the message.
+- D13g-03 Fit, in the order the prompt gave, stopping when it fits: the two choices shrink to 34vh
+  (and the choice icon to 56px, the start screen's gaps and the header margin tighten), and sideways
+  (landscape, 1000px and up) the board is one row of five tiles. Tile padding was not touched.
+  The tile's photo column is 56px with the status under it across the full width. Type stays at
+  22px and up, targets at 64px; the kiosk spec asserts no vertical scroll at both sizes with five
+  barbers working.
+- D13g-04 A tile shows the barber's photo as a 56px circle, or an initials circle (white on steel,
+  `--ink-3`) like the portal's cards. The shop mark was `PhotoFrame`'s placeholder panel; the board
+  no longer uses `PhotoFrame` at all.

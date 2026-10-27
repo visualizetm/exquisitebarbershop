@@ -71,6 +71,11 @@ test('pair, the board, a walk in, a check in, the idle reset, the exit PIN, unpa
   await expect(board.locator('.exq-board__tile').first()).toBeVisible();
   await expect(board.locator('.exq-board__tile[data-tone]').first()).toBeVisible();
   await expect(page.locator('a:visible')).toHaveCount(0);
+  // Five barbers working and the whole start screen fits without scrolling.
+  await expect(board.locator('.exq-board__tile')).toHaveCount(5);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight),
+  ).toBeLessThanOrEqual(0);
   await bigEnough(page, 64);
   await noAxe(page, 'start');
 
@@ -177,6 +182,10 @@ test('upright: the board and a walk in fit, every target is 64px', async ({ brow
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     UPRIGHT.width,
   );
+  expect(
+    await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight),
+  ).toBeLessThanOrEqual(0);
+  await expect(page.locator('.exq-board__initials').first()).toBeVisible();
   await bigEnough(page, 64);
   await noAxe(page, 'upright start');
   await page.getByRole('button', { name: 'Walk in' }).click();

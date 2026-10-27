@@ -18,7 +18,7 @@ import { NewBookingFlow, type FlowResult } from '@/booking-flow/NewBookingFlow';
 import { useChairEstimates, type FlowSession } from '@/booking-flow/flowData';
 import { Button, Input } from '@/components/ui';
 import { Mark } from '@/components/ui/Mark';
-import { PhotoFrame } from '@/components/ui/PhotoFrame';
+import { initialsOf } from '@/lib/initials';
 import { ApiRequestError, apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { CodePad } from './CodePad';
@@ -737,14 +737,12 @@ function Board({ board }: { board: KioskBoardResponse | null }) {
         <ul className="exq-bare exq-board__tiles">
           {board.tiles.map((t) => (
             <li key={t.staffId} className="exq-board__tile" data-tone={t.tone}>
-              <span className="exq-board__photo">
-                <PhotoFrame
-                  photo={t.photo}
-                  name={t.name}
-                  ratio="1:1"
-                  sizes="96px"
-                  chairNumber={t.chairNumber}
-                />
+              <span className="exq-board__photo" aria-hidden="true">
+                {t.photo ? (
+                  <img src={t.photo.url} alt="" width={56} height={56} />
+                ) : (
+                  <span className="exq-board__initials">{initialsOf(t.name)}</span>
+                )}
               </span>
               <span className="exq-board__who">
                 <strong className="exq-board__name">{t.name}</strong>

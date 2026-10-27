@@ -867,3 +867,9 @@ commit, and what is still open.
   (D13g-01, D13g-02); tests/e2e/kiosk.spec.ts counts 15, 10, 8 (a tap elsewhere changes nothing), 1,
   then the cleared start screen with a frozen clock; the owner's checkin spec waits for the count.
 - Heartbeat: 18:47 UTC, commit follows, next is M2 (the board fits, initials).
+
+### M2: the board fits, initials
+
+- Shipped: the start screen fits at 1180 x 820 and 820 x 1180 with five barbers (D13g-03), tiles
+  with photos or initials circles (D13g-04), asserted in tests/e2e/kiosk.spec.ts.
+- Heartbeat: 18:50 UTC, commit follows, next is M3 (guide, screens).
