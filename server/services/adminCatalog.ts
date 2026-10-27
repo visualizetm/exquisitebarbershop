@@ -331,24 +331,29 @@ export async function deleteStaff(
 // Settings
 // ---------------------------------------------------------------------------
 
-export async function getSettings(): Promise<{ settings: ShopSettingsInput }> {
+export async function getSettings(): Promise<{ settings: ShopSettingsInput; updatedAt: string }> {
   const {
     _id: _id,
     createdAt: _c,
-    updatedAt: _u,
+    updatedAt,
     ...settings
   } = await shopSettingsRepo.requireShopSettings();
-  return { settings };
+  return { settings, updatedAt: updatedAt.toISOString() };
 }
 
 export async function putSettings(
   principal: Principal,
-  input: ShopSettingsUpdate,
+  input: ShopSettingsUpdate & { expectedUpdatedAt?: string | undefined },
   meta: ServiceMeta,
 ) {
   const before = await getSettings();
+  // Two tabs: the later save is refused when the document moved on since it was loaded.
+  if (input.expectedUpdatedAt !== undefined && input.expectedUpdatedAt !== before.updatedAt) {
+    throw new AppError('CONFLICT', 'Changed somewhere else, reload');
+  }
+  const { expectedUpdatedAt: _e, ...update } = input;
   await withTransaction(async (session) => {
-    await shopSettingsRepo.updateShopSettings(input, meta.now, { session });
+    await shopSettingsRepo.updateShopSettings(update, meta.now, { session });
   });
   // The audit records what is stored now, which keeps any group the save left out.
   const after = await getSettings();

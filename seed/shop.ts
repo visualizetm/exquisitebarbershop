@@ -185,6 +185,16 @@ export function seedReviewItems(): ReviewItem[] {
 export const shopSettingsSeed: ShopSettingsInput = {
   name: 'Exquisite Barber & Beauty Lounge',
   tagline: 'Gifted Hands',
+  // The top of the home page, editable on the Website side.
+  hero: {
+    headline: 'Gifted hands. Exquisite cuts.',
+    redWord: 'Exquisite',
+    subline: 'Barbers and stylists under one roof. Pick your chair and book in under a minute.',
+  },
+  visit: {
+    parking: '', // PLACEHOLDER parking details from Dontrise
+    goodToKnow: ['Kids welcome', 'Wheelchair accessible parking lot'],
+  },
   // Suite F is on Google and on Drew's booking page. Squire says "Unit 4". Suite F wins until
   // Dontrise says otherwise.
   address: {

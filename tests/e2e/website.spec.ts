@@ -44,10 +44,10 @@ test.describe('the website page', () => {
     await page.setViewportSize(DESKTOP);
     await signInOwner(page);
     await page.goto('/admin/website');
-    await expect(page).toHaveURL(/\/admin\/website\/announcement$/);
+    await expect(page).toHaveURL(/\/admin\/website\?section=top$/);
     const nav = page.getByRole('navigation', { name: 'Website sections' });
     const expected: [string, string, string][] = [
-      ['Announcement', 'announcement', '/'],
+      ['Announcement bar', 'announcement', '/'],
       ['Top of page', 'top', '/'],
       ['Hours', 'hours', '/visit'],
       ['Services and prices', 'services', '/services'],
@@ -55,23 +55,23 @@ test.describe('the website page', () => {
       ['Reviews', 'reviews', '/'],
     ];
     for (const [name, id, href] of expected) {
-      await nav.getByRole('link', { name }).click();
-      await expect(page).toHaveURL(new RegExp(`/admin/website/${id}$`));
+      await nav.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+      await expect(page).toHaveURL(new RegExp(`/admin/website\\?section=${id}$`));
       await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
-      const link = page.getByRole('link', { name: 'View on site' });
+      const link = page.getByRole('link', { name: 'View site' });
       await expect(link).toHaveAttribute('href', href);
       await expect(link).toHaveAttribute('target', '_blank');
       await expect(link).toHaveAttribute('rel', /noopener/);
     }
     // The section is in the address, so a reload or a shared link lands on the same panel.
-    await page.goto('/admin/website/gallery');
-    await expect(nav.getByRole('link', { name: 'Gallery' })).toHaveAttribute(
+    await page.goto('/admin/website?section=gallery');
+    await expect(nav.getByRole('button', { name: /^Gallery/ })).toHaveAttribute(
       'aria-current',
       'page',
     );
     // The old tab addresses still work.
     await page.goto('/admin/website/top');
-    await expect(page).toHaveURL(/\/admin\/website\/top$/);
+    await expect(page).toHaveURL(/\/admin\/website\?section=top$/);
   });
 
   test('the announcement tab changes the strip on the site, and putting it back is one more save', async ({
@@ -410,15 +410,15 @@ for (const theme of ['light', 'dark'] as const) {
       await page.setViewportSize(size);
       const pages = [
         ...['hours', 'announcement', 'services', 'top', 'gallery', 'reviews'].map(
-          (t) => `/admin/website/${t}`,
+          (t) => `/admin/website?section=${t}`,
         ),
         ...['shop', 'rules', 'account', 'email'].map((t) => `/admin/settings?tab=${t}`),
       ];
       for (const url of pages) {
         await page.goto(url);
         await expect(
-          url.includes('/website/')
-            ? page.locator('.exq-website__panel')
+          url.includes('/website')
+            ? page.locator('.exq-editor__panel')
             : page.getByRole('tabpanel'),
         ).toBeVisible();
         await page.waitForTimeout(400);

@@ -10,7 +10,8 @@ import { LoginPage } from './pages/LoginPage';
 import { OutboxPage } from './pages/OutboxPage';
 import { SchedulePage } from './schedule/SchedulePage';
 import { SettingsPage } from './settings/SettingsPage';
-import { WebsitePage } from './website/WebsitePage';
+import { OLD_TAB_SECTIONS } from './website/sections';
+import { WebsiteEditor } from './website/WebsiteEditor';
 import { BookingsPage } from './bookings/BookingsPage';
 import { TodayPage } from './today/TodayPage';
 import { TeamDetailPage } from './team/TeamDetailPage';
@@ -107,8 +108,18 @@ const OLD_WEBSITE_TABS: Record<string, string> = {
 };
 function WebsiteHome() {
   const params = new URLSearchParams(useLocation().search);
-  const tab = OLD_WEBSITE_TABS[params.get('tab') ?? ''];
-  return <Navigate to={tab ? `/admin/website/${tab}` : SIDE_HOME.website} replace />;
+  const old = OLD_WEBSITE_TABS[params.get('tab') ?? ''];
+  if (old) return <Navigate to={`/admin/website?section=${old}`} replace />;
+  return <WebsiteEditor />;
+}
+
+/** /admin/website/top and friends (prompt 13b addresses) land on the editor's section. */
+function OldWebsiteTab() {
+  const { tab = '' } = useParams();
+  const section = OLD_TAB_SECTIONS[tab];
+  return (
+    <Navigate to={section ? `/admin/website?section=${section}` : SIDE_HOME.website} replace />
+  );
 }
 
 /** /admin lands on the side this device used last, Shop by default. */
@@ -134,7 +145,7 @@ function OwnerRoutes() {
       </Route>
       <Route path="website">
         <Route index element={<WebsiteHome />} />
-        <Route path=":tab" element={<WebsitePage />} />
+        <Route path=":tab" element={<OldWebsiteTab />} />
       </Route>
       <Route path="settings" element={<SettingsPage />} />
       <Route path="settings/*" element={<Navigate to="/admin/settings" replace />} />

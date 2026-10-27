@@ -14,18 +14,12 @@ export const SHOP_TABS: SectionTab[] = [
   { to: '/admin/shop/team', label: 'Team' },
 ];
 
-export const WEBSITE_TABS: SectionTab[] = [
-  { to: '/admin/website/announcement', label: 'Announcement' },
-  { to: '/admin/website/top', label: 'Top of page' },
-  { to: '/admin/website/hours', label: 'Hours' },
-  { to: '/admin/website/services', label: 'Services and prices' },
-  { to: '/admin/website/gallery', label: 'Gallery' },
-  { to: '/admin/website/reviews', label: 'Reviews' },
-];
+/** The Website side is one editor with its own section list, so the tab row has one tab. */
+export const WEBSITE_TABS: SectionTab[] = [{ to: '/admin/website', label: 'Editor' }];
 
 export const SIDE_HOME: Record<Side, string> = {
   shop: '/admin/shop/today',
-  website: '/admin/website/announcement',
+  website: '/admin/website?section=top',
 };
 
 const SIDE_KEY = 'exq-admin-side';

@@ -28189,6 +28189,27 @@ var DEFAULT_SOCIAL_LINKS = {
   tiktokUrl: "",
   facebookUrl: ""
 };
+var heroSchema = external_exports.object({
+  headline: nonEmptyText(48),
+  redWord: nonEmptyText(24),
+  subline: nonEmptyText(160)
+}).refine((v) => v.headline.split(/\s+/).some((w) => w.replace(/[.,!?]+$/, "") === v.redWord), {
+  message: "The red word must be one of the words in the headline",
+  path: ["redWord"]
+});
+var DEFAULT_HERO = {
+  headline: "Gifted hands. Exquisite cuts.",
+  redWord: "Exquisite",
+  subline: "Barbers and stylists under one roof. Pick your chair and book in under a minute."
+};
+var visitSchema = external_exports.object({
+  parking: external_exports.string().trim().max(300).default(""),
+  goodToKnow: external_exports.array(nonEmptyText(80)).max(6).default([])
+});
+var DEFAULT_VISIT = {
+  parking: "",
+  goodToKnow: ["Kids welcome", "Wheelchair accessible parking lot"]
+};
 var shopSettingsDocumentSchema = external_exports.object({
   _id: external_exports.literal(SHOP_SETTINGS_ID),
   name: nonEmptyText(120),
@@ -28208,7 +28229,9 @@ var shopSettingsDocumentSchema = external_exports.object({
   google: googleSettingsSchema.default(DEFAULT_GOOGLE),
   reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
-  nextOpenServiceId: idSchema.nullable().default(null)
+  nextOpenServiceId: idSchema.nullable().default(null),
+  hero: heroSchema.default(DEFAULT_HERO),
+  visit: visitSchema.default(DEFAULT_VISIT)
 }).extend(timestampsSchema.shape);
 var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   _id: true,
@@ -32238,6 +32261,17 @@ function seedReviewItems() {
 var shopSettingsSeed = {
   name: "Exquisite Barber & Beauty Lounge",
   tagline: "Gifted Hands",
+  // The top of the home page, editable on the Website side.
+  hero: {
+    headline: "Gifted hands. Exquisite cuts.",
+    redWord: "Exquisite",
+    subline: "Barbers and stylists under one roof. Pick your chair and book in under a minute."
+  },
+  visit: {
+    parking: "",
+    // PLACEHOLDER parking details from Dontrise
+    goodToKnow: ["Kids welcome", "Wheelchair accessible parking lot"]
+  },
   // Suite F is on Google and on Drew's booking page. Squire says "Unit 4". Suite F wins until
   // Dontrise says otherwise.
   address: {
@@ -34498,8 +34532,15 @@ var closureUpsertRequestSchema = external_exports.intersection(
   external_exports.object({ resolutions: resolutionsSchema })
 );
 var closureResponseSchema = external_exports.object({ closure: closureViewSchema }).extend(conflictOutcomeSchema.shape);
-var settingsResponseSchema = external_exports.object({ settings: shopSettingsInputSchema });
-var settingsRequestSchema = shopSettingsUpdateSchema;
+var settingsResponseSchema = external_exports.object({
+  settings: shopSettingsInputSchema,
+  /** When the document last changed; a save that carries an older value is refused. */
+  updatedAt: external_exports.iso.datetime().optional()
+});
+var settingsRequestSchema = shopSettingsUpdateSchema.extend({
+  /** The updatedAt the editor loaded; set it to be refused when another tab saved first. */
+  expectedUpdatedAt: external_exports.iso.datetime().optional()
+});
 var reviewsRequestSchema = external_exports.strictObject({
   /** Off hides the whole section on Home and the chair pages. */
   enabled: external_exports.boolean().optional(),
@@ -38112,15 +38153,19 @@ async function getSettings() {
   const {
     _id,
     createdAt: _c,
-    updatedAt: _u,
+    updatedAt,
     ...settings
   } = await shopSettingsRepo_exports.requireShopSettings();
-  return { settings };
+  return { settings, updatedAt: updatedAt.toISOString() };
 }
 async function putSettings(principal, input2, meta3) {
   const before = await getSettings();
+  if (input2.expectedUpdatedAt !== void 0 && input2.expectedUpdatedAt !== before.updatedAt) {
+    throw new AppError("CONFLICT", "Changed somewhere else, reload");
+  }
+  const { expectedUpdatedAt: _e, ...update } = input2;
   await withTransaction(async (session) => {
-    await shopSettingsRepo_exports.updateShopSettings(input2, meta3.now, { session });
+    await shopSettingsRepo_exports.updateShopSettings(update, meta3.now, { session });
   });
   const after = await getSettings();
   await audit2(
@@ -40336,6 +40381,9 @@ var publicShopSchema = external_exports.object({
   reviews: external_exports.array(publicReviewSchema).max(30).optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
+  /** The hero's words, from the settings; absent from older responses, the client then uses the seed copy. */
+  hero: heroSchema.optional(),
+  visit: visitSchema.optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
   maintenance: external_exports.boolean().optional(),
   /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
@@ -40576,6 +40624,8 @@ var publicRoutes = [
         email: publicEmail(settings.email),
         instagramHandle: settings.instagramHandle,
         timezone: settings.timezone,
+        hero: settings.hero,
+        visit: settings.visit,
         hours: hours?.days ?? EMPTY_WEEK,
         booking: {
           slotStepMinutes: settings.booking.slotStepMinutes,

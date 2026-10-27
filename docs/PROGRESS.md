@@ -750,3 +750,11 @@ commit, and what is still open.
   arrived and start routes. Tests: portal13d e2e at 390 with axe on every screen, portal, flow,
   team, realshop, checkin and admin specs updated.
 - Heartbeat: 11:53 UTC, commit follows, next is M2 (the website editor).
+
+### M2: the website editor
+
+- Shipped: one editor at /admin/website?section with the list and status tags, the live preview
+  (phone and computer, full screen under 1280), the hero copy and Visit words as settings with the
+  stale-save refusal, every old address redirected. Tests: hero unit (3), settingsEditor
+  integration (1), editor e2e at 1440 and 390 with axe, website, dashboard and admin specs updated.
+- Heartbeat: 12:13 UTC, commit follows, next is M3 (the guides).

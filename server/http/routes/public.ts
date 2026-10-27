@@ -100,6 +100,8 @@ export const publicRoutes: RouteDefinition[] = [
         email: publicEmail(settings.email),
         instagramHandle: settings.instagramHandle,
         timezone: settings.timezone,
+        hero: settings.hero,
+        visit: settings.visit,
         hours: hours?.days ?? EMPTY_WEEK,
         booking: {
           slotStepMinutes: settings.booking.slotStepMinutes,

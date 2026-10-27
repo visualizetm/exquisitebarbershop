@@ -263,6 +263,38 @@ export const DEFAULT_SOCIAL_LINKS: SocialLinks = {
   facebookUrl: '',
 };
 
+/**
+ * The top of the home page. The headline is at most 48 characters and the red word must appear in
+ * it, so the public hero can always paint one word red. The seed carries today's copy.
+ */
+export const heroSchema = z
+  .object({
+    headline: nonEmptyText(48),
+    redWord: nonEmptyText(24),
+    subline: nonEmptyText(160),
+  })
+  .refine((v) => v.headline.split(/\s+/).some((w) => w.replace(/[.,!?]+$/, '') === v.redWord), {
+    message: 'The red word must be one of the words in the headline',
+    path: ['redWord'],
+  });
+export type HeroCopy = z.infer<typeof heroSchema>;
+export const DEFAULT_HERO: HeroCopy = {
+  headline: 'Gifted hands. Exquisite cuts.',
+  redWord: 'Exquisite',
+  subline: 'Barbers and stylists under one roof. Pick your chair and book in under a minute.',
+};
+
+/** The Visit page's own words: parking, and the "Good to know" lines. */
+export const visitSchema = z.object({
+  parking: z.string().trim().max(300).default(''),
+  goodToKnow: z.array(nonEmptyText(80)).max(6).default([]),
+});
+export type VisitCopy = z.infer<typeof visitSchema>;
+export const DEFAULT_VISIT: VisitCopy = {
+  parking: '',
+  goodToKnow: ['Kids welcome', 'Wheelchair accessible parking lot'],
+};
+
 export const shopSettingsDocumentSchema = z
   .object({
     _id: z.literal(SHOP_SETTINGS_ID),
@@ -284,6 +316,8 @@ export const shopSettingsDocumentSchema = z
     reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
     /** The service "next open" times are computed for. Null means each chair's shortest service. */
     nextOpenServiceId: idSchema.nullable().default(null),
+    hero: heroSchema.default(DEFAULT_HERO),
+    visit: visitSchema.default(DEFAULT_VISIT),
   })
   .extend(timestampsSchema.shape);
 export type ShopSettingsDocument = z.infer<typeof shopSettingsDocumentSchema>;

@@ -1467,3 +1467,27 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   history), so the next NOW walk-in lands in the chair instead of being refused as busy. An undo
   back to confirmed takes the locks again and fails with SLOT_TAKEN when somebody has them by
   then. Found by the portal spec: a walk-in right after Done was refused.
+- D13d-12 The Website side is one editor at `/admin/website?section=<id>`: the section list with a
+  status tag each, the preview, the panel. Every old address (`/admin/website/<tab>`,
+  `/admin/website?tab=photo`, `/admin/photos`, `/admin/hours`) redirects to its section. The shell's
+  Website tab row has one tab, since the editor carries its own list on every width.
+- D13d-13 The hero copy is a setting (`hero: { headline, redWord, subline }`): the headline is at
+  most 48 characters and the red word must be one of its words, checked by zod on the server and
+  mirrored in the form. `shared/lib/hero.ts` turns the headline into display lines (one word per
+  line up to four, else paired) with the red word's line as the accent, so today's "Gifted hands.
+  Exquisite cuts." reads exactly as before. The seed carries it; `/api/shop` serves it.
+- D13d-14 The preview is the real home page top drawn from the draft (strip, hero with the photo,
+  headline lines, subline, buttons) in a 390 frame or a 1280 frame scaled to fit, never an iframe.
+  The section being edited gets the red outline and the Editing tag. For sections that live on
+  other pages (hours, services, team, gallery, visit) the preview says which page and View site
+  opens it: drawing every public page from a draft would have cost the milestone.
+- D13d-15 Save and publish goes through `PUT /api/admin/settings` with `expectedUpdatedAt`; the
+  server refuses a stale save with CONFLICT "Changed somewhere else, reload" and the response now
+  carries `updatedAt`. The existing panels (announcement, photos, hours, services, reviews,
+  gallery, team) keep their own validated routes and save on their own; the hero and the Visit
+  words are the editor's own draft with Undo changes and the leave-without-saving sheet.
+- D13d-16 The Visit page words are a setting too (`visit: { parking, goodToKnow }`), with the phone
+  and the email on the same panel; the email shows publicly only once it is no longer the
+  stand-in, as before. Team edits reuse the Team page inside the panel (portraits are the first
+  staff photo, which already replaces the initials everywhere); the work and the gallery reuse the
+  gallery panel, whose Home flag and order pick the six home photos.
