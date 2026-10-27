@@ -11,7 +11,10 @@ import { newId } from '../lib/ids';
 import { sessionOf, type RepoOptions } from './types';
 
 /** The discounts list defaults to empty, so a walk-in or a fixture never has to name it. */
-export type BookingInput = Omit<BookingDocument, '_id' | 'createdAt' | 'updatedAt' | 'discounts'> & {
+export type BookingInput = Omit<
+  BookingDocument,
+  '_id' | 'createdAt' | 'updatedAt' | 'discounts'
+> & {
   discounts?: BookingDocument['discounts'];
 };
 
