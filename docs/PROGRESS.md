@@ -810,4 +810,5 @@ commit, and what is still open.
 - Gate: 692 unit and integration (one email assertion updated for the offer line), dev e2e 152 of 165
   green on the full run, the 13 red fixed (offer tag contrast and hero height, ticket totals with
   the discount, the head preload removed, the fit guard booking later) and rerun green (49), prod-like
-  7, showcase 13, vercel-function 97. PR 17 against main.
+  7, showcase 13, vercel-function 97. PR 17 merged into main as b47f552 at 16:43 UTC; Vercel
+  production for it completed at 16:44 UTC.
