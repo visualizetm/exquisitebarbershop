@@ -9,13 +9,15 @@ import {
 } from '@shared/api/public';
 import { galleryResponseSchema } from '@shared/api/photos';
 import { heroLines } from '@shared/lib/hero';
-import type { HeroCopy, VisitCopy } from '@shared/schemas/shopSettings';
+import type { HeroCopy, LaunchOffer, VisitCopy } from '@shared/schemas/shopSettings';
+import { formatCents } from '@shared/lib/money';
 import {
   Button,
   ButtonAnchor,
   ErrorState,
   Input,
   Sheet,
+  Switch,
   Textarea,
   useToast,
 } from '@/components/ui';
@@ -58,6 +60,7 @@ export function WebsiteEditor() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [hero, setHero] = useState<HeroCopy | null>(null);
   const [visit, setVisit] = useState<(VisitCopy & { phone: string; email: string }) | null>(null);
+  const [offer, setOffer] = useState<LaunchOffer | null>(null);
   const [state, setState] = useState<SaveState>('clean');
   // The updatedAt the last save answered with, so a second save right after is not refused as stale.
   const [stamp, setStamp] = useState<string | null>(null);
@@ -68,19 +71,20 @@ export function WebsiteEditor() {
   useEffect(() => {
     if (loaded.status !== 'ready') return;
     setHero(loaded.data.settings.hero);
+    setOffer(loaded.data.settings.launchOffer);
     setVisit({
       ...loaded.data.settings.visit,
       phone: loaded.data.settings.phone,
       email: loaded.data.settings.email,
     });
-    // A reload after a save keeps "All changes saved and live" on the bar.
+    // A reload after a save keeps "Saved. Live on the site now" on the bar.
     setState((s) => (s === 'saved' ? 'saved' : 'clean'));
   }, [loaded.status === 'ready' ? loaded.data.updatedAt : null]);
 
   if (!section) return <Navigate to="/admin/website?section=top" replace />;
   if (loaded.status === 'error')
     return <ErrorState title="The website settings did not load">Reload the page.</ErrorState>;
-  if (loaded.status !== 'ready' || !hero || !visit) return <Status state="loading" />;
+  if (loaded.status !== 'ready' || !hero || !visit || !offer) return <Status state="loading" />;
   const settings = loaded.data.settings;
   const saved = stamp ?? loaded.data.updatedAt ?? null;
   const dirty = state === 'dirty' || state === 'saving';
@@ -94,6 +98,7 @@ export function WebsiteEditor() {
   };
   const undo = () => {
     setHero(settings.hero);
+    setOffer(settings.launchOffer);
     setVisit({ ...settings.visit, phone: settings.phone, email: settings.email });
     setState('clean');
     setError(null);
@@ -108,6 +113,7 @@ export function WebsiteEditor() {
         body: {
           ...settings,
           hero,
+          launchOffer: offer ?? settings.launchOffer,
           visit: { parking: visit?.parking ?? '', goodToKnow: visit?.goodToKnow ?? [] },
           phone: visit?.phone ?? settings.phone,
           email: visit?.email ?? settings.email,
@@ -117,7 +123,7 @@ export function WebsiteEditor() {
       setStamp(res.updatedAt ?? null);
       setState('saved');
       setVersion((v) => v + 1);
-      toast({ text: 'All changes saved and live', tone: 'ok' });
+      toast({ text: 'Saved. Live on the site now', tone: 'ok' });
     } catch (err) {
       setState('dirty');
       setError(
@@ -143,6 +149,8 @@ export function WebsiteEditor() {
         return settings.announcement.enabled ? 'On' : 'Off';
       case 'top':
         return shop.status === 'ready' && shop.data.heroPhoto ? 'Photo + headline' : 'Headline';
+      case 'offer':
+        return offer.enabled ? 'On' : 'Off';
       case 'work':
         return counts.work === null ? '' : `${String(counts.work)} photos`;
       case 'reviews':
@@ -170,7 +178,7 @@ export function WebsiteEditor() {
       <div className="exq-editor__bar">
         <p className="exq-editor__status exq-label" role="status" data-state={state}>
           {state === 'saved'
-            ? 'All changes saved and live'
+            ? 'Saved. Live on the site now'
             : state === 'saving'
               ? 'Saving'
               : state === 'dirty'
@@ -250,6 +258,20 @@ export function WebsiteEditor() {
             </>
           ) : null}
           {section.id === 'announcement' ? <AnnouncementPanel showViewLink={false} /> : null}
+          {section.id === 'offer' ? (
+            <OfferForm
+              offer={offer}
+              usage={loaded.data.launchOfferUsage ?? null}
+              onChange={(next) => {
+                setOffer(next);
+                setState('dirty');
+              }}
+              onSave={() => void save()}
+              onUndo={undo}
+              state={state}
+              error={error}
+            />
+          ) : null}
           {section.id === 'work' ? (
             <>
               <p className="exq-muted">
@@ -392,6 +414,123 @@ function HeroForm({
           Undo changes
         </Button>
         <Button type="submit" variant="accent" loading={state === 'saving'} disabled={!redOk}>
+          Save and publish
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** Whole dollars in the field, integer cents in the settings. */
+function dollars(cents: number): string {
+  return String(Math.round(cents / 100));
+}
+function cents(value: string): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : 0;
+}
+
+function OfferForm({
+  offer,
+  usage,
+  onChange,
+  onSave,
+  onUndo,
+  state,
+  error,
+}: {
+  offer: LaunchOffer;
+  usage: { count: number; amountCents: number } | null;
+  onChange: (next: LaunchOffer) => void;
+  onSave: () => void;
+  onUndo: () => void;
+  state: SaveState;
+  error: string | null;
+}) {
+  function submit(event: SyntheticEvent) {
+    event.preventDefault();
+    onSave();
+  }
+  return (
+    <form className="exq-editor__form" onSubmit={submit}>
+      <p className="exq-muted">
+        An amount off a client's first online booking. The site decides at booking time: online
+        bookings only, once per phone number, and only when the price reaches the minimum. Walk-ins
+        and bookings you or a barber add never get it.
+      </p>
+      {usage ? (
+        <p className="exq-editor__usage" data-testid="offer-usage">
+          Used {String(usage.count)} {usage.count === 1 ? 'time' : 'times'},{' '}
+          {formatCents(usage.amountCents)} off
+        </p>
+      ) : null}
+      <Switch
+        label="Offer on"
+        checked={offer.enabled}
+        onChange={(next) => {
+          onChange({ ...offer, enabled: next });
+        }}
+      />
+      <Input
+        label="Amount off, in dollars"
+        type="number"
+        min={0}
+        step={1}
+        required
+        value={dollars(offer.amountCents)}
+        onChange={(e) => {
+          onChange({ ...offer, amountCents: cents(e.target.value) });
+        }}
+      />
+      <Input
+        label="Minimum price, in dollars"
+        hint="The booking's price has to reach this before the offer applies."
+        type="number"
+        min={0}
+        step={1}
+        required
+        value={dollars(offer.minTotalCents)}
+        onChange={(e) => {
+          onChange({ ...offer, minTotalCents: cents(e.target.value) });
+        }}
+      />
+      <Input
+        label="Words on the site"
+        hint="Shows as a small red tag on the home page and the Book page while the offer is on."
+        required
+        maxLength={60}
+        value={offer.label}
+        onChange={(e) => {
+          onChange({ ...offer, label: e.target.value });
+        }}
+      />
+      <Input
+        label="First day (optional)"
+        type="date"
+        value={offer.startsOn}
+        onChange={(e) => {
+          onChange({ ...offer, startsOn: e.target.value });
+        }}
+      />
+      <Input
+        label="Last day (optional)"
+        hint="After this day the offer switches itself off."
+        type="date"
+        value={offer.endsOn}
+        onChange={(e) => {
+          onChange({ ...offer, endsOn: e.target.value });
+        }}
+      />
+      {error ? (
+        <p className="exq-editor__error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="exq-editor__actions">
+        <Button type="button" variant="outline" disabled={state !== 'dirty'} onClick={onUndo}>
+          Undo changes
+        </Button>
+        <Button type="submit" variant="accent" loading={state === 'saving'}>
           Save and publish
         </Button>
       </div>

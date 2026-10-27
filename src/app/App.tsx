@@ -1,12 +1,10 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
 import { AdminLayout, PublicLayout, TeamLayout } from './Layout';
-import { BookPage } from '@/pages/BookPage';
 import { ChairPage } from '@/pages/ChairPage';
 import { ChairsPage } from '@/pages/ChairsPage';
 import { GalleryPage } from '@/pages/GalleryPage';
 import { HomePage } from '@/pages/HomePage';
-import { ManagePage } from '@/pages/ManagePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ServicesPage } from '@/pages/ServicesPage';
 import { SetupPage } from '@/pages/SetupPage';
@@ -16,6 +14,11 @@ import { DemoNotice } from '@/components/site/DemoNotice';
 
 // The staff area is its own chunk: public visitors never download it.
 const AdminApp = lazy(() => import('@/admin/AdminApp'));
+// The booking flow and the manage page load on their own, so Home paints without them.
+const BookPage = lazy(() => import('@/pages/BookPage').then((m) => ({ default: m.BookPage })));
+const ManagePage = lazy(() =>
+  import('@/pages/ManagePage').then((m) => ({ default: m.ManagePage })),
+);
 // The barber portal is another chunk of its own, for the same reason.
 const TeamApp = lazy(() => import('@/team/TeamApp'));
 // The kit showcase exists only in development builds, for visual checks and screenshots.
@@ -33,8 +36,22 @@ export function App() {
           <Route path="chairs/:slug" element={<ChairPage />} />
           <Route path="gallery" element={<GalleryPage />} />
           <Route path="visit" element={<VisitPage />} />
-          <Route path="book" element={<BookPage />} />
-          <Route path="manage" element={<ManagePage />} />
+          <Route
+            path="book"
+            element={
+              <Suspense fallback={<Status state="loading" />}>
+                <BookPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="manage"
+            element={
+              <Suspense fallback={<Status state="loading" />}>
+                <ManagePage />
+              </Suspense>
+            }
+          />
           <Route path="setup" element={<SetupPage />} />
           {KitPage ? (
             <Route

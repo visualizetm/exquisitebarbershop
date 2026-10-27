@@ -60,6 +60,8 @@ export const publicShopSchema = z.object({
   /** The hero's words, from the settings; absent from older responses, the client then uses the seed copy. */
   hero: heroSchema.optional(),
   visit: visitSchema.optional(),
+  /** The launch offer while it is on and inside its dates; the site shows the label as a small tag. */
+  launchOffer: z.object({ label: z.string(), amountCents: z.int() }).nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
   maintenance: z.boolean().optional(),
   /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */

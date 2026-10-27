@@ -36,6 +36,14 @@ export const bookingCustomerSchema = z.object({
 });
 export type BookingCustomer = z.infer<typeof bookingCustomerSchema>;
 
+/** A discount applied by the server at booking time. The list is empty on most bookings. */
+export const discountSchema = z.object({
+  code: z.enum(['LAUNCH10']),
+  amountCents: centsSchema,
+  label: nonEmptyText(80),
+});
+export type Discount = z.infer<typeof discountSchema>;
+
 export const cancellationSchema = z.object({
   at: z.date(),
   by: actorTypeSchema,
@@ -55,7 +63,9 @@ export const bookingDocumentSchema = z
     durationMinutes: z.int().min(5),
     /** Buffer applied after this booking, captured so settings changes do not shift locks. */
     bufferMinutes: z.int().min(0),
+    /** The price of the services. What the client pays is this minus the discounts. */
     totalPriceCents: centsSchema,
+    discounts: z.array(discountSchema).default([]),
     customer: bookingCustomerSchema,
     status: bookingStatusSchema,
     source: bookingSourceSchema,

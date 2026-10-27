@@ -295,6 +295,30 @@ export const DEFAULT_VISIT: VisitCopy = {
   goodToKnow: ['Kids welcome', 'Wheelchair accessible parking lot'],
 };
 
+/**
+ * The launch offer the ads promise: an amount off a client's first online booking. The server
+ * decides inside the booking transaction (shared/lib/launchOffer.ts); the settings only say
+ * whether it is on, how much, the minimum price, the dates and the words on the site.
+ */
+export const launchOfferSchema = z.object({
+  enabled: z.boolean(),
+  amountCents: z.int().min(0).max(100_000),
+  minTotalCents: z.int().min(0).max(100_000),
+  label: nonEmptyText(60),
+  /** Shop dates. Empty means no bound. */
+  startsOn: z.union([z.literal(''), isoDateSchema]).default(''),
+  endsOn: z.union([z.literal(''), isoDateSchema]).default(''),
+});
+export type LaunchOffer = z.infer<typeof launchOfferSchema>;
+export const DEFAULT_LAUNCH_OFFER: LaunchOffer = {
+  enabled: true,
+  amountCents: 1000,
+  minTotalCents: 2000,
+  label: '$10 off your first online booking',
+  startsOn: '',
+  endsOn: '',
+};
+
 export const shopSettingsDocumentSchema = z
   .object({
     _id: z.literal(SHOP_SETTINGS_ID),
@@ -318,6 +342,7 @@ export const shopSettingsDocumentSchema = z
     nextOpenServiceId: idSchema.nullable().default(null),
     hero: heroSchema.default(DEFAULT_HERO),
     visit: visitSchema.default(DEFAULT_VISIT),
+    launchOffer: launchOfferSchema.default(DEFAULT_LAUNCH_OFFER),
   })
   .extend(timestampsSchema.shape);
 export type ShopSettingsDocument = z.infer<typeof shopSettingsDocumentSchema>;

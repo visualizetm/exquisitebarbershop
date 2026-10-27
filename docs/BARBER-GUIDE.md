@@ -47,7 +47,9 @@ day**, and a smaller **Check in**.
 
 **Today** lists your clients in time order: the time, the first name and last
 initial, the service and price, and a tag (Booked, Walk-in). Done and no show rows
-sit at the bottom, greyed. Tap any row to read notes or add one. You never see a
+sit at the bottom, greyed. A row that says **$10 off online** is a client's first online
+booking: the site took $10 off the price for them, so the price you see is before that. Tap
+any row to read notes or add one. You never see a
 phone number or email: **Call shop** in the row's panel reaches the desk.
 
 The screen refreshes itself every 30 seconds while it is open, and right after

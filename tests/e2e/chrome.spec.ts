@@ -74,7 +74,8 @@ test.describe('icons', () => {
   test('booking steps tick off, and the confirmation ticket names its facts', async ({ page }) => {
     await bookPublicly(page, 'drew', { name: 'Icon Check' });
     const ticket = page.locator('.exq-ticket');
-    await expect(ticket.locator('dt svg')).toHaveCount(5);
+    // Five facts, plus the launch offer row a first online booking carries.
+    await expect(ticket.locator('dt svg')).toHaveCount(6);
     await expect(ticket.locator('dt', { hasText: 'Day' })).toBeVisible();
     await expect(ticket.locator('dt', { hasText: 'Time' })).toBeVisible();
     await page.goto('/book?barber=drew');

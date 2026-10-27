@@ -28210,6 +28210,23 @@ var DEFAULT_VISIT = {
   parking: "",
   goodToKnow: ["Kids welcome", "Wheelchair accessible parking lot"]
 };
+var launchOfferSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  amountCents: external_exports.int().min(0).max(1e5),
+  minTotalCents: external_exports.int().min(0).max(1e5),
+  label: nonEmptyText(60),
+  /** Shop dates. Empty means no bound. */
+  startsOn: external_exports.union([external_exports.literal(""), isoDateSchema]).default(""),
+  endsOn: external_exports.union([external_exports.literal(""), isoDateSchema]).default("")
+});
+var DEFAULT_LAUNCH_OFFER = {
+  enabled: true,
+  amountCents: 1e3,
+  minTotalCents: 2e3,
+  label: "$10 off your first online booking",
+  startsOn: "",
+  endsOn: ""
+};
 var shopSettingsDocumentSchema = external_exports.object({
   _id: external_exports.literal(SHOP_SETTINGS_ID),
   name: nonEmptyText(120),
@@ -28231,7 +28248,8 @@ var shopSettingsDocumentSchema = external_exports.object({
   /** The service "next open" times are computed for. Null means each chair's shortest service. */
   nextOpenServiceId: idSchema.nullable().default(null),
   hero: heroSchema.default(DEFAULT_HERO),
-  visit: visitSchema.default(DEFAULT_VISIT)
+  visit: visitSchema.default(DEFAULT_VISIT),
+  launchOffer: launchOfferSchema.default(DEFAULT_LAUNCH_OFFER)
 }).extend(timestampsSchema.shape);
 var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
   _id: true,
@@ -28486,6 +28504,19 @@ var INDEXES = [
     keys: { "customer.phone": 1, startAt: -1 },
     options: { name: "customer_phone" },
     reason: "Open-bookings-per-phone guard and owner lookup of a customer history."
+  },
+  {
+    collection: "bookings",
+    keys: { "customer.phone": 1 },
+    options: {
+      name: "launchOfferOncePerPhone",
+      unique: true,
+      partialFilterExpression: {
+        "discounts.code": "LAUNCH10",
+        status: { $in: ["confirmed", "completed", "noShow"] }
+      }
+    },
+    reason: "The launch offer goes to one booking per phone: two first bookings placed at once cannot both carry it, and a cancelled one frees it."
   },
   {
     collection: "bookings",
@@ -29516,6 +29547,7 @@ async function listTimeBlocksEndingAfter(instant, staffIds, options) {
 // server/repos/bookingsRepo.ts
 var bookingsRepo_exports = {};
 __export(bookingsRepo_exports, {
+  LaunchOfferTaken: () => LaunchOfferTaken,
   ReferenceCodeCollision: () => ReferenceCodeCollision,
   backfillNameKeys: () => backfillNameKeys,
   cancelBooking: () => cancelBooking,
@@ -29527,6 +29559,8 @@ __export(bookingsRepo_exports, {
   findBookingByReferenceCode: () => findBookingByReferenceCode,
   findBookingsByIds: () => findBookingsByIds,
   insertBooking: () => insertBooking,
+  launchOfferUsage: () => launchOfferUsage,
+  launchOfferUsedByPhone: () => launchOfferUsedByPhone,
   listBookingsBetween: () => listBookingsBetween,
   listBookingsForPhone: () => listBookingsForPhone,
   listBookingsPage: () => listBookingsPage,
@@ -29561,6 +29595,11 @@ var bookingCustomerSchema = external_exports.object({
   phone: phoneSchema,
   email: emailSchema.nullable()
 });
+var discountSchema = external_exports.object({
+  code: external_exports.enum(["LAUNCH10"]),
+  amountCents: centsSchema,
+  label: nonEmptyText(80)
+});
 var cancellationSchema = external_exports.object({
   at: external_exports.date(),
   by: actorTypeSchema,
@@ -29578,7 +29617,9 @@ var bookingDocumentSchema = external_exports.object({
   durationMinutes: external_exports.int().min(5),
   /** Buffer applied after this booking, captured so settings changes do not shift locks. */
   bufferMinutes: external_exports.int().min(0),
+  /** The price of the services. What the client pays is this minus the discounts. */
   totalPriceCents: centsSchema,
+  discounts: external_exports.array(discountSchema).default([]),
   customer: bookingCustomerSchema,
   status: bookingStatusSchema,
   source: bookingSourceSchema,
@@ -29621,6 +29662,37 @@ var ReferenceCodeCollision = class extends Error {
     this.name = "ReferenceCodeCollision";
   }
 };
+var LaunchOfferTaken = class extends Error {
+  constructor() {
+    super("The launch offer was already used by this phone");
+  }
+};
+var OFFER_HOLDING_STATUSES = ["confirmed", "completed", "noShow"];
+async function launchOfferUsedByPhone(phone, options) {
+  const col = await collection("bookings");
+  const found = await col.findOne(
+    {
+      "customer.phone": phone,
+      "discounts.code": "LAUNCH10",
+      status: { $in: OFFER_HOLDING_STATUSES }
+    },
+    { projection: { _id: 1 }, ...sessionOf(options) }
+  );
+  return found !== null;
+}
+async function launchOfferUsage() {
+  const col = await collection("bookings");
+  const rows = await col.aggregate([
+    { $match: { "discounts.code": "LAUNCH10", status: { $in: OFFER_HOLDING_STATUSES } } },
+    { $unwind: "$discounts" },
+    { $match: { "discounts.code": "LAUNCH10" } },
+    {
+      $group: { _id: null, count: { $sum: 1 }, amountCents: { $sum: "$discounts.amountCents" } }
+    }
+  ]).toArray();
+  const row = rows[0];
+  return row ? { count: row.count, amountCents: row.amountCents } : { count: 0, amountCents: 0 };
+}
 async function insertBooking(input2, now2, options) {
   const doc = bookingDocumentSchema.parse({
     _id: options?.id ?? newId(),
@@ -29633,7 +29705,12 @@ async function insertBooking(input2, now2, options) {
   try {
     await col.insertOne(doc, sessionOf(options));
   } catch (error62) {
-    if (isDuplicateKeyError(error62)) throw new ReferenceCodeCollision(error62);
+    if (isDuplicateKeyError(error62)) {
+      if (error62 instanceof Error && error62.message.includes("launchOfferOncePerPhone")) {
+        throw new LaunchOfferTaken();
+      }
+      throw new ReferenceCodeCollision(error62);
+    }
     throw error62;
   }
   return doc;
@@ -32322,6 +32399,15 @@ var shopSettingsSeed = {
     rewards: false,
     smsReminders: false
   },
+  // The ads promise $10 off a first online booking. The minimum price is a guess. // PLACEHOLDER
+  launchOffer: {
+    enabled: true,
+    amountCents: 1e3,
+    minTotalCents: 2e3,
+    label: "$10 off your first online booking",
+    startsOn: "",
+    endsOn: ""
+  },
   announcement: {
     enabled: true,
     text: "Walk-ins welcome",
@@ -33789,6 +33875,32 @@ function managePath(token) {
   return `/manage?token=${encodeURIComponent(token)}`;
 }
 
+// shared/lib/launchOffer.ts
+var LAUNCH_OFFER_CODE = "LAUNCH10";
+function launchOfferIsLive(offer, shopDate) {
+  if (!offer.enabled || offer.amountCents <= 0) return false;
+  if (offer.startsOn !== "" && shopDate < offer.startsOn) return false;
+  if (offer.endsOn !== "" && shopDate > offer.endsOn) return false;
+  return true;
+}
+function launchOfferDiscount(offer, booking) {
+  if (booking.source !== "online") return null;
+  if (booking.alreadyUsed) return null;
+  if (!launchOfferIsLive(offer, booking.shopDate)) return null;
+  if (booking.priceCents < offer.minTotalCents) return null;
+  return {
+    code: LAUNCH_OFFER_CODE,
+    amountCents: Math.min(offer.amountCents, booking.priceCents),
+    label: offer.label
+  };
+}
+function discountCents(discounts) {
+  return (discounts ?? []).reduce((sum, d) => sum + d.amountCents, 0);
+}
+function totalAfterDiscounts(priceCents, discounts) {
+  return Math.max(0, priceCents - discountCents(discounts));
+}
+
 // server/services/bookingNotifications.ts
 function shopSnapshot(settings) {
   const a = settings.address;
@@ -34032,6 +34144,7 @@ var bookingViewSchema = external_exports.object({
   endAt: external_exports.iso.datetime(),
   durationMinutes: external_exports.int(),
   totalPriceCents: external_exports.int(),
+  discounts: external_exports.array(discountSchema).default([]),
   customer: external_exports.object({ name: external_exports.string(), phone: external_exports.string(), email: external_exports.string().nullable() }),
   notes: external_exports.string().nullable(),
   /** Calendar sequence number: rises on every reschedule so calendar apps replace the event. */
@@ -34535,7 +34648,9 @@ var closureResponseSchema = external_exports.object({ closure: closureViewSchema
 var settingsResponseSchema = external_exports.object({
   settings: shopSettingsInputSchema,
   /** When the document last changed; a save that carries an older value is refused. */
-  updatedAt: external_exports.iso.datetime().optional()
+  updatedAt: external_exports.iso.datetime().optional(),
+  /** How often the launch offer was given on bookings that stand, and what it took off. */
+  launchOfferUsage: external_exports.object({ count: external_exports.int(), amountCents: external_exports.int() }).optional()
 });
 var settingsRequestSchema = shopSettingsUpdateSchema.extend({
   /** The updatedAt the editor loaded; set it to be refused when another tab saved first. */
@@ -34734,6 +34849,7 @@ function toBookingView(booking, staff) {
     endAt: booking.endAt.toISOString(),
     durationMinutes: booking.durationMinutes,
     totalPriceCents: booking.totalPriceCents,
+    discounts: booking.discounts,
     customer: booking.customer,
     notes: booking.notes,
     sequence: booking.manageTokenVersion,
@@ -34952,7 +35068,8 @@ var ONLINE_POLICY = {
   override: false,
   enforcePhoneCap: true,
   audience: { customer: true, owner: true },
-  ownerSeenAt: null
+  ownerSeenAt: null,
+  offerAllowed: true
 };
 function serviceSnapshots(services, quote) {
   return services.map((s2) => {
@@ -35002,6 +35119,12 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
       );
     }
   }
+  const discount = policy.offerAllowed ? launchOfferDiscount(settings.launchOffer, {
+    source: policy.source,
+    priceCents: quote.price.totalCents,
+    shopDate: shopDateOf(meta3.now),
+    alreadyUsed: await bookingsRepo_exports.launchOfferUsedByPhone(input2.customer.phone, { session })
+  }) : null;
   const endAt = addMinutes(startAt, quote.serviceMinutes);
   const booking = await bookingsRepo_exports.insertBooking(
     {
@@ -35014,6 +35137,7 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
       durationMinutes: quote.serviceMinutes,
       bufferMinutes: quote.bufferMinutes,
       totalPriceCents: quote.price.totalCents,
+      discounts: discount ? [discount] : [],
       customer: input2.customer,
       status: "confirmed",
       source: policy.source,
@@ -35091,14 +35215,19 @@ async function placeBooking(input2, startAt, tried, referenceCode, meta3, policy
 async function placeWithFallback(input2, startAt, meta3, policy, idempotency) {
   const tried = /* @__PURE__ */ new Set();
   let lastConflict = null;
+  let effective = policy;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const referenceCode = await freshReferenceCode();
     try {
       return await withTransaction(
-        (session) => placeBooking(input2, startAt, tried, referenceCode, meta3, policy, idempotency, session)
+        (session) => placeBooking(input2, startAt, tried, referenceCode, meta3, effective, idempotency, session)
       );
     } catch (error62) {
       if (error62 instanceof ReferenceCodeCollision) continue;
+      if (error62 instanceof LaunchOfferTaken) {
+        effective = { ...effective, offerAllowed: false };
+        continue;
+      }
       if (error62 instanceof AppError && error62.code === "SLOT_TAKEN") {
         lastConflict = error62;
         const staffId = typeof error62.context?.staffId === "string" ? error62.context.staffId : null;
@@ -35287,6 +35416,7 @@ async function createManualBooking(input2, actor, meta3) {
           actor,
           override: input2.override,
           enforcePhoneCap: false,
+          offerAllowed: false,
           audience: { customer: notifyCustomer, owner: false },
           ownerSeenAt: meta3.now
         },
@@ -36460,6 +36590,7 @@ var teamBookingViewSchema = external_exports.object({
   services: external_exports.array(external_exports.string()),
   notes: external_exports.string().nullable(),
   priceCents: external_exports.int().min(0),
+  discounts: external_exports.array(discountSchema).default([]),
   arrivedAt: external_exports.iso.datetime().nullable(),
   startedAt: external_exports.iso.datetime().nullable()
 });
@@ -36781,6 +36912,9 @@ function serviceLines(p) {
     (s2) => `${s2.name}: ${formatCents(s2.priceCents)} (${s2.durationMinutes} min)`
   );
 }
+function discountLines(p) {
+  return p.booking.discounts.map((d) => `First online booking: -${formatCents(d.amountCents)}`);
+}
 function whenLine(p) {
   const start = new Date(p.booking.startAt);
   const end = new Date(p.booking.endAt);
@@ -36841,7 +36975,8 @@ function customerConfirmed(p, env, rescheduled) {
     `Reference code: ${p.booking.referenceCode}`,
     "Services:",
     ...serviceLines(p).map((l2) => `  ${l2}`),
-    `Total: ${formatCents(p.booking.totalPriceCents)}`,
+    ...discountLines(p),
+    `Total: ${formatCents(totalAfterDiscounts(p.booking.totalPriceCents, p.booking.discounts))}`,
     ...url2 ? [`Need to change it? Cancel or reschedule here: ${url2}`] : [],
     "A calendar file is attached.",
     "",
@@ -36853,7 +36988,8 @@ function customerConfirmed(p, env, rescheduled) {
     ...rescheduled && p.previousStartAt ? [esc2(`It was previously ${formatShopDateTime(new Date(p.previousStartAt))}.`)] : [],
     `<strong>Reference code: ${esc2(p.booking.referenceCode)}</strong>`,
     `Services:<br>${serviceLines(p).map(esc2).join("<br>")}`,
-    `Total: ${esc2(formatCents(p.booking.totalPriceCents))}`,
+    ...discountLines(p).map(esc2),
+    `Total: ${esc2(formatCents(totalAfterDiscounts(p.booking.totalPriceCents, p.booking.discounts)))}`,
     ...url2 ? [`Need to change it? <a href="${esc2(url2)}">Cancel or reschedule</a>.`] : [],
     "A calendar file is attached."
   ];
@@ -36900,7 +37036,8 @@ function ownerAlert(p, env, kind) {
     `Reference: ${p.booking.referenceCode}`,
     "Services:",
     ...serviceLines(p).map((l2) => `  ${l2}`),
-    `Total: ${formatCents(p.booking.totalPriceCents)}`,
+    ...discountLines(p),
+    `Total: ${formatCents(totalAfterDiscounts(p.booking.totalPriceCents, p.booking.discounts))}`,
     ...p.booking.notes ? [`Notes: ${p.booking.notes}`] : [],
     ...p.cancelReason ? [`Reason: ${p.cancelReason}`] : [],
     `Dashboard: ${env.appBaseUrl}/admin`
@@ -40273,7 +40410,14 @@ var adminRoutes = [
   }),
   owner("GET", "/api/admin/settings", async (ctx) => {
     ctxScope(ctx);
-    return { body: settingsResponseSchema.parse(await getSettings()), headers: NO_STORE };
+    const [settings, launchOfferUsage2] = await Promise.all([
+      getSettings(),
+      bookingsRepo_exports.launchOfferUsage()
+    ]);
+    return {
+      body: settingsResponseSchema.parse({ ...settings, launchOfferUsage: launchOfferUsage2 }),
+      headers: NO_STORE
+    };
   }),
   owner("PUT", "/api/admin/settings", async (ctx) => {
     const { principal } = ctxScope(ctx);
@@ -40384,6 +40528,8 @@ var publicShopSchema = external_exports.object({
   /** The hero's words, from the settings; absent from older responses, the client then uses the seed copy. */
   hero: heroSchema.optional(),
   visit: visitSchema.optional(),
+  /** The launch offer while it is on and inside its dates; the site shows the label as a small tag. */
+  launchOffer: external_exports.object({ label: external_exports.string(), amountCents: external_exports.int() }).nullable().optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
   maintenance: external_exports.boolean().optional(),
   /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
@@ -40626,6 +40772,7 @@ var publicRoutes = [
         timezone: settings.timezone,
         hero: settings.hero,
         visit: settings.visit,
+        launchOffer: launchOfferIsLive(settings.launchOffer, shopDateOf(ctx.now)) ? { label: settings.launchOffer.label, amountCents: settings.launchOffer.amountCents } : null,
         hours: hours?.days ?? EMPTY_WEEK,
         booking: {
           slotStepMinutes: settings.booking.slotStepMinutes,
@@ -41822,6 +41969,7 @@ function toTeamBookingView(b) {
     services: b.services.map((s2) => s2.name),
     notes: b.notes,
     priceCents: b.totalPriceCents,
+    discounts: b.discounts,
     arrivedAt: b.arrivedAt?.toISOString() ?? null,
     startedAt: b.startedAt?.toISOString() ?? null
   };

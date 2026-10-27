@@ -195,11 +195,13 @@ describe('a booking with a chosen barber', () => {
     const customerMail = log.sent.find((m) => m.to === 'sam@example.com');
     const ownerMail = log.sent.find((m) => m.to !== 'sam@example.com');
     expect(customerMail?.text).toContain('Kids Cut: $25 (30 min)');
-    expect(customerMail?.text).toContain('Total: $45');
+    // A first online booking carries the launch offer: the email shows it and the total after it.
+    expect(customerMail?.text).toContain('First online booking: -$10');
+    expect(customerMail?.text).toContain('Total: $35');
     // A chosen barber's price is exact: no "from" anywhere in the email.
     expect(customerMail?.text).not.toMatch(/from \$|starting price/i);
-    expect(customerMail?.html).toContain('$45');
-    expect(ownerMail?.text).toContain('Total: $45');
+    expect(customerMail?.html).toContain('$35');
+    expect(ownerMail?.text).toContain('Total: $35');
     expect(ownerMail?.text).toContain('Kids Cut: $25 (30 min)');
 
     const detail = bookingDetailResponseSchema.parse(

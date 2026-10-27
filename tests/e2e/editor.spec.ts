@@ -35,7 +35,7 @@ test('editing the headline shows in the preview, saves, and lands on the public 
 
   await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Save and publish' }).click();
-  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
+  await expect(page.locator('.exq-editor__status')).toHaveText('Saved. Live on the site now');
 
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(`Clean${stamp}`);
@@ -47,7 +47,7 @@ test('editing the headline shows in the preview, saves, and lands on the public 
   await page.getByLabel('Word in red').fill('Exquisite');
   await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Save and publish' }).click();
-  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
+  await expect(page.locator('.exq-editor__status')).toHaveText('Saved. Live on the site now');
 });
 
 test('the editor at 390 is one column with a full-screen Preview, and axe is clean', async ({
@@ -74,7 +74,7 @@ test('the editor at 390 is one column with a full-screen Preview, and axe is cle
   await page.getByLabel('Parking').fill('Free lot behind the building, enter from Edgmont Ave.');
   await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Save and publish' }).click();
-  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
+  await expect(page.locator('.exq-editor__status')).toHaveText('Saved. Live on the site now');
   // Read it back from the API rather than the page: the public page caches /api/shop for a
   // minute, which would hand the specs that follow a stale copy.
   const shop = (await (await page.request.get('/api/shop')).json()) as {
@@ -85,7 +85,7 @@ test('the editor at 390 is one column with a full-screen Preview, and axe is cle
   await page.getByLabel('Parking').fill('');
   await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Save and publish' }).click();
-  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
+  await expect(page.locator('.exq-editor__status')).toHaveText('Saved. Live on the site now');
   const back = (await (await page.request.get('/api/shop')).json()) as {
     visit: { parking: string };
   };

@@ -31,6 +31,7 @@ const payload: BookingEmailPayload = {
     startAt: '2026-07-15T13:00:00.000Z',
     endAt: '2026-07-15T13:45:00.000Z',
     durationMinutes: 45,
+    discounts: [],
     totalPriceCents: 4000,
     customer: { name: 'Sam <Customer>', phone: '+12155550123', email: 'sam@example.com' },
     notes: 'Scissors only',

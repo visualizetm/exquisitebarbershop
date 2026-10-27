@@ -43,6 +43,7 @@ export function toTeamBookingView(b: BookingDocument): TeamBookingView {
     services: b.services.map((s) => s.name),
     notes: b.notes,
     priceCents: b.totalPriceCents,
+    discounts: b.discounts,
     arrivedAt: b.arrivedAt?.toISOString() ?? null,
     startedAt: b.startedAt?.toISOString() ?? null,
   };

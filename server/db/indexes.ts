@@ -132,6 +132,20 @@ export const INDEXES: readonly IndexDefinition[] = [
   },
   {
     collection: 'bookings',
+    keys: { 'customer.phone': 1 },
+    options: {
+      name: 'launchOfferOncePerPhone',
+      unique: true,
+      partialFilterExpression: {
+        'discounts.code': 'LAUNCH10',
+        status: { $in: ['confirmed', 'completed', 'noShow'] },
+      },
+    },
+    reason:
+      'The launch offer goes to one booking per phone: two first bookings placed at once cannot both carry it, and a cancelled one frees it.',
+  },
+  {
+    collection: 'bookings',
     keys: { nameKey: 1, startAt: -1 },
     options: { name: 'by_name_key' },
     reason: "The owner's search finds a customer by the start of the name, any case or accent.",

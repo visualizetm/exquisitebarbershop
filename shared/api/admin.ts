@@ -542,6 +542,8 @@ export const settingsResponseSchema = z.object({
   settings: shopSettingsInputSchema,
   /** When the document last changed; a save that carries an older value is refused. */
   updatedAt: z.iso.datetime().optional(),
+  /** How often the launch offer was given on bookings that stand, and what it took off. */
+  launchOfferUsage: z.object({ count: z.int(), amountCents: z.int() }).optional(),
 });
 export const settingsRequestSchema = shopSettingsUpdateSchema.extend({
   /** The updatedAt the editor loaded; set it to be refused when another tab saved first. */

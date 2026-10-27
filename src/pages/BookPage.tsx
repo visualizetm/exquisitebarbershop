@@ -1,6 +1,7 @@
 import Calendar from '@untitled-ui/icons-react/build/esm/Calendar';
 import Clock from '@untitled-ui/icons-react/build/esm/Clock';
 import Scissors01 from '@untitled-ui/icons-react/build/esm/Scissors01';
+import Tag01 from '@untitled-ui/icons-react/build/esm/Tag01';
 import User01 from '@untitled-ui/icons-react/build/esm/User01';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -19,6 +20,7 @@ import { Status } from '@/components/Status';
 import { Button, Label, Link, StepBar, Ticket, TimeChip, useBar, useToast } from '@/components/ui';
 import type { BarConfig } from '@/components/ui/barStore';
 import { formatCents } from '@shared/lib/money';
+import { totalAfterDiscounts } from '@shared/lib/launchOffer';
 import { formatShopDate, formatShopTime } from '@shared/lib/time';
 import { BookingCard } from '@/components/booking/BookingCard';
 import { BookingSummary } from '@/components/booking/BookingSummary';
@@ -131,6 +133,7 @@ export function BookPage() {
   }
 
   const shop = useShop();
+  const offer = shop.status === 'ready' ? (shop.data.launchOffer ?? null) : null;
   const services = useApi('/api/services', publicServicesResponseSchema);
   const staff = useApi('/api/staff', publicStaffListResponseSchema);
 
@@ -584,8 +587,13 @@ export function BookPage() {
                   value: `${booked.customer.name}, ${booked.customer.phone}`,
                   icon: <User01 aria-hidden="true" />,
                 },
+                ...booked.discounts.map((d) => ({
+                  label: 'First online booking',
+                  value: `-${formatCents(d.amountCents)}`,
+                  icon: <Tag01 aria-hidden="true" />,
+                })),
               ]}
-              total={formatCents(booked.totalPriceCents)}
+              total={formatCents(totalAfterDiscounts(booked.totalPriceCents, booked.discounts))}
               actions={
                 <>
                   <IcsDownload booking={booked} shop={shop.data} manageUrl={manageUrl} />
@@ -647,6 +655,7 @@ export function BookPage() {
       <BookBar config={bar} />
       <div className="exq-book__main">
         <div className="exq-book__head">
+          {offer ? <p className="exq-offer-tag exq-label">{offer.label}</p> : null}
           <Label>Book online</Label>
           <h1 className="exq-book__title">Book your chair</h1>
           <p className="exq-book__sub">Takes about a minute.</p>

@@ -75,6 +75,7 @@ export function booking(
     referenceCode: 'ABC-DEFG',
     staffRequested: true,
     services: [],
+    discounts: [],
     endAt: new Date(overrides.startAt.getTime() + durationMinutes * 60_000),
     durationMinutes,
     bufferMinutes: 0,

@@ -231,6 +231,21 @@ None. Directions use the shop's own Google Maps page, built from the place id in
   shows a compact numbered panel; a chair that books on Instagram gets MESSAGE ON INSTAGRAM in the
   phone bar.
 
+## Prompt 13e additions
+
+- The barber portal fits every phone: `minmax(0, 1fr)` columns, tighter tracking on the two big
+  buttons, one column below 375, `min-width: 0` on every head, row and page child, the full dialog
+  gutter kept on Out for the day; `tests/e2e/fit.spec.ts` measures every portal screen and six
+  public pages at 360 and 390 (no sideways scroll, no text past the edge, no clipped box).
+- The head script starts the `/api/shop` request on public paths; Book and Manage are their own
+  chunks; the editor's saved message is "Saved. Live on the site now" (the public settings are never
+  cached). Lighthouse mobile Home on the demo build: 84, LCP 3.7 s, CLS 0 (D13e-05).
+- The $10 launch offer: `shopSettings.launchOffer`, `bookings.discounts`, the decision inside the
+  booking transaction, the unique partial index `launchOfferOncePerPhone`, the red tag on Home and
+  Book, the confirmation and email lines, "$10 off online" for the owner and the barbers, the
+  editor's Launch offer section with its usage count. `GET /api/shop` carries `launchOffer` while it
+  is live; `GET /api/admin/settings` carries `launchOfferUsage`.
+
 ## Last commit
 
 Prompt 12, 2026-10-25: the shop's real content (facts, team, services and per barber prices, photos, reviews)

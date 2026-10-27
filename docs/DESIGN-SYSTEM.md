@@ -287,3 +287,17 @@ the same rules. Every rule here holds with any photo, so a new upload never brea
 - No text sits on a photo except the hero over its scrim; names and prices sit under photos.
 - Visit has no storefront photo yet, so it has no photo slot at all (no placeholder in its place).
 - The old circular barber pole logo is never used, in any form.
+
+## Portal fit and the offer tag (prompt 13e)
+
+- A portal grid of buttons uses `minmax(0, 1fr)` columns, never bare `1fr`: a kit label with its
+  0.14em tracking can be wider than half of a 390 screen, and an `auto` minimum lets the grid grow
+  past the page. Shorten the tracking (0.06em on the two big Today buttons and Sign out) before
+  shrinking the type; below 375 the two buttons stack. Every flex or grid child in the portal has
+  `min-width: 0`, and a status tag keeps `white-space: nowrap` while the text beside it wraps.
+- A full dialog's body keeps the 20px side gutter by carrying the kit's full-dialog selector on its
+  own rule (`.exq-dialog[data-variant='full'] .exq-dialog__inner > .exq-team-out`).
+- `.exq-offer-tag`: the launch offer's one line, the kit label in `--red` on paper and
+  `--red-on-dark` on the ink hero. It sits under the hero actions and over the Book title, only while
+  the offer is on. It is the one addition to the public look in this prompt.
+- The fit guard (`tests/e2e/fit.spec.ts`) is the rule's test: run it after any portal or page change.

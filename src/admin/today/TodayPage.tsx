@@ -20,6 +20,7 @@ import { apiRequest } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
 import { firstNameLastInitial, money, shopDateLabel, shopTime } from '../format';
+import { discountTag } from '@shared/lib/launchOffer';
 import { useQuick } from '../shell/quick';
 import { useFloor } from './useFloor';
 import { WalkInLine, type LineActions } from './WalkInLine';
@@ -478,6 +479,7 @@ export function TodayPage() {
                         </span>
                         <span className="exq-num exq-donelist__price">
                           {money(b.totalPriceCents)}
+                          {discountTag(b.discounts) ? `, ${discountTag(b.discounts) ?? ''}` : ''}
                         </span>
                       </button>
                     </li>
@@ -561,6 +563,7 @@ function ChairCard({
             <span className="exq-floorcard__service">
               {serviceLine(b)} <span aria-hidden="true">·</span>{' '}
               <span className="exq-num">{money(b.totalPriceCents)}</span>
+              {discountTag(b.discounts) ? `, ${discountTag(b.discounts) ?? ''}` : ''}
             </span>
           </button>
           <div

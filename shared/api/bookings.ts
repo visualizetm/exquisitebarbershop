@@ -5,6 +5,7 @@ import {
   bookingServiceSchema,
   bookingSourceSchema,
   bookingStatusSchema,
+  discountSchema,
 } from '../schemas/booking';
 import { idSchema, referenceCodeSchema } from '../schemas/common';
 import { staffSelectorSchema } from './availability';
@@ -34,6 +35,7 @@ export const bookingViewSchema = z.object({
   endAt: z.iso.datetime(),
   durationMinutes: z.int(),
   totalPriceCents: z.int(),
+  discounts: z.array(discountSchema).default([]),
   customer: z.object({ name: z.string(), phone: z.string(), email: z.string().nullable() }),
   notes: z.string().nullable(),
   /** Calendar sequence number: rises on every reschedule so calendar apps replace the event. */
