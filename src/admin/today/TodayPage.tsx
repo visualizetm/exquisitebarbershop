@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import AlertTriangle from '@untitled-ui/icons-react/build/esm/AlertTriangle';
 import Announcement01 from '@untitled-ui/icons-react/build/esm/Announcement01';
@@ -9,9 +9,11 @@ import UserX01 from '@untitled-ui/icons-react/build/esm/UserX01';
 import {
   bookingResponseSchema,
   overviewResponseSchema,
+  seatResponseSchema,
   type AdminBookingView,
   type FloorChair,
 } from '@shared/api/admin';
+import { lineResponseSchema, walkInResponseSchema, type WalkInView } from '@shared/api/line';
 import { progressOf } from '@shared/lib/floor';
 import { Button, EmptyState, ErrorState, useToast } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
@@ -20,6 +22,7 @@ import { usePageTitle } from '@/lib/usePageTitle';
 import { firstNameLastInitial, money, shopDateLabel, shopTime } from '../format';
 import { useQuick } from '../shell/quick';
 import { useFloor } from './useFloor';
+import { WalkInLine, type LineActions } from './WalkInLine';
 
 const SOURCE_WORDS: Record<AdminBookingView['source'], string> = {
   online: 'Booked online',
@@ -120,6 +123,77 @@ export function TodayPage() {
   );
 
   const doneHref = '/admin/shop/bookings?range=today&status=completed';
+
+  const lineCall = useCallback(
+    async (run: () => Promise<unknown>, ok: string, id: string) => {
+      setBusy(id);
+      try {
+        await run();
+        if (ok) toast({ tone: 'ok', text: ok });
+        await floor.refresh();
+      } catch (error) {
+        toast({
+          tone: 'danger',
+          text: error instanceof Error ? error.message : 'That did not go through.',
+        });
+        await floor.refresh();
+      } finally {
+        setBusy(null);
+      }
+    },
+    [floor, toast],
+  );
+  const lineActions = useMemo<LineActions>(
+    () => ({
+      seat: (w: WalkInView, staffId?: string) =>
+        lineCall(
+          async () => {
+            const done = await apiRequest(`/api/admin/line/${w.id}/seat`, seatResponseSchema, {
+              method: 'POST',
+              body: staffId ? { staffId } : {},
+            });
+            toast({ tone: 'ok', text: `${w.name} is in with ${done.booking.staff.name}.` });
+            quick.changed();
+          },
+          '',
+          w.id,
+        ),
+      left: (w: WalkInView) =>
+        lineCall(
+          () =>
+            apiRequest(`/api/admin/line/${w.id}/left`, walkInResponseSchema, {
+              method: 'POST',
+              body: {},
+            }),
+          `${w.name} left the line.`,
+          w.id,
+        ),
+      move: (w: WalkInView, direction: 'up' | 'down') =>
+        lineCall(
+          () =>
+            apiRequest(`/api/admin/line/${w.id}/move`, lineResponseSchema, {
+              method: 'POST',
+              body: { direction },
+            }),
+          '',
+          w.id,
+        ),
+      changeChair: (w: WalkInView, staffId: string | null) =>
+        lineCall(
+          () =>
+            apiRequest(`/api/admin/line/${w.id}`, walkInResponseSchema, {
+              method: 'PATCH',
+              body: { staffId },
+            }),
+          `${w.name} moved.`,
+          w.id,
+        ),
+      add: () => {
+        quick.openNewBooking({ source: 'walkIn' });
+      },
+    }),
+    [lineCall, quick, toast],
+  );
 
   return (
     <div className="exq-today" data-state={data ? 'ready' : floor.error ? 'error' : 'loading'}>
@@ -239,6 +313,10 @@ export function TodayPage() {
                       busy={busy}
                       onAct={act}
                       onOpen={quick.openBooking}
+                      onSeat={(id, staffId) => {
+                        const w = data.line.find((x) => x.id === id);
+                        if (w) void lineActions.seat(w, staffId);
+                      }}
                     />
                   ))}
                 </ul>
@@ -338,6 +416,7 @@ export function TodayPage() {
           </div>
 
           <aside className="exq-today__aside">
+            <WalkInLine line={data?.line ?? []} busy={busy} actions={lineActions} />
             <section className="exq-panel" aria-labelledby="exq-sofar-head">
               <div className="exq-panel__head">
                 <h2 id="exq-sofar-head">Today so far</h2>
@@ -419,12 +498,14 @@ function ChairCard({
   busy,
   onAct,
   onOpen,
+  onSeat,
 }: {
   chair: FloorChair;
   now: string;
   busy: string | null;
   onAct: (b: AdminBookingView, action: FloorAction) => Promise<void>;
   onOpen: (id: string) => void;
+  onSeat: (walkInId: string, staffId: string) => void;
 }) {
   const [more, setMore] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -553,6 +634,20 @@ function ChairCard({
               : 'Free for the rest of the day'}
           </p>
           {nextLine}
+          {chair.seatWalkIn ? (
+            <div className="exq-floorcard__actions">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy === chair.seatWalkIn.id}
+                onClick={() => {
+                  if (chair.seatWalkIn) onSeat(chair.seatWalkIn.id, chair.staff.id);
+                }}
+              >
+                Seat walk-in #{chair.seatWalkIn.position + 1}
+              </Button>
+            </div>
+          ) : null}
         </>
       ) : chair.kind === 'instagram' ? (
         <>

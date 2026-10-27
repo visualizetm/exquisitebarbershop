@@ -30,6 +30,7 @@ import {
   outboxListResponseSchema,
   overviewResponseSchema,
   floorResponseSchema,
+  seatResponseSchema,
   ownerCancelRequestSchema,
   ownerRescheduleRequestSchema,
   resolutionsBodySchema,
@@ -115,6 +116,22 @@ import {
 } from '../../services/adminSchedule';
 import { bookingTable, overview } from '../../services/adminDashboard';
 import { floor } from '../../services/floor';
+import {
+  addToLine,
+  leaveLine,
+  lineView,
+  moveInLine,
+  seatFromLine,
+  updateInLine,
+} from '../../services/line';
+import {
+  lineAddRequestSchema,
+  lineMoveRequestSchema,
+  lineResponseSchema,
+  lineSeatRequestSchema,
+  lineUpdateRequestSchema,
+  walkInResponseSchema,
+} from '../../../shared/api/line';
 import { adminSearch } from '../../services/adminSearch';
 import { dismissAlert, resolveAlert } from '../../services/alerts';
 import { createManualBooking } from '../../services/bookingService';
@@ -183,6 +200,56 @@ export const adminRoutes: RouteDefinition[] = [
   owner('GET', '/api/admin/floor', async (ctx) => {
     ctxScope(ctx);
     return { body: floorResponseSchema.parse(await floor(ctx.now)), headers: NO_STORE };
+  }),
+  // The walk-in line -------------------------------------------------------
+  owner('GET', '/api/admin/line', async (ctx) => {
+    ctxScope(ctx);
+    return { body: lineResponseSchema.parse(await lineView(ctx.now)), headers: NO_STORE };
+  }),
+  owner('POST', '/api/admin/line', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input = await parseBody(ctx, lineAddRequestSchema);
+    return {
+      status: 201,
+      body: walkInResponseSchema.parse({ walkIn: await addToLine(principal, input, metaOf(ctx)) }),
+      headers: NO_STORE,
+    };
+  }),
+  owner('PATCH', '/api/admin/line/:id', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const patch = await parseBody(ctx, lineUpdateRequestSchema);
+    return {
+      body: walkInResponseSchema.parse({
+        walkIn: await updateInLine(principal, id, patch, metaOf(ctx)),
+      }),
+    };
+  }),
+  owner('POST', '/api/admin/line/:id/move', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { direction } = await parseBody(ctx, lineMoveRequestSchema);
+    return {
+      body: lineResponseSchema.parse(await moveInLine(principal, id, direction, metaOf(ctx))),
+    };
+  }),
+  owner('POST', '/api/admin/line/:id/seat', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    const { staffId } = await parseBody(ctx, lineSeatRequestSchema);
+    return {
+      status: 201,
+      body: seatResponseSchema.parse(
+        await seatFromLine(principal, scope, id, staffId, metaOf(ctx)),
+      ),
+    };
+  }),
+  owner('POST', '/api/admin/line/:id/left', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    return {
+      body: walkInResponseSchema.parse({ walkIn: await leaveLine(principal, id, metaOf(ctx)) }),
+    };
   }),
   owner('GET', '/api/admin/booking-table', async (ctx) => {
     ctxScope(ctx);

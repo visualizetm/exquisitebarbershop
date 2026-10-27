@@ -1354,3 +1354,25 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   still fetches the overview for the alerts strip only. Plainer than a new alerts endpoint.
 - D13c-03 Rob's standing rule is in CLAUDE.md under Conventions: booking flows never open in a
   side drawer or sheet; they all open the full-screen `NewBookingFlow`. Side sheets read details.
+- D13c-04 The walk-in line is the `walkIns` collection (zod in `shared/schemas/walkIn.ts`, index
+  `(status, position)` plus `createdAt`). The phone is stored in E.164 like every other number
+  (so client lookups match) and shown as (XXX) XXX-XXXX in every view; the prompt's display form is
+  the view, the storage form stays consistent. Positions are integers; move swaps with the
+  neighbor in one transaction. Audit actions `line.add`, `line.update`, `line.move`, `line.left`,
+  `line.seat` on entity type `walkIn`.
+- D13c-05 Wait estimates are pure in `shared/lib/waitEstimate.ts`: a chair's free time is the end of
+  its current cut (real start when Start was pressed) or now; each person ahead takes the first gap
+  that fits their minutes before the chair's next booking; first available goes to whichever chair
+  frees first. "Free" within one minute, otherwise "about <time> (n min)", and "unknown" when the
+  chair has no hours today and no cut going (then nothing is shown as a number). Minutes come from
+  the chair's own service times when a chair is chosen, else the shop's. The per-chair state
+  ("Free about 2:50") counts only that chair's own line, not the shared pool.
+- D13c-06 Seating goes through `createManualBooking` (source walk-in, `arrived: true` so arrivedAt
+  is set at insert) and so through the slot locks in the booking transaction. The entry is claimed
+  first with a conditional update (waiting to seated), so two taps make one booking; a seat that
+  loses the slot race is handed back to the line and answered with CHAIR_BUSY and the estimate.
+  Seating ignores the hours (the barber is standing there, like any walk-in); the chair's current
+  cut and its bookings still decide. Barbers seat into their own chair only (chair scope).
+- D13c-07 The line rides in the floor response (`line`, and `seatWalkIn` on a free chair for the
+  first person it can take) so Today keeps one 30 second poll; `GET /api/admin/line` and
+  `GET /api/team/line` serve the panel's actions and the portal.

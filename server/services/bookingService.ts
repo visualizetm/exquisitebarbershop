@@ -580,7 +580,7 @@ export async function createBooking(
  * never overlap a booking or blocked time and online booking cannot land on it.
  */
 async function placeWalkIn(
-  input: PlacementInput & { notifyCustomer: boolean },
+  input: PlacementInput & { notifyCustomer: boolean; arrived?: boolean | undefined },
   startAt: Date,
   referenceCode: string,
   meta: RequestMeta,
@@ -630,6 +630,7 @@ async function placeWalkIn(
       rescheduledFromId: null,
       manageTokenVersion: 1,
       ownerSeenAt: meta.now,
+      arrivedAt: input.arrived ? meta.now : null,
     },
     meta.now,
     { session },
@@ -760,7 +761,7 @@ export async function createManualBooking(
 }
 
 async function placeWalkInWithRetry(
-  input: PlacementInput & { notifyCustomer: boolean },
+  input: PlacementInput & { notifyCustomer: boolean; arrived?: boolean | undefined },
   startAt: Date,
   meta: RequestMeta,
   actor: Actor,

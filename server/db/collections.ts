@@ -24,6 +24,7 @@ import type { StaffDocument } from '../../shared/schemas/staff';
 import type { SystemStateDocument } from '../../shared/schemas/systemState';
 import type { TimeBlockDocument } from '../../shared/schemas/timeBlock';
 import type { UserDocument } from '../../shared/schemas/user';
+import type { WalkInDocument } from '../../shared/schemas/walkIn';
 import type { WeeklyHoursDocument } from '../../shared/schemas/weeklyHours';
 import { getDb } from './client';
 import { COLLECTIONS, type CollectionName } from './indexes';
@@ -50,6 +51,7 @@ export interface CollectionTypes {
   systemState: SystemStateDocument;
   alerts: AlertDocument;
   customerNotes: CustomerNoteDocument;
+  walkIns: WalkInDocument;
   staffPins: StaffPinDocument;
   setupTokens: SetupTokenDocument;
   teamSessions: TeamSessionDocument;

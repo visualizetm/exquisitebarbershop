@@ -693,3 +693,12 @@ commit, and what is still open.
   week chart and recent activity moved under the Bookings list, the standing full-screen booking
   rule in CLAUDE.md. Lighthouse is measured once before SHIP.
 - Heartbeat: 00:16 UTC, commit follows, next is M1 (the walk-in line).
+
+### M1: the walk-in line
+
+- Shipped: `walkIns` collection and repo, pure wait estimates, the line service (add, update,
+  move, left, seat through the booking service and slot locks), owner and barber routes, the
+  Today panel (numbered cards, Seat, Move sheet, Left, up and down, Add walk-in) and "Seat
+  walk-in #n" on free chairs. Tests: waitEstimate (7, frozen clock), line integration (4: add,
+  order, estimate, phone check, seat with arrivedAt, busy refusal, concurrency, barber scope).
+- Heartbeat: 00:50 UTC, commit follows, next is M2 (the full-screen NewBookingFlow).

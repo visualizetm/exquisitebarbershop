@@ -18,8 +18,19 @@ import {
   teamWalkInResponseSchema,
   teamWeekResponseSchema,
 } from '../../../shared/api/team';
-import { conflictOnlyResponseSchema, timeBlockResponseSchema } from '../../../shared/api/admin';
+import {
+  conflictOnlyResponseSchema,
+  seatResponseSchema,
+  timeBlockResponseSchema,
+} from '../../../shared/api/admin';
 import { okResponseSchema } from '../../../shared/api/auth';
+import {
+  lineAddRequestSchema,
+  lineResponseSchema,
+  walkInResponseSchema,
+} from '../../../shared/api/line';
+import { chairScope } from '../../services/access';
+import { addToLine, lineView, seatFromLine } from '../../services/line';
 import { idSchema } from '../../../shared/schemas/common';
 import {
   changePin,
@@ -166,6 +177,49 @@ export const teamRoutes: RouteDefinition[] = [
         idempotencyKey: key,
       });
       return { status: 201, body: teamWalkInResponseSchema.parse(done), headers: NO_STORE };
+    },
+  },
+  // The walk-in line: see it, add to it, seat into this chair.
+  {
+    method: 'GET',
+    path: '/api/team/line',
+    auth: 'team',
+    handler: async (ctx) => {
+      chairScope(principalOf(ctx));
+      return { body: lineResponseSchema.parse(await lineView(ctx.now)), headers: NO_STORE };
+    },
+  },
+  {
+    method: 'POST',
+    path: '/api/team/line',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      chairScope(principal);
+      const input = await parseBody(ctx, lineAddRequestSchema);
+      return {
+        status: 201,
+        body: walkInResponseSchema.parse({
+          walkIn: await addToLine(principal, input, metaOf(ctx)),
+        }),
+        headers: NO_STORE,
+      };
+    },
+  },
+  {
+    method: 'POST',
+    path: '/api/team/line/:id/seat',
+    auth: 'team',
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const { id } = parseParams(ctx, idParams);
+      return {
+        status: 201,
+        body: seatResponseSchema.parse(
+          await seatFromLine(principal, scope, id, scope.staffId, metaOf(ctx)),
+        ),
+      };
     },
   },
   {

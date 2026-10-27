@@ -20,6 +20,9 @@ export const ERROR_CODES = {
   METHOD_NOT_ALLOWED: 405,
   CONFLICT: 409,
   SLOT_TAKEN: 409,
+  /** Seating a walk-in: the chair cannot take the full service now; the body carries the estimate. */
+  CHAIR_BUSY: 409,
+  ALREADY_SEATED: 409,
   SCHEDULE_CONFLICT: 409,
   INVALID_TRANSITION: 409,
   SLUG_TAKEN: 409,
