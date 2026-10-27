@@ -59,6 +59,8 @@ export function WebsiteEditor() {
   const [hero, setHero] = useState<HeroCopy | null>(null);
   const [visit, setVisit] = useState<(VisitCopy & { phone: string; email: string }) | null>(null);
   const [state, setState] = useState<SaveState>('clean');
+  // The updatedAt the last save answered with, so a second save right after is not refused as stale.
+  const [stamp, setStamp] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState<SectionId | null>(null);
 
@@ -71,7 +73,8 @@ export function WebsiteEditor() {
       phone: loaded.data.settings.phone,
       email: loaded.data.settings.email,
     });
-    setState('clean');
+    // A reload after a save keeps "All changes saved and live" on the bar.
+    setState((s) => (s === 'saved' ? 'saved' : 'clean'));
   }, [loaded.status === 'ready' ? loaded.data.updatedAt : null]);
 
   if (!section) return <Navigate to="/admin/website?section=top" replace />;
@@ -79,7 +82,7 @@ export function WebsiteEditor() {
     return <ErrorState title="The website settings did not load">Reload the page.</ErrorState>;
   if (loaded.status !== 'ready' || !hero || !visit) return <Status state="loading" />;
   const settings = loaded.data.settings;
-  const saved = loaded.data.updatedAt ?? null;
+  const saved = stamp ?? loaded.data.updatedAt ?? null;
   const dirty = state === 'dirty' || state === 'saving';
 
   const go = (id: SectionId) => {
@@ -100,7 +103,7 @@ export function WebsiteEditor() {
     setState('saving');
     setError(null);
     try {
-      await apiRequest('/api/admin/settings', settingsResponseSchema, {
+      const res = await apiRequest('/api/admin/settings', settingsResponseSchema, {
         method: 'PUT',
         body: {
           ...settings,
@@ -111,6 +114,7 @@ export function WebsiteEditor() {
           expectedUpdatedAt: saved ?? undefined,
         },
       });
+      setStamp(res.updatedAt ?? null);
       setState('saved');
       setVersion((v) => v + 1);
       toast({ text: 'All changes saved and live', tone: 'ok' });

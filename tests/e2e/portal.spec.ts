@@ -157,7 +157,9 @@ test.describe('a barber’s day at 390', () => {
     await expect(page.getByText('Note saved.')).toBeVisible();
     await expect(sheet.getByRole('link', { name: 'Call shop' })).toHaveAttribute('href', /^tel:/);
     await page.keyboard.press('Escape');
-    await expect(page.locator('.exq-team-chair__notes')).toHaveText('Likes a number 2 on the sides');
+    await expect(page.locator('.exq-team-chair__notes')).toHaveText(
+      'Likes a number 2 on the sides',
+    );
 
     // The week shows seven days and the client under today.
     await page.getByRole('link', { name: 'Week', exact: true }).click();

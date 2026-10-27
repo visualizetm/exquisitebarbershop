@@ -335,7 +335,6 @@ button.exq-team-row:hover {
   display: block;
   margin-bottom: var(--s1);
   color: var(--fg-3);
-  white-space: nowrap;
 }
 .exq-team-head > .exq-btn {
   flex: none;

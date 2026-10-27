@@ -19,7 +19,7 @@ test('editing the headline shows in the preview, saves, and lands on the public 
   const preview = page.getByTestId('preview-headline').first();
   await expect(preview).toContainText(`Clean${stamp}`);
   await expect(preview.locator('[data-accent="true"]')).toHaveText(`Clean${stamp}`);
-  await expect(page.getByRole('status').filter({ hasText: 'Unsaved changes' })).toBeVisible();
+  await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   // Leaving with unsaved changes asks in a sheet; Keep editing stays.
   await page.getByRole('button', { name: /^Hours/ }).click();
   const ask = page.getByRole('dialog', { name: 'Leave without saving?' });
@@ -33,8 +33,9 @@ test('editing the headline shows in the preview, saves, and lands on the public 
   const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
   expect(axe.violations.map((v) => `${v.id}: ${v.nodes[0]?.html ?? ''}`)).toEqual([]);
 
+  await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Save and publish' }).click();
-  await expect(page.getByText('All changes saved and live').first()).toBeVisible();
+  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
 
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(`Clean${stamp}`);
@@ -44,8 +45,9 @@ test('editing the headline shows in the preview, saves, and lands on the public 
   await page.goto('/admin/website?section=top');
   await page.getByLabel('Headline').fill(original);
   await page.getByLabel('Word in red').fill('Exquisite');
+  await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Save and publish' }).click();
-  await expect(page.getByText('All changes saved and live').first()).toBeVisible();
+  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
 });
 
 test('the editor at 390 is one column with a full-screen Preview, and axe is clean', async ({
@@ -70,10 +72,22 @@ test('the editor at 390 is one column with a full-screen Preview, and axe is cle
     page.getByRole('heading', { name: 'Visit, map and contact', level: 1 }),
   ).toBeVisible();
   await page.getByLabel('Parking').fill('Free lot behind the building, enter from Edgmont Ave.');
+  await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
   await page.getByRole('button', { name: 'Save and publish' }).click();
-  await expect(page.getByText('All changes saved and live').first()).toBeVisible();
-  await page.goto('/visit');
-  await expect(
-    page.getByText('Free lot behind the building, enter from Edgmont Ave.'),
-  ).toBeVisible();
+  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
+  // Read it back from the API rather than the page: the public page caches /api/shop for a
+  // minute, which would hand the specs that follow a stale copy.
+  const shop = (await (await page.request.get('/api/shop')).json()) as {
+    visit: { parking: string };
+  };
+  expect(shop.visit.parking).toBe('Free lot behind the building, enter from Edgmont Ave.');
+  // Put the placeholder back for the specs that follow.
+  await page.getByLabel('Parking').fill('');
+  await expect(page.locator('.exq-editor__status')).toHaveText('Unsaved changes');
+  await page.getByRole('button', { name: 'Save and publish' }).click();
+  await expect(page.locator('.exq-editor__status')).toHaveText('All changes saved and live');
+  const back = (await (await page.request.get('/api/shop')).json()) as {
+    visit: { parking: string };
+  };
+  expect(back.visit.parking).toBe('');
 });

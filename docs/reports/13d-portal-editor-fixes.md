@@ -19,9 +19,13 @@ Data model: shopSettings gains hero { headline, redWord, subline } and visit { p
 
 API contract: POST /api/auth/tablet (owner); POST /api/team/bookings/:id/arrived and /start (barber); GET /api/admin/line and /api/team/line now carry gate per chair, firstAvailable and flag per entry; POST /api/admin/now, /api/team/now, /api/admin/line and /api/team/line refuse with SHOP_CLOSED or BARBER_OFF outside the hours; GET /api/admin/settings carries updatedAt and PUT takes expectedUpdatedAt (409 CONFLICT when stale); GET /api/shop carries hero and visit. Everything else unchanged.
 
-Tests: TESTS_TBD
+Tests:
 
-Checks: CHECKS_TBD
+- Vitest 95 files, 680 passed, 0 failed; coverage statements 96.59%, branches 88.7%, functions 97.7%, lines 96.59%
+- Playwright dev suite in the gate: 156 passed, 4 failed, 1 skipped; the 4 (portal head overflow at 390 from a late CSS change, the editor spec leaving the parking line set for the Visit spec, and one chair-state collision that passed on rerun) fixed and rerun: checkin, dashboard, editor, realshop 36 passed; flow and portal13d passed. Prod-like 7 of 7, showcase 13 of 13, test:vercel-function 97 passed
+- Commands: /tmp/gate.sh (build, typecheck, lint, format:check, test:coverage, dev, prod-like and showcase Playwright, test:vercel-function); PRODLIKE_SKIP_BUILD=1 npx playwright test -c playwright.prod.config.ts; npx playwright test -c playwright.demo.config.ts; npx playwright test tests/e2e/editor.spec.ts tests/e2e/realshop.spec.ts
+
+Checks: typecheck clean, lint clean, format clean, build clean, API bundle rebuilt and proven under plain Node.
 
 Checklist:
 
@@ -36,13 +40,13 @@ Checklist:
 - PASS tap targets 44px or more, PIN keys 64px (portal13d.spec measures the keys; checkin.spec every button and link); axe clean on the portal screens at 390, the editor at 390 and 1440, the check in at 1180 and 820
 - PASS Lighthouse mobile Home 85 (FCP 2.0 s, LCP 3.9 s, TBT 150 ms, CLS 0), accessibility 100, best practices 96, SEO 63 (the demo build is noindex, as before); at the line, see risks
 
-Commits: COMMITS_TBD
+Commits: b3b1829 the five 13c fixes; 9ef718e the barber portal redo; bfb00cd the website editor; 834408c the guides and the chair states; the SHIP commit with the spec fixes and this report follows.
 
 Env vars: none new.
 
 Open questions: Rob to confirm the hero copy wording and the Visit parking line (both editable now); whether the preview should also draw the Visit and Services pages from a draft (a later prompt); the Sign out button's place on the portal head.
 
-Known gaps and risks: Lighthouse Home sits at 85 with LCP 3.9 s on the simulated phone (the hero photo), one point from the floor; the preview's computer frame is a fixed 0.42 scale; the editor embeds the Team page (its own heading and title) rather than a trimmed team panel; the e2e server's all-day hours mean the suite never sees the closed state on screen, only the integration and unit tests do; the tablet flag cookie is a bearer flag (harmless without a session, logged in D13d-06); the line is empty in the guide screens because the demo is captured before opening time.
+Known gaps and risks: Lighthouse Home sits at 85 with LCP 3.9 s on the simulated phone (the hero photo), one point from the floor; the preview's computer frame is a fixed 0.42 scale; the editor embeds the Team page (its own heading and title) rather than a trimmed team panel; the e2e server's all-day hours mean the suite never sees the closed state on screen, only the integration and unit tests do; the tablet flag cookie is a bearer flag (harmless without a session, logged in D13d-06); the line is empty in the guide screens because the demo is captured before opening time; the public pages cache /api/shop for a minute, so an edit shows on the site within a minute, not at once.
 
 Milestone times: M0 15 minutes (11:06 to 11:21 UTC), M1 32 minutes (to 11:53), M2 20 minutes (to 12:13), M3 about 15 minutes (to 12:28), SHIP from 12:28.
 

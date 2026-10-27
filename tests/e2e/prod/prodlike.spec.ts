@@ -234,9 +234,9 @@ test('the owner signs in and the Photos screen says storage is not set up', asyn
   );
 
   await page.goto('/admin/website?tab=gallery');
-  await expect(page).toHaveURL(/\/admin\/website\/gallery$/);
+  await expect(page).toHaveURL(/\/admin\/website\?section=gallery$/);
   await expect(page.getByRole('heading', { name: 'Gallery', level: 1 })).toBeVisible();
-  const empty = page.locator('.exq-website__panel .exq-state[data-state="empty"]');
+  const empty = page.locator('.exq-editor__panel .exq-state[data-state="empty"]');
   await expect(empty).toContainText("Photo storage isn't set up yet.");
   await expect(empty).toContainText("Photos can be added once it's connected.");
   await expect(page.getByRole('button', { name: 'Upload photo' })).toHaveCount(0);
