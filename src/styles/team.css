@@ -338,15 +338,34 @@ button.exq-team-row:hover {
 }
 .exq-team-head > .exq-btn {
   flex: none;
+  padding-inline: var(--s3);
+  letter-spacing: 0.06em;
   white-space: nowrap;
+}
+/* Nothing in a portal column may push the page sideways: every flex or grid child can shrink. */
+.exq-team-page > *,
+.exq-team-head > *,
+.exq-team-row > * {
+  min-width: 0;
 }
 .exq-team-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--s3);
 }
 .exq-team-actions .exq-btn {
+  min-width: 0;
   min-height: 64px;
+  padding-inline: var(--s3);
+  /* Tighter tracking before smaller type: "Out for the day" fits half of a 390 screen. */
+  letter-spacing: 0.06em;
+  white-space: normal;
+  text-align: center;
+}
+@media (max-width: 374px) {
+  .exq-team-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .exq-team-actions__wide {
   grid-column: 1 / -1;
@@ -404,6 +423,14 @@ button.exq-team-row:hover {
 .exq-team-row__tag {
   color: var(--fg-3);
   white-space: nowrap;
+  letter-spacing: 0.06em;
+}
+.exq-team-sub-row > .exq-label {
+  flex: none;
+  white-space: nowrap;
+}
+.exq-team-row__body span {
+  white-space: normal;
 }
 .exq-team-row[data-state='confirmed'] .exq-team-row__tag[data-source='walkIn'] {
   color: var(--accent-text);
@@ -420,11 +447,18 @@ button.exq-team-row:hover {
 .exq-team-row[data-state='cancelled'] .exq-team-row__tag {
   color: var(--fg-2);
 }
-.exq-team-out {
+.exq-team-out,
+.exq-dialog[data-variant='full'] .exq-dialog__inner > .exq-team-out {
   display: grid;
   gap: var(--s4);
   max-width: 560px;
-  padding: var(--s4);
+  /* The same 20px side gutter as every portal screen; the kit zeroes full-dialog padding. */
+  padding: var(--s5) var(--s4);
+}
+.exq-team-out__actions .exq-btn {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
 }
 .exq-team-out__title {
   margin: 0;

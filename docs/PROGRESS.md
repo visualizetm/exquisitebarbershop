@@ -773,3 +773,12 @@ commit, and what is still open.
 - Gate green after four spec fixes (680 unit and integration, dev e2e 156 plus the reruns, prod-like 7,
   showcase 13, vercel-function 97), Lighthouse Home 85, screens in docs/screens/p13d, PR 15 merged
   into main as 92bf393 at 13:07 UTC. This closes the three-prompt dashboard and portal revamp.
+
+## Prompt 13e
+
+### M0: portal fit at 360 and 390
+
+- Shipped: the portal fit rules in `src/styles/team.css` (D13e-01, D13e-02) and the fit guard
+  `tests/e2e/fit.spec.ts` (D13e-03, 4 specs, every portal screen and six public pages at 360 x 740
+  and 390 x 844). Demo screens at docs/screens/p13e follow with M1's build.
+- Heartbeat: 15:40 UTC, commit follows, next is M1 (the hero and honest saves).

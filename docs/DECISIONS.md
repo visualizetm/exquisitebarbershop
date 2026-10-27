@@ -1498,3 +1498,22 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
 - D13d-18 A chair's state on the check in and the barber tiles follows the hours rule before the
   estimate: "Closed. Opens Tue 10 AM", "Off today" or "Done for the day" beat "Free now", so the
   screen never says a chair is free while the shop is closed (the 8 AM capture showed it).
+
+## Prompt 13e
+
+- D13e-01 The portal's two big buttons use the kit label with its 0.14em tracking, and at 390 that
+  made "Out for the day" wider than half the screen; the grid's `1fr` columns have an `auto`
+  minimum, so the grid grew past the page. The fix is in the portal styles, not per screen:
+  `minmax(0, 1fr)` columns, the two buttons at 0.06em tracking with normal wrapping and the
+  smaller side padding, one column below 375, and `min-width: 0` on every head, row and page child.
+  Shrinking the type was rejected: the labels stay the kit size and lose tracking first.
+- D13e-02 Out for the day had no side gutter because the kit zeroes the padding of everything in a
+  full dialog but its head; the portal rule now carries that selector, so the dialog body keeps
+  the 20px gutter and both buttons fill it. The alternative, a kit change, would touch every
+  full dialog including the booking flow.
+- D13e-03 The fit guard (`tests/e2e/fit.spec.ts`) measures every visible text element on every
+  portal screen and the six public pages at 360 and 390: the page may not scroll sideways, no
+  element may sit past the right edge, and an element that hides its overflow may not hold more
+  text than it shows. Rows that scroll sideways on purpose (the chairs carousel) and screen
+  reader text in 1px boxes are skipped. On the e2e data the guard passed before the CSS fix too,
+  so the fix is hardening against longer names and the proof is the guard plus the demo screens.
