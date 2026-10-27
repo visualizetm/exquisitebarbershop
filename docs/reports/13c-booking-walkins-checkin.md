@@ -19,9 +19,13 @@ Data model: walkIns (status_position on status, position; createdAt); shopSettin
 
 API contract: GET, POST /api/admin/line (owner); PATCH /api/admin/line/:id (owner); POST /api/admin/line/:id/move, /seat, /left (owner); POST /api/admin/now (owner, Idempotency-Key); GET /api/admin/checkin/lookup (owner); POST /api/admin/checkin/:id/arrived (owner); GET, POST /api/team/line (barber); POST /api/team/line/:id/seat (barber); POST /api/team/now (barber, Idempotency-Key); POST /api/team/bookings (barber, Idempotency-Key); GET /api/team/checkin/lookup (barber); POST /api/team/checkin/:id/arrived (barber). Error codes added: CHAIR_BUSY, ALREADY_SEATED. Audit actions added: line.add, line.update, line.move, line.left, line.seat. Everything else unchanged; /api/now does not exist.
 
-Tests: TESTS_TBD
+Tests:
 
-Checks: CHECKS_TBD
+- Vitest 91 files, 668 passed, 0 failed; coverage statements 96.59%, branches 88.47%, functions 97.86%, lines 96.59% (one v8 run over the whole repo; per folder is not split by the reporter)
+- Playwright dev suite in the gate: 153 passed, 3 failed, 1 skipped; the 3 (dashboard Walk-in with Dontrise blocked by the check-in spec's appointment, the portal axe helper demanding "in the chair" when a chair has a booking within the cut) fixed in the specs and rerun with checkin, dashboard, flow and portal: 28 passed. Prod-like 7 of 7. Showcase 13 of 13. test:vercel-function 97 passed
+- Commands: /tmp/gate.sh (build, typecheck, lint, format:check, test:coverage, dev, prod-like and showcase Playwright, test:vercel-function); npx playwright test tests/e2e/checkin.spec.ts tests/e2e/dashboard.spec.ts tests/e2e/flow.spec.ts tests/e2e/portal.spec.ts
+
+Checks: typecheck clean, lint clean, format clean (lighthouse.json ignored), build clean, API bundle rebuilt and proven under plain Node.
 
 Checklist:
 

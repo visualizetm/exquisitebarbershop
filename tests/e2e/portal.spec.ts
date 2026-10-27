@@ -37,7 +37,8 @@ async function walkIn(page: Page, name: string, phone: string) {
   await flow.getByLabel('Mobile phone').fill(phone);
   await flow.getByRole('button', { name: 'Continue' }).click();
   await flow.getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect(flow.getByText(/In the chair now with/)).toBeVisible();
+  // In the chair when the chair is free for the cut, else a place in the line: both are right here.
+  await expect(flow.getByText(/In the chair now with|Walk-in #\d+ for/)).toBeVisible();
   await flow.getByRole('button', { name: 'Done' }).click();
   await expect(flow).toBeHidden();
 }

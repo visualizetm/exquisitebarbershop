@@ -150,6 +150,16 @@ test.describe('the front desk check in at 1180x820', () => {
     await page.getByRole('button', { name: 'I have an appointment' }).click();
     await box.fill('Desk');
     await expect(tile).toContainText('already checked in');
+    // Cancel it so Dontrise's chair is free for the specs that follow.
+    const cancelled = await page.evaluate(async (bookingId) => {
+      const res = await fetch(`/api/admin/bookings/${bookingId}/cancel`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: 'e2e cleanup', notify: false }),
+      });
+      return res.ok;
+    }, id);
+    expect(cancelled).toBe(true);
   });
 
   test('a barber opens the check in from the portal, sideways too, and Exit goes back', async ({
