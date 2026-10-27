@@ -6,8 +6,21 @@ import type {
   WalkInView,
 } from '../../shared/api/line';
 import { chairState } from '../../shared/lib/floor';
+import {
+  chairGate,
+  firstAvailableGate,
+  gateText,
+  gateView,
+  type NowGate,
+  type OpenSpan,
+} from '../../shared/lib/openNow';
 import { formatUsPhone } from '../../shared/lib/phone';
-import { shopDateOf, shopDayBounds } from '../../shared/lib/time';
+import {
+  addDaysToIsoDate,
+  dayKeyOfIsoDate,
+  shopDateOf,
+  shopDayBounds,
+} from '../../shared/lib/time';
 import {
   estimateForChair,
   estimateInLine,
@@ -33,7 +46,7 @@ import {
 } from '../repos';
 import { actorOf, assertInScope, type Scope } from './access';
 import { activeStaff, type ServiceMeta } from './adminBookings';
-import { quoteStaff, workingRangesFor } from './availability';
+import { quoteStaff, shopRangesFor, workingRangesFor } from './availability';
 import { createManualBooking, type RequestMeta } from './bookingService';
 import { toAdminBookingView } from './bookingView';
 import { loadScheduleData, type ScheduleData } from './scheduleData';
@@ -48,19 +61,42 @@ interface Snapshot {
   waiting: WalkInDocument[];
   chairs: ChairLoad[];
   staffById: Map<string, StaffDocument>;
+  /** Today's shop hours, the next time the shop opens, and each chair's hours today. */
+  shopRanges: OpenSpan[];
+  opensAt: Date | null;
+  hours: Map<string, OpenSpan[]>;
+}
+
+/** How many days ahead the "Opens Tue 10 AM" line looks. */
+const OPENING_LOOKAHEAD_DAYS = 8;
+
+function nextOpening(data: ScheduleData, today: string, now: Date): Date | null {
+  for (let i = 0; i < OPENING_LOOKAHEAD_DAYS; i += 1) {
+    const date = addDaysToIsoDate(today, i);
+    const ranges = shopRangesFor(
+      date,
+      dayKeyOfIsoDate(date),
+      data.source.shopHours,
+      data.source.closures,
+    );
+    const next = (ranges ?? []).find((r) => r.start.getTime() > now.getTime());
+    if (next) return next.start;
+  }
+  return null;
 }
 
 /** Everything the estimates need, read once per request. */
 async function snapshot(now: Date): Promise<Snapshot> {
   const today = shopDateOf(now);
   const [data, bookings, services, settings, waiting] = await Promise.all([
-    loadScheduleData(today, today),
+    loadScheduleData(today, addDaysToIsoDate(today, OPENING_LOOKAHEAD_DAYS)),
     bookingsRepo.listBookingsBetween(shopDayBounds(today)),
     servicesRepo.listServices(),
     shopSettingsRepo.requireShopSettings(),
     walkInsRepo.listWaiting(),
   ]);
-  const chairs = activeStaff(data.staff).map((s) => chairLoad(s, bookings, data, today, now));
+  const staff = activeStaff(data.staff);
+  const chairs = staff.map((s) => chairLoad(s, bookings, data, today, now));
   return {
     now,
     data,
@@ -69,6 +105,11 @@ async function snapshot(now: Date): Promise<Snapshot> {
     waiting,
     chairs,
     staffById: new Map(data.staff.map((s) => [s._id, s])),
+    shopRanges:
+      shopRangesFor(today, dayKeyOfIsoDate(today), data.source.shopHours, data.source.closures) ??
+      [],
+    opensAt: nextOpening(data, today, now),
+    hours: new Map(staff.map((s) => [s._id, workingRangesFor(s._id, today, data.source).ranges])),
   };
 }
 
@@ -113,6 +154,49 @@ function toView(e: WaitEstimate): WaitEstimateView {
   return e.kind === 'about' ? { kind: 'about', at: e.at.toISOString(), minutes: e.minutes } : e;
 }
 
+/** The hours rule for one chair, or for first available when `staffId` is null. */
+function gateFor(snap: Snapshot, staffId: string | null): NowGate {
+  const named = (id: string) => ({
+    name: snap.staffById.get(id)?.name ?? 'Chair',
+    ranges: snap.hours.get(id) ?? [],
+  });
+  if (staffId) return chairGate(named(staffId), snap.shopRanges, snap.now, snap.opensAt);
+  return firstAvailableGate(
+    snap.chairs.map((c) => named(c.staffId)),
+    snap.shopRanges,
+    snap.now,
+    snap.opensAt,
+  );
+}
+
+/** NOW and the line are only offered inside the hours; outside them the request is refused. */
+function assertOpen(snap: Snapshot, staffId: string | null): void {
+  const gate = gateFor(snap, staffId);
+  if (gate.kind === 'open') return;
+  const message = gateText(gate) ?? 'Not right now';
+  throw new AppError(
+    gate.kind === 'off' || gate.kind === 'done' ? 'BARBER_OFF' : 'SHOP_CLOSED',
+    message,
+  );
+}
+
+/** The Today flag on a waiting entry whose chair is no longer taking anyone. */
+function flagFor(snap: Snapshot, w: WalkInDocument): string | null {
+  const gate = gateFor(snap, w.staffId);
+  switch (gate.kind) {
+    case 'open':
+      return null;
+    case 'closed':
+      return 'The shop is closed. Mark left';
+    case 'off':
+      return `${gate.name} is off. Move or mark left`;
+    case 'done':
+      return `${gate.name} is done for the day. Move or mark left`;
+    case 'nobody':
+      return 'Nobody is in. Mark left';
+  }
+}
+
 function persons(snap: Snapshot): PoolPerson[] {
   return snap.waiting.map((w) => ({
     staffId: w.staffId,
@@ -131,6 +215,7 @@ function chairEstimates(snap: Snapshot): ChairEstimate[] {
       staffId: chair.staffId,
       name: staff?.name ?? 'Chair',
       chairNumber: staff?.chairNumber ?? null,
+      gate: gateView(gateFor(snap, chair.staffId)),
       estimate: toView(estimateForChair(chair, ahead, 1, snap.now)),
     };
   });
@@ -158,6 +243,7 @@ function walkInView(snap: Snapshot, w: WalkInDocument): WalkInView {
       staffId: chair.staffId,
       name: staff?.name ?? 'Chair',
       chairNumber: staff?.chairNumber ?? null,
+      gate: gateView(gateFor(snap, chair.staffId)),
       estimate: toView(estimate),
     };
   });
@@ -184,6 +270,7 @@ function walkInView(snap: Snapshot, w: WalkInDocument): WalkInView {
     ),
     estimate: toView(mine.estimate),
     expectedStaffId: w.staffId ?? mine.staffId,
+    flag: flagFor(snap, w),
     options,
   };
 }
@@ -194,6 +281,7 @@ export async function lineView(now: Date): Promise<LineResponse> {
     now: now.toISOString(),
     line: snap.waiting.map((w) => walkInView(snap, w)),
     chairs: chairEstimates(snap),
+    firstAvailable: gateView(gateFor(snap, null)),
   };
 }
 
@@ -252,6 +340,7 @@ export async function addToLine(
   if (services.length !== new Set(input.serviceIds).size) {
     throw new AppError('SERVICE_UNAVAILABLE', 'A chosen service was not found');
   }
+  assertOpen(await snapshot(meta.now), staffId);
   const w = await walkInsRepo.insertWalkIn(
     {
       name: input.name,
@@ -447,6 +536,7 @@ export async function bookNow(
   const wanted = scope.kind === 'chair' ? scope.staffId : (input.staffId ?? null);
   if (wanted) await requireChair(wanted);
   const snap = await snapshot(meta.now);
+  assertOpen(snap, wanted);
   const candidates = snap.chairs.filter((c) => (wanted ? c.staffId === wanted : c.working));
   const free = candidates.filter(
     (c) =>

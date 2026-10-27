@@ -291,8 +291,8 @@ test.describe('a chair only lists the services it does', () => {
     const pad = page.getByRole('group', { name: /^PIN for/ });
     for (const digit of E2E_BARBER_PIN)
       await pad.getByRole('button', { name: digit, exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
-    await page.getByRole('button', { name: 'Walk-in', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /^Hey, /, level: 1 })).toBeVisible();
+    await page.getByRole('button', { name: 'Add booking', exact: true }).click();
     return page.getByRole('dialog', { name: 'New booking' });
   }
 

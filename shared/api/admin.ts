@@ -538,8 +538,15 @@ export const closureResponseSchema = z
   .object({ closure: closureViewSchema })
   .extend(conflictOutcomeSchema.shape);
 
-export const settingsResponseSchema = z.object({ settings: shopSettingsInputSchema });
-export const settingsRequestSchema = shopSettingsUpdateSchema;
+export const settingsResponseSchema = z.object({
+  settings: shopSettingsInputSchema,
+  /** When the document last changed; a save that carries an older value is refused. */
+  updatedAt: z.iso.datetime().optional(),
+});
+export const settingsRequestSchema = shopSettingsUpdateSchema.extend({
+  /** The updatedAt the editor loaded; set it to be refused when another tab saved first. */
+  expectedUpdatedAt: z.iso.datetime().optional(),
+});
 
 /**
  * Website, Reviews (`PUT /api/admin/reviews`, answered with the settings). Each part is optional,

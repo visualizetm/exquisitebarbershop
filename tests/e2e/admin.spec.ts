@@ -100,5 +100,5 @@ test('the staff sign in page points barbers to their PIN sign in', async ({ page
   await expect(link).toHaveAttribute('href', '/team');
   await link.click();
   await expect(page).toHaveURL(/\/team$/);
-  await expect(page.getByRole('heading', { name: 'Who is signing in?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "Who's working?" })).toBeVisible();
 });

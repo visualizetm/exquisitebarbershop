@@ -10,8 +10,9 @@ import { Avatar } from '@/admin/components/Avatar';
 import { useTeamSession } from './useTeamSession';
 
 /**
- * One shared link for the whole shop: tap your name, then your six digit PIN. Every wrong try gets
- * the same words, so the screen never says whether the name or the PIN was at fault.
+ * One shared link for the whole shop: tap your card, then your six digit PIN on a big pad. Nobody
+ * types a name. Every wrong try gets the same words, so the screen never says whether the name
+ * or the PIN was at fault.
  */
 export function SignIn() {
   usePageTitle('Team sign in');
@@ -52,9 +53,10 @@ export function SignIn() {
 
   return (
     <main className="exq-team-signin" data-state={chosen ? 'pin' : 'names'}>
-      <span className="exq-team-signin__mark">
-        <Mark name="disc" alt="Exquisite" width={72} height={72} />
-      </span>
+      <header className="exq-team-signin__top">
+        <Mark name="disc" alt="Exquisite" width={44} height={44} />
+        <span className="exq-label">Team portal</span>
+      </header>
       {chosen ? (
         <section aria-labelledby="exq-team-pin-title" className="exq-team-signin__panel">
           <h1 id="exq-team-pin-title" className="exq-team-signin__title">
@@ -67,6 +69,7 @@ export function SignIn() {
             disabled={working}
             error={error}
             resetKey={resetKey}
+            revealable
           />
           {demo ? <p className="exq-team-signin__demo">Demo PIN: {DEMO_PIN}</p> : null}
           <Button
@@ -82,8 +85,9 @@ export function SignIn() {
       ) : (
         <section aria-labelledby="exq-team-names-title" className="exq-team-signin__panel">
           <h1 id="exq-team-names-title" className="exq-team-signin__title">
-            Who is signing in?
+            Who's working?
           </h1>
+          <p className="exq-muted">Tap your name, then your PIN.</p>
           {staff.status === 'loading' ? (
             <p className="exq-skeleton exq-team-signin__placeholder" aria-busy="true">
               Loading the team
@@ -106,7 +110,11 @@ export function SignIn() {
                     <Avatar name={member.name} photo={member.photo} />
                     <span className="exq-team-name__text">
                       <strong>{member.name}</strong>
-                      <span>{member.title}</span>
+                      <span>
+                        {member.chairNumber !== null
+                          ? `Chair ${String(member.chairNumber).padStart(2, '0')}`
+                          : member.title}
+                      </span>
                     </span>
                   </button>
                 </li>
@@ -114,6 +122,9 @@ export function SignIn() {
             </ul>
           )}
           {demo ? <p className="exq-team-signin__demo">Demo PIN: {DEMO_PIN}</p> : null}
+          <p className="exq-muted exq-team-signin__help">
+            Not you? Ask the owner for your setup link.
+          </p>
         </section>
       )}
     </main>

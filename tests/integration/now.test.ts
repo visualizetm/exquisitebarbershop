@@ -1,7 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { closuresRepo, timeBlocksRepo, weeklyHoursRepo } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
+import type { WeekHours } from '../../shared/schemas/common';
 import { serviceSeedId, staffSeedId } from '../../seed/shop';
 import { nowResponseSchema } from '../../shared/api/admin';
+import { lineResponseSchema } from '../../shared/api/line';
+import { shopDateOf, shopDayBounds } from '../../shared/lib/time';
 import { apiErrorSchema } from '../../shared/api/errors';
 import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
 import { call, nextDate, slotAt, startTestServer, type TestServer } from '../helpers/bookingApi';
@@ -14,6 +18,7 @@ let ownerCookie: string;
 let drewCookie: string;
 const cut = serviceSeedId('haircut');
 const drew = staffSeedId('drew');
+const nelly = staffSeedId('nelly');
 const lee = staffSeedId('lee');
 let n = 0;
 const phone = () => `215555${String(3000 + (n += 1))}`;
@@ -31,14 +36,36 @@ const barber = (method: string, path: string, body?: unknown) => as(drewCookie)(
 const codeOf = (body: unknown) => apiErrorSchema.parse(body).error.code;
 const customer = (name: string) => ({ name, phone: phone(), email: null });
 
+// Open around the clock every day, and the clock frozen at 13:00 shop time on the next Tuesday
+// (only Date is faked), so NOW and the line behave the same whenever this file runs (D12-88).
+const allDay = { start: '00:00', end: '23:59' };
+const ALWAYS: WeekHours = {
+  mon: [allDay],
+  tue: [allDay],
+  wed: [allDay],
+  thu: [allDay],
+  fri: [allDay],
+  sat: [allDay],
+  sun: [allDay],
+};
+const FROZEN_NOW = new Date(slotAt(nextDate(2, 1), '13:00'));
+async function openAlways(): Promise<void> {
+  await weeklyHoursRepo.setShopHours(ALWAYS, new Date());
+  for (const key of ['lee', 'nelly', 'drew', 'dontrise', 'iniya'] as const)
+    await weeklyHoursRepo.setStaffHours(staffSeedId(key), ALWAYS, new Date());
+}
+
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: FROZEN_NOW, shouldAdvanceTime: true });
   await runSeed(db(), NOW);
+  await openAlways();
   server = await startTestServer();
   const ownerLogin = await createLogin({ role: 'owner', staffId: staffSeedId('dontrise') });
   ownerCookie = await sessionCookie(ownerLogin._id);
   drewCookie = await teamCookie(drew);
 });
 afterAll(async () => {
+  vi.useRealTimers();
   await server.close();
 });
 
@@ -137,5 +164,120 @@ describe('NOW', () => {
     expect(none.status).toBe(404);
     // A grid time for the test's sake, so the helper imports stay used.
     expect(slotAt(nextDate(3, 3), '10:00')).toMatch(/T/);
+  });
+
+  it('refuses NOW and the line when the shop is closed, and says when it opens', async () => {
+    const today = shopDateOf(new Date());
+    const closure = await closuresRepo.insertClosure(
+      { date: today, kind: 'closed', intervals: [], label: 'Test closure' },
+      new Date(),
+    );
+    try {
+      const now = await owner('POST', '/api/admin/now', {
+        serviceIds: [cut],
+        staffId: drew,
+        customer: customer('Closed Now'),
+      });
+      expect(now.status).toBe(409);
+      expect(codeOf(now.body)).toBe('SHOP_CLOSED');
+      expect((now.body as { error: { message: string } }).error.message).toMatch(
+        /^The shop is closed right now\. Opens /,
+      );
+      const line = await owner('POST', '/api/admin/line', {
+        name: 'Closed Line',
+        phone: phone(),
+        serviceIds: [cut],
+        staffId: null,
+      });
+      expect(line.status).toBe(409);
+      expect(codeOf(line.body)).toBe('SHOP_CLOSED');
+      const view = lineResponseSchema.parse((await owner('GET', '/api/admin/line')).body);
+      expect(view.firstAvailable.kind).toBe('closed');
+      expect(view.chairs.every((c) => c.gate.kind === 'closed')).toBe(true);
+      expect(await db().collection('walkIns').countDocuments({ name: 'Closed Line' })).toBe(0);
+    } finally {
+      await closuresRepo.deleteClosure(closure._id);
+    }
+  });
+
+  it('refuses a barber who is off today, flags anyone already waiting for them, and never drops them', async () => {
+    // Somebody joins Lee's line while Lee is in; then Lee takes the day off.
+    const waiting = await owner('POST', '/api/admin/line', {
+      name: 'Waits For Lee',
+      phone: phone(),
+      serviceIds: [cut],
+      staffId: lee,
+    });
+    expect(waiting.status).toBe(201);
+    const bounds = shopDayBounds(shopDateOf(new Date()));
+    const block = await timeBlocksRepo.insertTimeBlock(
+      {
+        staffId: lee,
+        kind: 'dayOff',
+        startAt: bounds.start,
+        endAt: bounds.end,
+        reason: null,
+        createdBy: { type: 'owner', userId: null, staffId: null },
+      },
+      new Date(),
+    );
+    try {
+      const now = await owner('POST', '/api/admin/now', {
+        serviceIds: [cut],
+        staffId: lee,
+        customer: customer('Lee Off'),
+      });
+      expect(now.status).toBe(409);
+      expect(codeOf(now.body)).toBe('BARBER_OFF');
+      expect((now.body as { error: { message: string } }).error.message).toBe('Lee is off today.');
+      const view = lineResponseSchema.parse((await owner('GET', '/api/admin/line')).body);
+      const entry = view.line.find((w) => w.name === 'Waits For Lee');
+      expect(entry?.flag).toBe('Lee is off. Move or mark left');
+      expect(entry?.status).toBe('waiting');
+      expect(view.chairs.find((c) => c.staffId === lee)?.gate).toEqual({
+        kind: 'off',
+        text: 'Lee is off today.',
+      });
+      // First available is still open: somebody else is in.
+      expect(view.firstAvailable.kind).toBe('open');
+    } finally {
+      await timeBlocksRepo.deleteTimeBlock(block._id);
+    }
+  });
+
+  it('a cut marked done early gives the rest of its time back, so the next NOW lands in the chair', async () => {
+    const first = nowResponseSchema.parse(
+      (
+        await owner('POST', '/api/admin/now', {
+          serviceIds: [cut],
+          staffId: nelly,
+          customer: customer('Done Early'),
+        })
+      ).body,
+    );
+    expect(first.kind).toBe('booking');
+    if (first.kind !== 'booking') return;
+    const done = await owner('POST', `/api/admin/bookings/${first.booking.id}/status`, {
+      status: 'completed',
+      notify: false,
+    });
+    expect(done.status).toBe(200);
+    const again = nowResponseSchema.parse(
+      (
+        await owner('POST', '/api/admin/now', {
+          serviceIds: [cut],
+          staffId: nelly,
+          customer: customer('Right After'),
+        })
+      ).body,
+    );
+    expect(again.kind).toBe('booking');
+    // Undoing the first one now fails: its time belongs to the second.
+    const undo = await owner('POST', `/api/admin/bookings/${first.booking.id}/status`, {
+      status: 'confirmed',
+      notify: false,
+    });
+    expect(undo.status).toBe(409);
+    expect(codeOf(undo.body)).toBe('SLOT_TAKEN');
   });
 });

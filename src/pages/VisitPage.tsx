@@ -11,6 +11,7 @@ import { ButtonAnchor, ErrorState, Reveal, SectionHead } from '@/components/ui';
 import { Status } from '@/components/Status';
 import { usePageMeta } from '@/lib/usePageTitle';
 import { useShop } from '@/app/useShop';
+import { DEFAULT_VISIT } from '@shared/schemas/shopSettings';
 import { changePolicyLabel } from '@/lib/booking/policy';
 import { hoursLabel } from '@/lib/hours';
 import { addressLine, directionsUrl, todayKey } from '@/lib/shop';
@@ -119,13 +120,22 @@ export function VisitPage() {
                 <li>Walk-ins welcome when a chair is free.</li>
                 <li>{changePolicyLabel(result.data.booking.cancelCutoffMinutes)}</li>
               </ul>
-              <h3 className="exq-visit__subheading">Good to know</h3>
-              <ul className="exq-visit__policy-list">
-                <li>Kids welcome</li>
-                <li>Wheelchair accessible parking lot</li>
-              </ul>
+              {(result.data.visit?.goodToKnow ?? DEFAULT_VISIT.goodToKnow).length > 0 ? (
+                <>
+                  <h3 className="exq-visit__subheading">Good to know</h3>
+                  <ul className="exq-visit__policy-list">
+                    {(result.data.visit?.goodToKnow ?? DEFAULT_VISIT.goodToKnow).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
               <h3 className="exq-visit__subheading">Parking</h3>
-              <p data-state="placeholder">Parking details coming soon.</p>
+              {result.data.visit?.parking ? (
+                <p>{result.data.visit.parking}</p>
+              ) : (
+                <p data-state="placeholder">Parking details coming soon.</p>
+              )}
             </Reveal>
           </div>
         </div>

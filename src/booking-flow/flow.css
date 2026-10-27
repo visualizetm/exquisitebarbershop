@@ -123,6 +123,18 @@
 .exq-flow__now[data-state='selected'] {
   border-color: var(--red);
 }
+.exq-flow__now[data-state='closed'] {
+  border-color: var(--border);
+  color: var(--fg-2);
+  cursor: not-allowed;
+}
+.exq-flow__now[data-state='closed'] .exq-flow__now-icon {
+  background: var(--card-2);
+  color: var(--fg-3);
+}
+.exq-flow__now-chip[data-state='closed'] {
+  color: var(--fg-3);
+}
 .exq-flow__now-icon {
   display: grid;
   place-items: center;
@@ -193,6 +205,24 @@
 }
 .exq-flow__time:hover {
   border-color: var(--fg);
+}
+
+/* The day strip: one row that scrolls sideways, never a month grid; the times sit right under it. */
+.exq-flow .exq-day-picker .exq-day-picker__list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--s2);
+  overflow-x: auto;
+  padding-bottom: var(--s2);
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.exq-flow .exq-day-picker .exq-day-option {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+}
+.exq-flow .exq-day-picker {
+  margin-bottom: var(--s4);
 }
 
 /* Client */

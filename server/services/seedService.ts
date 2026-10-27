@@ -38,6 +38,7 @@ export async function runSeed(
   options: SeedOptions = {},
 ): Promise<SeedSummary> {
   await ensureIndexes(db);
+  await shopSettingsRepo.dropLegacySettingsFields();
   const summary: SeedSummary = {
     settingsCreated: false,
     shopHoursCreated: false,

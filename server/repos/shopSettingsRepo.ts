@@ -48,6 +48,19 @@ export async function getShopSettings(options?: RepoOptions): Promise<ShopSettin
 }
 
 /** Like getShopSettings but fails loudly: the app cannot run without settings. */
+/**
+ * Prompt 13c stored a shop-wide "keep the tablet signed in" flag; 13d made it a per-device cookie.
+ * Drops the old field from the document once; a no-op afterwards.
+ */
+export async function dropLegacySettingsFields(options?: RepoOptions): Promise<void> {
+  const col = await collection('shopSettings');
+  await col.updateOne(
+    { _id: SHOP_SETTINGS_ID },
+    { $unset: { keepTabletSignedIn: '' } },
+    sessionOf(options),
+  );
+}
+
 export async function requireShopSettings(options?: RepoOptions): Promise<ShopSettingsDocument> {
   const settings = await getShopSettings(options);
   if (!settings) {

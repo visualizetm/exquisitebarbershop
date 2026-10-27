@@ -879,7 +879,7 @@ div.exq-chaircard {
   pointer-events: auto;
 }
 .exq-toast[data-tone='ok'] {
-  border-left-color: var(--ok);
+  border-left-color: var(--fg);
 }
 .exq-toast[data-tone='warn'] {
   border-left-color: var(--warn);

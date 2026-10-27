@@ -1318,23 +1318,6 @@ function randomRequestId() {
   return randomBytes(8).toString("hex");
 }
 
-// server/repos/shopSettingsRepo.ts
-var shopSettingsRepo_exports = {};
-__export(shopSettingsRepo_exports, {
-  createShopSettingsIfMissing: () => createShopSettingsIfMissing,
-  getShopSettings: () => getShopSettings,
-  requireShopSettings: () => requireShopSettings,
-  updateReviewSettings: () => updateReviewSettings,
-  updateShopSettings: () => updateShopSettings
-});
-
-// shared/lib/constants.ts
-var SHOP_TIMEZONE = "America/New_York";
-var LOCK_GRANULARITY_MINUTES = 15;
-var SHOP_SETTINGS_ID = "shop";
-var REFERENCE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-var MAX_NOTE_LENGTH = 500;
-
 // node_modules/zod/v4/classic/external.js
 var external_exports = {};
 __export(external_exports, {
@@ -27593,6 +27576,13 @@ function friendlyDateTime(dateTimeish) {
   }
 }
 
+// shared/lib/constants.ts
+var SHOP_TIMEZONE = "America/New_York";
+var LOCK_GRANULARITY_MINUTES = 15;
+var SHOP_SETTINGS_ID = "shop";
+var REFERENCE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+var MAX_NOTE_LENGTH = 500;
+
 // shared/lib/time.ts
 var DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 var ISO_DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -27611,6 +27601,9 @@ function shopDayStart(isoDate) {
     throw new RangeError(`Invalid ISO date: ${isoDate}`);
   }
   return dt.startOf("day");
+}
+function addDaysToIsoDate(isoDate, days) {
+  return isoDateOf(shopDayStart(isoDate).plus({ days }));
 }
 function shopDayBounds(isoDate) {
   const start = shopDayStart(isoDate);
@@ -27733,202 +27726,6 @@ var timestampsSchema = external_exports.object({
   createdAt: external_exports.date(),
   updatedAt: external_exports.date()
 });
-
-// shared/schemas/shopSettings.ts
-var addressSchema = external_exports.object({
-  line1: nonEmptyText(120),
-  line2: nonEmptyText(120).nullable(),
-  city: nonEmptyText(80),
-  state: external_exports.string().length(2),
-  postalCode: external_exports.string().regex(/^\d{5}(?:-\d{4})?$/)
-});
-var firstAvailableStrategySchema = external_exports.enum(["leastBookedThatDay", "roundRobin"]);
-var bookingSettingsSchema = external_exports.object({
-  /** Customer-facing start time step. Must be a multiple of the lock granularity. */
-  slotStepMinutes: external_exports.int().min(LOCK_GRANULARITY_MINUTES).max(120).multipleOf(LOCK_GRANULARITY_MINUTES).default(15),
-  /** Gap reserved after each booking. Locked with the booking. A service may override it. */
-  bufferMinutes: external_exports.int().min(0).max(60).multipleOf(5).default(10),
-  /** How far in the future a slot must be before it can be booked online. */
-  leadTimeMinutes: external_exports.int().min(0).max(7 * 24 * 60).default(60),
-  /** How many days ahead customers may book. */
-  bookingWindowDays: external_exports.int().min(1).max(365).default(30),
-  /** Customers cannot cancel online closer than this to the start. */
-  cancelCutoffMinutes: external_exports.int().min(0).max(7 * 24 * 60).default(120),
-  /** Customers cannot reschedule online closer than this to the start. */
-  rescheduleCutoffMinutes: external_exports.int().min(0).max(7 * 24 * 60).default(120),
-  maxServicesPerBooking: external_exports.int().min(1).max(6).default(3),
-  allowFirstAvailable: external_exports.boolean().default(true),
-  firstAvailableStrategy: firstAvailableStrategySchema.default("leastBookedThatDay"),
-  requireEmail: external_exports.boolean().default(false),
-  /** Abuse guard: open bookings a single phone number may hold at once. */
-  maxOpenBookingsPerPhone: external_exports.int().min(1).max(20).default(3)
-});
-var notificationSettingsSchema = external_exports.object({
-  ownerAlertEmail: emailSchema,
-  fromName: nonEmptyText(80),
-  replyToEmail: emailSchema.nullable(),
-  customerConfirmationEmail: external_exports.boolean().default(true),
-  ownerNewBookingEmail: external_exports.boolean().default(true),
-  /** Reserved for the SMS channel. Off until the SMS provider is wired in. */
-  customerSms: external_exports.boolean().default(false)
-});
-var staffPermissionsSchema = external_exports.object({
-  /** Barbers may block their own time (lunch, time off). Off by default. */
-  barbersCanBlockTime: external_exports.boolean().default(false),
-  /** Barbers may upload photos to their own chair. Off by default. */
-  barbersCanUploadPhotos: external_exports.boolean().default(false)
-});
-var DEFAULT_STAFF_PERMISSIONS = {
-  barbersCanBlockTime: false,
-  barbersCanUploadPhotos: false
-};
-var featureFlagsSchema = external_exports.object({
-  giftCards: external_exports.boolean().default(false),
-  rewards: external_exports.boolean().default(false),
-  smsReminders: external_exports.boolean().default(false)
-});
-var ratingSchema = external_exports.number().min(0).max(5).refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, {
-  message: "Use at most one decimal, for example 4.7"
-});
-var googleRatingFields = {
-  rating: ratingSchema,
-  reviewCount: external_exports.int().min(0).max(1e5),
-  /** The shop date the rating was last read from Google, or empty. */
-  ratingCheckedOn: external_exports.union([external_exports.literal(""), isoDateSchema])
-};
-var ratingNeedsCount = (g) => g.reviewCount === 0 || g.rating >= 1;
-var ratingNeedsCountIssue = {
-  path: ["rating"],
-  message: "Add the rating, or set the review count to 0"
-};
-var googleSettingsSchema = external_exports.object({
-  placeId: external_exports.string().trim().max(200).regex(/^[A-Za-z0-9_-]*$/, "A place id has only letters, digits, hyphens and underscores"),
-  ...googleRatingFields
-}).refine(ratingNeedsCount, ratingNeedsCountIssue);
-var googleRatingSchema = external_exports.strictObject(googleRatingFields).refine(ratingNeedsCount, ratingNeedsCountIssue);
-var DEFAULT_GOOGLE = {
-  placeId: "",
-  rating: 0,
-  reviewCount: 0,
-  ratingCheckedOn: ""
-};
-var REVIEW_SOURCES = ["google", "thecut"];
-var reviewSourceSchema = external_exports.enum(REVIEW_SOURCES);
-var MAX_REVIEWS = 30;
-var REVIEW_TEXT_MAX = 600;
-var reviewItemSchema = external_exports.object({
-  id: idSchema,
-  /** First name and last initial, as the reviewer shows it. */
-  name: nonEmptyText(80),
-  text: nonEmptyText(REVIEW_TEXT_MAX),
-  stars: external_exports.int().min(1).max(5),
-  source: reviewSourceSchema,
-  /** The day it was posted (shop date). theCut shows no exact date, so its reviews have none. */
-  date: isoDateSchema.optional(),
-  staffId: idSchema.nullable(),
-  show: external_exports.boolean(),
-  sortOrder: external_exports.int().min(0).max(1e4)
-});
-var reviewsSettingsSchema = external_exports.object({
-  enabled: external_exports.boolean(),
-  items: external_exports.array(reviewItemSchema).max(MAX_REVIEWS)
-}).refine((r) => new Set(r.items.map((i) => i.id)).size === r.items.length, {
-  path: ["items"],
-  message: "Each review needs its own id"
-});
-var DEFAULT_REVIEWS = { enabled: true, items: [] };
-var announcementLinkSchema = external_exports.string().trim().max(200).refine(
-  (v) => v === "" || v.startsWith("/") && !v.startsWith("//") || v.startsWith("https://"),
-  {
-    message: "Use a path such as /book or an https address"
-  }
-);
-var announcementSchema = external_exports.object({
-  enabled: external_exports.boolean(),
-  text: external_exports.string().trim().max(90),
-  linkLabel: external_exports.string().trim().max(30),
-  linkUrl: announcementLinkSchema,
-  /** The last day the strip shows (shop date), or empty to keep it until it is switched off. */
-  endsOn: external_exports.union([external_exports.literal(""), isoDateSchema]).default("")
-}).refine((a) => !a.enabled || a.text.length > 0, {
-  path: ["text"],
-  message: "Add the announcement text, or switch it off"
-}).refine((a) => a.linkLabel === "" === (a.linkUrl === ""), {
-  path: ["linkUrl"],
-  message: "Give the link both a label and an address, or leave both empty"
-});
-var DEFAULT_ANNOUNCEMENT = {
-  enabled: true,
-  text: "Walk-ins welcome",
-  linkLabel: "Book online",
-  linkUrl: "/book",
-  endsOn: ""
-};
-function announcementIsLive(a, today) {
-  return a.enabled && (a.endsOn === "" || today <= a.endsOn);
-}
-function socialUrl(domain2, label) {
-  return external_exports.string().trim().max(200).refine(
-    (v) => {
-      if (v === "") return true;
-      try {
-        const url2 = new URL(v);
-        return url2.protocol === "https:" && (url2.hostname === domain2 || url2.hostname.endsWith(`.${domain2}`));
-      } catch {
-        return false;
-      }
-    },
-    { message: `Use the full https address of the ${label} page, or leave it empty` }
-  );
-}
-var socialLinksSchema = external_exports.object({
-  instagramUrl: socialUrl("instagram.com", "Instagram"),
-  tiktokUrl: socialUrl("tiktok.com", "TikTok"),
-  facebookUrl: socialUrl("facebook.com", "Facebook")
-});
-var DEFAULT_SOCIAL_LINKS = {
-  instagramUrl: "",
-  tiktokUrl: "",
-  facebookUrl: ""
-};
-var shopSettingsDocumentSchema = external_exports.object({
-  _id: external_exports.literal(SHOP_SETTINGS_ID),
-  name: nonEmptyText(120),
-  tagline: nonEmptyText(120),
-  address: addressSchema,
-  phone: phoneSchema,
-  email: emailSchema,
-  instagramHandle: external_exports.string().regex(/^[A-Za-z0-9._]{1,30}$/),
-  websiteUrl: external_exports.url().nullable(),
-  timezone: external_exports.literal("America/New_York"),
-  booking: bookingSettingsSchema,
-  notifications: notificationSettingsSchema,
-  features: featureFlagsSchema,
-  permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
-  announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
-  social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
-  google: googleSettingsSchema.default(DEFAULT_GOOGLE),
-  reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
-  /** The service "next open" times are computed for. Null means each chair's shortest service. */
-  nextOpenServiceId: idSchema.nullable().default(null),
-  /**
-   * The front desk tablet: when on, a dashboard sign-in stays good for 30 idle days instead of
-   * 14, so the check-in screen does not sign itself out over a long weekend. Off by default.
-   */
-  keepTabletSignedIn: external_exports.boolean().default(false)
-}).extend(timestampsSchema.shape);
-var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
-  _id: true,
-  createdAt: true,
-  updatedAt: true
-});
-var shopSettingsUpdateSchema = shopSettingsInputSchema.omit({
-  reviews: true,
-  google: true
-});
-
-// server/db/client.ts
-import { MongoClient } from "mongodb";
 
 // shared/schemas/timeBlock.ts
 var timeBlockKindSchema = external_exports.enum(["timeOff", "block", "dayOff", "extraHours"]);
@@ -28223,6 +28020,231 @@ function currentEnvProblems() {
 function getBuildSha() {
   return process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "unknown";
 }
+
+// server/repos/shopSettingsRepo.ts
+var shopSettingsRepo_exports = {};
+__export(shopSettingsRepo_exports, {
+  createShopSettingsIfMissing: () => createShopSettingsIfMissing,
+  dropLegacySettingsFields: () => dropLegacySettingsFields,
+  getShopSettings: () => getShopSettings,
+  requireShopSettings: () => requireShopSettings,
+  updateReviewSettings: () => updateReviewSettings,
+  updateShopSettings: () => updateShopSettings
+});
+
+// shared/schemas/shopSettings.ts
+var addressSchema = external_exports.object({
+  line1: nonEmptyText(120),
+  line2: nonEmptyText(120).nullable(),
+  city: nonEmptyText(80),
+  state: external_exports.string().length(2),
+  postalCode: external_exports.string().regex(/^\d{5}(?:-\d{4})?$/)
+});
+var firstAvailableStrategySchema = external_exports.enum(["leastBookedThatDay", "roundRobin"]);
+var bookingSettingsSchema = external_exports.object({
+  /** Customer-facing start time step. Must be a multiple of the lock granularity. */
+  slotStepMinutes: external_exports.int().min(LOCK_GRANULARITY_MINUTES).max(120).multipleOf(LOCK_GRANULARITY_MINUTES).default(15),
+  /** Gap reserved after each booking. Locked with the booking. A service may override it. */
+  bufferMinutes: external_exports.int().min(0).max(60).multipleOf(5).default(10),
+  /** How far in the future a slot must be before it can be booked online. */
+  leadTimeMinutes: external_exports.int().min(0).max(7 * 24 * 60).default(60),
+  /** How many days ahead customers may book. */
+  bookingWindowDays: external_exports.int().min(1).max(365).default(30),
+  /** Customers cannot cancel online closer than this to the start. */
+  cancelCutoffMinutes: external_exports.int().min(0).max(7 * 24 * 60).default(120),
+  /** Customers cannot reschedule online closer than this to the start. */
+  rescheduleCutoffMinutes: external_exports.int().min(0).max(7 * 24 * 60).default(120),
+  maxServicesPerBooking: external_exports.int().min(1).max(6).default(3),
+  allowFirstAvailable: external_exports.boolean().default(true),
+  firstAvailableStrategy: firstAvailableStrategySchema.default("leastBookedThatDay"),
+  requireEmail: external_exports.boolean().default(false),
+  /** Abuse guard: open bookings a single phone number may hold at once. */
+  maxOpenBookingsPerPhone: external_exports.int().min(1).max(20).default(3)
+});
+var notificationSettingsSchema = external_exports.object({
+  ownerAlertEmail: emailSchema,
+  fromName: nonEmptyText(80),
+  replyToEmail: emailSchema.nullable(),
+  customerConfirmationEmail: external_exports.boolean().default(true),
+  ownerNewBookingEmail: external_exports.boolean().default(true),
+  /** Reserved for the SMS channel. Off until the SMS provider is wired in. */
+  customerSms: external_exports.boolean().default(false)
+});
+var staffPermissionsSchema = external_exports.object({
+  /** Barbers may block their own time (lunch, time off). Off by default. */
+  barbersCanBlockTime: external_exports.boolean().default(false),
+  /** Barbers may upload photos to their own chair. Off by default. */
+  barbersCanUploadPhotos: external_exports.boolean().default(false)
+});
+var DEFAULT_STAFF_PERMISSIONS = {
+  barbersCanBlockTime: false,
+  barbersCanUploadPhotos: false
+};
+var featureFlagsSchema = external_exports.object({
+  giftCards: external_exports.boolean().default(false),
+  rewards: external_exports.boolean().default(false),
+  smsReminders: external_exports.boolean().default(false)
+});
+var ratingSchema = external_exports.number().min(0).max(5).refine((v) => Math.abs(v * 10 - Math.round(v * 10)) < 1e-9, {
+  message: "Use at most one decimal, for example 4.7"
+});
+var googleRatingFields = {
+  rating: ratingSchema,
+  reviewCount: external_exports.int().min(0).max(1e5),
+  /** The shop date the rating was last read from Google, or empty. */
+  ratingCheckedOn: external_exports.union([external_exports.literal(""), isoDateSchema])
+};
+var ratingNeedsCount = (g) => g.reviewCount === 0 || g.rating >= 1;
+var ratingNeedsCountIssue = {
+  path: ["rating"],
+  message: "Add the rating, or set the review count to 0"
+};
+var googleSettingsSchema = external_exports.object({
+  placeId: external_exports.string().trim().max(200).regex(/^[A-Za-z0-9_-]*$/, "A place id has only letters, digits, hyphens and underscores"),
+  ...googleRatingFields
+}).refine(ratingNeedsCount, ratingNeedsCountIssue);
+var googleRatingSchema = external_exports.strictObject(googleRatingFields).refine(ratingNeedsCount, ratingNeedsCountIssue);
+var DEFAULT_GOOGLE = {
+  placeId: "",
+  rating: 0,
+  reviewCount: 0,
+  ratingCheckedOn: ""
+};
+var REVIEW_SOURCES = ["google", "thecut"];
+var reviewSourceSchema = external_exports.enum(REVIEW_SOURCES);
+var MAX_REVIEWS = 30;
+var REVIEW_TEXT_MAX = 600;
+var reviewItemSchema = external_exports.object({
+  id: idSchema,
+  /** First name and last initial, as the reviewer shows it. */
+  name: nonEmptyText(80),
+  text: nonEmptyText(REVIEW_TEXT_MAX),
+  stars: external_exports.int().min(1).max(5),
+  source: reviewSourceSchema,
+  /** The day it was posted (shop date). theCut shows no exact date, so its reviews have none. */
+  date: isoDateSchema.optional(),
+  staffId: idSchema.nullable(),
+  show: external_exports.boolean(),
+  sortOrder: external_exports.int().min(0).max(1e4)
+});
+var reviewsSettingsSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  items: external_exports.array(reviewItemSchema).max(MAX_REVIEWS)
+}).refine((r) => new Set(r.items.map((i) => i.id)).size === r.items.length, {
+  path: ["items"],
+  message: "Each review needs its own id"
+});
+var DEFAULT_REVIEWS = { enabled: true, items: [] };
+var announcementLinkSchema = external_exports.string().trim().max(200).refine(
+  (v) => v === "" || v.startsWith("/") && !v.startsWith("//") || v.startsWith("https://"),
+  {
+    message: "Use a path such as /book or an https address"
+  }
+);
+var announcementSchema = external_exports.object({
+  enabled: external_exports.boolean(),
+  text: external_exports.string().trim().max(90),
+  linkLabel: external_exports.string().trim().max(30),
+  linkUrl: announcementLinkSchema,
+  /** The last day the strip shows (shop date), or empty to keep it until it is switched off. */
+  endsOn: external_exports.union([external_exports.literal(""), isoDateSchema]).default("")
+}).refine((a) => !a.enabled || a.text.length > 0, {
+  path: ["text"],
+  message: "Add the announcement text, or switch it off"
+}).refine((a) => a.linkLabel === "" === (a.linkUrl === ""), {
+  path: ["linkUrl"],
+  message: "Give the link both a label and an address, or leave both empty"
+});
+var DEFAULT_ANNOUNCEMENT = {
+  enabled: true,
+  text: "Walk-ins welcome",
+  linkLabel: "Book online",
+  linkUrl: "/book",
+  endsOn: ""
+};
+function announcementIsLive(a, today) {
+  return a.enabled && (a.endsOn === "" || today <= a.endsOn);
+}
+function socialUrl(domain2, label) {
+  return external_exports.string().trim().max(200).refine(
+    (v) => {
+      if (v === "") return true;
+      try {
+        const url2 = new URL(v);
+        return url2.protocol === "https:" && (url2.hostname === domain2 || url2.hostname.endsWith(`.${domain2}`));
+      } catch {
+        return false;
+      }
+    },
+    { message: `Use the full https address of the ${label} page, or leave it empty` }
+  );
+}
+var socialLinksSchema = external_exports.object({
+  instagramUrl: socialUrl("instagram.com", "Instagram"),
+  tiktokUrl: socialUrl("tiktok.com", "TikTok"),
+  facebookUrl: socialUrl("facebook.com", "Facebook")
+});
+var DEFAULT_SOCIAL_LINKS = {
+  instagramUrl: "",
+  tiktokUrl: "",
+  facebookUrl: ""
+};
+var heroSchema = external_exports.object({
+  headline: nonEmptyText(48),
+  redWord: nonEmptyText(24),
+  subline: nonEmptyText(160)
+}).refine((v) => v.headline.split(/\s+/).some((w) => w.replace(/[.,!?]+$/, "") === v.redWord), {
+  message: "The red word must be one of the words in the headline",
+  path: ["redWord"]
+});
+var DEFAULT_HERO = {
+  headline: "Gifted hands. Exquisite cuts.",
+  redWord: "Exquisite",
+  subline: "Barbers and stylists under one roof. Pick your chair and book in under a minute."
+};
+var visitSchema = external_exports.object({
+  parking: external_exports.string().trim().max(300).default(""),
+  goodToKnow: external_exports.array(nonEmptyText(80)).max(6).default([])
+});
+var DEFAULT_VISIT = {
+  parking: "",
+  goodToKnow: ["Kids welcome", "Wheelchair accessible parking lot"]
+};
+var shopSettingsDocumentSchema = external_exports.object({
+  _id: external_exports.literal(SHOP_SETTINGS_ID),
+  name: nonEmptyText(120),
+  tagline: nonEmptyText(120),
+  address: addressSchema,
+  phone: phoneSchema,
+  email: emailSchema,
+  instagramHandle: external_exports.string().regex(/^[A-Za-z0-9._]{1,30}$/),
+  websiteUrl: external_exports.url().nullable(),
+  timezone: external_exports.literal("America/New_York"),
+  booking: bookingSettingsSchema,
+  notifications: notificationSettingsSchema,
+  features: featureFlagsSchema,
+  permissions: staffPermissionsSchema.default(DEFAULT_STAFF_PERMISSIONS),
+  announcement: announcementSchema.default(DEFAULT_ANNOUNCEMENT),
+  social: socialLinksSchema.default(DEFAULT_SOCIAL_LINKS),
+  google: googleSettingsSchema.default(DEFAULT_GOOGLE),
+  reviews: reviewsSettingsSchema.default(DEFAULT_REVIEWS),
+  /** The service "next open" times are computed for. Null means each chair's shortest service. */
+  nextOpenServiceId: idSchema.nullable().default(null),
+  hero: heroSchema.default(DEFAULT_HERO),
+  visit: visitSchema.default(DEFAULT_VISIT)
+}).extend(timestampsSchema.shape);
+var shopSettingsInputSchema = shopSettingsDocumentSchema.omit({
+  _id: true,
+  createdAt: true,
+  updatedAt: true
+});
+var shopSettingsUpdateSchema = shopSettingsInputSchema.omit({
+  reviews: true,
+  google: true
+});
+
+// server/db/client.ts
+import { MongoClient } from "mongodb";
 
 // server/lib/pii.ts
 var EMAIL = /([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
@@ -28716,6 +28738,8 @@ var ERROR_CODES = {
   /** Seating a walk-in: the chair cannot take the full service now; the body carries the estimate. */
   CHAIR_BUSY: 409,
   ALREADY_SEATED: 409,
+  /** NOW and the line outside the hours: the barber is off or done (SHOP_CLOSED covers the shop). */
+  BARBER_OFF: 409,
   SCHEDULE_CONFLICT: 409,
   INVALID_TRANSITION: 409,
   SLUG_TAKEN: 409,
@@ -28859,6 +28883,14 @@ function withDefaults(doc) {
 async function getShopSettings(options) {
   const col = await collection("shopSettings");
   return withDefaults(await col.findOne({ _id: SHOP_SETTINGS_ID }, sessionOf(options)));
+}
+async function dropLegacySettingsFields(options) {
+  const col = await collection("shopSettings");
+  await col.updateOne(
+    { _id: SHOP_SETTINGS_ID },
+    { $unset: { keepTabletSignedIn: "" } },
+    sessionOf(options)
+  );
 }
 async function requireShopSettings(options) {
   const settings = await getShopSettings(options);
@@ -29930,7 +29962,8 @@ __export(slotLocksRepo_exports, {
   acquireUnheldSlotLocks: () => acquireUnheldSlotLocks,
   listSlotLocksForHolder: () => listSlotLocksForHolder,
   listSlotLocksForStaff: () => listSlotLocksForStaff,
-  releaseSlotLocks: () => releaseSlotLocks
+  releaseSlotLocks: () => releaseSlotLocks,
+  releaseSlotLocksFrom: () => releaseSlotLocksFrom
 });
 
 // shared/schemas/slotLock.ts
@@ -29971,6 +30004,11 @@ async function acquireSlotLocks(staffId, range, holder, now2, options) {
     throw error62;
   }
   return docs;
+}
+async function releaseSlotLocksFrom(holderId, from, options) {
+  const col = await collection("slotLocks");
+  const result = await col.deleteMany({ holderId, slotStart: { $gte: from } }, sessionOf(options));
+  return result.deletedCount;
 }
 async function releaseSlotLocks(holderId, options) {
   const col = await collection("slotLocks");
@@ -31284,7 +31322,10 @@ async function markLeft(id, now2, options) {
 // server/auth/cookies.ts
 var SESSION_COOKIE = "__Host-exq_session";
 var TEAM_COOKIE = "__Host-exq_team";
+var TABLET_COOKIE = "__Host-exq_tablet";
+var TABLET_COOKIE_DAYS = 400;
 var TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+var HEX_PATTERN = /^[a-f0-9]{64}$/;
 function readCookie(req, wanted) {
   const header = req.headers.cookie;
   if (!header) return null;
@@ -31294,9 +31335,18 @@ function readCookie(req, wanted) {
     const name = part.slice(0, index).trim();
     if (name !== wanted) continue;
     const value = part.slice(index + 1).trim();
-    return TOKEN_PATTERN.test(value) ? value : null;
+    return (wanted === TABLET_COOKIE ? HEX_PATTERN : TOKEN_PATTERN).test(value) ? value : null;
   }
   return null;
+}
+function readTabletCookie(req) {
+  return readCookie(req, TABLET_COOKIE);
+}
+function setTabletCookie(res, value) {
+  appendSetCookie(
+    res,
+    `${TABLET_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${String(TABLET_COOKIE_DAYS * 24 * 60 * 60)}`
+  );
 }
 function readSessionCookie(req) {
   return readCookie(req, SESSION_COOKIE);
@@ -31336,21 +31386,26 @@ var SESSION_TOUCH_MS = 60 * 6e4;
 function expiryFor(createdAt, now2, idleMs) {
   return new Date(Math.min(now2.getTime() + idleMs, createdAt.getTime() + SESSION_ABSOLUTE_MS));
 }
-async function idleWindowMs() {
-  const settings = await shopSettingsRepo_exports.getShopSettings();
-  return settings?.keepTabletSignedIn ? SESSION_TABLET_IDLE_MS : SESSION_IDLE_MS;
+function tabletFlagValue() {
+  return sha256Hex(`tablet-device:${getEnv2().MANAGE_LINK_SECRET}`);
+}
+function markTablet(res) {
+  setTabletCookie(res, tabletFlagValue());
+}
+function idleWindowMs(req) {
+  return readTabletCookie(req) === tabletFlagValue() ? SESSION_TABLET_IDLE_MS : SESSION_IDLE_MS;
 }
 function maxAgeSeconds(expiresAt, now2) {
   return (expiresAt.getTime() - now2.getTime()) / 1e3;
 }
 async function startSession(res, user, meta3) {
   const token = randomToken(32);
-  const idleMs = await idleWindowMs();
   const session = await sessionsRepo_exports.insertSession(
     {
       tokenHash: sha256Hex(token),
       userId: user._id,
-      expiresAt: expiryFor(meta3.now, meta3.now, idleMs),
+      // The first window is the plain one; the tablet's flag lengthens it on the next touch.
+      expiresAt: expiryFor(meta3.now, meta3.now, SESSION_IDLE_MS),
       ip: meta3.ip?.slice(0, 64) ?? null,
       userAgent: meta3.userAgent?.slice(0, 512) ?? null
     },
@@ -31378,7 +31433,7 @@ async function authenticateFromCookie(ctx) {
     return null;
   }
   if (ctx.now.getTime() - session.lastSeenAt.getTime() >= SESSION_TOUCH_MS) {
-    const expiresAt = expiryFor(session.createdAt, ctx.now, await idleWindowMs());
+    const expiresAt = expiryFor(session.createdAt, ctx.now, idleWindowMs(ctx.req));
     await sessionsRepo_exports.touchSession(session._id, ctx.now, expiresAt);
     setSessionCookie(ctx.res, token, maxAgeSeconds(expiresAt, ctx.now));
   }
@@ -32206,6 +32261,17 @@ function seedReviewItems() {
 var shopSettingsSeed = {
   name: "Exquisite Barber & Beauty Lounge",
   tagline: "Gifted Hands",
+  // The top of the home page, editable on the Website side.
+  hero: {
+    headline: "Gifted hands. Exquisite cuts.",
+    redWord: "Exquisite",
+    subline: "Barbers and stylists under one roof. Pick your chair and book in under a minute."
+  },
+  visit: {
+    parking: "",
+    // PLACEHOLDER parking details from Dontrise
+    goodToKnow: ["Kids welcome", "Wheelchair accessible parking lot"]
+  },
   // Suite F is on Google and on Drew's booking page. Squire says "Unit 4". Suite F wins until
   // Dontrise says otherwise.
   address: {
@@ -33797,10 +33863,15 @@ var waitEstimateViewSchema = external_exports.discriminatedUnion("kind", [
   external_exports.object({ kind: external_exports.literal("about"), at: external_exports.iso.datetime(), minutes: external_exports.int().min(0) }),
   external_exports.object({ kind: external_exports.literal("unknown") })
 ]);
+var nowGateViewSchema = external_exports.object({
+  kind: external_exports.enum(["open", "closed", "off", "done", "nobody"]),
+  text: external_exports.string().nullable()
+});
 var chairEstimateSchema = external_exports.object({
   staffId: idSchema,
   name: external_exports.string(),
   chairNumber: external_exports.int().nullable(),
+  gate: nowGateViewSchema,
   estimate: waitEstimateViewSchema
 });
 var walkInViewSchema = external_exports.object({
@@ -33823,13 +33894,17 @@ var walkInViewSchema = external_exports.object({
   estimate: waitEstimateViewSchema,
   /** For first available: the chair the estimate expects to free up first. */
   expectedStaffId: idSchema.nullable(),
+  /** "Drew is off. Move or mark left" when the chair they wait for is no longer taking anyone. */
+  flag: external_exports.string().nullable(),
   /** The same person on every other chair, for Move. */
   options: external_exports.array(chairEstimateSchema)
 });
 var lineResponseSchema = external_exports.object({
   now: external_exports.iso.datetime(),
   line: external_exports.array(walkInViewSchema),
-  chairs: external_exports.array(chairEstimateSchema)
+  chairs: external_exports.array(chairEstimateSchema),
+  /** The gate for "first available": the shop open and somebody in. */
+  firstAvailable: nowGateViewSchema
 });
 var lineAddRequestSchema = external_exports.object({
   name: external_exports.string().trim().min(1).max(80),
@@ -34457,8 +34532,15 @@ var closureUpsertRequestSchema = external_exports.intersection(
   external_exports.object({ resolutions: resolutionsSchema })
 );
 var closureResponseSchema = external_exports.object({ closure: closureViewSchema }).extend(conflictOutcomeSchema.shape);
-var settingsResponseSchema = external_exports.object({ settings: shopSettingsInputSchema });
-var settingsRequestSchema = shopSettingsUpdateSchema;
+var settingsResponseSchema = external_exports.object({
+  settings: shopSettingsInputSchema,
+  /** When the document last changed; a save that carries an older value is refused. */
+  updatedAt: external_exports.iso.datetime().optional()
+});
+var settingsRequestSchema = shopSettingsUpdateSchema.extend({
+  /** The updatedAt the editor loaded; set it to be refused when another tab saved first. */
+  expectedUpdatedAt: external_exports.iso.datetime().optional()
+});
 var reviewsRequestSchema = external_exports.strictObject({
   /** Off hides the whole section on Home and the chair pages. */
   enabled: external_exports.boolean().optional(),
@@ -35917,6 +35999,7 @@ async function loadSeedPhotos(now2, options = {}) {
 // server/services/seedService.ts
 async function runSeed(db, now2 = /* @__PURE__ */ new Date(), options = {}) {
   await ensureIndexes(db);
+  await shopSettingsRepo_exports.dropLegacySettingsFields();
   const summary = {
     settingsCreated: false,
     shopHoursCreated: false,
@@ -36358,7 +36441,10 @@ var teamMeResponseSchema = external_exports.object({
     id: idSchema,
     name: external_exports.string(),
     title: external_exports.string(),
-    photo: photoViewSchema.nullable()
+    photo: photoViewSchema.nullable(),
+    chairNumber: external_exports.int().nullable(),
+    bio: external_exports.string(),
+    instagramHandle: external_exports.string().nullable()
   }),
   /** When this sign-in ends, whatever the barber does. */
   expiresAt: external_exports.iso.datetime()
@@ -36372,7 +36458,10 @@ var teamBookingViewSchema = external_exports.object({
   endAt: external_exports.iso.datetime(),
   customerName: external_exports.string(),
   services: external_exports.array(external_exports.string()),
-  notes: external_exports.string().nullable()
+  notes: external_exports.string().nullable(),
+  priceCents: external_exports.int().min(0),
+  arrivedAt: external_exports.iso.datetime().nullable(),
+  startedAt: external_exports.iso.datetime().nullable()
 });
 var teamDayResponseSchema = external_exports.object({
   date: isoDateSchema,
@@ -37357,6 +37446,25 @@ async function changeBookingStatus(principal, scope, id, input2, meta3) {
         "INVALID_TRANSITION",
         "The booking changed in the meantime. Reload and try again."
       );
+    if (to === "completed" || to === "noShow") {
+      await slotLocksRepo_exports.releaseSlotLocksFrom(booking._id, floorToStep(meta3.now), { session });
+    } else {
+      const range = {
+        start: booking.startAt,
+        end: addMinutes(booking.endAt, booking.bufferMinutes)
+      };
+      await slotLocksRepo_exports.acquireUnheldSlotLocks(
+        booking.staffId,
+        range,
+        { holderType: "booking", holderId: booking._id },
+        meta3.now,
+        { session }
+      );
+      const mine = await slotLocksRepo_exports.listSlotLocksForHolder(booking._id, { session });
+      if (mine.length < lockSlotStarts(range.start, range.end).length) {
+        throw new AppError("SLOT_TAKEN", "That time was taken in the meantime. Rebook instead.");
+      }
+    }
     await auditLogRepo_exports.appendAuditEntry(
       {
         actor,
@@ -38045,15 +38153,19 @@ async function getSettings() {
   const {
     _id,
     createdAt: _c,
-    updatedAt: _u,
+    updatedAt,
     ...settings
   } = await shopSettingsRepo_exports.requireShopSettings();
-  return { settings };
+  return { settings, updatedAt: updatedAt.toISOString() };
 }
 async function putSettings(principal, input2, meta3) {
   const before = await getSettings();
+  if (input2.expectedUpdatedAt !== void 0 && input2.expectedUpdatedAt !== before.updatedAt) {
+    throw new AppError("CONFLICT", "Changed somewhere else, reload");
+  }
+  const { expectedUpdatedAt: _e, ...update } = input2;
   await withTransaction(async (session) => {
-    await shopSettingsRepo_exports.updateShopSettings(input2, meta3.now, { session });
+    await shopSettingsRepo_exports.updateShopSettings(update, meta3.now, { session });
   });
   const after = await getSettings();
   await audit2(
@@ -39054,6 +39166,44 @@ function chairState(input2) {
   return { kind: "free", current: null, next: next2, window: null };
 }
 
+// shared/lib/openNow.ts
+function isOpenAt(ranges, now2) {
+  return ranges.some((r) => r.start.getTime() <= now2.getTime() && now2.getTime() < r.end.getTime());
+}
+function chairGate(chair, shopRanges, now2, opensAt) {
+  if (!isOpenAt(shopRanges, now2)) return { kind: "closed", opensAt };
+  if (chair.ranges.length === 0) return { kind: "off", name: chair.name };
+  if (chair.ranges.every((r) => r.end.getTime() <= now2.getTime()))
+    return { kind: "done", name: chair.name };
+  return { kind: "open" };
+}
+function firstAvailableGate(chairs, shopRanges, now2, opensAt) {
+  if (!isOpenAt(shopRanges, now2)) return { kind: "closed", opensAt };
+  const anyone = chairs.some((c) => chairGate(c, shopRanges, now2, opensAt).kind === "open");
+  return anyone ? { kind: "open" } : { kind: "nobody" };
+}
+function opensLabel(at) {
+  const dt = DateTime.fromJSDate(at).setZone(SHOP_TIMEZONE);
+  return dt.minute === 0 ? dt.toFormat("ccc h a") : dt.toFormat("ccc h:mm a");
+}
+function gateText(gate) {
+  switch (gate.kind) {
+    case "open":
+      return null;
+    case "closed":
+      return gate.opensAt ? `The shop is closed right now. Opens ${opensLabel(gate.opensAt)}.` : "The shop is closed right now.";
+    case "off":
+      return `${gate.name} is off today.`;
+    case "done":
+      return `${gate.name} is done for the day.`;
+    case "nobody":
+      return "Nobody is in right now.";
+  }
+}
+function gateView(gate) {
+  return { kind: gate.kind, text: gateText(gate) };
+}
+
 // shared/lib/waitEstimate.ts
 var MINUTE = 6e4;
 var FREE_GRACE_MINUTES = 1;
@@ -39113,16 +39263,32 @@ function estimateInLine(chairs, line, index, now2) {
 
 // server/services/line.ts
 var FIRST_AVAILABLE = "First available";
+var OPENING_LOOKAHEAD_DAYS = 8;
+function nextOpening(data, today, now2) {
+  for (let i = 0; i < OPENING_LOOKAHEAD_DAYS; i += 1) {
+    const date5 = addDaysToIsoDate(today, i);
+    const ranges = shopRangesFor(
+      date5,
+      dayKeyOfIsoDate(date5),
+      data.source.shopHours,
+      data.source.closures
+    );
+    const next2 = (ranges ?? []).find((r) => r.start.getTime() > now2.getTime());
+    if (next2) return next2.start;
+  }
+  return null;
+}
 async function snapshot(now2) {
   const today = shopDateOf(now2);
   const [data, bookings, services, settings, waiting] = await Promise.all([
-    loadScheduleData(today, today),
+    loadScheduleData(today, addDaysToIsoDate(today, OPENING_LOOKAHEAD_DAYS)),
     bookingsRepo_exports.listBookingsBetween(shopDayBounds(today)),
     servicesRepo_exports.listServices(),
     shopSettingsRepo_exports.requireShopSettings(),
     walkInsRepo_exports.listWaiting()
   ]);
-  const chairs = activeStaff(data.staff).map((s2) => chairLoad(s2, bookings, data, today, now2));
+  const staff = activeStaff(data.staff);
+  const chairs = staff.map((s2) => chairLoad(s2, bookings, data, today, now2));
   return {
     now: now2,
     data,
@@ -39130,7 +39296,10 @@ async function snapshot(now2) {
     settings,
     waiting,
     chairs,
-    staffById: new Map(data.staff.map((s2) => [s2._id, s2]))
+    staffById: new Map(data.staff.map((s2) => [s2._id, s2])),
+    shopRanges: shopRangesFor(today, dayKeyOfIsoDate(today), data.source.shopHours, data.source.closures) ?? [],
+    opensAt: nextOpening(data, today, now2),
+    hours: new Map(staff.map((s2) => [s2._id, workingRangesFor(s2._id, today, data.source).ranges]))
   };
 }
 function chairLoad(staff, bookings, data, today, now2) {
@@ -39157,6 +39326,43 @@ function minutesFor(snap, serviceIds, staffId) {
 function toView(e) {
   return e.kind === "about" ? { kind: "about", at: e.at.toISOString(), minutes: e.minutes } : e;
 }
+function gateFor(snap, staffId) {
+  const named = (id) => ({
+    name: snap.staffById.get(id)?.name ?? "Chair",
+    ranges: snap.hours.get(id) ?? []
+  });
+  if (staffId) return chairGate(named(staffId), snap.shopRanges, snap.now, snap.opensAt);
+  return firstAvailableGate(
+    snap.chairs.map((c) => named(c.staffId)),
+    snap.shopRanges,
+    snap.now,
+    snap.opensAt
+  );
+}
+function assertOpen(snap, staffId) {
+  const gate = gateFor(snap, staffId);
+  if (gate.kind === "open") return;
+  const message = gateText(gate) ?? "Not right now";
+  throw new AppError(
+    gate.kind === "off" || gate.kind === "done" ? "BARBER_OFF" : "SHOP_CLOSED",
+    message
+  );
+}
+function flagFor(snap, w) {
+  const gate = gateFor(snap, w.staffId);
+  switch (gate.kind) {
+    case "open":
+      return null;
+    case "closed":
+      return "The shop is closed. Mark left";
+    case "off":
+      return `${gate.name} is off. Move or mark left`;
+    case "done":
+      return `${gate.name} is done for the day. Move or mark left`;
+    case "nobody":
+      return "Nobody is in. Mark left";
+  }
+}
 function persons(snap) {
   return snap.waiting.map((w) => ({
     staffId: w.staffId,
@@ -39171,6 +39377,7 @@ function chairEstimates(snap) {
       staffId: chair.staffId,
       name: staff?.name ?? "Chair",
       chairNumber: staff?.chairNumber ?? null,
+      gate: gateView(gateFor(snap, chair.staffId)),
       estimate: toView(estimateForChair(chair, ahead, 1, snap.now))
     };
   });
@@ -39193,6 +39400,7 @@ function walkInView(snap, w) {
       staffId: chair.staffId,
       name: staff?.name ?? "Chair",
       chairNumber: staff?.chairNumber ?? null,
+      gate: gateView(gateFor(snap, chair.staffId)),
       estimate: toView(estimate)
     };
   });
@@ -39219,6 +39427,7 @@ function walkInView(snap, w) {
     ),
     estimate: toView(mine.estimate),
     expectedStaffId: w.staffId ?? mine.staffId,
+    flag: flagFor(snap, w),
     options
   };
 }
@@ -39227,7 +39436,8 @@ async function lineView(now2) {
   return {
     now: now2.toISOString(),
     line: snap.waiting.map((w) => walkInView(snap, w)),
-    chairs: chairEstimates(snap)
+    chairs: chairEstimates(snap),
+    firstAvailable: gateView(gateFor(snap, null))
   };
 }
 async function requireChair(staffId) {
@@ -39264,6 +39474,7 @@ async function addToLine(principal, input2, meta3) {
   if (services.length !== new Set(input2.serviceIds).size) {
     throw new AppError("SERVICE_UNAVAILABLE", "A chosen service was not found");
   }
+  assertOpen(await snapshot(meta3.now), staffId);
   const w = await walkInsRepo_exports.insertWalkIn(
     {
       name: input2.name,
@@ -39401,6 +39612,7 @@ async function bookNow(principal, scope, input2, meta3) {
   const wanted = scope.kind === "chair" ? scope.staffId : input2.staffId ?? null;
   if (wanted) await requireChair(wanted);
   const snap = await snapshot(meta3.now);
+  assertOpen(snap, wanted);
   const candidates = snap.chairs.filter((c) => wanted ? c.staffId === wanted : c.working);
   const free = candidates.filter(
     (c) => estimateForChair(
@@ -40169,6 +40381,9 @@ var publicShopSchema = external_exports.object({
   reviews: external_exports.array(publicReviewSchema).max(30).optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
+  /** The hero's words, from the settings; absent from older responses, the client then uses the seed copy. */
+  hero: heroSchema.optional(),
+  visit: visitSchema.optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
   maintenance: external_exports.boolean().optional(),
   /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */
@@ -40409,6 +40624,8 @@ var publicRoutes = [
         email: publicEmail(settings.email),
         instagramHandle: settings.instagramHandle,
         timezone: settings.timezone,
+        hero: settings.hero,
+        visit: settings.visit,
         hours: hours?.days ?? EMPTY_WEEK,
         booking: {
           slotStepMinutes: settings.booking.slotStepMinutes,
@@ -40574,6 +40791,16 @@ var authRoutes = [
       assertDemoEnabled();
       const result = await loginAsDemoOwner(ctx.res, metaOf(ctx));
       return { body: await meFor(result.user._id), headers: NO_STORE };
+    }
+  },
+  {
+    // "Keep this tablet signed in" on the check-in screen: a device flag for this browser only.
+    method: "POST",
+    path: "/api/auth/tablet",
+    auth: "owner",
+    handler: (ctx) => {
+      markTablet(ctx.res);
+      return Promise.resolve({ body: okResponseSchema.parse({ ok: true }), headers: NO_STORE });
     }
   },
   {
@@ -41593,8 +41820,16 @@ function toTeamBookingView(b) {
     endAt: b.endAt.toISOString(),
     customerName: b.customer.name,
     services: b.services.map((s2) => s2.name),
-    notes: b.notes
+    notes: b.notes,
+    priceCents: b.totalPriceCents,
+    arrivedAt: b.arrivedAt?.toISOString() ?? null,
+    startedAt: b.startedAt?.toISOString() ?? null
   };
+}
+async function bookingDocById(id) {
+  const b = await bookingsRepo_exports.findBookingById(id);
+  if (!b) throw new AppError("NOT_FOUND", "Booking was not found");
+  return b;
 }
 async function ownStaff(principal) {
   const { staffId } = chairScope(principal);
@@ -41614,7 +41849,10 @@ async function teamMe(principal) {
       id: staff._id,
       name: staff.name,
       title: staff.title,
-      photo: photos.get(staff._id) ?? null
+      photo: photos.get(staff._id) ?? null,
+      chairNumber: staff.chairNumber,
+      bio: staff.bio,
+      instagramHandle: staff.instagramHandle
     },
     expiresAt: (session?.expiresAt ?? /* @__PURE__ */ new Date()).toISOString()
   };
@@ -41923,6 +42161,29 @@ var teamRoutes = [
       return { body: teamStatusResponseSchema.parse({ booking }), headers: NO_STORE };
     }
   },
+  // Arrived and Start on the barber's own bookings: the same audited stamps the floor uses.
+  ...["arrived", "start"].map((moment) => ({
+    method: "POST",
+    path: `/api/team/bookings/:id/${moment}`,
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const { id } = parseParams(ctx, idParams3);
+      const done = await stampBookingMoment2(
+        principal,
+        chairScope(principal),
+        id,
+        moment,
+        metaOf(ctx)
+      );
+      return {
+        body: teamStatusResponseSchema.parse({
+          booking: toTeamBookingView(await bookingDocById(done.booking.id))
+        }),
+        headers: NO_STORE
+      };
+    }
+  })),
   {
     method: "POST",
     path: "/api/team/bookings/:id/note",

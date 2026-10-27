@@ -42,7 +42,17 @@ export function toTeamBookingView(b: BookingDocument): TeamBookingView {
     customerName: b.customer.name,
     services: b.services.map((s) => s.name),
     notes: b.notes,
+    priceCents: b.totalPriceCents,
+    arrivedAt: b.arrivedAt?.toISOString() ?? null,
+    startedAt: b.startedAt?.toISOString() ?? null,
   };
+}
+
+/** The stored booking, for a view after an audited stamp. */
+export async function bookingDocById(id: string): Promise<BookingDocument> {
+  const b = await bookingsRepo.findBookingById(id);
+  if (!b) throw new AppError('NOT_FOUND', 'Booking was not found');
+  return b;
 }
 
 async function ownStaff(principal: Principal) {
@@ -65,6 +75,9 @@ export async function teamMe(principal: Principal): Promise<TeamMeResponse> {
       name: staff.name,
       title: staff.title,
       photo: photos.get(staff._id) ?? null,
+      chairNumber: staff.chairNumber,
+      bio: staff.bio,
+      instagramHandle: staff.instagramHandle,
     },
     expiresAt: (session?.expiresAt ?? new Date()).toISOString(),
   };

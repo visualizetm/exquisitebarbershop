@@ -7,6 +7,8 @@ import {
   googleSettingsSchema,
   reviewSourceSchema,
   socialLinksSchema,
+  heroSchema,
+  visitSchema,
 } from '../schemas/shopSettings';
 import { servicePriceSchema, staffRoleSchema } from '../schemas/staff';
 import { photoViewSchema } from './photos';
@@ -55,6 +57,9 @@ export const publicShopSchema = z.object({
   reviews: z.array(publicReviewSchema).max(30).optional(),
   /** The home page hero, when the owner has uploaded one. */
   heroPhoto: photoViewSchema.nullable().optional(),
+  /** The hero's words, from the settings; absent from older responses, the client then uses the seed copy. */
+  hero: heroSchema.optional(),
+  visit: visitSchema.optional(),
   /** MAINTENANCE_MODE is on: the site shows the maintenance message instead of its pages. */
   maintenance: z.boolean().optional(),
   /** DEMO_MODE is on: sample data, a demo sign-in, noindex, and the manage link shown on screen. */

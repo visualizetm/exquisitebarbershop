@@ -1,6 +1,8 @@
 import { DateTime } from 'luxon';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { weeklyHoursRepo } from '../../server/repos';
 import { runSeed } from '../../server/services/seedService';
+import type { WeekHours } from '../../shared/schemas/common';
 import { maskName, matchesQuery } from '../../server/services/checkIn';
 import { serviceSeedId, staffSeedId } from '../../seed/shop';
 import {
@@ -9,7 +11,7 @@ import {
 } from '../../shared/api/checkIn';
 import { SHOP_TIMEZONE } from '../../shared/lib/constants';
 import { createLogin, sessionCookie, teamCookie } from '../helpers/auth';
-import { call, startTestServer, type TestServer } from '../helpers/bookingApi';
+import { call, nextDate, slotAt, startTestServer, type TestServer } from '../helpers/bookingApi';
 import { NOW, useTestDb } from '../helpers/db';
 
 process.env.OUTBOX_AFTER_RESPONSE = 'off';
@@ -53,8 +55,29 @@ async function bookToday(name: string, phone: string, staffId: string, minutesAh
   return (res.body as { booking: { id: string } }).booking.id;
 }
 
+// Open around the clock every day, and the clock frozen at 13:00 shop time on the next Tuesday
+// (only Date is faked), so NOW and the line behave the same whenever this file runs (D12-88).
+const allDay = { start: '00:00', end: '23:59' };
+const ALWAYS: WeekHours = {
+  mon: [allDay],
+  tue: [allDay],
+  wed: [allDay],
+  thu: [allDay],
+  fri: [allDay],
+  sat: [allDay],
+  sun: [allDay],
+};
+const FROZEN_NOW = new Date(slotAt(nextDate(2, 1), '13:00'));
+async function openAlways(): Promise<void> {
+  await weeklyHoursRepo.setShopHours(ALWAYS, new Date());
+  for (const key of ['lee', 'nelly', 'drew', 'dontrise', 'iniya'] as const)
+    await weeklyHoursRepo.setStaffHours(staffSeedId(key), ALWAYS, new Date());
+}
+
 beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ['Date'], now: FROZEN_NOW, shouldAdvanceTime: true });
   await runSeed(db(), NOW);
+  await openAlways();
   server = await startTestServer();
   const ownerLogin = await createLogin({ role: 'owner', staffId: dontrise });
   ownerCookie = await sessionCookie(ownerLogin._id);
@@ -63,6 +86,7 @@ beforeAll(async () => {
   barber = as(leeCookie);
 });
 afterAll(async () => {
+  vi.useRealTimers();
   await server.close();
 });
 

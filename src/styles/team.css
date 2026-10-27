@@ -303,3 +303,231 @@ button.exq-team-row:hover {
   gap: var(--s2);
   justify-content: flex-end;
 }
+
+/* ---------------------------------------------------------------------------
+   Prompt 13d: dark, Archivo, one-handed. The head with the barber, the two big actions, the chair
+   card, the day list with source tags, the full-screen Out for the day, the sign-in cards.
+   --------------------------------------------------------------------------- */
+.exq-team {
+  background: var(--bg);
+}
+.exq-team-head {
+  align-items: center;
+}
+.exq-team-head .exq-chairrow__avatar {
+  flex: none;
+  width: 48px;
+  height: 48px;
+}
+.exq-team-head__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.exq-team-head__text h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 7vw, 2.25rem);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.exq-team-head__text .exq-label {
+  display: block;
+  margin-bottom: var(--s1);
+  color: var(--fg-3);
+}
+.exq-team-head > .exq-btn {
+  flex: none;
+  white-space: nowrap;
+}
+.exq-team-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+}
+.exq-team-actions .exq-btn {
+  min-height: 64px;
+}
+.exq-team-actions__wide {
+  grid-column: 1 / -1;
+  min-height: var(--hit);
+}
+.exq-team-chair {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--card);
+}
+.exq-team-chair[data-state='busy'] {
+  border-color: var(--red);
+}
+.exq-team-chair > p {
+  margin: 0;
+}
+.exq-team-chair__label {
+  margin: 0;
+  color: var(--fg-3);
+  font-size: var(--t-label);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.exq-team-chair__state {
+  justify-self: start;
+  padding: 2px var(--s3);
+  border: 1px solid var(--fg);
+  border-radius: var(--r-pill);
+  font-size: var(--t-label);
+  font-weight: 700;
+}
+.exq-team-chair__who {
+  font-size: var(--t-h3);
+  font-weight: 800;
+  line-height: 1.15;
+}
+.exq-team-chair__notes {
+  padding: var(--s2) var(--s3);
+  border-left: 3px solid var(--red);
+  background: var(--card-2);
+}
+.exq-team-sub-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--s2);
+}
+.exq-team-sub-row .exq-team-sub {
+  margin: 0;
+}
+.exq-team-row__tag {
+  color: var(--fg-3);
+  white-space: nowrap;
+}
+.exq-team-row[data-state='confirmed'] .exq-team-row__tag[data-source='walkIn'] {
+  color: var(--accent-text);
+}
+.exq-team-row[data-state='completed'],
+.exq-team-row[data-state='noShow'],
+.exq-team-row[data-state='cancelled'] {
+  border-color: transparent;
+  background: var(--card-2);
+  color: var(--fg-2);
+}
+.exq-team-row[data-state='completed'] .exq-team-row__tag,
+.exq-team-row[data-state='noShow'] .exq-team-row__tag,
+.exq-team-row[data-state='cancelled'] .exq-team-row__tag {
+  color: var(--fg-2);
+}
+.exq-team-out {
+  display: grid;
+  gap: var(--s4);
+  max-width: 560px;
+  padding: var(--s4);
+}
+.exq-team-out__title {
+  margin: 0;
+  font-size: var(--t-h2);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.exq-team-out__text {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--t-h3);
+}
+.exq-team-out__actions {
+  display: grid;
+  gap: var(--s3);
+}
+.exq-team-out__actions .exq-btn {
+  min-height: 64px;
+}
+
+/* Sign in: Who's working? as a grid of cards */
+.exq-team-signin {
+  background: var(--bg);
+}
+.exq-team-signin__top {
+  display: flex;
+  gap: var(--s3);
+  align-items: center;
+  justify-self: start;
+  width: 100%;
+  max-width: 420px;
+}
+.exq-team-signin__panel {
+  justify-items: stretch;
+  text-align: left;
+}
+.exq-team-signin__title {
+  font-size: var(--t-h2);
+  font-weight: 900;
+  font-stretch: var(--w-display);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.exq-team-signin__names {
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+}
+.exq-team-name {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2);
+  min-height: 120px;
+  padding: var(--s4);
+  border-radius: var(--r-card);
+}
+.exq-team-name .exq-chairrow__avatar {
+  width: 48px;
+  height: 48px;
+}
+.exq-team-name__text strong {
+  font-size: var(--t-body);
+}
+.exq-team-signin__help {
+  margin: 0;
+  text-align: center;
+}
+.exq-team-signin .exq-pin {
+  justify-self: center;
+}
+.exq-pin__dots[data-state='shown'] .exq-pin__dot[data-state='filled'] {
+  display: grid;
+  place-items: center;
+  width: auto;
+  min-width: 28px;
+  height: 36px;
+  border-radius: var(--r-tile);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.exq-pin__reveal {
+  justify-self: center;
+  min-height: var(--hit);
+  padding: 0 var(--s3);
+  border: 0;
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.exq-team-profile {
+  display: grid;
+  gap: var(--s3);
+  margin: 0;
+}
+.exq-team-profile > div {
+  display: grid;
+  gap: var(--s1);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+.exq-team-profile dd {
+  margin: 0;
+}

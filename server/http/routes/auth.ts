@@ -10,7 +10,7 @@ import {
 } from '../../../shared/api/auth';
 import { changeOwnEmail, changeOwnPassword, login, loginAsDemoOwner } from '../../auth/authService';
 import { assertDemoEnabled, demoEnabled } from '../../services/demo';
-import { endAllSessions, endSession } from '../../auth/sessions';
+import { endAllSessions, endSession, markTablet } from '../../auth/sessions';
 import { shopSettingsRepo, staffRepo, usersRepo } from '../../repos';
 import { AppError } from '../../lib/errors';
 import { storageEnabled } from '../../storage';
@@ -67,6 +67,16 @@ export const authRoutes: RouteDefinition[] = [
       assertDemoEnabled();
       const result = await loginAsDemoOwner(ctx.res, metaOf(ctx));
       return { body: await meFor(result.user._id), headers: NO_STORE };
+    },
+  },
+  {
+    // "Keep this tablet signed in" on the check-in screen: a device flag for this browser only.
+    method: 'POST',
+    path: '/api/auth/tablet',
+    auth: 'owner',
+    handler: (ctx) => {
+      markTablet(ctx.res);
+      return Promise.resolve({ body: okResponseSchema.parse({ ok: true }), headers: NO_STORE });
     },
   },
   {

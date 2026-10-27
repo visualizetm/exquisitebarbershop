@@ -52,14 +52,25 @@ export function WalkInLine({
                   {w.staffName}
                 </p>
                 <p className="exq-line__wait exq-label">
-                  Waiting {w.waitingMinutes} min <span aria-hidden="true">·</span>{' '}
-                  {estimateLabel(
-                    w.estimate,
-                    w.staffId === null && w.expectedStaffId
-                      ? (w.options.find((o) => o.staffId === w.expectedStaffId)?.name ?? '')
-                      : '',
+                  Waiting {w.waitingMinutes} min
+                  {w.estimate.kind === 'unknown' ? null : (
+                    <>
+                      {' '}
+                      <span aria-hidden="true">·</span>{' '}
+                      {estimateLabel(
+                        w.estimate,
+                        w.staffId === null && w.expectedStaffId
+                          ? (w.options.find((o) => o.staffId === w.expectedStaffId)?.name ?? '')
+                          : '',
+                      )}
+                    </>
                   )}
                 </p>
+                {w.flag ? (
+                  <p className="exq-line__flag" role="status">
+                    {w.flag}
+                  </p>
+                ) : null}
                 <div className="exq-line__actions">
                   <Button
                     size="sm"

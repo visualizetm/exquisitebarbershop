@@ -13,7 +13,16 @@ export const SESSION_COOKIE = '__Host-exq_session';
  */
 export const TEAM_COOKIE = '__Host-exq_team';
 
+/**
+ * The front desk tablet's device flag. Set once by the owner on that tablet ("Keep this tablet
+ * signed in"); while it is present and valid, the owner session on that device idles out after 30
+ * days instead of 14. It is a flag, not a credential: without a valid session it does nothing.
+ */
+export const TABLET_COOKIE = '__Host-exq_tablet';
+export const TABLET_COOKIE_DAYS = 400;
+
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const HEX_PATTERN = /^[a-f0-9]{64}$/;
 
 function readCookie(req: IncomingMessage, wanted: string): string | null {
   const header = req.headers.cookie;
@@ -24,9 +33,24 @@ function readCookie(req: IncomingMessage, wanted: string): string | null {
     const name = part.slice(0, index).trim();
     if (name !== wanted) continue;
     const value = part.slice(index + 1).trim();
-    return TOKEN_PATTERN.test(value) ? value : null;
+    return (wanted === TABLET_COOKIE ? HEX_PATTERN : TOKEN_PATTERN).test(value) ? value : null;
   }
   return null;
+}
+
+export function readTabletCookie(req: IncomingMessage): string | null {
+  return readCookie(req, TABLET_COOKIE);
+}
+
+export function setTabletCookie(res: ServerResponse, value: string): void {
+  appendSetCookie(
+    res,
+    `${TABLET_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${String(TABLET_COOKIE_DAYS * 24 * 60 * 60)}`,
+  );
+}
+
+export function clearTabletCookie(res: ServerResponse): void {
+  appendSetCookie(res, `${TABLET_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
 }
 
 /** Reads the session token, ignoring anything that is not a well-formed token. */

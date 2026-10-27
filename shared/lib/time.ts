@@ -34,6 +34,11 @@ export function shopDayStart(isoDate: string): DateTime {
 }
 
 /** UTC bounds [start, end) of a shop-local calendar day. Handles 23 and 25 hour DST days. */
+/** The ISO date `days` after (or before, when negative) a shop-local date. */
+export function addDaysToIsoDate(isoDate: string, days: number): string {
+  return isoDateOf(shopDayStart(isoDate).plus({ days }));
+}
+
 export function shopDayBounds(isoDate: string): { start: Date; end: Date } {
   const start = shopDayStart(isoDate);
   return { start: start.toJSDate(), end: start.plus({ days: 1 }).toJSDate() };

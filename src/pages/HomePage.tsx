@@ -6,6 +6,8 @@ import { galleryResponseSchema } from '@shared/api/photos';
 import { publicServicesResponseSchema, publicStaffListResponseSchema } from '@shared/api/public';
 import { formatUsPhone } from '@shared/lib/phone';
 import { HOME_REVIEWS } from '@shared/lib/reviews';
+import { heroLines } from '@shared/lib/hero';
+import { DEFAULT_HERO } from '@shared/schemas/shopSettings';
 import { HoursTable } from '@/components/site/HoursTable';
 import { PhotoGrid } from '@/components/site/PhotoGrid';
 import { RatingLine } from '@/components/site/RatingLine';
@@ -50,6 +52,8 @@ export function HomePage() {
   const work = gallery.status === 'ready' ? homeWork(gallery.data.photos) : [];
   const data = shop.status === 'ready' ? shop.data : null;
   const hero = data?.heroPhoto ?? null;
+  // The words come from the settings; the seed copy stands in until the shop answers.
+  const heroCopy = data?.hero ?? DEFAULT_HERO;
   const today = data ? data.hours[todayKey()] : null;
   const where = data ? `${data.address.city} ${data.address.state}` : 'Brookhaven PA';
   // The server sends only shown reviews, in the owner's order, and none while the section is off.
@@ -72,18 +76,13 @@ export function HomePage() {
               id="exq-hero-title"
               mode="load"
               className="exq-display exq-home__title exq-hero__title"
-              lines={[
-                { text: 'Gifted' },
-                { text: 'hands.' },
-                { text: 'Exquisite', accent: true },
-                { text: 'cuts.' },
-              ]}
+              lines={heroLines(heroCopy)}
             />
             <p
               className="exq-hero__sub exq-hero__rise exq-home__lead"
               style={{ '--rise-i': 4 } as React.CSSProperties}
             >
-              Barbers and stylists under one roof. Pick your chair and book in under a minute.
+              {heroCopy.subline}
             </p>
             <p
               className="exq-hero__actions exq-hero__rise exq-home__actions"

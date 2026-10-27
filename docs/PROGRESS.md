@@ -729,3 +729,41 @@ commit, and what is still open.
 - Gate green (668 unit and integration, 153 dev e2e with three spec-state fixes rerun, prod-like 7,
   showcase 13, vercel-function 97), Lighthouse Home 92, screens in docs/screens/p13c, PR 13 merged
   into main as e95d10a at 10:38 UTC. Next is 13d (the barber portal redo and the website editor).
+
+## Prompt 13d
+
+### M0: the five fixes from 13c
+
+- Shipped: the hours rule for NOW and the line (shared helper, SHOP_CLOSED and BARBER_OFF, the
+  flagged line entry, no "wait time unknown" with 0 minutes), the day strip on the time step, the
+  check-in choices filling the screen with icons and 46px titles, no green on admin or portal
+  surfaces, the per-device tablet flag replacing the shop-wide setting. Tests: openNow unit (4),
+  now integration (6, two refusals), tabletSession integration (1), line, checkIn and authz.
+- Heartbeat: 11:21 UTC, commit follows, next is M1 (the barber portal redo).
+
+### M1: the barber portal redo
+
+- Shipped: Who's working? cards and the PIN pad with Show and Hide, the dark portal, Today with
+  the barber head, Add booking (NOW first), Out for the day (full-screen confirm), Check in, In
+  your chair (current cut, first walk-in with Start cut, next client with Start cut), the day list
+  with source tags and done rows at the bottom, Me with the profile, 30 second refresh, barber
+  arrived and start routes. Tests: portal13d e2e at 390 with axe on every screen, portal, flow,
+  team, realshop, checkin and admin specs updated.
+- Heartbeat: 11:53 UTC, commit follows, next is M2 (the website editor).
+
+### M2: the website editor
+
+- Shipped: one editor at /admin/website?section with the list and status tags, the live preview
+  (phone and computer, full screen under 1280), the hero copy and Visit words as settings with the
+  stale-save refusal, every old address redirected. Tests: hero unit (3), settingsEditor
+  integration (1), editor e2e at 1440 and 390 with axe, website, dashboard and admin specs updated.
+- Heartbeat: 12:13 UTC, commit follows, next is M3 (the guides).
+
+### M3: the guides
+
+- Shipped: docs/OWNER-GUIDE.md (15 sections: the two sides, the floor, the line, New booking with
+  Now, bookings, schedule, the check-in tablet, clients, team, logins, the editor, settings,
+  launch checks, who to call) and docs/BARBER-GUIDE.md (cards and PIN, Today, Add booking, Done,
+  Out for the day, week and time off, Me, the tablet), screens in docs/screens/p13d/guide, the PDF
+  re-rendered. Lighthouse mobile Home 85, CLS 0.
+- Heartbeat: 12:21 UTC, commit follows, next is SHIP.

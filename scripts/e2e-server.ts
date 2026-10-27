@@ -41,6 +41,37 @@ async function main(): Promise<void> {
     const id = staffSeedId(member.key);
     await staffPinsRepo.upsertPin(id, await hashPin(id, E2E_BARBER_PIN), new Date());
   }
+  // The shop is open around the clock today and tomorrow (special hours) and every barber has
+  // extra hours over the same span, so NOW, the line and the check in work whenever the suite
+  // runs. The weekly hours stay as seeded, so the public pages still show the real week.
+  const { closuresRepo, timeBlocksRepo } = await import('../server/repos');
+  const { addDaysToIsoDate, shopDateOf, shopDayBounds } = await import('../shared/lib/time');
+  const today = shopDateOf(new Date());
+  for (const date of [today, addDaysToIsoDate(today, 1)]) {
+    await closuresRepo.upsertClosure(
+      {
+        date,
+        kind: 'specialHours',
+        intervals: [{ start: '00:00', end: '23:59' }],
+        label: 'Open all day for the test run',
+      },
+      new Date(),
+    );
+    const bounds = shopDayBounds(date);
+    for (const member of staffSeed) {
+      await timeBlocksRepo.insertTimeBlock(
+        {
+          staffId: staffSeedId(member.key),
+          kind: 'extraHours',
+          startAt: bounds.start,
+          endAt: bounds.end,
+          reason: 'Open all day for the test run',
+          createdBy: { type: 'owner', userId: null, staffId: null },
+        },
+        new Date(),
+      );
+    }
+  }
 
   // Playwright calls this once per run, so reruns never share rate-limit windows or lockouts.
   // Test-only: it lives in this script, never in the API, and production limits are untouched.

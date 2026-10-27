@@ -1416,3 +1416,85 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   three days ahead", so on a Tuesday or Wednesday THU jumped a week past FRI and the week test
   failed (it turned main red right after the 13c merge). FRI is now the day after THU. Same
   class of flake as D13b-13.
+- D13d-01 The hours rule for NOW and the line is one pure helper, `shared/lib/openNow.ts`: the shop
+  must be open right now, the barber must have hours today and not be past their last range; first
+  available needs the shop open and somebody in. The server refuses with SHOP_CLOSED ("The shop is
+  closed right now. Opens Tue 10 AM.") or BARBER_OFF ("Drew is off today.", "Drew is done for the
+  day.") in `bookNow` and `addToLine`; the line response carries each chair's gate and the first
+  available gate so the NOW tile and the check in say the same words. A cut already going does not
+  reopen a chair: the rule is about taking new people.
+- D13d-02 A waiting entry whose chair goes off or past close is never dropped: the view carries a
+  `flag` ("Drew is off. Move or mark left") that Today shows in red. "Waiting 0 min, wait time
+  unknown" is gone: with no estimate the card shows the minutes waiting only.
+- D13d-03 The e2e server opens the shop around the clock today and tomorrow with a specialHours
+  closure and gives every barber extra hours over the same span, so NOW, the line and the check in
+  behave the same whenever the suite runs. The weekly hours stay as seeded, so the public pages and
+  the day strip still show the real week. The integration files that use NOW freeze the clock at
+  13:00 on the next Tuesday with always-open hours (the D12-88 pattern) and the refusals are
+  proven with a closure and a day-off block.
+- D13d-04 The time step is the public DayPicker in one scrolling row: the kit wraps `exq-chips` from
+  768px, which is what made the month grid; the flow overrides it to a nowrap strip with scroll
+  snap. The times stay right under it, grouped Morning, Afternoon and Evening. "The shop is closed
+  that day Try another day" now ends its first sentence.
+- D13d-05 No green in the admin or the portal: every `--ok` use on those surfaces became white
+  (free, done, saved) or steel (decided, completed). The token stays for the public setup page.
+- D13d-06 "Keep this tablet signed in" is a button on the owner's check-in screen that sets a
+  device flag cookie (`__Host-exq_tablet`, 400 days, HttpOnly, its value derived from the server
+  secret). A session touched from a request carrying a valid flag idles out after 30 days; every
+  other owner session keeps 14. The shop-wide setting is gone and `runSeed` unsets the old field.
+  The flag is not a credential: without a valid session it does nothing, and a made-up value is
+  ignored. Trade-off: the tablet stays signed in for 30 idle days, so it lives behind the desk.
+- D13d-07 The portal is dark on every screen: `.exq-app[data-state='team']` joins the dashboard's
+  token scope, and the Appearance switch left the Me screen. Sign in is a grid of cards (initials
+  or portrait, name, chair number) and the PIN pad gained a Show and Hide toggle; the keys were
+  64px already.
+- D13d-08 Today's one big action is Add booking, which opens the flow with NOW already picked (the
+  barber can still pick a later time), next to Out for the day; the old Walk-in button is gone.
+  Out for the day is a full-screen confirm over the existing out-today action and the owner
+  resolver; the copy says "the owner" rather than a name, since the owner's name is a setting.
+- D13d-09 "In your chair" reads the same `currentBooking` rule as the floor (Start pressed, else
+  the booked window holding now); when the chair is free it shows the first walk-in waiting for
+  this barber (or first available) with Start cut, which seats through the line service and the
+  slot locks, else the next booked client with Start cut, which stamps arrived and started through
+  `POST /api/team/bookings/:id/arrived` and `/start` (chair scope, the same audited stamps the
+  owner uses).
+- D13d-10 Today refreshes every 30 seconds while the tab is visible and after each action, with
+  the last data kept on screen while a refresh is in flight. Done and no-show rows sit at the
+  bottom on the raised surface in the secondary color rather than faded, because a faded tag
+  failed the contrast check.
+- D13d-11 Done early or a no show hands the rest of the booking's time back: the status change
+  releases the booking's slot locks from the current block onward (the blocks behind us stay as
+  history), so the next NOW walk-in lands in the chair instead of being refused as busy. An undo
+  back to confirmed takes the locks again and fails with SLOT_TAKEN when somebody has them by
+  then. Found by the portal spec: a walk-in right after Done was refused.
+- D13d-12 The Website side is one editor at `/admin/website?section=<id>`: the section list with a
+  status tag each, the preview, the panel. Every old address (`/admin/website/<tab>`,
+  `/admin/website?tab=photo`, `/admin/photos`, `/admin/hours`) redirects to its section. The shell's
+  Website tab row has one tab, since the editor carries its own list on every width.
+- D13d-13 The hero copy is a setting (`hero: { headline, redWord, subline }`): the headline is at
+  most 48 characters and the red word must be one of its words, checked by zod on the server and
+  mirrored in the form. `shared/lib/hero.ts` turns the headline into display lines (one word per
+  line up to four, else paired) with the red word's line as the accent, so today's "Gifted hands.
+  Exquisite cuts." reads exactly as before. The seed carries it; `/api/shop` serves it.
+- D13d-14 The preview is the real home page top drawn from the draft (strip, hero with the photo,
+  headline lines, subline, buttons) in a 390 frame or a 1280 frame scaled to fit, never an iframe.
+  The section being edited gets the red outline and the Editing tag. For sections that live on
+  other pages (hours, services, team, gallery, visit) the preview says which page and View site
+  opens it: drawing every public page from a draft would have cost the milestone.
+- D13d-15 Save and publish goes through `PUT /api/admin/settings` with `expectedUpdatedAt`; the
+  server refuses a stale save with CONFLICT "Changed somewhere else, reload" and the response now
+  carries `updatedAt`. The existing panels (announcement, photos, hours, services, reviews,
+  gallery, team) keep their own validated routes and save on their own; the hero and the Visit
+  words are the editor's own draft with Undo changes and the leave-without-saving sheet.
+- D13d-16 The Visit page words are a setting too (`visit: { parking, goodToKnow }`), with the phone
+  and the email on the same panel; the email shows publicly only once it is no longer the
+  stand-in, as before. Team edits reuse the Team page inside the panel (portraits are the first
+  staff photo, which already replaces the initials everywhere); the work and the gallery reuse the
+  gallery panel, whose Home flag and order pick the six home photos.
+- D13d-17 The guides are rewritten for the two sides, the floor, the line, New booking with Now,
+  the check in and the tablet sign-in, Move and Reschedule, the editor, and the new portal; their
+  screens come from the demo build (docs/screens/p13d/guide) and the PDF is re-rendered with the
+  existing script. The barber guide gained the check-in tablet section.
+- D13d-18 A chair's state on the check in and the barber tiles follows the hours rule before the
+  estimate: "Closed. Opens Tue 10 AM", "Off today" or "Done for the day" beat "Free now", so the
+  screen never says a chair is free while the shop is closed (the 8 AM capture showed it).

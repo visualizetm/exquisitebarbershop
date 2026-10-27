@@ -1,14 +1,21 @@
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { SessionDocument } from '../../shared/schemas/session';
 import type { UserDocument } from '../../shared/schemas/user';
 import type { RequestContext, Principal } from '../http/types';
 import { randomToken, sha256Hex } from '../lib/ids';
-import { sessionsRepo, shopSettingsRepo, usersRepo } from '../repos';
-import { clearSessionCookie, readSessionCookie, setSessionCookie } from './cookies';
+import { getEnv } from '../env';
+import { sessionsRepo, usersRepo } from '../repos';
+import {
+  clearSessionCookie,
+  readSessionCookie,
+  readTabletCookie,
+  setSessionCookie,
+  setTabletCookie,
+} from './cookies';
 
 /** A session lives 14 days past its last use and never more than 60 days in total. */
 export const SESSION_IDLE_MS = 14 * 24 * 60 * 60_000;
-/** With "Keep the tablet signed in" on, the idle window is 30 days (the 60 day cap stays). */
+/** On the front desk tablet (its device flag set), the idle window is 30 days (the 60 day cap stays). */
 export const SESSION_TABLET_IDLE_MS = 30 * 24 * 60 * 60_000;
 export const SESSION_ABSOLUTE_MS = 60 * 24 * 60 * 60_000;
 /** Activity refreshes the expiry at most this often, to keep writes rare. */
@@ -18,10 +25,19 @@ function expiryFor(createdAt: Date, now: Date, idleMs: number): Date {
   return new Date(Math.min(now.getTime() + idleMs, createdAt.getTime() + SESSION_ABSOLUTE_MS));
 }
 
-/** The idle window the owner chose: 30 days when the tablet setting is on, else 14. */
-async function idleWindowMs(): Promise<number> {
-  const settings = await shopSettingsRepo.getShopSettings();
-  return settings?.keepTabletSignedIn ? SESSION_TABLET_IDLE_MS : SESSION_IDLE_MS;
+/** The device flag's value: derived from the server secret, so a made-up cookie does nothing. */
+export function tabletFlagValue(): string {
+  return sha256Hex(`tablet-device:${getEnv().MANAGE_LINK_SECRET}`);
+}
+
+/** Marks this device as the front desk tablet: its owner session idles out after 30 days. */
+export function markTablet(res: ServerResponse): void {
+  setTabletCookie(res, tabletFlagValue());
+}
+
+/** 30 days on the tablet (a valid device flag on the request), 14 days anywhere else. */
+function idleWindowMs(req: IncomingMessage): number {
+  return readTabletCookie(req) === tabletFlagValue() ? SESSION_TABLET_IDLE_MS : SESSION_IDLE_MS;
 }
 
 function maxAgeSeconds(expiresAt: Date, now: Date): number {
@@ -38,12 +54,12 @@ export async function startSession(
   meta: { ip: string | null; userAgent: string | null; now: Date },
 ): Promise<SessionDocument> {
   const token = randomToken(32);
-  const idleMs = await idleWindowMs();
   const session = await sessionsRepo.insertSession(
     {
       tokenHash: sha256Hex(token),
       userId: user._id,
-      expiresAt: expiryFor(meta.now, meta.now, idleMs),
+      // The first window is the plain one; the tablet's flag lengthens it on the next touch.
+      expiresAt: expiryFor(meta.now, meta.now, SESSION_IDLE_MS),
       ip: meta.ip?.slice(0, 64) ?? null,
       userAgent: meta.userAgent?.slice(0, 512) ?? null,
     },
@@ -78,7 +94,7 @@ export async function authenticateFromCookie(ctx: RequestContext): Promise<Princ
     return null;
   }
   if (ctx.now.getTime() - session.lastSeenAt.getTime() >= SESSION_TOUCH_MS) {
-    const expiresAt = expiryFor(session.createdAt, ctx.now, await idleWindowMs());
+    const expiresAt = expiryFor(session.createdAt, ctx.now, idleWindowMs(ctx.req));
     await sessionsRepo.touchSession(session._id, ctx.now, expiresAt);
     setSessionCookie(ctx.res, token, maxAgeSeconds(expiresAt, ctx.now));
   }

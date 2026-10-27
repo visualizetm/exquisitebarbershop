@@ -43,21 +43,21 @@ test.describe('the owner dashboard shell', () => {
     const sw = top.getByRole('group', { name: 'Dashboard side' });
     await expect(sw.getByRole('button', { name: 'Shop' })).toHaveAttribute('aria-pressed', 'true');
     await sw.getByRole('button', { name: 'Website' }).click();
-    await expect(page).toHaveURL(/\/admin\/website\/announcement$/);
+    await expect(page).toHaveURL(/\/admin\/website\?section=top$/);
     const web = page.getByRole('navigation', { name: 'Website sections' });
     for (const label of [
-      'Announcement',
+      'Announcement bar',
       'Top of page',
       'Hours',
       'Services and prices',
       'Gallery',
       'Reviews',
     ]) {
-      await expect(web.getByRole('link', { name: label })).toBeVisible();
+      await expect(web.getByRole('button', { name: new RegExp(`^${label}`) })).toBeVisible();
     }
     expect(await page.evaluate(() => localStorage.getItem('exq-admin-side'))).toBe('website');
     await page.goto('/admin');
-    await expect(page).toHaveURL(/\/admin\/website\/announcement$/);
+    await expect(page).toHaveURL(/\/admin\/website\?section=top$/);
     await sw.getByRole('button', { name: 'Shop' }).click();
     await expect(page).toHaveURL(/\/admin\/shop\/today$/);
     // Every old address lands on its new home.
@@ -66,8 +66,9 @@ test.describe('the owner dashboard shell', () => {
       ['/admin/customers', /\/admin\/shop\/clients$/],
       ['/admin/team', /\/admin\/shop\/team$/],
       ['/admin/schedule?view=week', /\/admin\/shop\/schedule\?view=week$/],
-      ['/admin/website?tab=photo', /\/admin\/website\/top$/],
-      ['/admin/photos', /\/admin\/website\/gallery$/],
+      ['/admin/website?tab=photo', /\/admin\/website\?section=top$/],
+      ['/admin/website/top', /\/admin\/website\?section=top$/],
+      ['/admin/photos', /\/admin\/website\?section=gallery$/],
     ] as const) {
       await page.goto(from);
       await expect(page, from).toHaveURL(to);

@@ -44,7 +44,8 @@ export function TimePicker({
     <div className="exq-time-picker" data-state={slots.length === 0 ? 'none' : 'ready'}>
       {slots.length === 0 ? (
         <p className="exq-time-picker__empty" role="alert">
-          {closedReason ?? 'No open times that day.'} Try another day.
+          {closedReason ? closedReason.replace(/\.?$/, '.') : 'No open times that day.'} Try another
+          day.
         </p>
       ) : (
         PARTS.map((part) => {

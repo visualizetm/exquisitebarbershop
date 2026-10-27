@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import CalendarCheck01 from '@untitled-ui/icons-react/build/esm/CalendarCheck01';
+import UserPlus01 from '@untitled-ui/icons-react/build/esm/UserPlus01';
 import { DateTime } from 'luxon';
 import {
   checkInArrivedResponseSchema,
   checkInLookupResponseSchema,
   type CheckInMatch,
 } from '@shared/api/checkIn';
+import { okResponseSchema } from '@shared/api/auth';
 import { SHOP_TIMEZONE } from '@shared/lib/constants';
 import { shopTime } from '@/admin/format';
-import { chairEstimateLabel } from '@/admin/today/estimateLabel';
+import { chairStateLabel } from '@/admin/today/estimateLabel';
 import { NewBookingFlow, type FlowResult } from '@/booking-flow/NewBookingFlow';
 import { useChairEstimates, type FlowSession } from '@/booking-flow/flowData';
 import { Button, Input } from '@/components/ui';
@@ -46,6 +49,8 @@ export function CheckInPage({
   const estimates = useChairEstimates(session, screen.kind === 'start', tick);
   const clock = useClock();
   useWakeLock();
+  // The hours rule: Walk in is only offered while the shop is open and somebody is in.
+  const walkInOpen = estimates.firstAvailable === null || estimates.firstAvailable.kind === 'open';
 
   // The start screen refreshes the chairs every 30 seconds; an end screen goes back on its own.
   useEffect(() => {
@@ -81,6 +86,7 @@ export function CheckInPage({
       <header className="exq-checkin__head">
         <p className="exq-checkin__brand">Front desk check in</p>
         <p className="exq-checkin__clock exq-label">{clock}</p>
+        {session === 'owner' ? <KeepSignedIn /> : null}
         <Link to={exitTo} className="exq-checkin__exit">
           Exit
         </Link>
@@ -94,13 +100,20 @@ export function CheckInPage({
               type="button"
               className="exq-checkin__choice"
               data-variant="accent"
+              data-state={walkInOpen ? 'open' : 'closed'}
+              disabled={!walkInOpen}
               onClick={() => {
                 setScreen({ kind: 'walkIn' });
               }}
             >
+              <span className="exq-checkin__choice-icon" aria-hidden="true">
+                <UserPlus01 />
+              </span>
               <span className="exq-checkin__choice-title">Walk in</span>
               <span className="exq-checkin__choice-sub">
-                Pick a service and barber, or the first chair free
+                {walkInOpen
+                  ? 'Pick a service and barber, or the first chair free'
+                  : (estimates.firstAvailable?.text ?? 'Not right now')}
               </span>
             </button>
             <button
@@ -110,6 +123,9 @@ export function CheckInPage({
                 setScreen({ kind: 'find' });
               }}
             >
+              <span className="exq-checkin__choice-icon" aria-hidden="true">
+                <CalendarCheck01 />
+              </span>
               <span className="exq-checkin__choice-title">I have an appointment</span>
               <span className="exq-checkin__choice-sub">
                 Find it by name or the last 4 of your phone
@@ -122,9 +138,15 @@ export function CheckInPage({
             </h2>
             <ul className="exq-bare exq-checkin__chair-list">
               {estimates.chairs.map((c) => (
-                <li key={c.staffId} className="exq-checkin__chair" data-state={c.estimate.kind}>
+                <li
+                  key={c.staffId}
+                  className="exq-checkin__chair"
+                  data-state={c.gate.kind === 'open' ? c.estimate.kind : 'closed'}
+                >
                   <span className="exq-checkin__chair-name">{c.name}</span>
-                  <span className="exq-checkin__chair-state">{chairEstimateLabel(c.estimate)}</span>
+                  <span className="exq-checkin__chair-state">
+                    {chairStateLabel(c.gate, c.estimate)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -291,6 +313,46 @@ function FindAppointment({
         </Button>
       </div>
     </main>
+  );
+}
+
+const TABLET_KEY = 'exq-tablet-kept';
+
+/**
+ * "Keep this tablet signed in": sets the device flag cookie for this browser only, so the owner
+ * session on this tablet idles out after 30 days instead of 14. Other devices stay at 14.
+ */
+function KeepSignedIn() {
+  const [kept, setKept] = useState(() => {
+    try {
+      return localStorage.getItem(TABLET_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [working, setWorking] = useState(false);
+  async function keep() {
+    setWorking(true);
+    try {
+      await apiRequest('/api/auth/tablet', okResponseSchema, { method: 'POST', body: {} });
+      setKept(true);
+      try {
+        localStorage.setItem(TABLET_KEY, '1');
+      } catch {
+        // Private mode: the cookie is set all the same.
+      }
+    } catch {
+      // The button stays; the next tap tries again.
+    } finally {
+      setWorking(false);
+    }
+  }
+  return kept ? (
+    <span className="exq-checkin__kept exq-label">Stays signed in on this tablet</span>
+  ) : (
+    <Button size="sm" variant="ghost" loading={working} onClick={() => void keep()}>
+      Keep this tablet signed in
+    </Button>
   );
 }
 
