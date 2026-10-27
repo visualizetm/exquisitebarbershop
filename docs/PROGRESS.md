@@ -804,3 +804,10 @@ commit, and what is still open.
 - Shipped: the offer in the owner guide (section 12) and the barber guide (section 3), the PDF
   re-rendered, SITE-REPORT and DESIGN-SYSTEM updated, screens in docs/screens/p13e.
 - Heartbeat: 16:05 UTC, commit follows, next is SHIP.
+
+### SHIP
+
+- Gate: 692 unit and integration (one email assertion updated for the offer line), dev e2e 152 of 165
+  green on the full run, the 13 red fixed (offer tag contrast and hero height, ticket totals with
+  the discount, the head preload removed, the fit guard booking later) and rerun green (49), prod-like
+  7, showcase 13, vercel-function 97. PR 17 against main.

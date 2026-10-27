@@ -1522,7 +1522,10 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   it downloads alongside the app and the photo request starts as soon as the app runs. A static
   `<link rel="preload">` for the photo was rejected: the photo's address only arrives with the
   shop response, so a preload could not name it. Book and Manage are their own chunks, so Home
-  no longer carries the booking flow.
+  no longer carries the booking flow. Revised at SHIP: the head request is out again. On the
+  showcase the first visit sets the shop up, and a second first request arrived while that ran and
+  saw the site as not set up (demo spec red). The chunk split stays; the head script and its CSP
+  hash are back to what they were.
 - D13e-05 Responsive widths for the hero exist on Cloudinary (400, 800, 1200 and 1600; the
   production driver). The local and GridFS drivers still serve one file, so the demo build's
   Lighthouse measures the one-size hero; resized copies for those drivers were not built (no
@@ -1547,10 +1550,13 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   the offer. A cancelled booking leaves the index, so the phone is free again. Reschedules and
   moves keep the same document and so keep the discount. A claims collection was rejected: the
   index is one line and needs no cleanup.
-- D13e-09 The public flow shows the offer label as a small red tag on Home and Book, and the
+- D13e-09 The public flow shows the offer label as a small tag on Home and Book (red on paper
+  through `--accent-text`, white on the photo hero like every small label there, D12-80), and the
   discount line and the new total on the confirmation only, from the server's answer. A check
   before confirm ("does this phone qualify?") was rejected: it would tell anyone whether a phone
-  has booked here before.
+  has booked here before. On Home the tag takes the eyebrow line while the offer is on: a line of
+  its own pushed the hero past the first screen at 390 (rules spec), and the address is in the
+  facts under the actions anyway.
 - D13e-10 The owner and the barbers see "$45, $10 off online" next to the price (detail sheet,
   floor card, done list, Today row and In your chair); the email lists "First online booking:
   -$10" and the total after it; the editor's Launch offer section carries the switch, the
