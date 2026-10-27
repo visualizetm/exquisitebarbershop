@@ -46,7 +46,7 @@ Env vars: none new.
 
 Open questions: Rob to confirm the two-address check in (the owner's tablet uses /admin/checkin, a barber's uses /team/checkin) and the wording of the end screens; whether the line should also show on the Bookings tab.
 
-Known gaps and risks: the tablet setting lengthens every owner session, not one device; a barber's check in only finds that barber's bookings, so a shared desk tablet should be signed in as the owner; estimates assume each person ahead takes the first gap that fits, a real floor drifts; the Wake Lock is untested on a real iPad; the owner guide does not yet describe the line or the check in (13d); the time step's "closed that day" note runs two sentences together (pre-existing DayPicker copy).
+Known gaps and risks: CI on main went red right after the merge on a pre-existing weekday flake in teamPortal.test.ts (THU and FRI derived separately; fails on Tuesdays and Wednesdays), fixed in the follow-up PR 14 (D13c-17); the tablet setting lengthens every owner session, not one device; a barber's check in only finds that barber's bookings, so a shared desk tablet should be signed in as the owner; estimates assume each person ahead takes the first gap that fits, a real floor drifts; the Wake Lock is untested on a real iPad; the owner guide does not yet describe the line or the check in (13d); the time step's "closed that day" note runs two sentences together (pre-existing DayPicker copy).
 
 Milestone times: M0 12 minutes (00:04 to 00:16 UTC), M1 about 35 minutes (to 00:50 with the heartbeat), M2 about 25 minutes of flow work plus the discard fix (commit 00:50), M3 18 minutes (00:50 to 01:08), SHIP from 01:08 (build, Lighthouse, captures, gate, report, PR).
 

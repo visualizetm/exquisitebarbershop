@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { DateTime } from 'luxon';
 import { withTransaction } from '../../server/db/transaction';
 import { newId } from '../../server/lib/ids';
 import {
@@ -41,7 +42,8 @@ process.env.OUTBOX_AFTER_RESPONSE = 'off';
 const { db } = useTestDb();
 let server: TestServer;
 const THU = nextDate(4, 3);
-const FRI = nextDate(5, 3);
+// The day after, never its own "next Friday": on a Tuesday or Wednesday that lands before THU.
+const FRI = DateTime.fromISO(THU).plus({ days: 1 }).toISODate() ?? '';
 const MORNING = new Date(slotAt(THU, '10:00'));
 const lee = staffSeedId('lee');
 const drew = staffSeedId('drew');
