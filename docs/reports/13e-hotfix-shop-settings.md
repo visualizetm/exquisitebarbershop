@@ -12,7 +12,7 @@ Key decisions:
 
 - Default in the repo's fill() rather than a one-off database migration. Rejected: a $set on the production document. fill() is the existing pattern for groups added after setup, covers every environment (production, preview, any restored backup), and needs no database access from this session.
 - Merge stored values over the defaults ({ ...DEFAULT, ...stored }). Rejected: stored ?? DEFAULT. The spread also covers a partly written group, matching announcement, google and reviews.
-- Cover hero and visit too, not only launchOffer. They were added in 13d with the same gap; production only survived them because the 13d demo reset wrote them.
+- Cover hero and visit too, not only launchOffer. They were added in 13d with the same gap; production most likely survived them only because a demo reset after 13d wrote them (not verified: the production database is not reachable from this session).
 
 Deviations: Done as a direct hotfix in this session instead of a Claude Code prompt, because production was down. Integration tests could not run in this sandbox (mongodb-memory-server cannot download its binary here); the full suite ran in CI instead.
 
@@ -34,7 +34,9 @@ Checks: typecheck clean, lint clean on the changed files, format clean on the ch
 
 Commits:
 
-- branch claude/hotfix-shop-settings-defaults: "Hotfix: fill hero, visit and launchOffer for older settings documents"; this report as a follow-up commit
+- 0343da6 Hotfix: fill hero, visit and launchOffer for older settings documents
+- ecc78ef Report: 13e hotfix for the /api/shop 500 (this report, plus a follow-up wording commit)
+- branch claude/hotfix-shop-settings-defaults
 - PR 20, open, not merged
 
 Env vars: none new.
