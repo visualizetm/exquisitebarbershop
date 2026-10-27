@@ -54,6 +54,6 @@ Needs Rob's tablet and phone: the check in on the real shop tablet, upright and 
 
 Ready for next step: 13d (the barber portal redo and the website editor) starts from src/team/TodayPage.tsx and src/admin/website/. It must not change NewBookingFlow's entry points, the NOW rule in bookNow, the line service, the slot locks, the pricing rule, the reviews writer, the seed photo ids, the carousel, the reveal tokens or the public booking rules.
 
-Production: PRODUCTION_TBD
+Production: PR 13 merged into main as e95d10a at 10:38 UTC with both CI runs and the Vercel preview green. Vercel's status on the merge commit read "Vercel is deploying your app" at 10:38 UTC; the final state is recorded in the next commit of this file. The health URL is not reachable from this sandbox, so Rob checks /api/health once for buildSha e95d10a.
 
-MERGE_TBD, production: ready
+e95d10a, production: ready
