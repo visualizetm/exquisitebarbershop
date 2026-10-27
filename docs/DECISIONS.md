@@ -1562,3 +1562,28 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
   -$10" and the total after it; the editor's Launch offer section carries the switch, the
   amounts in whole dollars, the words, the dates and "Used 12 times, $120 off" counted over the
   bookings that stand.
+
+## Prompt 13f
+
+- D13f-01 The kiosk is its own auth level with its own cookie (`__Host-exq_kiosk`, Strict, 180
+  days slid forward on use, written at most hourly). The router's owner and team cases answer a
+  request that carries only a kiosk cookie with 403 FORBIDDEN, not 401: a tablet is never asked to
+  sign in. Reusing the owner session with a "kiosk" flag was rejected: the tablet must hold no
+  credential that opens the dashboard, and a separate cookie is the one thing the router can check.
+- D13f-02 One collection, `kioskDevices`, holds the whole life of a tablet: the one-use pairing
+  code (a keyed argon2 hash, like a PIN, ten minutes), the device token (sha256, unique partial
+  index) and the exit PIN (the PIN hashing). Pairing tries every device still waiting for a code
+  after the same hashing work, so a wrong code costs the same as a right one. A separate pairing
+  codes collection was rejected as a second thing to expire and clean.
+- D13f-03 Kiosk responses are built as their own shapes (`shared/api/kiosk.ts`): the board carries
+  names, chair numbers, photos, a status word and a count per chair, and an empty line; NOW answers
+  with the chair and the position only. The admin NOW view (customer phone and email) never leaves
+  the server on the kiosk routes. A scan test proves it on every kiosk body.
+- D13f-04 The board is computed inside the line service from the same snapshot, the same hours rule
+  and the same estimates the line uses (`kioskBoard`), so there is no second rule: Free now, With a
+  client free about, Starts at, On a break until (a time block covering now), Done for the day, and
+  Off today from the chair's working flag. A barber in a cut outside the hours still shows as busy.
+- D13f-05 The kiosk walk in goes through `bookNow` with a kiosk principal and the walk-in source,
+  so the slot locks, the line rules and the 13e offer rule (online only) all apply unchanged; the
+  audit actor type gains `kiosk`. The owner's device routes live under `/api/admin/kiosk/devices`
+  and every setup, pairing and unpairing is audited (`kiosk.setup`, `kiosk.pair`, `kiosk.unpair`).

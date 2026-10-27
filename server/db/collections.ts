@@ -17,6 +17,7 @@ import type {
 import type { ScheduleGuardDocument } from '../../shared/schemas/scheduleGuard';
 import type { RateLimitDocument } from '../../shared/schemas/rateLimit';
 import type { ServiceDocument } from '../../shared/schemas/service';
+import type { KioskDeviceDocument } from '../../shared/schemas/kioskDevice';
 import type { SessionDocument } from '../../shared/schemas/session';
 import type { ShopSettingsDocument } from '../../shared/schemas/shopSettings';
 import type { SlotLockDocument } from '../../shared/schemas/slotLock';
@@ -55,6 +56,7 @@ export interface CollectionTypes {
   staffPins: StaffPinDocument;
   setupTokens: SetupTokenDocument;
   teamSessions: TeamSessionDocument;
+  kioskDevices: KioskDeviceDocument;
 }
 
 /** Typed access to a collection. Only repositories call this. */

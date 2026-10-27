@@ -11,7 +11,7 @@ import { idSchema } from './common';
 export const timeBlockKindSchema = z.enum(['timeOff', 'block', 'dayOff', 'extraHours']);
 export type TimeBlockKind = z.infer<typeof timeBlockKindSchema>;
 
-export const actorTypeSchema = z.enum(['owner', 'barber', 'customer', 'system']);
+export const actorTypeSchema = z.enum(['owner', 'barber', 'customer', 'system', 'kiosk']);
 
 export const actorSchema = z.object({
   type: actorTypeSchema,

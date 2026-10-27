@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
+import { readKioskCookie } from '../auth/cookies';
 import { currentEnvProblems, getEnv, getPartialEnv } from '../env';
 import { AppError } from '../lib/errors';
 import { randomRequestId } from '../lib/ids';
@@ -20,7 +21,7 @@ interface CompiledRoute extends RouteDefinition {
 /** Finds the caller for a protected route: the owner's session cookie or a barber's PIN session. */
 export type Authenticator = (
   ctx: RequestContext,
-  level: 'owner' | 'team',
+  level: 'owner' | 'team' | 'kiosk',
 ) => Promise<Principal | null>;
 
 /** Until the auth prompt lands, every non-public route is denied. Deny by default is the safe choice. */
@@ -103,7 +104,7 @@ async function assertServing(route: RouteDefinition, pathname: string, now: Date
   }
 }
 
-const KNOWN_LEVELS: ReadonlySet<string> = new Set(['public', 'team', 'owner', 'internal']);
+const KNOWN_LEVELS: ReadonlySet<string> = new Set(['public', 'team', 'owner', 'kiosk', 'internal']);
 
 /** Deny by default: building a router with a route that has no valid auth level fails at startup. */
 export function createRouter(
@@ -176,14 +177,27 @@ export function createRouter(
         case 'internal':
           assertInternalSecret(req, route);
           break;
+        case 'kiosk': {
+          const principal = await authenticate(ctx, 'kiosk');
+          if (principal?.role !== 'kiosk') throw new AppError('AUTH_REQUIRED', 'Pair this tablet');
+          ctx.principal = principal;
+          break;
+        }
         case 'team': {
           const principal = await authenticate(ctx, 'team');
+          // A paired tablet is never a sign-in: it is refused outright, not asked to sign in.
+          if (!principal && readKioskCookie(req)) {
+            throw new AppError('FORBIDDEN', 'The front desk tablet cannot do this');
+          }
           if (principal?.role !== 'barber') throw new AppError('AUTH_REQUIRED', 'Please sign in');
           ctx.principal = principal;
           break;
         }
         case 'owner': {
           const principal = await authenticate(ctx, 'owner');
+          if (!principal && readKioskCookie(req)) {
+            throw new AppError('FORBIDDEN', 'The front desk tablet cannot do this');
+          }
           if (!principal) throw new AppError('AUTH_REQUIRED', 'Please sign in');
           if (principal.mustChangePassword && route.allowDuringPasswordChange !== true) {
             throw new AppError('PASSWORD_CHANGE_REQUIRED', 'Please choose a new password first');

@@ -812,3 +812,14 @@ commit, and what is still open.
   the discount, the head preload removed, the fit guard booking later) and rerun green (49), prod-like
   7, showcase 13, vercel-function 97. PR 17 merged into main as b47f552 at 16:43 UTC; Vercel
   production for it completed at 16:44 UTC.
+
+## Prompt 13f
+
+### M0: the kiosk device and its auth level
+
+- Shipped: the `kiosk` auth level and cookie (D13f-01), `kioskDevices` with pairing, the exit PIN
+  and revocation (D13f-02), the kiosk routes with masked shapes and the board (D13f-03, D13f-04),
+  the walk in through NOW (D13f-05), the owner's Check in tablets tab under Settings, and
+  tests/integration/kiosk.test.ts (pair once, expiry, the lock, the 403 loop over every owner and
+  team route, the response scan, no offer on a kiosk walk in).
+- Heartbeat: 17:40 UTC, commit follows, next is M1 (the locked page at /checkin).

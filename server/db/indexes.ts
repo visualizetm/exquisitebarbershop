@@ -26,6 +26,7 @@ export const COLLECTIONS = {
   staffPins: 'staffPins',
   setupTokens: 'setupTokens',
   teamSessions: 'teamSessions',
+  kioskDevices: 'kioskDevices',
 } as const;
 export type CollectionName = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
 
@@ -189,6 +190,17 @@ export const INDEXES: readonly IndexDefinition[] = [
     keys: { staffId: 1 },
     options: { name: 'by_staff' },
     reason: "A new link retires the barber's earlier ones.",
+  },
+  // kioskDevices
+  {
+    collection: 'kioskDevices',
+    keys: { tokenHash: 1 },
+    options: {
+      name: 'uniq_tokenHash',
+      unique: true,
+      partialFilterExpression: { tokenHash: { $type: 'string' } },
+    },
+    reason: 'The tablet cookie is looked up by its token hash on every kiosk request.',
   },
   // teamSessions
   {

@@ -128,6 +128,12 @@ import {
   updateInLine,
 } from '../../services/line';
 import { arriveFromCheckIn, lookupToday } from '../../services/checkIn';
+import { listKioskDevices, setupKioskDevice, unpairKioskDevice } from '../../auth/kioskAuth';
+import {
+  kioskDeviceCreateRequestSchema,
+  kioskDeviceCreateResponseSchema,
+  kioskDeviceListResponseSchema,
+} from '../../../shared/api/kiosk';
 import {
   lineAddRequestSchema,
   lineMoveRequestSchema,
@@ -267,6 +273,26 @@ export const adminRoutes: RouteDefinition[] = [
     const input = await parseBody(ctx, nowRequestSchema);
     const done = await bookNow(principal, scope, input, { ...metaOf(ctx), idempotencyKey: key });
     return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+  }),
+  // Settings, Check in tablets: set one up (the answer carries the one-use code), list, unpair.
+  owner('GET', '/api/admin/kiosk/devices', async (ctx) => {
+    ctxScope(ctx);
+    return {
+      body: kioskDeviceListResponseSchema.parse({ devices: await listKioskDevices() }),
+      headers: NO_STORE,
+    };
+  }),
+  owner('POST', '/api/admin/kiosk/devices', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const input = await parseBody(ctx, kioskDeviceCreateRequestSchema);
+    const made = await setupKioskDevice(principal, input, metaOf(ctx));
+    return { status: 201, body: kioskDeviceCreateResponseSchema.parse(made), headers: NO_STORE };
+  }),
+  owner('DELETE', '/api/admin/kiosk/devices/:id', async (ctx) => {
+    const { principal } = ctxScope(ctx);
+    const { id } = parseParams(ctx, idParams);
+    await unpairKioskDevice(null, id, principal, metaOf(ctx));
+    return { body: { ok: true }, headers: NO_STORE };
   }),
   // Front desk check in: masked lookup of today's confirmed bookings, and the arrived tap.
   owner('GET', '/api/admin/checkin/lookup', async (ctx) => {

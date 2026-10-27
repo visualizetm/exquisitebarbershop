@@ -2459,3 +2459,30 @@
   color: var(--accent-text);
   font-weight: 700;
 }
+
+/* Settings, Check in tablets (prompt 13f). */
+.exq-settings__tablets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s3);
+}
+.exq-settings__tablet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--line);
+}
+.exq-settings__tablet p {
+  margin: 0;
+}
+.exq-settings__code {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}

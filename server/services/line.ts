@@ -1,4 +1,7 @@
+import { DateTime } from 'luxon';
 import type { AdminBookingView, NowResponse } from '../../shared/api/admin';
+import type { KioskBoardResponse, KioskNowResponse, KioskTile } from '../../shared/api/kiosk';
+import { staffPhotoMap } from './photosService';
 import type {
   ChairEstimate,
   LineResponse,
@@ -11,9 +14,12 @@ import {
   firstAvailableGate,
   gateText,
   gateView,
+  isOpenAt,
+  opensLabel,
   type NowGate,
   type OpenSpan,
 } from '../../shared/lib/openNow';
+import { SHOP_TIMEZONE } from '../../shared/lib/constants';
 import { formatUsPhone } from '../../shared/lib/phone';
 import {
   addDaysToIsoDate,
@@ -586,4 +592,118 @@ export async function bookNow(
     if (error instanceof AppError && error.code === 'SLOT_TAKEN') return joinLine();
     throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// The locked front desk tablet (prompt 13f)
+// ---------------------------------------------------------------------------
+
+function clockLabel(at: Date): string {
+  const dt = DateTime.fromJSDate(at).setZone(SHOP_TIMEZONE);
+  return dt.minute === 0 ? dt.toFormat('h a') : dt.toFormat('h:mm a');
+}
+
+/**
+ * The "Who's in today" board: one tile per barber working today, from the same snapshot, the
+ * same hours rule and the same estimates the line uses, plus how many wait for each chair. It
+ * carries no client at all, only counts. Shaped like the line response (chairs, now,
+ * firstAvailable, an empty line) so the booking flow reads it as one.
+ */
+export async function kioskBoard(now: Date): Promise<KioskBoardResponse> {
+  const snap = await snapshot(now);
+  const estimates = chairEstimates(snap);
+  const photos = await staffPhotoMap();
+  const open = isOpenAt(snap.shopRanges, now);
+  const first = gateFor(snap, null);
+  const shopSpan = snap.shopRanges[0];
+  const todayBlocks = snap.data.source.timeBlocks.filter(
+    (b) => b.startAt.getTime() <= now.getTime() && b.endAt.getTime() > now.getTime(),
+  );
+  const staffInOrder = [...snap.staffById.values()].sort(
+    (a, b) => (a.chairNumber ?? 99) - (b.chairNumber ?? 99) || a.sortOrder - b.sortOrder,
+  );
+  const tiles: KioskTile[] = [];
+  const offToday: string[] = [];
+  for (const staff of staffInOrder) {
+    const chair = snap.chairs.find((c) => c.staffId === staff._id);
+    const est = estimates.find((e) => e.staffId === staff._id);
+    const ranges = snap.hours.get(staff._id) ?? [];
+    if (!chair?.working || !est) {
+      offToday.push(staff.name);
+      continue;
+    }
+    const waiting = snap.waiting.filter((w) => w.staffId === staff._id).length;
+    const base = {
+      staffId: staff._id,
+      name: staff.name,
+      chairNumber: staff.chairNumber,
+      photo: photos.get(staff._id) ?? null,
+      waiting,
+    };
+    const firstStart = ranges[0]?.start ?? null;
+    const block = todayBlocks.find((b) => b.staffId === staff._id);
+    if (est.gate.kind === 'done') {
+      tiles.push({ ...base, tone: 'away', status: 'Done for the day' });
+    } else if (firstStart && firstStart.getTime() > now.getTime() && !chair.busyUntil) {
+      tiles.push({ ...base, tone: 'away', status: `Starts at ${clockLabel(firstStart)}` });
+    } else if (block && !chair.busyUntil) {
+      tiles.push({ ...base, tone: 'away', status: `On a break until ${clockLabel(block.endAt)}` });
+    } else if (est.estimate.kind === 'free' && est.gate.kind === 'open') {
+      tiles.push({ ...base, tone: 'free', status: 'Free now' });
+    } else if (est.estimate.kind === 'about') {
+      tiles.push({
+        ...base,
+        tone: 'busy',
+        status: `With a client, free about ${clockLabel(new Date(est.estimate.at))}`,
+      });
+    } else {
+      tiles.push({ ...base, tone: 'busy', status: 'With a client' });
+    }
+  }
+  return {
+    now: now.toISOString(),
+    line: [],
+    chairs: estimates,
+    firstAvailable: gateView(first),
+    shop: {
+      name: snap.settings.name,
+      hoursToday: shopSpan
+        ? `${clockLabel(shopSpan.start)} to ${clockLabel(snap.shopRanges[snap.shopRanges.length - 1]?.end ?? shopSpan.end)}`
+        : 'Closed today',
+      open,
+      closedText: open
+        ? null
+        : `Closed now.${snap.opensAt ? ` Opens ${opensLabel(snap.opensAt)}.` : ''}`,
+    },
+    tiles,
+    offToday,
+  };
+}
+
+/** A walk in from the tablet: NOW through the one booking path, answered without the client's details. */
+export async function kioskNow(
+  principal: Principal,
+  input: { serviceIds: string[]; staffId?: string | null | undefined; customer: BookingCustomer },
+  meta: RequestMeta & { idempotencyKey: string },
+): Promise<KioskNowResponse> {
+  const done = await bookNow(principal, { kind: 'all' }, input, meta);
+  if (done.kind === 'booking') {
+    const staff = await staffRepo.findStaffById(done.booking.staff.id);
+    return {
+      kind: 'booking',
+      booking: {
+        id: done.booking.id,
+        staff: { id: done.booking.staff.id, name: done.booking.staff.name },
+        chairNumber: staff?.chairNumber ?? null,
+      },
+    };
+  }
+  return {
+    kind: 'line',
+    walkIn: {
+      position: done.walkIn.position,
+      staffName: done.walkIn.staffName,
+      estimate: done.walkIn.estimate,
+    },
+  };
 }
