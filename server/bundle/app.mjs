@@ -28905,7 +28905,12 @@ function fill(doc) {
     social: stored.social ?? {
       ...DEFAULT_SOCIAL_LINKS,
       instagramUrl: `https://instagram.com/${doc.instagramHandle}`
-    }
+    },
+    // Groups added in 13d and 13e. A document written before them must still serve /api/shop:
+    // production had no launchOffer until a reseed, and GET /api/shop failed with a 500.
+    hero: { ...DEFAULT_HERO, ...stored.hero },
+    visit: { ...DEFAULT_VISIT, ...stored.visit },
+    launchOffer: { ...DEFAULT_LAUNCH_OFFER, ...stored.launchOffer }
   };
 }
 function withDefaults(doc) {
