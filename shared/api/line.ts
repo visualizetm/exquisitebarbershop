@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MAX_NOTE_LENGTH } from '../lib/constants';
+import { bookingCustomerSchema } from '../schemas/booking';
 import { idSchema, phoneSchema } from '../schemas/common';
 import { walkInStatusSchema } from '../schemas/walkIn';
 
@@ -78,3 +79,22 @@ export const lineSeatRequestSchema = z.object({
 });
 
 export const walkInResponseSchema = z.object({ walkIn: walkInViewSchema });
+
+/** NOW: a walk-in booked this minute when the chair is free, else a place in the line. */
+export const nowRequestSchema = z.object({
+  serviceIds: z.array(idSchema).min(1).max(6),
+  /** Null or missing means first available. */
+  staffId: idSchema.nullable().optional(),
+  customer: bookingCustomerSchema,
+  notes: z.string().trim().max(MAX_NOTE_LENGTH).optional(),
+});
+export type NowRequest = z.input<typeof nowRequestSchema>;
+
+/** A barber booking a later time on their own chair. */
+export const teamBookingRequestSchema = z.object({
+  serviceIds: z.array(idSchema).min(1).max(6),
+  startAt: z.iso.datetime({ offset: true }),
+  customer: bookingCustomerSchema,
+  notes: z.string().trim().max(MAX_NOTE_LENGTH).optional(),
+});
+export type TeamBookingRequest = z.input<typeof teamBookingRequestSchema>;

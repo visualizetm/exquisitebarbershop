@@ -646,6 +646,13 @@ export const seatResponseSchema = z.object({
 });
 export type SeatResponse = z.infer<typeof seatResponseSchema>;
 
+/** NOW: the booking that was made, or the place in the line when the chair was busy. */
+export const nowResponseSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('booking'), booking: adminBookingViewSchema }),
+  z.object({ kind: z.literal('line'), walkIn: walkInViewSchema }),
+]);
+export type NowResponse = z.infer<typeof nowResponseSchema>;
+
 export const floorChairKindSchema = z.enum(['inChair', 'free', 'off', 'instagram']);
 export type FloorChairKind = z.infer<typeof floorChairKindSchema>;
 

@@ -991,6 +991,26 @@ div.exq-chaircard {
   padding: var(--s5);
 }
 
+/* Full screen on ink: the booking flow. The head stays sticky with the step bar under it. */
+.exq-dialog[data-variant='full'] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  margin: 0;
+  border-radius: 0;
+  background: var(--bg);
+}
+.exq-dialog[data-variant='full'] .exq-dialog__inner {
+  height: 100dvh;
+}
+.exq-dialog[data-variant='full'] .exq-dialog__head {
+  background: var(--bg);
+}
+.exq-dialog[data-variant='full'] .exq-dialog__inner > :not(.exq-dialog__head) {
+  padding: 0;
+}
+
 .exq-dialog[data-variant='sheet'] {
   position: fixed;
   inset: auto 0 0 0;

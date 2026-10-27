@@ -1376,3 +1376,19 @@ team,team/:id}` and `/admin/website/:tab`. Every old address redirects with its 
 - D13c-07 The line rides in the floor response (`line`, and `seatWalkIn` on a free chair for the
   first person it can take) so Today keeps one 30 second poll; `GET /api/admin/line` and
   `GET /api/team/line` serve the panel's actions and the portal.
+- D13c-08 NOW is decided on the server in `bookNow`: a free chair with nobody ahead in its line gets
+  a walk-in booking starting this minute (off the 15 minute grid, no lead time, source walk-in,
+  arrivedAt set); any other case joins the line with the estimate. A slot race lost mid-way also
+  joins the line. Only owner and barber sessions reach it (`/api/admin/now`, `/api/team/now`);
+  the public `/api/bookings` keeps the grid and the lead time and `/api/now` does not exist.
+- D13c-09 Seat from the line stays a one-tap action on Today (the person is already in the line
+  with their services and chair); the flow is for new bookings. A free chair's "Seat walk-in #n"
+  is the same action with the chair chosen.
+- D13c-10 Move and Reschedule open the flow on the Barber or Time step and post to the existing
+  `/api/admin/bookings/:id/reschedule`, so repricing, the slot lock swap and the customer email
+  are unchanged. The flow shows the new barber's exact price before Confirm.
+- D13c-11 A barber books a later time on their own chair through `POST /api/team/bookings`
+  (source phone, no override), and the Barber step is skipped for a team session.
+- D13c-12 "Discard this booking?" is a nested modal inside the full dialog. The kit's `Dialog`
+  ignores close and cancel events that bubble from a nested dialog (`event.target` check), which
+  is what let Keep going close only the modal.

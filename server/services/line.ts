@@ -1,4 +1,4 @@
-import type { AdminBookingView } from '../../shared/api/admin';
+import type { AdminBookingView, NowResponse } from '../../shared/api/admin';
 import type {
   ChairEstimate,
   LineResponse,
@@ -15,7 +15,7 @@ import {
   type PoolPerson,
   type WaitEstimate,
 } from '../../shared/lib/waitEstimate';
-import type { BookingDocument } from '../../shared/schemas/booking';
+import type { BookingCustomer, BookingDocument } from '../../shared/schemas/booking';
 import type { ServiceDocument } from '../../shared/schemas/service';
 import type { ShopSettingsDocument } from '../../shared/schemas/shopSettings';
 import type { StaffDocument } from '../../shared/schemas/staff';
@@ -424,4 +424,76 @@ export async function seatFromLine(
     walkIn: walkInView(await snapshot(meta.now), seated),
     booking: fresh ? toAdminBookingView(fresh, staff) : booking,
   };
+}
+
+/**
+ * NOW, for owner and barber sessions only: when a chair can take the full service this minute
+ * the booking is made right away (walk-in source, arrivedAt set, off the 15 minute grid and
+ * inside the lead time, through the booking service and its slot locks); otherwise the client
+ * joins the line for that chair, or the shared line for first available. Two NOWs for one chair
+ * at once: the slot locks let one through and the other joins the line.
+ */
+export async function bookNow(
+  principal: Principal,
+  scope: Scope,
+  input: {
+    serviceIds: string[];
+    staffId?: string | null | undefined;
+    customer: BookingCustomer;
+    notes?: string | undefined;
+  },
+  meta: RequestMeta & { idempotencyKey: string },
+): Promise<NowResponse> {
+  const wanted = scope.kind === 'chair' ? scope.staffId : (input.staffId ?? null);
+  if (wanted) await requireChair(wanted);
+  const snap = await snapshot(meta.now);
+  const candidates = snap.chairs.filter((c) => (wanted ? c.staffId === wanted : c.working));
+  const free = candidates.filter(
+    (c) =>
+      estimateForChair(
+        { ...c, working: true },
+        [],
+        minutesFor(snap, input.serviceIds, c.staffId),
+        meta.now,
+      ).kind === 'free',
+  );
+  const joinLine = async (): Promise<NowResponse> => ({
+    kind: 'line',
+    walkIn: await addToLine(
+      principal,
+      {
+        name: input.customer.name,
+        phone: input.customer.phone,
+        serviceIds: input.serviceIds,
+        staffId: wanted,
+        ...(input.notes ? { note: input.notes } : {}),
+      },
+      meta,
+    ),
+  });
+  // With nobody ahead on that chair, book it; a person already waiting for it goes first.
+  const nobodyAhead = (staffId: string) =>
+    !snap.waiting.some((w) => w.staffId === staffId || (w.staffId === null && !wanted));
+  const chair = free.find((c) => nobodyAhead(c.staffId));
+  if (!chair) return joinLine();
+  try {
+    const outcome = await createManualBooking(
+      {
+        source: 'walkIn',
+        serviceIds: input.serviceIds,
+        staff: chair.staffId,
+        customer: input.customer,
+        ...(input.notes ? { notes: input.notes } : {}),
+        override: false,
+        notifyCustomer: input.customer.email !== null,
+        arrived: true,
+      },
+      actorOf(principal),
+      meta,
+    );
+    return { kind: 'booking', booking: outcome.body.booking };
+  } catch (error) {
+    if (error instanceof AppError && error.code === 'SLOT_TAKEN') return joinLine();
+    throw error;
+  }
 }

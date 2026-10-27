@@ -1,10 +1,16 @@
 import { createContext, useContext } from 'react';
+import type { AdminBookingView } from '@shared/api/admin';
 
 export interface NewBookingPrefill {
   staffId?: string;
   /** An ISO instant, for example from a click on the schedule grid. */
   startAt?: string;
+  /** A walk-in: the flow opens on the Time step with NOW in view. */
   source?: 'phone' | 'walkIn';
+  /** Move an existing booking to another barber (starts on the Barber step, service fixed). */
+  move?: AdminBookingView;
+  /** Give an existing booking a new time (starts on the Time step). */
+  reschedule?: AdminBookingView;
 }
 
 /**

@@ -30,6 +30,7 @@ import {
   outboxListResponseSchema,
   overviewResponseSchema,
   floorResponseSchema,
+  nowResponseSchema,
   seatResponseSchema,
   ownerCancelRequestSchema,
   ownerRescheduleRequestSchema,
@@ -118,6 +119,7 @@ import { bookingTable, overview } from '../../services/adminDashboard';
 import { floor } from '../../services/floor';
 import {
   addToLine,
+  bookNow,
   leaveLine,
   lineView,
   moveInLine,
@@ -127,6 +129,7 @@ import {
 import {
   lineAddRequestSchema,
   lineMoveRequestSchema,
+  nowRequestSchema,
   lineResponseSchema,
   lineSeatRequestSchema,
   lineUpdateRequestSchema,
@@ -250,6 +253,13 @@ export const adminRoutes: RouteDefinition[] = [
     return {
       body: walkInResponseSchema.parse({ walkIn: await leaveLine(principal, id, metaOf(ctx)) }),
     };
+  }),
+  owner('POST', '/api/admin/now', async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const key = idempotencyKeyOf(ctx);
+    const input = await parseBody(ctx, nowRequestSchema);
+    const done = await bookNow(principal, scope, input, { ...metaOf(ctx), idempotencyKey: key });
+    return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
   }),
   owner('GET', '/api/admin/booking-table', async (ctx) => {
     ctxScope(ctx);

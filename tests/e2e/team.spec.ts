@@ -29,8 +29,11 @@ test.describe('schedule', () => {
     // The plus in a chair header opens New booking with that barber chosen.
     await page.getByRole('button', { name: 'New booking for Drew' }).click();
     const panel = page.getByRole('dialog', { name: 'New booking' });
-    await expect(panel.getByLabel('Barber')).toHaveValue('drew');
-    await expect(panel.getByLabel('Time', { exact: true })).not.toHaveValue('');
+    const rail = panel.locator('.exq-flow__rail');
+    await expect(rail).toContainText('Drew');
+    await expect(rail.locator('.exq-flow__rail-row', { hasText: 'Time' })).not.toContainText(
+      'Not yet',
+    );
     // A click on an empty slot of a chair does the same with the clicked time.
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: 'New booking' })).toHaveCount(0);
@@ -43,8 +46,8 @@ test.describe('schedule', () => {
       .nth(3)
       .click({ position: { x: 20, y: 24 * 4 * 5 + 12 } });
     await expect(
-      page.getByRole('dialog', { name: 'New booking' }).getByLabel('Barber'),
-    ).toHaveValue('nelly');
+      page.getByRole('dialog', { name: 'New booking' }).locator('.exq-flow__rail'),
+    ).toContainText('Nelly Cutz');
   });
 
   test('draws a red line for now, and the week view counts and opens a day', async ({

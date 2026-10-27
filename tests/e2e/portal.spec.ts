@@ -25,14 +25,21 @@ async function signInBarber(page: Page, name: string, pin: string = E2E_BARBER_P
   await expect(page.getByRole('heading', { name: 'Today', level: 1 })).toBeVisible();
 }
 
+/** Walk-in through the full-screen flow: Haircut, NOW, name and phone, confirm. */
 async function walkIn(page: Page, name: string, phone: string) {
   await page.getByRole('button', { name: 'Walk-in' }).click();
-  const sheet = page.getByRole('dialog', { name: 'Walk-in' });
-  await sheet.getByLabel('Name').fill(name);
-  await sheet.getByLabel('Mobile phone').fill(phone);
-  await sheet.getByLabel(/^Haircut(?! and| with)/).check();
-  await sheet.getByRole('button', { name: 'Start now' }).click();
-  await expect(page.getByText(`${name} is in your chair.`)).toBeVisible();
+  const flow = page.getByRole('dialog', { name: 'New booking' });
+  await flow.getByRole('button', { name: /^Haircut\b(?! and| with)/ }).click();
+  await flow.getByRole('button', { name: 'Continue' }).click();
+  await expect(flow.getByRole('button', { name: /^Now/ })).toHaveAttribute('aria-pressed', 'true');
+  await flow.getByRole('button', { name: 'Continue' }).click();
+  await flow.getByLabel('Name', { exact: true }).fill(name);
+  await flow.getByLabel('Mobile phone').fill(phone);
+  await flow.getByRole('button', { name: 'Continue' }).click();
+  await flow.getByRole('button', { name: 'Confirm', exact: true }).click();
+  await expect(flow.getByText(/In the chair now with/)).toBeVisible();
+  await flow.getByRole('button', { name: 'Done' }).click();
+  await expect(flow).toBeHidden();
 }
 
 test.describe('signing in', () => {
@@ -355,7 +362,8 @@ for (const theme of ['light', 'dark'] as const) {
     await check('booking sheet');
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Walk-in' }).click();
-    await check('walk-in sheet');
+    await expect(page.getByRole('dialog', { name: 'New booking' })).toBeVisible();
+    await check('walk-in flow');
     await page.keyboard.press('Escape');
     await page.getByRole('link', { name: 'Week', exact: true }).click();
     await expect(page.locator('.exq-team-day')).toHaveCount(7);

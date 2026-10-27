@@ -701,4 +701,15 @@ commit, and what is still open.
   Today panel (numbered cards, Seat, Move sheet, Left, up and down, Add walk-in) and "Seat
   walk-in #n" on free chairs. Tests: waitEstimate (7, frozen clock), line integration (4: add,
   order, estimate, phone check, seat with arrivedAt, busy refusal, concurrency, barber scope).
-- Heartbeat: 00:50 UTC, commit follows, next is M2 (the full-screen NewBookingFlow).
+- Heartbeat: 00:21 UTC, commit follows, next is M2 (the full-screen NewBookingFlow).
+
+### M2: the full-screen NewBookingFlow
+
+- Shipped: `src/booking-flow/NewBookingFlow.tsx` (Service, Barber, Time with NOW first, Client with
+  the owner's client search, Confirm, the ticket), the `full` dialog variant, every entry point
+  opens it (top bar, Add walk-in, Seat from a free chair, Move, Reschedule, portal Add booking and
+  Walk-in); the New booking drawer and the portal forms are deleted. NOW goes through `bookNow`
+  (free chair with nobody ahead books this minute through the booking service and slot locks, else
+  joins the line). Tests: now integration (4), flow e2e (owner 1440, barber 390, discard, entry
+  points at 1440 and 390), updated dashboard, team, realshop, portal and authz specs.
+- Heartbeat: 00:50 UTC, commit follows, next is M3 (the front desk check in).

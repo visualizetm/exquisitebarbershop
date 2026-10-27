@@ -33842,6 +33842,19 @@ var lineSeatRequestSchema = external_exports.object({
   staffId: idSchema.optional()
 });
 var walkInResponseSchema = external_exports.object({ walkIn: walkInViewSchema });
+var nowRequestSchema = external_exports.object({
+  serviceIds: external_exports.array(idSchema).min(1).max(6),
+  /** Null or missing means first available. */
+  staffId: idSchema.nullable().optional(),
+  customer: bookingCustomerSchema,
+  notes: external_exports.string().trim().max(MAX_NOTE_LENGTH).optional()
+});
+var teamBookingRequestSchema = external_exports.object({
+  serviceIds: external_exports.array(idSchema).min(1).max(6),
+  startAt: external_exports.iso.datetime({ offset: true }),
+  customer: bookingCustomerSchema,
+  notes: external_exports.string().trim().max(MAX_NOTE_LENGTH).optional()
+});
 
 // shared/api/availability.ts
 var staffSelectorSchema = external_exports.union([
@@ -34508,6 +34521,10 @@ var seatResponseSchema = external_exports.object({
   walkIn: walkInViewSchema,
   booking: adminBookingViewSchema
 });
+var nowResponseSchema = external_exports.discriminatedUnion("kind", [
+  external_exports.object({ kind: external_exports.literal("booking"), booking: adminBookingViewSchema }),
+  external_exports.object({ kind: external_exports.literal("line"), walkIn: walkInViewSchema })
+]);
 var floorChairKindSchema = external_exports.enum(["inChair", "free", "off", "instagram"]);
 var floorChairSchema = external_exports.object({
   staff: staffRefSchema,
@@ -39371,6 +39388,57 @@ async function seatFromLine(principal, scope, id, requestedStaffId, meta3) {
     booking: fresh ? toAdminBookingView(fresh, staff) : booking
   };
 }
+async function bookNow(principal, scope, input2, meta3) {
+  const wanted = scope.kind === "chair" ? scope.staffId : input2.staffId ?? null;
+  if (wanted) await requireChair(wanted);
+  const snap = await snapshot(meta3.now);
+  const candidates = snap.chairs.filter((c) => wanted ? c.staffId === wanted : c.working);
+  const free = candidates.filter(
+    (c) => estimateForChair(
+      { ...c, working: true },
+      [],
+      minutesFor(snap, input2.serviceIds, c.staffId),
+      meta3.now
+    ).kind === "free"
+  );
+  const joinLine = async () => ({
+    kind: "line",
+    walkIn: await addToLine(
+      principal,
+      {
+        name: input2.customer.name,
+        phone: input2.customer.phone,
+        serviceIds: input2.serviceIds,
+        staffId: wanted,
+        ...input2.notes ? { note: input2.notes } : {}
+      },
+      meta3
+    )
+  });
+  const nobodyAhead = (staffId) => !snap.waiting.some((w) => w.staffId === staffId || w.staffId === null && !wanted);
+  const chair = free.find((c) => nobodyAhead(c.staffId));
+  if (!chair) return joinLine();
+  try {
+    const outcome2 = await createManualBooking(
+      {
+        source: "walkIn",
+        serviceIds: input2.serviceIds,
+        staff: chair.staffId,
+        customer: input2.customer,
+        ...input2.notes ? { notes: input2.notes } : {},
+        override: false,
+        notifyCustomer: input2.customer.email !== null,
+        arrived: true
+      },
+      actorOf2(principal),
+      meta3
+    );
+    return { kind: "booking", booking: outcome2.body.booking };
+  } catch (error62) {
+    if (error62 instanceof AppError && error62.code === "SLOT_TAKEN") return joinLine();
+    throw error62;
+  }
+}
 
 // server/services/floor.ts
 var DONE_SHOWN = 3;
@@ -39606,6 +39674,13 @@ var adminRoutes = [
     return {
       body: walkInResponseSchema.parse({ walkIn: await leaveLine(principal, id, metaOf(ctx)) })
     };
+  }),
+  owner("POST", "/api/admin/now", async (ctx) => {
+    const { principal, scope } = ctxScope(ctx);
+    const key = idempotencyKeyOf(ctx);
+    const input2 = await parseBody(ctx, nowRequestSchema);
+    const done = await bookNow(principal, scope, input2, { ...metaOf(ctx), idempotencyKey: key });
+    return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
   }),
   owner("GET", "/api/admin/booking-table", async (ctx) => {
     ctxScope(ctx);
@@ -41779,6 +41854,51 @@ var teamRoutes = [
         idempotencyKey: key
       });
       return { status: 201, body: teamWalkInResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  // NOW on this chair: a booking this minute when free, else a place in the line.
+  {
+    method: "POST",
+    path: "/api/team/now",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const key = idempotencyKeyOf(ctx);
+      const input2 = await parseBody(ctx, nowRequestSchema);
+      const done = await bookNow(principal, scope, input2, { ...metaOf(ctx), idempotencyKey: key });
+      return { status: 201, body: nowResponseSchema.parse(done), headers: NO_STORE };
+    }
+  },
+  // A later time on this chair: the normal rules (grid, lead time), never an override.
+  {
+    method: "POST",
+    path: "/api/team/bookings",
+    auth: "team",
+    handler: async (ctx) => {
+      const principal = principalOf(ctx);
+      const scope = chairScope(principal);
+      const key = idempotencyKeyOf(ctx);
+      const input2 = await parseBody(ctx, teamBookingRequestSchema);
+      const outcome2 = await createManualBooking(
+        {
+          source: "phone",
+          serviceIds: input2.serviceIds,
+          staff: scope.staffId,
+          startAt: input2.startAt,
+          customer: input2.customer,
+          ...input2.notes ? { notes: input2.notes } : {},
+          override: false,
+          notifyCustomer: input2.customer.email !== null
+        },
+        actorOf2(principal),
+        { ...metaOf(ctx), idempotencyKey: key }
+      );
+      return {
+        status: outcome2.status,
+        body: manualBookingResponseSchema.parse(outcome2.body),
+        headers: NO_STORE
+      };
     }
   },
   // The walk-in line: see it, add to it, seat into this chair.

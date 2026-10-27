@@ -2,38 +2,29 @@ import { useRef, useState } from 'react';
 import type { SyntheticEvent } from 'react';
 import Phone from '@untitled-ui/icons-react/build/esm/Phone';
 import Plus from '@untitled-ui/icons-react/build/esm/Plus';
-import {
-  publicServicesResponseSchema,
-  publicShopSchema,
-  publicStaffListResponseSchema,
-} from '@shared/api/public';
+import UserPlus01 from '@untitled-ui/icons-react/build/esm/UserPlus01';
+import { publicShopSchema } from '@shared/api/public';
 import {
   teamDayResponseSchema,
   teamStatusResponseSchema,
-  teamWalkInResponseSchema,
   type TeamBookingView,
   type TeamDayResponse,
 } from '@shared/api/team';
-import { formatCents } from '@shared/lib/money';
 import {
   Button,
   ButtonAnchor,
-  Checkbox,
   EmptyState,
   ErrorState,
-  Input,
   Sheet,
   StatusChip,
   Textarea,
   useToast,
 } from '@/components/ui';
+import { NewBookingFlow, type FlowIntent } from '@/booking-flow/NewBookingFlow';
 import { Status } from '@/components/Status';
-import { ApiRequestError } from '@/lib/api';
-import { offeredServices } from '@/lib/booking/offered';
-import { chairServices } from '@/lib/menuPrices';
 import { useApi } from '@/lib/useApi';
 import { usePageTitle } from '@/lib/usePageTitle';
-import { newIdempotencyKey, shopDateLabel, shopTime } from '@/admin/format';
+import { shopDateLabel, shopTime } from '@/admin/format';
 import { TeamError } from './TeamError';
 import { useTeamAction, useTeamApi, useTeamMe } from './useTeamSession';
 
@@ -51,7 +42,8 @@ export function TodayPage() {
   const shop = useApi('/api/shop', publicShopSchema);
   const last = useRef<TeamDayResponse | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [walkIn, setWalkIn] = useState(false);
+  const [flow, setFlow] = useState<FlowIntent | null>(null);
+  const me = useTeamMe();
   const [busy, setBusy] = useState<string | null>(null);
 
   if (day.status === 'ready') last.current = day.data;
@@ -113,15 +105,27 @@ export function TodayPage() {
               : ''}
           </p>
         </div>
-        <Button
-          size="lg"
-          icon={<Plus aria-hidden="true" />}
-          onClick={() => {
-            setWalkIn(true);
-          }}
-        >
-          Walk-in
-        </Button>
+        <div className="exq-team-head__actions">
+          <Button
+            size="lg"
+            icon={<UserPlus01 aria-hidden="true" />}
+            onClick={() => {
+              setFlow({ kind: 'new', now: true });
+            }}
+          >
+            Walk-in
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            icon={<Plus aria-hidden="true" />}
+            onClick={() => {
+              setFlow({ kind: 'new' });
+            }}
+          >
+            Add booking
+          </Button>
+        </div>
       </header>
 
       {data.isOut ? (
@@ -242,21 +246,19 @@ export function TodayPage() {
         ) : null}
       </Sheet>
 
-      <Sheet
-        open={walkIn}
-        title="Walk-in"
+      <NewBookingFlow
+        open={flow !== null}
+        session="team"
+        ownChair={{ id: me.staff.id, name: me.staff.name }}
+        intent={flow ?? { kind: 'new' }}
         onClose={() => {
-          setWalkIn(false);
+          setFlow(null);
         }}
-      >
-        <WalkInForm
-          onDone={(name) => {
-            setWalkIn(false);
-            reload();
-            toast({ text: `${name} is in your chair.`, tone: 'ok' });
-          }}
-        />
-      </Sheet>
+        onDone={(result) => {
+          reload();
+          toast({ text: result.text, tone: 'ok' });
+        }}
+      />
     </div>
   );
 }
@@ -370,103 +372,5 @@ function BookingActions({
         </ButtonAnchor>
       ) : null}
     </div>
-  );
-}
-
-function WalkInForm({ onDone }: { onDone: (name: string) => void }) {
-  const act = useTeamAction();
-  const me = useTeamMe();
-  const services = useApi('/api/services', publicServicesResponseSchema);
-  const team = useApi('/api/staff', publicStaffListResponseSchema);
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [key] = useState(newIdempotencyKey);
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(event: SyntheticEvent) {
-    event.preventDefault();
-    if (chosen.length === 0) {
-      setError('Pick at least one service.');
-      return;
-    }
-    setWorking(true);
-    setError(null);
-    try {
-      await act('/api/team/walk-ins', teamWalkInResponseSchema, {
-        body: { name, phone, serviceIds: chosen },
-        headers: { 'Idempotency-Key': key },
-      });
-      onDone(name.trim());
-    } catch (err) {
-      setError(
-        err instanceof ApiRequestError && err.details?.[0]
-          ? `${err.details[0].path}: ${err.details[0].message}`
-          : err instanceof ApiRequestError
-            ? err.message
-            : 'That did not save. Try again.',
-      );
-    } finally {
-      setWorking(false);
-    }
-  }
-
-  if (services.status === 'loading' || team.status === 'loading') return <Status state="loading" />;
-  if (services.status === 'error') return <Status state="error" />;
-  // Only the services on this barber's own menu: another chair's would be refused. If the menu
-  // cannot be read, every service is listed and the server decides.
-  // Prices and times are this barber's own where they set them.
-  const member = team.status === 'ready' ? team.data.staff.find((m) => m.id === me.staff.id) : null;
-  const offered = member
-    ? chairServices(services.data.services, member)
-    : offeredServices(services.data.services, null);
-  return (
-    <form className="exq-team-form" onSubmit={(e) => void submit(e)}>
-      <Input
-        label="Name"
-        required
-        maxLength={80}
-        autoComplete="off"
-        value={name}
-        onChange={(e) => {
-          setName(e.target.value);
-        }}
-      />
-      <Input
-        label="Mobile phone"
-        hint="So the shop can reach them. You will not see it again."
-        type="tel"
-        inputMode="tel"
-        required
-        autoComplete="off"
-        value={phone}
-        onChange={(e) => {
-          setPhone(e.target.value);
-        }}
-      />
-      <fieldset className="exq-fieldset">
-        <legend>Services</legend>
-        {offered.length === 0 ? (
-          <p className="exq-muted">You have no services set up yet. Ask the owner to add them.</p>
-        ) : null}
-        {offered.map((s) => (
-          <Checkbox
-            key={s.id}
-            label={`${s.name}, ${formatCents(s.priceCents)}`}
-            checked={chosen.includes(s.id)}
-            onChange={(e) => {
-              setChosen((prev) =>
-                e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id),
-              );
-            }}
-          />
-        ))}
-      </fieldset>
-      <TeamError message={error} />
-      <Button type="submit" size="lg" loading={working}>
-        Start now
-      </Button>
-    </form>
   );
 }

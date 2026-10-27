@@ -295,3 +295,11 @@ button.exq-team-row:hover {
   width: 100%;
   padding: var(--s6);
 }
+
+/* Today's two actions in the head: Walk-in (NOW) and Add booking. */
+.exq-team-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  justify-content: flex-end;
+}
